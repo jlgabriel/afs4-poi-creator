@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "app": "pct",
+  "name": "PCT matrix V3 - elongated hangar",
+  "poiName": "pct_matrix_hangar",
+  "createdAt": "2026-07-06T00:00:00Z",
+  "modifiedAt": "2026-07-06T00:00:00Z",
+  "reference": { "lon": 11.8615, "lat": 48.37 },
+  "camera": { "lon": 11.8615, "lat": 48.37, "zoom": 17 },
+  "objects": [
+    {
+      "id": "22222222-2222-4222-8222-222222222222",
+      "kind": "xref",
+      "name": "hangar_small_plates_ds_02_15_42",
+      "position": { "lon": 11.8615, "lat": 48.37 },
+      "height": { "mode": "asl", "value": 438 },
+      "direction": 90,
+      "scale": 1,
+      "label": "V3 axis: at dir 0 does the long 42 m side run N-S or E-W? then set direction 90 and note the turn"
+    }
+  ]
+}
