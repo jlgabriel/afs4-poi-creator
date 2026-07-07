@@ -1,8 +1,10 @@
 /// <reference types="vite/client" />
 
-// Renderer-visible shape of the preload bridge. Replaced by the full PctApi (§3.5) in M1e-2.
-interface Window {
-  pct?: {
-    ping(): string;
-  };
+// The preload bridge, typed for the renderer. window.pct is the whole main↔renderer surface (§3.5).
+import type { PctApi } from "../shared/pctApi";
+
+declare global {
+  interface Window {
+    pct: PctApi;
+  }
 }
