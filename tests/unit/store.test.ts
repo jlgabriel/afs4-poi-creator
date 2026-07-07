@@ -1,0 +1,287 @@
+import { afterEach, describe, expect, it, vi } from "vitest";
+import type { Catalog, PlacedXref, Project } from "../../src/core/project/types";
+import { createEditorStore, type EditorDeps } from "../../src/renderer/state/store";
+
+function baseProject(objects: PlacedXref[] = []): Project {
+  return {
+    schemaVersion: 1,
+    app: "pct",
+    name: "T",
+    poiName: "t",
+    createdAt: "2026-07-07T00:00:00Z",
+    modifiedAt: "2026-07-07T00:00:00Z",
+    reference: null,
+    camera: { lon: 10, lat: 48, zoom: 15 },
+    objects,
+  };
+}
+
+const xref = (id: string, over: Partial<PlacedXref> = {}): PlacedXref => ({
+  id,
+  kind: "xref",
+  name: "tower",
+  position: { lon: 10, lat: 48 },
+  height: { mode: "terrain" },
+  direction: 0,
+  scale: 1,
+  ...over,
+});
+
+/** A store with a controllable clock, deterministic ids, and a spy autosave sink. */
+function makeStore(over: Partial<EditorDeps> = {}) {
+  const persist = vi.fn();
+  const clock = { t: 1000 };
+  let idn = 0;
+  const store = createEditorStore({
+    persist,
+    now: () => clock.t,
+    newId: () => `id${idn++}`,
+    autosaveMs: 500,
+    coalesceMs: 800,
+    initialProject: baseProject(),
+    ...over,
+  });
+  return { store, persist, clock };
+}
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+describe("commit chokepoint", () => {
+  it("a mutation pushes undo, dirties, and clears redo", () => {
+    const { store } = makeStore();
+    store.getState().renameProject("A");
+    const s = store.getState();
+    expect(s.project.name).toBe("A");
+    expect(s.dirty).toBe(true);
+    expect(s.undoStack).toHaveLength(1);
+    expect(s.redoStack).toHaveLength(0);
+  });
+
+  it("a no-op transform (same reference) changes nothing", () => {
+    const { store, persist } = makeStore();
+    store.getState().moveObject("nope", { lon: 1, lat: 1 }); // no such id → mutate returns same ref
+    const s = store.getState();
+    expect(s.dirty).toBe(false);
+    expect(s.undoStack).toHaveLength(0);
+    expect(persist).not.toHaveBeenCalled();
+  });
+
+  it("caps the undo stack at 50 snapshots", () => {
+    const { store } = makeStore();
+    for (let i = 0; i < 55; i++) store.getState().renameProject(`n${i}`);
+    expect(store.getState().undoStack).toHaveLength(50);
+    expect(store.getState().project.name).toBe("n54");
+  });
+});
+
+describe("undo / redo", () => {
+  it("round-trips and prunes selection to surviving ids", () => {
+    const { store } = makeStore();
+    const s = store.getState();
+    s.armPlacement("tower");
+    s.placeAt({ lon: 10, lat: 48 }); // adds id0, selects it
+    expect(store.getState().project.objects).toHaveLength(1);
+    expect(store.getState().selection).toEqual(["id0"]);
+
+    store.getState().undo(); // object gone
+    expect(store.getState().project.objects).toHaveLength(0);
+    expect(store.getState().selection).toEqual([]); // pruned — id0 no longer exists
+
+    store.getState().redo(); // back
+    expect(store.getState().project.objects).toHaveLength(1);
+  });
+
+  it("a fresh commit clears the redo stack", () => {
+    const { store } = makeStore();
+    const s = store.getState();
+    s.renameProject("A");
+    s.undo();
+    expect(store.getState().redoStack).toHaveLength(1);
+    store.getState().renameProject("B");
+    expect(store.getState().redoStack).toHaveLength(0);
+  });
+});
+
+describe("placeAt", () => {
+  it("no-ops when nothing is armed", () => {
+    const { store } = makeStore();
+    store.getState().placeAt({ lon: 10, lat: 48 });
+    expect(store.getState().project.objects).toHaveLength(0);
+  });
+
+  it("adds + selects the object and keeps placement armed for multi-drop", () => {
+    const { store } = makeStore();
+    const s = store.getState();
+    s.armPlacement("tower");
+    s.placeAt({ lon: 10, lat: 48 });
+    const st = store.getState();
+    expect(st.project.objects[0]).toMatchObject({ id: "id0", name: "tower" });
+    expect(st.selection).toEqual(["id0"]);
+    expect(st.placing).toBe("tower"); // still armed
+  });
+});
+
+describe("nudgeHeight — promotion + coalescing", () => {
+  it("promotes terrain → terrain-offset and coalesces a rapid run into one undo entry", () => {
+    const { store, clock } = makeStore({ coalesceMs: 800 });
+    store.getState().openProject("/p", baseProject([xref("a", { height: { mode: "terrain" } })]));
+
+    clock.t = 1000;
+    store.getState().nudgeHeight("a", 0.5); // promote → offset 0.5, undo entry #1
+    clock.t = 1200;
+    store.getState().nudgeHeight("a", 0.5); // within window → coalesced, offset 1.0
+    clock.t = 1400;
+    store.getState().nudgeHeight("a", 0.5); // coalesced, offset 1.5
+
+    expect(store.getState().project.objects[0].height).toEqual({
+      mode: "terrain-offset",
+      offset: 1.5,
+    });
+    expect(store.getState().undoStack).toHaveLength(1);
+
+    store.getState().undo(); // single step back to the original terrain spec
+    expect(store.getState().project.objects[0].height).toEqual({ mode: "terrain" });
+  });
+
+  it("starts a new undo entry once the coalesce window lapses", () => {
+    const { store, clock } = makeStore({ coalesceMs: 800 });
+    store.getState().openProject("/p", baseProject([xref("a")]));
+    clock.t = 1000;
+    store.getState().nudgeHeight("a", 0.5);
+    clock.t = 2000; // > 800 ms later
+    store.getState().nudgeHeight("a", 0.5);
+    expect(store.getState().undoStack).toHaveLength(2);
+  });
+
+  it("a commit between nudges breaks coalescing", () => {
+    const { store, clock } = makeStore();
+    store.getState().openProject("/p", baseProject([xref("a")]));
+    clock.t = 1000;
+    store.getState().nudgeHeight("a", 0.5); // undo #1
+    store.getState().rotateObject("a", 45); // undo #2, resets coalescing
+    clock.t = 1100; // still inside the window numerically…
+    store.getState().nudgeHeight("a", 0.5); // …but the run was reset → undo #3
+    expect(store.getState().undoStack).toHaveLength(3);
+  });
+});
+
+describe("deleteSelection / duplicateSelection", () => {
+  it("deletes all selected objects in one undo entry and clears selection", () => {
+    const { store } = makeStore();
+    store.getState().openProject("/p", baseProject([xref("a"), xref("b"), xref("c")]));
+    store.getState().select(["a", "b"]);
+    store.getState().deleteSelection();
+
+    expect(store.getState().project.objects.map((o) => o.id)).toEqual(["c"]);
+    expect(store.getState().selection).toEqual([]);
+    expect(store.getState().undoStack).toHaveLength(1);
+
+    store.getState().undo();
+    expect(store.getState().project.objects).toHaveLength(3);
+  });
+
+  it("duplicates the selection offset east, selecting the copies, in one undo entry", () => {
+    const { store } = makeStore();
+    store.getState().openProject("/p", baseProject([xref("a", { position: { lon: 10, lat: 48 } })]));
+    store.getState().select(["a"]);
+    store.getState().duplicateSelection(5);
+
+    const st = store.getState();
+    expect(st.project.objects).toHaveLength(2);
+    const copy = st.project.objects[1];
+    expect(copy.name).toBe("tower");
+    expect(copy.position.lon).toBeGreaterThan(10); // moved east
+    expect(copy.position.lat).toBeCloseTo(48, 4);
+    expect(st.selection).toEqual([copy.id]);
+    expect(st.undoStack).toHaveLength(1);
+  });
+});
+
+describe("camera — capture-on-save, not mutate-on-pan", () => {
+  it("setMapView is ephemeral: no dirty, no undo, no autosave; serialize stamps it in", () => {
+    const { store, persist } = makeStore();
+    store.getState().setMapView({ lon: 1, lat: 2, zoom: 9 });
+    const s = store.getState();
+    expect(s.dirty).toBe(false);
+    expect(s.undoStack).toHaveLength(0);
+    expect(persist).not.toHaveBeenCalled();
+    expect(s.project.camera).toEqual({ lon: 10, lat: 48, zoom: 15 }); // document untouched
+    expect(s.serialize().camera).toEqual({ lon: 1, lat: 2, zoom: 9 }); // …but the snapshot has it
+  });
+
+  it("markSaved clears dirty, records the path, and folds the live camera into the document", () => {
+    const { store } = makeStore();
+    store.getState().renameProject("Edited");
+    store.getState().setMapView({ lon: 3, lat: 4, zoom: 12 });
+    store.getState().markSaved("/x.json");
+    const s = store.getState();
+    expect(s.dirty).toBe(false);
+    expect(s.projectPath).toBe("/x.json");
+    expect(s.project.camera).toEqual({ lon: 3, lat: 4, zoom: 12 });
+  });
+});
+
+describe("autosave debounce", () => {
+  it("debounces rapid commits into one persist carrying the live camera", () => {
+    vi.useFakeTimers();
+    const { store, persist } = makeStore({ autosaveMs: 500 });
+    const s = store.getState();
+    s.setMapView({ lon: 11, lat: 49, zoom: 17 });
+    s.renameProject("One");
+    s.renameProject("Two");
+    expect(persist).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(500);
+    expect(persist).toHaveBeenCalledTimes(1);
+    const snap = persist.mock.calls[0][0] as Project;
+    expect(snap.name).toBe("Two");
+    expect(snap.camera).toEqual({ lon: 11, lat: 49, zoom: 17 });
+  });
+});
+
+describe("resolved-elevation cache", () => {
+  it("moveObject invalidates the object's cached terrain", () => {
+    const { store } = makeStore();
+    store.getState().openProject("/p", baseProject([xref("a")]));
+    store.getState().setResolvedElev("a", 438);
+    expect(store.getState().resolvedElev.get("a")).toBe(438);
+    store.getState().moveObject("a", { lon: 10.01, lat: 48.01 });
+    expect(store.getState().resolvedElev.has("a")).toBe(false);
+  });
+});
+
+describe("lifecycle", () => {
+  it("openProject resets history, dirty, selection, and adopts the project's camera", () => {
+    const { store } = makeStore();
+    store.getState().renameProject("dirtying");
+    store.getState().select(["ghost"]);
+    store.getState().openProject("/p.json", baseProject([xref("a")]));
+    const s = store.getState();
+    expect(s.dirty).toBe(false);
+    expect(s.undoStack).toHaveLength(0);
+    expect(s.redoStack).toHaveLength(0);
+    expect(s.selection).toEqual([]);
+    expect(s.projectPath).toBe("/p.json");
+    expect(s.mapView).toEqual({ lon: 10, lat: 48, zoom: 15 });
+  });
+
+  it("loadCatalog indexes objects by exact name", () => {
+    const { store } = makeStore();
+    const catalog: Catalog = {
+      schemaVersion: 1,
+      scannedAt: "2026-07-07T00:00:00Z",
+      installDir: "/i",
+      userXrefDir: null,
+      bundles: [],
+      xref: [
+        { name: "tower_a", bundle: "b", source: "install", bbMin: [0, 0, 0], bbMax: [1, 1, 1], bsRadius: 1, size: { x: 1, y: 1, z: 1 }, category: "buildings/tower", displayName: "Tower A", act: true },
+      ],
+      plants: [],
+      airportLights: [],
+      animated: [],
+    };
+    store.getState().loadCatalog(catalog);
+    expect(store.getState().catalogIndex.get("tower_a")?.displayName).toBe("Tower A");
+  });
+});
