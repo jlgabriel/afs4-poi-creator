@@ -5,9 +5,10 @@ installable `scenery/poi/` package. A sibling to
 [afs4‑pylon‑race](https://github.com/jlgabriel/afs4-pylon-race); shares its geometry and
 POI‑folder conventions.
 
-> **Status:** M0 in progress — the pure TypeScript **core** and a headless **scanner**.
-> No Electron/UI yet (that lands in M1). See [`docs/PCT_DESIGN__FABLE__20260706.md`](docs/PCT_DESIGN__FABLE__20260706.md)
-> for the full design & milestone plan.
+> **Status:** M0 (core + scanner) and the M1 **export core + CLI** are done and green — you can
+> already build and install a POI from a `project.json` with no UI. The Electron shell is next. See
+> [`docs/PCT_DESIGN__FABLE__20260706.md`](docs/PCT_DESIGN__FABLE__20260706.md) for the full design &
+> milestone plan, and [`docs/FORMAT-FINDINGS.md`](docs/FORMAT-FINDINGS.md) for the in-sim format matrix.
 
 ## What M0 delivers
 
@@ -31,6 +32,7 @@ from the sim's plain‑text `.tmi` index files — **no asset extraction, no IPA
 npm install
 npm test                 # vitest over core/ (unit + golden; self-contained)
 npm run scan -- --install "D:\SteamLibrary\steamapps\common\Aerofly FS 4 Flight Simulator"
+npm run export -- examples/tower.project.json --install   # build a POI and install it into scenery/poi/
 npm run gen:categories   # regenerate core/catalog/categories.data.ts from docs/ (names only)
 npm run typecheck
 ```

@@ -32,6 +32,14 @@ export function poiFolderName(ref: LonLat, poiName: string): string {
   return `${encodeLonLat(ref.lon, ref.lat)}_${poiName}`;
 }
 
+/** True if `name` is a safe POI folder name to create or delete inside scenery/poi/: the AFS4
+ *  coordinate prefix (e/w + 5 digits + n/s + 4 digits) followed by a lowercase slug, and
+ *  nothing else — no path separators, no "..". Guards installs/uninstalls so the tool only ever
+ *  touches folders it could have produced (design §3.4). */
+export function isSafePoiFolderName(name: string): boolean {
+  return /^[ew]\d{5}[ns]\d{4}_[a-z0-9_]+$/.test(name);
+}
+
 /** Simple average of points — the default POI anchor when the user sets none. */
 export function centroid(points: LonLat[]): LonLat {
   if (points.length === 0) return { lon: 0, lat: 0 };

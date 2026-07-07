@@ -8,6 +8,7 @@
   "author": "Juan Luis Gabriel",
   "scripts": {
     "scan": "tsx src/cli/scan.ts",
+    "export": "tsx src/cli/export.ts",
     "gen:categories": "tsx scripts/gen-categories.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

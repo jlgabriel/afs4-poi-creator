@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "app": "pct",
+  "name": "PCT matrix test - one tower",
+  "poiName": "pct_matrix_tower",
+  "createdAt": "2026-07-06T00:00:00Z",
+  "modifiedAt": "2026-07-06T00:00:00Z",
+  "reference": { "lon": 11.86, "lat": 48.37 },
+  "camera": { "lon": 11.86, "lat": 48.37, "zoom": 17 },
+  "objects": [
+    {
+      "id": "11111111-1111-4111-8111-111111111111",
+      "kind": "xref",
+      "name": "tower00_small_plates_ds_00_08_08",
+      "position": { "lon": 11.86, "lat": 48.37 },
+      "height": { "mode": "asl", "value": 438 },
+      "direction": 0,
+      "scale": 1,
+      "label": "grounded: 438 m ASL = Open-Meteo terrain @ 11.86,48.37 (V1/V2 confirmed in-sim)"
+    }
+  ]
+}

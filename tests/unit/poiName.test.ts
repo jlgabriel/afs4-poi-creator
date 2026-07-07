@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { encodeLonLat, bankersRound, poiFolderName, centroid } from "../../src/core/geo/poiName";
+import {
+  encodeLonLat,
+  bankersRound,
+  poiFolderName,
+  centroid,
+  isSafePoiFolderName,
+} from "../../src/core/geo/poiName";
 
 describe("bankersRound (Python round() parity — round half to even)", () => {
   it("rounds halves to the nearest EVEN integer, not up", () => {
@@ -39,5 +45,22 @@ describe("poiFolderName & centroid", () => {
   it("centroid averages points", () => {
     expect(centroid([{ lon: 0, lat: 0 }, { lon: 2, lat: 4 }])).toEqual({ lon: 1, lat: 2 });
     expect(centroid([])).toEqual({ lon: 0, lat: 0 });
+  });
+});
+
+describe("isSafePoiFolderName (install/uninstall path guard)", () => {
+  it("accepts a coordinate prefix + lowercase slug", () => {
+    expect(isSafePoiFolderName("e01185n4838_munich_test")).toBe(true);
+    expect(isSafePoiFolderName("w11988n3968_reno")).toBe(true);
+    expect(isSafePoiFolderName("e17473s3685_auckland_1")).toBe(true);
+  });
+  it("rejects traversal, separators, empty slug, uppercase, missing prefix", () => {
+    expect(isSafePoiFolderName("e01185n4838_..")).toBe(false);
+    expect(isSafePoiFolderName("e01185n4838_a/b")).toBe(false);
+    expect(isSafePoiFolderName("e01185n4838_a\\b")).toBe(false);
+    expect(isSafePoiFolderName("e01185n4838_")).toBe(false);
+    expect(isSafePoiFolderName("e01185n4838_Munich")).toBe(false);
+    expect(isSafePoiFolderName("../etc")).toBe(false);
+    expect(isSafePoiFolderName("munich_test")).toBe(false);
   });
 });
