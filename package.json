@@ -11,6 +11,7 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
+    "preview:renderer": "vite --config vite.preview.mts",
     "scan": "tsx src/cli/scan.ts",
     "export": "tsx src/cli/export.ts",
     "gen:categories": "tsx scripts/gen-categories.ts",
