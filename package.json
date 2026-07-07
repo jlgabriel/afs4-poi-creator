@@ -6,21 +6,37 @@
   "description": "PCT — POI Creation Tool: place Aerofly FS4 built-in objects on a satellite map and export an installable POI. M0: pure TypeScript core + headless scanner.",
   "license": "MIT",
   "author": "Juan Luis Gabriel",
+  "main": "./out/main/index.js",
   "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
     "scan": "tsx src/cli/scan.ts",
     "export": "tsx src/cli/export.ts",
     "gen:categories": "tsx scripts/gen-categories.ts",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.web.json",
     "test": "vitest run",
     "test:watch": "vitest"
   },
   "devDependencies": {
+    "@types/leaflet": "^1.9.21",
     "@types/node": "^26.1.0",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.2.0",
+    "electron": "^43.0.0",
+    "electron-builder": "^26.15.3",
+    "electron-vite": "^5.0.0",
     "tsx": "^4.23.0",
     "typescript": "^6.0.3",
+    "vite": "^7.3.6",
     "vitest": "^4.1.10"
   },
   "dependencies": {
-    "zod": "^4.4.3"
+    "leaflet": "^1.9.4",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "zod": "^4.4.3",
+    "zustand": "^5.0.14"
   }
 }
