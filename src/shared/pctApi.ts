@@ -42,6 +42,11 @@ export interface InstalledPoi {
 export interface ExportOptions {
   target: "install" | "choose-folder"; // main resolves the destination; renderer names no path
   overwrite: boolean;
+  // Manual terrain ASL for the WHOLE POI — the offline / needs-elevation fallback (design R1, and
+  // the CLI's --base-elevation). When set, export skips the network lookup and resolves every
+  // terrain-relative height against this one value; when absent, main uses the elevation provider
+  // and may return a `needs-elevation` envelope the renderer answers by re-exporting WITH a base.
+  baseElevation?: number;
 }
 
 /** Async (IPC). Implemented in preload/index.ts, handled in main/ipc.ts. Fallible methods return a
@@ -62,7 +67,8 @@ export interface PctApi {
   loadShadow(): Promise<Project | null>;
 
   resolveHeights(objects: PlacedXref[]): Promise<PctResult<ResolvedXref[]>>;
-  exportPoi(project: Project, opts: ExportOptions): Promise<PctResult<InstallResult>>;
+  // `null` value = the user cancelled the choose-folder dialog (target "install" never cancels).
+  exportPoi(project: Project, opts: ExportOptions): Promise<PctResult<InstallResult | null>>;
   uninstallPoi(folderName: string): Promise<PctResult<void>>;
   listInstalledPois(): Promise<InstalledPoi[]>;
   revealInFolder(folderName: string): Promise<void>; // main validates + resolves within known roots
