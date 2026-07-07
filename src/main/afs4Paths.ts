@@ -33,14 +33,17 @@ export function resolveXrefDir(installArg: string): string | null {
   return null;
 }
 
-/** The AFS4 user folder (holds scenery/) per OS. Windows Documents→OneDrive redirection is a
- *  known gap (design R5): Settings lets the user override this. */
-export function afs4UserDir(): string {
+/** The AFS4 user folder (holds scenery/) per OS. On Windows, pass `documentsDir` =
+ *  app.getPath("documents") so an OneDrive-redirected Documents is honoured (design R5); Settings
+ *  still lets the user override the result. */
+export function afs4UserDir(documentsDir?: string): string {
   const home = os.homedir();
   if (process.platform === "darwin") {
     return path.join(home, "Library", "Application Support", "Aerofly FS 4");
   }
-  if (process.platform === "win32") return path.join(home, "Documents", "Aerofly FS 4");
+  if (process.platform === "win32") {
+    return path.join(documentsDir ?? path.join(home, "Documents"), "Aerofly FS 4");
+  }
   return path.join(home, "Aerofly FS 4");
 }
 
@@ -87,8 +90,9 @@ export function detectInstallDirs(): string[] {
   return found;
 }
 
-/** The AFS4 user dir if it exists on disk, else null (the wizard then asks the user to locate it). */
-export function detectUserDir(): string | null {
-  const dir = afs4UserDir();
+/** The AFS4 user dir if it exists on disk, else null (the wizard then asks the user to locate it).
+ *  `documentsDir` (app.getPath("documents")) makes this OneDrive-safe on Windows. */
+export function detectUserDir(documentsDir?: string): string | null {
+  const dir = afs4UserDir(documentsDir);
   return existsSync(dir) ? dir : null;
 }

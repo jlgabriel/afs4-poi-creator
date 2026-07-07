@@ -1,17 +1,22 @@
 import { defineConfig, externalizeDepsPlugin } from "electron-vite";
 import react from "@vitejs/plugin-react";
 
-// PCT — Electron/React/Vite wiring. Three build targets that all share the pure src/core:
-//   main + preload run in Node (deps externalized so Electron loads them from node_modules);
-//   renderer is a sandboxed Chromium page whose only privileged channel is preload (§3.5 PctApi).
-// Uses electron-vite's conventional entry points (src/main/index.ts, src/preload/index.ts,
-// src/renderer/index.html) so there is no custom input wiring to drift.
+// PCT — Electron/React/Vite wiring. Three build targets that all share the pure src/core.
+// The preload is emitted as CommonJS (index.cjs) ON PURPOSE: it lets the renderer run with
+// sandbox:true (Electron requires a CJS preload under sandbox), and the preload only needs
+// contextBridge + ipcRenderer, which the sandbox supports (Fable review P1-6). main + renderer keep
+// electron-vite's conventional entries (src/main/index.ts, src/renderer/index.html).
 export default defineConfig({
   main: {
     plugins: [externalizeDepsPlugin()],
   },
   preload: {
     plugins: [externalizeDepsPlugin()],
+    build: {
+      rollupOptions: {
+        output: { format: "cjs", entryFileNames: "index.cjs" },
+      },
+    },
   },
   renderer: {
     plugins: [react()],

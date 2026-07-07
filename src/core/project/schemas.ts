@@ -58,7 +58,9 @@ export const zPlacedXref = z.looseObject({
   locked: z.boolean().optional(),
 });
 
-export const zCamera = z.object({
+// loose (like the document top level) so a project written by a newer PCT that adds camera fields
+// round-trips without loss — zod v4 z.object would strip them (Fable review nit).
+export const zCamera = z.looseObject({
   lon: z.number().finite(),
   lat: z.number().finite(),
   zoom: z.number().finite(),
@@ -82,12 +84,12 @@ export const zSettings = z.looseObject({
   schemaVersion: z.literal(CURRENT_SETTINGS_VERSION),
   installDir: z.string().nullable(),
   afs4UserDir: z.string().nullable(),
-  tiles: z.object({
+  tiles: z.looseObject({
     provider: z.enum(["esri", "custom"]),
     customUrl: z.string().optional(),
     customAttribution: z.string().optional(),
   }),
-  elevation: z.object({ provider: z.enum(["open-meteo", "none"]) }),
+  elevation: z.looseObject({ provider: z.enum(["open-meteo", "none"]) }),
   recentProjects: z.array(z.string()),
   lastScanAt: z.string().nullable(),
 });

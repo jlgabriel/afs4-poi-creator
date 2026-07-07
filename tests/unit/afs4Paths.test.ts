@@ -62,4 +62,12 @@ describe("path auto-detection (platform-dependent, must never throw)", () => {
     const d = detectUserDir();
     expect(d === null || typeof d === "string").toBe(true);
   });
+  it.skipIf(process.platform !== "win32")(
+    "win32: afs4UserDir honours an injected (OneDrive-redirected) Documents dir (R5)",
+    () => {
+      expect(afs4UserDir("D:/OneDrive/Documents")).toBe(
+        path.join("D:/OneDrive/Documents", "Aerofly FS 4"),
+      );
+    },
+  );
 });

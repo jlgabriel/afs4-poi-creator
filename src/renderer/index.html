@@ -3,8 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!-- Renderer CSP: no remote code; tiles/elevation are fetched via main, images/connect open.
-         Tightened in M1e-4 once the exact tile/elevation origins are wired. -->
+    <!-- CSP is applied as a response header by the main process (packaged builds only), not a meta
+         tag — a static meta would clamp Vite's dev HMR. See the CSP constant in src/main/index.ts. -->
     <title>PCT — POI Creation Tool</title>
   </head>
   <body>

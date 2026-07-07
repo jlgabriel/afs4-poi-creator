@@ -40,4 +40,9 @@ describe("settings", () => {
     expect(s.installDir).toBe("A");
     expect(s.afs4UserDir).toBe("B");
   });
+  it("deep-merges nested tiles (a provider-only patch keeps the existing customUrl)", () => {
+    writeSettings(tmp, { tiles: { provider: "custom", customUrl: "https://t/{z}/{x}/{y}.png" } });
+    writeSettings(tmp, { tiles: { provider: "custom" } }); // partial — no customUrl
+    expect(readSettings(tmp).tiles.customUrl).toBe("https://t/{z}/{x}/{y}.png");
+  });
 });
