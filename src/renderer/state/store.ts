@@ -16,7 +16,7 @@
 // entry, not dozens (commitCoalesced). Kept free of DOM globals so it unit-tests under the node
 // config; the DOM-coupled singleton + autosave sink live in editorStore.ts.
 
-import { createStore, type StoreApi } from "zustand/vanilla";
+import { createStore, type Mutate, type StoreApi } from "zustand/vanilla";
 import { subscribeWithSelector } from "zustand/middleware";
 import type {
   Catalog,
@@ -124,7 +124,9 @@ export interface EditorState {
   redo: () => void;
 }
 
-export type EditorStore = StoreApi<EditorState>;
+// The store type must carry the subscribeWithSelector augmentation, otherwise `.subscribe` collapses
+// to the base single-arg overload and the map's selector subscription won't typecheck.
+export type EditorStore = Mutate<StoreApi<EditorState>, [["zustand/subscribeWithSelector", never]]>;
 
 export interface EditorDeps {
   now: () => number; // ms clock for nudge coalescing (default Date.now)

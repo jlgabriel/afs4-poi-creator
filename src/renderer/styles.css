@@ -1,0 +1,60 @@
+:root {
+  color-scheme: light dark;
+}
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+body {
+  font-family: system-ui, sans-serif;
+}
+
+/* Shell: a fixed toolbar over a map that fills the rest. min-height:0 lets the flex child shrink so
+   the Leaflet container gets a real height (else tiles render into a 0-px box). */
+.pct-app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+.pct-map {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.pct-map.placing .leaflet-container,
+.pct-map.placing .leaflet-grab {
+  cursor: crosshair;
+}
+
+/* M1e-4 dev harness toolbar (temporary — the real TopBar/Catalog/Inspector arrive in M1e-5). */
+.pct-toolbar {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 12px;
+  background: #1f2937;
+  color: #e5e7eb;
+  font-size: 13px;
+}
+.pct-toolbar button {
+  font: inherit;
+  padding: 4px 10px;
+  border: 1px solid #4b5563;
+  border-radius: 4px;
+  background: #374151;
+  color: #e5e7eb;
+  cursor: pointer;
+}
+.pct-toolbar button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.pct-toolbar .spacer {
+  flex: 1 1 auto;
+}
+.pct-toolbar .readout {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+}
