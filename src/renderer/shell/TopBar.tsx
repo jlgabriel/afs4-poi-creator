@@ -63,12 +63,7 @@ export function TopBar({ onExport, onRescan }: TopBarProps): React.ReactElement 
       </button>
 
       <span className="pct-divider" />
-      <button
-        type="button"
-        onClick={onExport}
-        disabled={!onExport || !pct}
-        title={pct ? undefined : NO_PCT}
-      >
+      <button type="button" onClick={onExport} disabled={!onExport}>
         Export POI…
       </button>
 
