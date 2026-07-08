@@ -193,3 +193,136 @@ body {
   font-size: 11px;
   color: #94a3b8;
 }
+
+/* Inspector fields. */
+.pct-inspector-body {
+  flex: 1 1 auto;
+  overflow: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.pct-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.pct-field-row {
+  flex-direction: row;
+  gap: 8px;
+}
+.pct-field-col {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.pct-field-title {
+  font-weight: 600;
+  font-size: 14px;
+  color: #0f172a;
+}
+.pct-field-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: #64748b;
+}
+.pct-field-meta {
+  font-size: 12px;
+  color: #64748b;
+}
+.pct-warn {
+  color: #b45309;
+}
+.pct-xref {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.pct-xref code {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  padding: 3px 6px;
+  background: #eef2f7;
+  border-radius: 4px;
+  color: #334155;
+}
+.pct-copy {
+  font: inherit;
+  font-size: 11px;
+  padding: 2px 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  background: #fff;
+  cursor: pointer;
+}
+.pct-num {
+  font: inherit;
+  padding: 4px 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  background: #fff;
+  color: #0f172a;
+  font-variant-numeric: tabular-nums;
+  min-width: 0;
+}
+.pct-num-off {
+  color: #94a3b8;
+  border-color: #e2e8f0;
+  background: #f1f5f9;
+  text-align: center;
+}
+
+/* Height control. */
+.pct-height {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 4px;
+  border-top: 1px solid #e2e8f0;
+}
+.pct-radio-row {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.pct-radio {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #334155;
+}
+.pct-nudge-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.pct-nudge-row .pct-num {
+  flex: 1 1 auto;
+  text-align: right;
+}
+.pct-nudge-row button {
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 7px;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  background: #fff;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+.pct-unit {
+  font-size: 12px;
+  color: #64748b;
+}
+.pct-height-resolved {
+  font-size: 12px;
+  color: #94a3b8;
+  font-variant-numeric: tabular-nums;
+}
