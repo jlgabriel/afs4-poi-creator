@@ -5,8 +5,10 @@ import { TopBar } from "./TopBar";
 import { CatalogPanel } from "../catalog/CatalogPanel";
 import { MapView } from "../map/MapView";
 import { Inspector } from "../inspector/Inspector";
+import { useKeyboardShortcuts } from "../app/useKeyboardShortcuts";
 
 export function AppShell(): React.ReactElement {
+  useKeyboardShortcuts();
   return (
     <div className="pct-app">
       <TopBar />

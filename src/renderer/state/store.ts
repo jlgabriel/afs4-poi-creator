@@ -105,6 +105,7 @@ export interface EditorState {
 
   // ── document mutations (gesture-end / explicit — drag PREVIEW never hits the store) ──
   moveObject: (id: string, p: LonLat) => void;
+  nudgePosition: (id: string, deltaM: number, bearingDeg: number) => void;
   rotateObject: (id: string, deg: number) => void;
   scaleObject: (id: string, f: number) => void;
   setHeight: (id: string, h: HeightSpec) => void;
@@ -266,6 +267,21 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
         moveObject: (id, p) => {
           commit((proj) => mutate.moveObject(proj, id, p));
           // the object moved → the terrain under it changed → drop its cached elevation (P2-8)
+          set((s) => {
+            if (!s.resolvedElev.has(id)) return s;
+            const resolvedElev = new Map(s.resolvedElev);
+            resolvedElev.delete(id);
+            return { resolvedElev };
+          });
+        },
+        // Relative move by metres along a compass bearing — the keyboard arrow-nudge (design §5).
+        // Coalesces like nudgeHeight so holding an arrow is ONE undo entry, and drops the resolved
+        // elevation exactly as moveObject does (same terrain-changed reasoning, P2-8).
+        nudgePosition: (id, deltaM, bearingDeg) => {
+          commitCoalesced(`${id}:pos`, (proj) => {
+            const o = proj.objects.find((x) => x.id === id);
+            return o ? mutate.moveObject(proj, id, destination(o.position, deltaM, bearingDeg)) : proj;
+          });
           set((s) => {
             if (!s.resolvedElev.has(id)) return s;
             const resolvedElev = new Map(s.resolvedElev);

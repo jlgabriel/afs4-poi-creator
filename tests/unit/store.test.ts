@@ -167,6 +167,42 @@ describe("nudgeHeight — promotion + coalescing", () => {
   });
 });
 
+describe("nudgePosition — coalescing + elevation drop", () => {
+  it("coalesces a rapid east run into one undo entry, and undo restores the origin", () => {
+    const { store, clock } = makeStore({ coalesceMs: 800 });
+    store.getState().openProject("/p", baseProject([xref("a", { position: { lon: 10, lat: 48 } })]));
+
+    clock.t = 1000;
+    store.getState().nudgePosition("a", 5, 90); // east, undo entry #1
+    clock.t = 1200;
+    store.getState().nudgePosition("a", 5, 90); // within window → coalesced
+
+    const st = store.getState();
+    expect(st.project.objects[0].position.lon).toBeGreaterThan(10); // moved east
+    expect(st.project.objects[0].position.lat).toBeCloseTo(48, 4);
+    expect(st.undoStack).toHaveLength(1);
+
+    store.getState().undo();
+    expect(store.getState().project.objects[0].position).toEqual({ lon: 10, lat: 48 });
+  });
+
+  it("drops the object's cached terrain elevation (like moveObject)", () => {
+    const { store } = makeStore();
+    store.getState().openProject("/p", baseProject([xref("a")]));
+    store.getState().setResolvedElev("a", 500);
+    store.getState().nudgePosition("a", 0.5, 0);
+    expect(store.getState().resolvedElev.has("a")).toBe(false);
+  });
+
+  it("no-ops on a missing id (no undo entry, stays clean)", () => {
+    const { store } = makeStore();
+    store.getState().openProject("/p", baseProject([xref("a")]));
+    store.getState().nudgePosition("ghost", 5, 90);
+    expect(store.getState().undoStack).toHaveLength(0);
+    expect(store.getState().dirty).toBe(false);
+  });
+});
+
 describe("deleteSelection / duplicateSelection", () => {
   it("deletes all selected objects in one undo entry and clears selection", () => {
     const { store } = makeStore();

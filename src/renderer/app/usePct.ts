@@ -10,7 +10,8 @@ import * as mutate from "../../core/project/mutate";
 import { editorStore } from "../state/editorStore";
 import { DEFAULT_CAMERA } from "../state/store";
 import { DEMO_CATALOG, demoProject } from "../dev/devFixtures";
-import { decideBootPhase, getPct } from "./pct";
+import { getPct } from "./pct";
+import { decideBootPhase } from "./bootPhase";
 
 export type BootPhase = "loading" | "wizard" | "editor";
 
