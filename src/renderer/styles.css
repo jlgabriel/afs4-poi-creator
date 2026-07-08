@@ -326,3 +326,122 @@ body {
   color: #94a3b8;
   font-variant-numeric: tabular-nums;
 }
+
+/* First-run wizard (a full-screen step flow that replaces the editor while phase === "wizard"). */
+.pct-wizard {
+  display: grid;
+  place-items: center;
+  height: 100vh;
+  padding: 24px;
+  background: #0f172a;
+}
+.pct-wizard-card {
+  width: min(560px, 100%);
+  max-height: 90vh;
+  overflow: auto;
+  padding: 24px 28px;
+  background: #f8fafc;
+  color: #0f172a;
+  border-radius: 10px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+}
+.pct-wizard-brand {
+  margin: 0 0 12px;
+  font-size: 20px;
+}
+.pct-wizard-card h2 {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+.pct-wizard-card p {
+  color: #334155;
+  line-height: 1.5;
+}
+.pct-wizard-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 20px;
+}
+.pct-wizard-card button {
+  font: inherit;
+  padding: 6px 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+}
+.pct-wizard-card button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.pct-primary {
+  background: #2563eb;
+  color: #fff;
+  border-color: #2563eb;
+}
+.pct-wizard-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 8px 0;
+}
+.pct-cand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.pct-cand.sel {
+  border-color: #2563eb;
+  background: #eff6ff;
+}
+.pct-cand code {
+  font-size: 12px;
+  word-break: break-all;
+}
+.pct-wizard-summary {
+  font-weight: 600;
+  font-size: 15px;
+  color: #0f172a;
+}
+.pct-wizard-bundles {
+  max-height: 240px;
+  overflow: auto;
+}
+.pct-bundle-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-bottom: 1px solid #eef2f7;
+  font-size: 13px;
+}
+.pct-bundle-row code {
+  flex: 1 1 auto;
+}
+.pct-bundle-src {
+  font-size: 11px;
+  color: #94a3b8;
+}
+.pct-count {
+  font-variant-numeric: tabular-nums;
+  color: #475569;
+}
+.pct-spinner {
+  width: 28px;
+  height: 28px;
+  margin: 16px 0;
+  border-radius: 50%;
+  border: 3px solid #cbd5e1;
+  border-top-color: #2563eb;
+  animation: pct-spin 0.8s linear infinite;
+}
+@keyframes pct-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

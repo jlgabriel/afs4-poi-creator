@@ -7,11 +7,11 @@ import { MapView } from "../map/MapView";
 import { Inspector } from "../inspector/Inspector";
 import { useKeyboardShortcuts } from "../app/useKeyboardShortcuts";
 
-export function AppShell(): React.ReactElement {
+export function AppShell({ onRescan }: { onRescan: () => void }): React.ReactElement {
   useKeyboardShortcuts();
   return (
     <div className="pct-app">
-      <TopBar />
+      <TopBar onRescan={onRescan} />
       <CatalogPanel />
       <MapView />
       <Inspector />

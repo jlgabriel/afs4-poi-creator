@@ -5,7 +5,7 @@
 // The store is seeded BEFORE the editor renders, so MapView (which reads the camera once at mount)
 // sees the right project. The `cancelled` latch keeps React 19 StrictMode's double-invoke from
 // double-seeding / racing the async IPC reads (which are idempotent anyway).
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import * as mutate from "../../core/project/mutate";
 import { editorStore } from "../state/editorStore";
 import { DEFAULT_CAMERA } from "../state/store";
@@ -15,7 +15,13 @@ import { decideBootPhase } from "./bootPhase";
 
 export type BootPhase = "loading" | "wizard" | "editor";
 
-export function useBootstrap(): BootPhase {
+export interface Bootstrap {
+  phase: BootPhase;
+  showEditor: () => void; // the wizard calls this once it has loaded the catalog
+  showWizard: () => void; // TopBar Rescan re-enters the wizard (keeps the open project)
+}
+
+export function useBootstrap(): Bootstrap {
   const [phase, setPhase] = useState<BootPhase>("loading");
 
   useEffect(() => {
@@ -48,5 +54,7 @@ export function useBootstrap(): BootPhase {
     };
   }, []);
 
-  return phase;
+  const showEditor = useCallback(() => setPhase("editor"), []);
+  const showWizard = useCallback(() => setPhase("wizard"), []);
+  return { phase, showEditor, showWizard };
 }

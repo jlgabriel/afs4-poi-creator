@@ -1,21 +1,13 @@
 // App.tsx — the composition root. It runs the bootstrap (useBootstrap) and switches on the resulting
 // phase: a splash while catalog/settings load, the first-run wizard, or the editor shell. The demo
-// seeding + the real IPC bootstrap both live in app/usePct.ts; this file is just the switch.
+// seeding + the real IPC bootstrap both live in app/usePct.ts; this file is just the switch. Rescan
+// (TopBar) flips back to the wizard, which reloads the catalog without disturbing the open project.
 import { useBootstrap } from "./app/usePct";
 import { AppShell } from "./shell/AppShell";
-
-// Placeholder for the real first-run wizard (M1e-5e). Only reachable in the Electron app when nothing
-// is cached yet; the browser preview never lands here (it seeds the demo and goes straight to editor).
-function WizardPlaceholder(): React.ReactElement {
-  return (
-    <div className="pct-boot">
-      <p>First-run setup arrives in M1e-5e. Run a scan via the app to populate the catalog.</p>
-    </div>
-  );
-}
+import { FirstRunWizard } from "./dialogs/FirstRunWizard";
 
 export function App(): React.ReactElement {
-  const phase = useBootstrap();
+  const { phase, showEditor, showWizard } = useBootstrap();
   if (phase === "loading") {
     return (
       <div className="pct-boot">
@@ -23,6 +15,6 @@ export function App(): React.ReactElement {
       </div>
     );
   }
-  if (phase === "wizard") return <WizardPlaceholder />;
-  return <AppShell />;
+  if (phase === "wizard") return <FirstRunWizard onDone={showEditor} />;
+  return <AppShell onRescan={showWizard} />;
 }
