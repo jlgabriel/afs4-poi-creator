@@ -58,6 +58,10 @@ export interface PctApi {
   getCachedCatalog(): Promise<Catalog | null>;
   getSettings(): Promise<Settings>;
   setSettings(patch: Partial<Settings>): Promise<Settings>;
+  // Native folder picker for the first-run wizard / Settings — main runs the dialog. Returns the
+  // chosen path OUTward for display + a follow-up scan(installDir, …) / setSettings; the P0-2 rule
+  // forbids paths flowing IN, not out (same as detectPaths → scan). null = the user cancelled.
+  chooseDirectory(purpose: "install-dir" | "user-dir"): Promise<string | null>;
 
   // Project files — main owns the path + dialogs (P0-2). A returned `path` is for display only.
   openProject(): Promise<PctResult<{ path: string; project: Project } | null>>;

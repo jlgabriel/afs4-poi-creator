@@ -102,6 +102,8 @@ const pickSaveProject = (project: Project): Promise<string | null> =>
   });
 const pickExportFolder = (): Promise<string | null> =>
   showOpenFile({ title: "Export POI to folder", properties: ["openDirectory", "createDirectory"] });
+const pickDirectory = (title: string): Promise<string | null> =>
+  showOpenFile({ title, properties: ["openDirectory"] });
 
 /** Export: resolve heights (manual base, else the elevation provider), plan the POI, and write it —
  *  into scenery/poi/ (install) or a chosen folder. Returns null only when choose-folder is cancelled. */
@@ -147,6 +149,15 @@ export function registerIpc(): void {
   ipcMain.handle(
     "pct:setSettings",
     (_e, patch: Partial<Settings>): Settings => writeSettings(userData(), patch, documents()),
+  );
+  ipcMain.handle(
+    "pct:chooseDirectory",
+    (_e, purpose: "install-dir" | "user-dir"): Promise<string | null> =>
+      pickDirectory(
+        purpose === "install-dir"
+          ? "Select the Aerofly FS 4 install folder"
+          : "Select the Aerofly FS 4 user folder",
+      ),
   );
 
   // ── Project files (M1e-2b) — main owns the path + dialogs ──

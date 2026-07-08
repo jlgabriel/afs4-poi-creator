@@ -11,6 +11,7 @@ const pct: PctApi = {
   getCachedCatalog: () => ipcRenderer.invoke("pct:getCachedCatalog"),
   getSettings: () => ipcRenderer.invoke("pct:getSettings"),
   setSettings: (patch) => ipcRenderer.invoke("pct:setSettings", patch),
+  chooseDirectory: (purpose) => ipcRenderer.invoke("pct:chooseDirectory", purpose),
   openProject: () => ipcRenderer.invoke("pct:openProject"),
   saveProject: (project) => ipcRenderer.invoke("pct:saveProject", project),
   saveProjectAs: (project) => ipcRenderer.invoke("pct:saveProjectAs", project),
