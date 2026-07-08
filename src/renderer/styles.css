@@ -1,5 +1,9 @@
 :root {
-  color-scheme: light dark;
+  /* The app is a light-only theme — every colour below is a hard-coded light value and there are
+     no dark-mode styles. Declaring `light dark` let an OS in dark mode resolve UA system colours
+     (notably `buttontext`) to white, which made every button without an explicit colour (Copy,
+     height nudges, wizard/modal actions — all with #fff faces) vanish. Pin to light. */
+  color-scheme: light;
 }
 html,
 body,
@@ -505,6 +509,16 @@ body {
 .pct-modal-card button:disabled {
   opacity: 0.5;
   cursor: default;
+}
+/* Primary buttons (Get started / Scan / Install) live inside the wizard & modal cards,
+   whose base `button` rules outrank .pct-primary (0,1,1 / 0,2,1 vs 0,1,0) and clobber its
+   blue background — leaving white text on a white button. Re-assert the blue with card scope
+   (placed after the modal base rule to win the modal tie) so the white label sits on blue. */
+.pct-wizard-card button.pct-primary,
+.pct-modal-card button.pct-primary {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #fff;
 }
 .pct-modal-card input {
   font: inherit;
