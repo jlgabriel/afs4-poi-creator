@@ -163,7 +163,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }): React.ReactE
               <span className="pct-spacer" />
               <button
                 className="pct-primary"
-                disabled={!validSlug || busy || !pct}
+                disabled={!validSlug || busy || !pct || objects.length === 0}
                 title={pct ? undefined : "Install runs in the desktop app"}
                 onClick={() => void doExport()}
               >

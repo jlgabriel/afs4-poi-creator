@@ -10,6 +10,10 @@ import { arrowToVector, isEditableTarget } from "./keyboard";
 export function useKeyboardShortcuts(): void {
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
+      // A modal (the Export dialog) owns the keyboard while open. Its buttons aren't editable targets,
+      // so without this the focus guard below lets Delete/arrows/Ctrl+Z mutate the document behind the
+      // modal (P1-2). aria-modal is the semantic signal every PCT modal sets — covers Settings in M2 too.
+      if (document.querySelector('[aria-modal="true"]') !== null) return;
       if (isEditableTarget(document.activeElement)) return; // don't hijack typing (P1-4)
       const store = editorStore.getState();
       const mod = e.ctrlKey || e.metaKey;
@@ -33,7 +37,11 @@ export function useKeyboardShortcuts(): void {
       }
       if (mod) return; // leave every other Ctrl/Cmd combo (reload, devtools, copy…) to the browser
 
-      if (e.key === "Delete") {
+      if (e.key === "Delete" || e.key === "Backspace") {
+        // macOS laptops send Backspace for their only delete key (P1-6). Consume it only when there's
+        // something to delete, so a bare Backspace isn't swallowed (and never triggers history back-nav).
+        if (store.selection.length === 0) return;
+        e.preventDefault();
         store.deleteSelection();
         return;
       }

@@ -35,10 +35,10 @@ export function NumberInput({ value, onCommit, format, id, ariaLabel }: NumberIn
       onBlur={commit}
       onKeyDown={(e) => {
         if (e.key === "Enter") e.currentTarget.blur();
-        else if (e.key === "Escape") {
-          setDraft(null);
-          e.currentTarget.blur();
-        }
+        // Revert on Escape: drop the draft, but do NOT blur() — blur fires onBlur=commit synchronously
+        // with the still-stale draft (setDraft(null) hasn't applied yet), which would COMMIT instead of
+        // revert (P1-1). Matches TopBar's ProjectNameField. Focus stays; the field shows the store value.
+        else if (e.key === "Escape") setDraft(null);
       }}
     />
   );

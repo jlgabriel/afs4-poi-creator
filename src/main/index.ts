@@ -15,7 +15,7 @@ const RENDERER_URL = process.env["ELECTRON_RENDERER_URL"];
 const CSP =
   "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; " +
   "img-src 'self' data: blob: https://server.arcgisonline.com https://tile.openstreetmap.org; " +
-  "connect-src 'self'; object-src 'none'; base-uri 'none'";
+  "connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'";
 
 function createWindow(): void {
   const win = new BrowserWindow({
