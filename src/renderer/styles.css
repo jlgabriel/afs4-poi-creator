@@ -52,8 +52,10 @@ body {
   grid-column: 3;
   grid-row: 2;
 }
-.pct-map.placing .leaflet-container,
-.pct-map.placing .leaflet-grab {
+/* .pct-map IS the Leaflet container (L.map() initialises on it), so target it directly — a descendant
+   selector finds no inner .leaflet-container. .pct-map.placing (0,2,0) outranks Leaflet's .leaflet-grab
+   so the crosshair wins while an object is armed. */
+.pct-map.placing {
   cursor: crosshair;
 }
 

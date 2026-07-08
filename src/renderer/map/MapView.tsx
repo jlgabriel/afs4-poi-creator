@@ -80,5 +80,13 @@ export function MapView(): React.ReactElement {
     };
   }, []);
 
-  return <div ref={ref} className={placing !== null ? "pct-map placing" : "pct-map"} />;
+  // Toggle the placement class imperatively — React must NOT own this div's className. Leaflet writes
+  // its own classes (leaflet-container, leaflet-grab, …) onto the SAME element after init; re-rendering
+  // the div with a React-driven className wipes them, and losing leaflet-container drops its
+  // position:relative / overflow:hidden so the map panes detach and spill over the side panels.
+  useEffect(() => {
+    ref.current?.classList.toggle("placing", placing !== null);
+  }, [placing]);
+
+  return <div ref={ref} className="pct-map" />;
 }
