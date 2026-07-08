@@ -36,7 +36,9 @@ export interface Filter {
 }
 
 const UNDO_CAP = 50; // design §3.6: snapshot stacks capped at 50
-const DEFAULT_CAMERA: Camera = { lon: 0, lat: 20, zoom: 2 };
+/** The blank-project world view (new project before the user navigates). Exported for the shell's
+ *  New / bootstrap paths so they don't duplicate the literal. */
+export const DEFAULT_CAMERA: Camera = { lon: 0, lat: 20, zoom: 2 };
 
 const capUndo = (stack: Project[]): Project[] =>
   stack.length > UNDO_CAP ? stack.slice(stack.length - UNDO_CAP) : stack;

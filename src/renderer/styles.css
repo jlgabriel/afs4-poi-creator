@@ -11,34 +11,96 @@ body {
   font-family: system-ui, sans-serif;
 }
 
-/* Shell: a fixed toolbar over a map that fills the rest. min-height:0 lets the flex child shrink so
-   the Leaflet container gets a real height (else tiles render into a 0-px box). */
+/* Splash / wizard placeholder. */
+.pct-boot {
+  display: grid;
+  place-items: center;
+  height: 100vh;
+  padding: 24px;
+  color: #64748b;
+  text-align: center;
+}
+
+/* Shell: a spanning TopBar (row 1, auto) over a 3-panel row (row 2, 1fr): catalog | map | inspector.
+   All four are direct grid children of .pct-app. The map cell MUST resolve to a real height or Leaflet
+   renders into a 0-px box — row 2 is 1fr of (100vh − topbar), the .pct-map grid item stretches to fill
+   it, and min-height:0 lets it shrink instead of overflowing. */
 .pct-app {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: 260px 1fr 300px;
+  grid-template-rows: auto 1fr;
   height: 100vh;
 }
+.pct-topbar {
+  grid-column: 1 / -1;
+  grid-row: 1;
+}
+.pct-catalog {
+  grid-column: 1;
+  grid-row: 2;
+}
 .pct-map {
-  flex: 1 1 auto;
+  grid-column: 2;
+  grid-row: 2;
   min-height: 0;
+}
+.pct-inspector {
+  grid-column: 3;
+  grid-row: 2;
 }
 .pct-map.placing .leaflet-container,
 .pct-map.placing .leaflet-grab {
   cursor: crosshair;
 }
 
-/* M1e-4 dev harness toolbar (temporary — the real TopBar/Catalog/Inspector arrive in M1e-5). */
-.pct-toolbar {
-  flex: 0 0 auto;
+/* Side panels. */
+.pct-catalog,
+.pct-inspector {
+  min-height: 0;
+  overflow: hidden;
   display: flex;
-  gap: 8px;
+  flex-direction: column;
+  background: #f8fafc;
+  color: #0f172a;
+}
+.pct-catalog {
+  border-right: 1px solid #e2e8f0;
+}
+.pct-inspector {
+  border-left: 1px solid #e2e8f0;
+}
+
+/* TopBar. */
+.pct-topbar {
+  display: flex;
   align-items: center;
-  padding: 8px 12px;
+  gap: 8px;
+  padding: 6px 12px;
   background: #1f2937;
   color: #e5e7eb;
   font-size: 13px;
 }
-.pct-toolbar button {
+.pct-brand {
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+.pct-projname {
+  font: inherit;
+  min-width: 180px;
+  padding: 3px 8px;
+  background: #111827;
+  color: #e5e7eb;
+  border: 1px solid #374151;
+  border-radius: 4px;
+}
+.pct-dirty {
+  font-size: 11px;
+  color: #374151;
+}
+.pct-dirty.on {
+  color: #f59e0b;
+}
+.pct-topbar button {
   font: inherit;
   padding: 4px 10px;
   border: 1px solid #4b5563;
@@ -47,14 +109,87 @@ body {
   color: #e5e7eb;
   cursor: pointer;
 }
-.pct-toolbar button:disabled {
-  opacity: 0.45;
+.pct-topbar button:disabled {
+  opacity: 0.4;
   cursor: default;
 }
-.pct-toolbar .spacer {
+.pct-divider {
+  width: 1px;
+  align-self: stretch;
+  margin: 2px 4px;
+  background: #4b5563;
+}
+.pct-spacer {
   flex: 1 1 auto;
 }
-.pct-toolbar .readout {
+.pct-readout {
   font-variant-numeric: tabular-nums;
-  opacity: 0.85;
+  opacity: 0.8;
+}
+
+/* Panel chrome (catalog + inspector). */
+.pct-panel-title {
+  margin: 0;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #64748b;
+  border-bottom: 1px solid #e2e8f0;
+}
+.pct-empty {
+  padding: 12px;
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+/* Catalog list. */
+.pct-search {
+  margin: 8px;
+  padding: 5px 8px;
+  font: inherit;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+}
+.pct-catalog-list {
+  flex: 1 1 auto;
+  overflow: auto;
+  padding: 0 8px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.pct-obj-card {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px;
+  font: inherit;
+  text-align: left;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.pct-obj-card:hover {
+  border-color: #94a3b8;
+}
+.pct-obj-card.armed {
+  border-color: #2563eb;
+  box-shadow: inset 0 0 0 1px #2563eb;
+}
+.pct-obj-name {
+  font-weight: 600;
+  font-size: 13px;
+  color: #0f172a;
+}
+.pct-obj-meta {
+  font-size: 12px;
+  color: #475569;
+  font-variant-numeric: tabular-nums;
+}
+.pct-obj-cat {
+  font-size: 11px;
+  color: #94a3b8;
 }
