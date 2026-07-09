@@ -17,6 +17,10 @@ import react from "@vitejs/plugin-react";
 export default defineConfig({
   root: "src/renderer",
   plugins: [react()],
+  // react-window (and any other hooks-based dep) must resolve to the SAME React instance as the app,
+  // or React throws "Invalid hook call … more than one copy of React". Pinning dedupe guarantees one
+  // copy under the dev server + HMR. Mirrors the renderer target in electron.vite.config.ts.
+  resolve: { dedupe: ["react", "react-dom"] },
   server: {
     port: 5199,
     fs: { allow: [import.meta.dirname] }, // src/renderer imports reach ../core, ../shared

@@ -20,5 +20,8 @@ export default defineConfig({
   },
   renderer: {
     plugins: [react()],
+    // Keep hooks-based deps (react-window) on the app's single React instance — avoids the
+    // "Invalid hook call … more than one copy of React" failure. Mirrors vite.preview.mts.
+    resolve: { dedupe: ["react", "react-dom"] },
   },
 });

@@ -35,4 +35,14 @@ describe("matchesFilter", () => {
     expect(matchesFilter(obj(), filter({ category: "buildings/tower" }))).toBe(true);
     expect(matchesFilter(obj(), filter({ category: "airport/hangar" }))).toBe(false);
   });
+
+  it("treats a top-level category as a whole-segment prefix over its sub-categories", () => {
+    // obj() is buildings/tower
+    expect(matchesFilter(obj(), filter({ category: "buildings" }))).toBe(true);
+    expect(matchesFilter(obj({ category: "buildings/office" }), filter({ category: "buildings" }))).toBe(true);
+    // a single-level category still matches exactly
+    expect(matchesFilter(obj({ category: "jetways" }), filter({ category: "jetways" }))).toBe(true);
+    // prefix is by whole segment, not a bare substring
+    expect(matchesFilter(obj(), filter({ category: "build" }))).toBe(false);
+  });
 });
