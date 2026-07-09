@@ -82,14 +82,21 @@ async function guarded<T>(fn: () => T | Promise<T>): Promise<PctResult<T>> {
 }
 
 // ── Dialogs (parented to the focused window when there is one) ─────────────────
+// After a native dialog closes we explicitly refocus the webContents. On Windows, Electron can leave
+// the window looking focused while key events stop reaching the page until an OS-level refocus — the
+// prime suspect for Bug A ("search rejects typing after a wizard boot": the wizard's Browse is the only
+// native dialog on that path). Refocusing is a no-op when focus is already correct, so it is safe on all
+// paths. UNVERIFIED on-device — confirm via the in-sim protocol.
 async function showOpenFile(opts: OpenDialogOptions): Promise<string | null> {
   const win = BrowserWindow.getFocusedWindow();
   const r = await (win ? dialog.showOpenDialog(win, opts) : dialog.showOpenDialog(opts));
+  win?.webContents.focus();
   return r.canceled || r.filePaths.length === 0 ? null : r.filePaths[0];
 }
 async function showSaveFile(opts: SaveDialogOptions): Promise<string | null> {
   const win = BrowserWindow.getFocusedWindow();
   const r = await (win ? dialog.showSaveDialog(win, opts) : dialog.showSaveDialog(opts));
+  win?.webContents.focus();
   return r.canceled || !r.filePath ? null : r.filePath;
 }
 const pickOpenProject = (): Promise<string | null> =>

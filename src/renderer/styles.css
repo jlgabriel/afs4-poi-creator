@@ -220,6 +220,8 @@ body {
 }
 .pct-field-col {
   flex: 1 1 0;
+  min-width: 0; /* a flex item defaults to min-width:auto — without this the lon/lat inputs can't shrink
+                   below their intrinsic ~20-char width and the second (Lat) overflows the 300px panel. */
   display: flex;
   flex-direction: column;
   gap: 4px;

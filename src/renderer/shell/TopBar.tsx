@@ -1,5 +1,5 @@
 // TopBar.tsx — the spanning top bar (design §5): brand · editable project name · dirty dot ·
-// [New][Open][Save] │ [Export POI…] │ [Rescan][Settings]. Undo/redo and edit verbs are keyboard-only
+// [New][Open][Save] │ [Export POI…] │ [Rescan]. (Settings is M2 — hidden, see below.) Undo/redo and edit verbs are keyboard-only
 // (added in M1e-5c), not buttons. New/Open/Save delegate to app/commands.ts; Export/Rescan are handed
 // down as callbacks by AppShell (wired in M1e-5f / M1e-5e) so the button is disabled until its step
 // lands. IPC-backed buttons disable in the browser preview (no bridge).
@@ -76,9 +76,7 @@ export function TopBar({ onExport, onRescan }: TopBarProps): React.ReactElement 
       >
         Rescan
       </button>
-      <button type="button" disabled title="Settings — M2">
-        Settings
-      </button>
+      {/* Settings is M2 — hidden until then (a disabled button reads as broken; Rescan is the M1 path). */}
 
       <span className="pct-spacer" />
       <span className="pct-readout">
