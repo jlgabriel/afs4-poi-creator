@@ -121,6 +121,7 @@ export interface EditorState {
 
   // ── camera + resolved elevation (ephemeral) ──
   setMapView: (camera: Camera) => void;
+  flyTo: (p: LonLat) => void;
   setResolvedElev: (id: string, terrainAsl: number) => void;
 
   // ── history ──
@@ -337,6 +338,14 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
         },
 
         setMapView: (camera) => set({ mapView: camera }),
+        // Recenter the map on a point (placed-list double-click). Reuses the cameraEpoch channel the
+        // MapView already watches — a bump means "follow mapView now"; pan/zoom never bump it, so this
+        // is the one imperative recenter besides document load. Zoom in a little if we're far out.
+        flyTo: (p) =>
+          set((s) => ({
+            mapView: { lon: p.lon, lat: p.lat, zoom: Math.max(s.mapView.zoom, 17) },
+            cameraEpoch: s.cameraEpoch + 1,
+          })),
         setResolvedElev: (id, terrainAsl) =>
           set((s) => {
             const resolvedElev = new Map(s.resolvedElev);

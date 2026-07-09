@@ -48,9 +48,13 @@ body {
   grid-row: 2;
   min-height: 0;
 }
-.pct-inspector {
+.pct-right {
   grid-column: 3;
   grid-row: 2;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid #e2e8f0;
 }
 /* .pct-map IS the Leaflet container (L.map() initialises on it), so target it directly — a descendant
    selector finds no inner .leaflet-container. .pct-map.placing (0,2,0) outranks Leaflet's .leaflet-grab
@@ -61,7 +65,8 @@ body {
 
 /* Side panels. */
 .pct-catalog,
-.pct-inspector {
+.pct-inspector,
+.pct-placed {
   min-height: 0;
   overflow: hidden;
   display: flex;
@@ -72,8 +77,13 @@ body {
 .pct-catalog {
   border-right: 1px solid #e2e8f0;
 }
+/* Inspector (top) + PlacedList (bottom) split the right column. */
 .pct-inspector {
-  border-left: 1px solid #e2e8f0;
+  flex: 1 1 55%;
+}
+.pct-placed {
+  flex: 1 1 45%;
+  border-top: 1px solid #e2e8f0;
 }
 
 /* TopBar. */
@@ -438,6 +448,88 @@ body {
 }
 .pct-height-resolved {
   font-size: 12px;
+  color: #94a3b8;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Placed list (right column, below the inspector). */
+.pct-placed-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-right: 8px;
+  border-bottom: 1px solid #e2e8f0;
+}
+.pct-placed-head .pct-panel-title {
+  border-bottom: none;
+}
+.pct-placed-actions {
+  display: flex;
+  gap: 4px;
+}
+.pct-placed-actions button {
+  font: inherit;
+  font-size: 11px;
+  padding: 3px 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  background: #fff;
+  color: #0f172a;
+  cursor: pointer;
+}
+.pct-placed-actions button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.pct-placed-list {
+  flex: 1 1 auto;
+  overflow: auto;
+  padding: 6px 8px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.pct-placed-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 6px;
+  font: inherit;
+  text-align: left;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.pct-placed-row:hover {
+  border-color: #94a3b8;
+}
+.pct-placed-row.sel {
+  border-color: #f59e0b;
+  background: #fffbeb;
+}
+.pct-placed-row .pct-thumb {
+  width: 30px;
+  height: 30px;
+  padding: 3px;
+}
+.pct-placed-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.pct-placed-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #0f172a;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pct-placed-meta {
+  font-size: 11px;
   color: #94a3b8;
   font-variant-numeric: tabular-nums;
 }

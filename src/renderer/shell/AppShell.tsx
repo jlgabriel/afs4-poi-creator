@@ -6,6 +6,7 @@ import { TopBar } from "./TopBar";
 import { CatalogPanel } from "../catalog/CatalogPanel";
 import { MapView } from "../map/MapView";
 import { Inspector } from "../inspector/Inspector";
+import { PlacedList } from "../placed/PlacedList";
 import { ExportDialog } from "../dialogs/ExportDialog";
 import { useKeyboardShortcuts } from "../app/useKeyboardShortcuts";
 
@@ -17,7 +18,10 @@ export function AppShell({ onRescan }: { onRescan: () => void }): React.ReactEle
       <TopBar onRescan={onRescan} onExport={() => setExportOpen(true)} />
       <CatalogPanel />
       <MapView />
-      <Inspector />
+      <div className="pct-right">
+        <Inspector />
+        <PlacedList />
+      </div>
       {exportOpen && <ExportDialog onClose={() => setExportOpen(false)} />}
     </div>
   );

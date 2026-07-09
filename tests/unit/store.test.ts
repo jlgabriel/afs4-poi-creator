@@ -257,6 +257,25 @@ describe("camera — capture-on-save, not mutate-on-pan", () => {
     expect(s.projectPath).toBe("/x.json");
     expect(s.project.camera).toEqual({ lon: 3, lat: 4, zoom: 12 });
   });
+
+  it("flyTo recenters via a cameraEpoch bump, ephemerally, zooming in to at least 17", () => {
+    const { store, persist } = makeStore();
+    const e0 = store.getState().cameraEpoch;
+    store.getState().flyTo({ lon: 6.98, lat: 46.27 });
+    const s = store.getState();
+    expect(s.mapView).toEqual({ lon: 6.98, lat: 46.27, zoom: 17 }); // 15 → 17
+    expect(s.cameraEpoch).toBe(e0 + 1); // signals the map to recenter
+    expect(s.dirty).toBe(false); // ephemeral — document untouched
+    expect(s.undoStack).toHaveLength(0);
+    expect(persist).not.toHaveBeenCalled();
+  });
+
+  it("flyTo keeps the current zoom when already closer than 17", () => {
+    const { store } = makeStore();
+    store.getState().setMapView({ lon: 0, lat: 0, zoom: 20 });
+    store.getState().flyTo({ lon: 1, lat: 2 });
+    expect(store.getState().mapView.zoom).toBe(20); // don't zoom back out
+  });
 });
 
 describe("autosave debounce", () => {
