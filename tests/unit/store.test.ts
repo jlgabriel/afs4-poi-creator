@@ -302,6 +302,19 @@ describe("lifecycle", () => {
     expect(s.mapView).toEqual({ lon: 10, lat: 48, zoom: 15 });
   });
 
+  it("bumps cameraEpoch on document load (open/new) but not on edits or pan (P1-4 re-center signal)", () => {
+    const { store } = makeStore();
+    const e0 = store.getState().cameraEpoch;
+    store.getState().renameProject("edit"); // a document edit…
+    expect(store.getState().cameraEpoch).toBe(e0); // …does not re-center
+    store.getState().openProject("/p.json", baseProject([xref("a")]));
+    expect(store.getState().cameraEpoch).toBe(e0 + 1); // a load re-centers
+    store.getState().newProject(baseProject());
+    expect(store.getState().cameraEpoch).toBe(e0 + 2);
+    store.getState().setMapView({ lon: 1, lat: 2, zoom: 9 }); // panning…
+    expect(store.getState().cameraEpoch).toBe(e0 + 2); // …never yanks the view back
+  });
+
   it("loadCatalog indexes objects by exact name", () => {
     const { store } = makeStore();
     const catalog: Catalog = {

@@ -1,0 +1,58 @@
+# electron-builder — PCT dev builds (M1e-6). No code signing in v1 (design §Packaging); the README
+# documents the SmartScreen/Gatekeeper "unidentified developer" steps. Installers land in dist/
+# (gitignored). buildResources is resources/ — deliberately NOT build/, which PCT uses as a scratch
+# target for `npm run export`. Production node_modules are pulled in automatically by electron-builder;
+# `files` only needs to allow the electron-vite output + package.json.
+appId: com.jlgabriel.pct
+productName: PCT
+copyright: © 2026 Juan Luis Gabriel — MIT
+
+directories:
+  buildResources: resources
+  output: dist
+
+files:
+  - out/**
+  - package.json
+  - "!**/*.map"
+
+asar: true
+# No native modules → nothing to rebuild against Electron's ABI.
+npmRebuild: false
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+    - target: portable
+      arch: [x64]
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  artifactName: ${name}-${version}-setup.${ext}
+  shortcutName: ${productName}
+  uninstallDisplayName: ${productName}
+
+portable:
+  artifactName: ${name}-${version}-portable.${ext}
+
+# macOS builds must be produced on a Mac (dmg/zip can't be created from Windows). Both arches so
+# Apple-silicon (e.g. an M4) and Intel are covered. Unsigned → Gatekeeper right-click-Open.
+mac:
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+    - target: zip
+      arch: [arm64, x64]
+  category: public.app-category.utilities
+
+dmg:
+  artifactName: ${name}-${version}-${arch}.${ext}
+
+linux:
+  target:
+    - AppImage
+  category: Utility
+  artifactName: ${name}-${version}.${ext}

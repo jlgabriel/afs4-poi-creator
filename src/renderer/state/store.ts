@@ -83,6 +83,7 @@ export interface EditorState {
   placing: string | null; // catalog name armed for click-to-place
   filter: Filter;
   mapView: Camera; // the LIVE camera; stamped into the document only at save
+  cameraEpoch: number; // bumps on document load (open/new) → MapView re-centers; pan never bumps it
   resolvedElev: Map<string, number>; // id → terrain ASL under it, for the inspector; drop on move
 
   // ── low-level (exposed for the map layer + tests) ──
@@ -212,7 +213,7 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
       // The fresh-document reset shared by open/new.
       const load = (project: Project, projectPath: string | null): void => {
         coalesce = null;
-        set({
+        set((s) => ({
           project,
           projectPath,
           dirty: false,
@@ -222,7 +223,8 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
           placing: null,
           resolvedElev: new Map(),
           mapView: project.camera,
-        });
+          cameraEpoch: s.cameraEpoch + 1, // re-center the map on the incoming document (P1-4 / A#4)
+        }));
       };
 
       return {
@@ -237,6 +239,7 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
         placing: null,
         filter: { query: "", category: null },
         mapView: deps.initialProject.camera,
+        cameraEpoch: 0,
         resolvedElev: new Map(),
 
         commit,

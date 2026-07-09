@@ -29,7 +29,6 @@ const BARREL: ResolvedXref = {
 const GOLDEN_TOC = `<[file][][]
     <[cultivation][][]
         <[string8][coordinate_system][lonlat]>
-        <[string8][buildings_texture_folder][]>
         <[list_xref][xref_list][]
             <[xref][element][]
                 <[vector3_float64][position][11.8500000 48.3760000 520.00]>
@@ -53,7 +52,6 @@ const GOLDEN_TSL = `<[file][][]
         <[string8][name][Munich test]>
         <[string8u][coordinate_system][lonlat]>
         <[bool][autoheight][true]>
-        <[string8u][geometry][]>
         <[string8u][cultivation][poi]>
     >
 >
@@ -68,7 +66,6 @@ describe("buildToc — cultivation list_xref", () => {
       "<[file][][]\n" +
         "    <[cultivation][][]\n" +
         "        <[string8][coordinate_system][lonlat]>\n" +
-        "        <[string8][buildings_texture_folder][]>\n" +
         "        <[list_xref][xref_list][]\n" +
         "        >\n" +
         "    >\n" +

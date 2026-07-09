@@ -22,7 +22,7 @@ function messageFor(error: PctError): string {
     case "needs-elevation":
       return "Elevation service unavailable — enter a base elevation (m ASL) below and export again.";
     case "folder-exists":
-      return `A POI folder "${error.folderName}" already exists. (Overwrite / uninstall arrive in M2.)`;
+      return `A POI folder "${error.folderName}" already exists.`;
     default:
       return error.message;
   }
@@ -47,6 +47,29 @@ export function ExportDialog({ onClose }: { onClose: () => void }): React.ReactE
     refMode === "map" ? { lon: mapView.lon, lat: mapView.lat } : centroid(objects.map((o) => o.position));
   const folderName = validSlug ? poiFolderName(previewRef, slug) : null;
 
+  // One install attempt. On a folder-exists refusal, offer to replace and retry with overwrite — the
+  // installer's overwrite path is already safe, so this is dialog-side only (Fable P1-5 / A#5).
+  const install = async (opts: ExportOptions): Promise<void> => {
+    if (!pct) return;
+    setBusy(true);
+    const res = await pct.exportPoi(editorStore.getState().serialize(), opts);
+    setBusy(false);
+
+    if (res.ok) {
+      if (res.value !== null) setResult(res.value); // null only for choose-folder cancel (unused here)
+      return;
+    }
+    if (res.error.code === "folder-exists" && !opts.overwrite) {
+      const replace = window.confirm(
+        `A POI folder "${res.error.folderName}" already exists.\n\nReplace the installed POI?`,
+      );
+      if (replace) return install({ ...opts, overwrite: true });
+      setError(`Kept the existing "${res.error.folderName}". Rename the POI to install a separate copy.`);
+      return;
+    }
+    setError(messageFor(res.error));
+  };
+
   const doExport = async (): Promise<void> => {
     if (!pct || !validSlug) return;
     setError(null);
@@ -66,15 +89,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }): React.ReactE
     const opts: ExportOptions = { target: "install", overwrite: false };
     if (baseElevation !== undefined) opts.baseElevation = baseElevation;
 
-    setBusy(true);
-    const res = await pct.exportPoi(editorStore.getState().serialize(), opts);
-    setBusy(false);
-
-    if (!res.ok) {
-      setError(messageFor(res.error));
-      return;
-    }
-    if (res.value !== null) setResult(res.value); // null only for choose-folder cancel (unused here)
+    await install(opts);
   };
 
   return (

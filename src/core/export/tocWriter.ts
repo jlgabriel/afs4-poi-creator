@@ -28,12 +28,12 @@ function xrefElement(o: ResolvedXref): string[] {
 /** Build the `poi.toc` text for a set of height-resolved objects.
  *  V-matrix assumption: a POI with only xrefs needs just the `xref_list` inside
  *  `cultivation` — the optional plant/light/airport_light lists are omitted, not emitted
- *  empty. If in-sim testing shows the sim wants them present, add them here. */
+ *  empty, and the empty `buildings_texture_folder` tag is dropped too (confirmed
+ *  it's optional, forum 2026-07-08). If in-sim testing shows the sim wants them present, add them here. */
 export function buildToc(objects: ResolvedXref[]): string {
   const xrefList = block("list_xref", "xref_list", "", objects.flatMap(xrefElement));
   const cultivation = block("cultivation", "", "", [
     tag("string8", "coordinate_system", "lonlat"),
-    tag("string8", "buildings_texture_folder", ""),
     ...xrefList,
   ]);
   return block("file", "", "", cultivation).join("\n") + "\n";

@@ -25,10 +25,13 @@ export function MapView(): React.ReactElement {
     const el = ref.current;
     if (!el) return;
 
-    const { camera } = editorStore.getState().project;
+    // Read the LIVE camera (mapView), not project.camera, so a remount (StrictMode / Rescan) restores
+    // where the user was looking. On a document load the store resets mapView to the new project's
+    // camera and bumps cameraEpoch (subscribed below) so the map follows it (Fable P1-4 / A#4).
+    const cam0 = editorStore.getState().mapView;
     const map = L.map(el, { attributionControl: true, zoomControl: true }).setView(
-      [camera.lat, camera.lon],
-      camera.zoom,
+      [cam0.lat, cam0.lon],
+      cam0.zoom,
     );
     // maxNativeZoom < maxZoom = OVERZOOM: keep zooming past native tile resolution so metre-precise
     // placement stays usable instead of hitting gray tiles (P1-5).
@@ -50,6 +53,17 @@ export function MapView(): React.ReactElement {
       (s) => [s.project.objects, s.catalogIndex, s.selection] as const,
       paint,
       { equalityFn: shallow },
+    );
+
+    // Re-center when a NEW document loads (Open / New / Rescan): the store bumps cameraEpoch and resets
+    // mapView to the incoming project's camera. Pan/zoom never bump it, so looking around is never
+    // yanked back (Fable P1-4 / A#4).
+    const unsubCamera = editorStore.subscribe(
+      (s) => s.cameraEpoch,
+      () => {
+        const c = editorStore.getState().mapView;
+        map.setView([c.lat, c.lon], c.zoom);
+      },
     );
 
     // Empty-map click = place the armed object (footprint clicks don't bubble here → select ≠ place).
@@ -75,6 +89,7 @@ export function MapView(): React.ReactElement {
     return () => {
       window.removeEventListener("keydown", onKey);
       unsub();
+      unsubCamera();
       layer.destroy();
       map.remove(); // frees the container so StrictMode's second mount can re-init it
     };
