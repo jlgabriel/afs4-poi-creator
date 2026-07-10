@@ -5,6 +5,7 @@
 // footprint diff stays intact. M2d added scale, label, lock and the lazy elevation fetch (HeightControl).
 import { useState } from "react";
 import type { CatalogObject, PlacedXref } from "../../core/project/types";
+import { clampLonLat } from "../../core/project/schemas";
 import { editorStore, useEditor } from "../state/editorStore";
 import { HeightControl } from "./HeightControl";
 import { NumberInput } from "./NumberInput";
@@ -78,7 +79,8 @@ function ObjectFields({
           <NumberInput
             value={obj.position.lon}
             format={(n) => n.toFixed(6)}
-            onCommit={(lon) => store().moveObject(obj.id, { lon, lat: obj.position.lat })}
+            // clamp into ±180/±90 so a slipped decimal can't write an out-of-range, unloadable project (C1)
+            onCommit={(lon) => store().moveObject(obj.id, clampLonLat({ lon, lat: obj.position.lat }))}
             ariaLabel="Longitude"
           />
         </label>
@@ -87,7 +89,7 @@ function ObjectFields({
           <NumberInput
             value={obj.position.lat}
             format={(n) => n.toFixed(6)}
-            onCommit={(lat) => store().moveObject(obj.id, { lon: obj.position.lon, lat })}
+            onCommit={(lat) => store().moveObject(obj.id, clampLonLat({ lon: obj.position.lon, lat }))}
             ariaLabel="Latitude"
           />
         </label>

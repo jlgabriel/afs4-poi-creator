@@ -19,7 +19,9 @@ export function NumberInput({ value, onCommit, format, id, ariaLabel }: NumberIn
   const commit = (): void => {
     if (draft === null) return;
     const n = Number.parseFloat(draft);
-    if (!Number.isNaN(n) && n !== value) onCommit(n);
+    // isFinite (not just !isNaN): "1e999" parses to Infinity, which zLonLat rejects on the next open —
+    // reject it here so the editor never commits a value its own loader can't read back (Fable C1).
+    if (Number.isFinite(n) && n !== value) onCommit(n);
     setDraft(null);
   };
 

@@ -9,9 +9,20 @@
 // The sim's own text files indent children by 4 spaces per level; `block` reproduces that.
 
 /** A leaf tag on a single line: `<[type][name][value]>`. The value is emitted verbatim —
- *  callers pre-format numbers with the fmt* helpers below so precision is explicit. */
+ *  callers pre-format numbers with the fmt* helpers below so precision is explicit. Free TEXT
+ *  values (a user-typed name) must be run through `sanitizeValue` first — the grammar has no escape. */
 export function tag(type: string, name: string, value: string | number): string {
   return `<[${type}][${name}][${value}]>`;
+}
+
+/** Make arbitrary free text safe as a tag VALUE. The grammar has NO escape mechanism: tmParser reads
+ *  a value verbatim up to the FIRST `]` (see tmParser.bracket), so a stray `]` truncates the value and
+ *  corrupts the rest of the file — e.g. a project named `Munich [WIP]` would break its own `.tsl`
+ *  (Fable C2). Brackets become parens (readable), and CR/LF/TAB collapse to a space so a value can't
+ *  break out of its single line. The only user-controlled value today is the `.tsl` place `name`
+ *  (project.name); catalogue-sourced xref names are slugs and can't contain these. */
+export function sanitizeValue(s: string): string {
+  return s.replace(/\[/g, "(").replace(/\]/g, ")").replace(/[\r\n\t]+/g, " ");
 }
 
 /** A block tag with children, as an array of lines (indented 4 spaces per nesting level):

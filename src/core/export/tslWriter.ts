@@ -17,14 +17,16 @@
 //        (a .tmb geometry is referenced by basename, no extension), so we pass the .toc's
 //        basename ("poi") — planExport writes the file as "poi.toc".
 
-import { tag, block } from "../tm/tmEmit";
+import { tag, block, sanitizeValue } from "../tm/tmEmit";
 
 /** Build the `poi.tsl` text.
  *  @param opts.name         human title stored in the place; optional per the format spec, kept as the POI's label.
  *  @param opts.tocFileName  cultivation reference (the .toc basename), or null for no toc. */
 export function buildTsl(opts: { name: string; tocFileName: string | null }): string {
   const body = [
-    tag("string8", "name", opts.name),
+    // sanitizeValue: project.name is the one user-typed value in the whole export; a `]` in it would
+    // truncate the tag and corrupt the .tsl written into the user's scenery/poi/ (Fable C2).
+    tag("string8", "name", sanitizeValue(opts.name)),
     tag("string8u", "coordinate_system", "lonlat"),
     tag("bool", "autoheight", "true"),
   ];

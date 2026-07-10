@@ -3,6 +3,7 @@ import type { Project, ResolvedXref } from "../../src/core/project/types";
 import { buildToc } from "../../src/core/export/tocWriter";
 import { buildTsl } from "../../src/core/export/tslWriter";
 import { planExport, POI_README_MARKER } from "../../src/core/export/planExport";
+import { parseTm, child } from "../../src/core/tm/tmParser";
 
 // Two placed objects, heights already resolved to ASL — the shape the exporter consumes.
 const TOWER: ResolvedXref = {
@@ -82,6 +83,15 @@ describe("buildTsl — place_simple wrapper", () => {
     const tsl = buildTsl({ name: "Empty", tocFileName: null });
     expect(tsl).not.toContain("cultivation");
     expect(tsl).toContain("<[bool][autoheight][true]>");
+  });
+  it("sanitises brackets in the project name so the .tsl stays parseable (Fable C2)", () => {
+    // Pre-fix, `Munich [WIP]` emitted <…[name][Munich [WIP]]…>, which parseTm truncates at the first
+    // `]` → the file is corrupt. The sanitised form round-trips, and the tag AFTER name survives.
+    const tsl = buildTsl({ name: "Munich [WIP]", tocFileName: "poi" });
+    expect(tsl).toContain("<[string8][name][Munich (WIP)]>");
+    const place = parseTm(tsl).children[0]; // <file> → <tmsimulator_scenery_place_simple>
+    expect(child(place, "name")?.value).toBe("Munich (WIP)");
+    expect(child(place, "cultivation")?.value).toBe("poi");
   });
 });
 

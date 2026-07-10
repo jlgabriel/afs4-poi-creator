@@ -128,7 +128,8 @@ export function ExportDialog({ onClose }: { onClose: () => void }): React.ReactE
     setError(null);
 
     const baseElevation = baseElev.trim() === "" ? undefined : Number.parseFloat(baseElev);
-    if (baseElevation !== undefined && Number.isNaN(baseElevation)) {
+    // isFinite (not just !isNaN): "1e999" → Infinity → "Infinity" literal in the .toc height (Fable C1).
+    if (baseElevation !== undefined && !Number.isFinite(baseElevation)) {
       setError("Base elevation must be a number (metres ASL).");
       return;
     }

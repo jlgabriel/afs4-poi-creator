@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { tag, block, fmtLonLat, fmtMeters, fmtNum } from "../../src/core/tm/tmEmit";
+import { tag, block, sanitizeValue, fmtLonLat, fmtMeters, fmtNum } from "../../src/core/tm/tmEmit";
 
 describe("tag", () => {
   it("emits a leaf tag on one line", () => {
@@ -22,6 +22,20 @@ describe("block", () => {
       "    >",
       ">",
     ]);
+  });
+});
+
+describe("sanitizeValue — free text safe as a tag value (grammar has no escape, Fable C2)", () => {
+  it("turns brackets into parens so a value can't truncate at the first ']'", () => {
+    expect(sanitizeValue("Munich [WIP]")).toBe("Munich (WIP)");
+    expect(sanitizeValue("a]b[c")).toBe("a)b(c");
+  });
+  it("flattens CR/LF/TAB to a space so a value can't break out of its line", () => {
+    expect(sanitizeValue("two\nlines")).toBe("two lines");
+    expect(sanitizeValue("a\r\n\tb")).toBe("a b");
+  });
+  it("leaves ordinary text untouched", () => {
+    expect(sanitizeValue("Munich test")).toBe("Munich test");
   });
 });
 

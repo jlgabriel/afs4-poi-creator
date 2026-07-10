@@ -9,7 +9,7 @@
 // flags any drift between the validators and the model.
 
 import { z } from "zod";
-import type { Project, Settings } from "./types";
+import type { LonLat, Project, Settings } from "./types";
 
 export const CURRENT_PROJECT_VERSION = 1;
 export const CURRENT_SETTINGS_VERSION = 1;
@@ -35,6 +35,17 @@ export const zLonLat = z.object({
   lon: z.number().finite().min(-180).max(180),
   lat: z.number().finite().min(-90).max(90),
 });
+
+/** Clamp a coordinate into the exact WGS84 ranges `zLonLat` enforces on load, so a mistyped inspector
+ *  value (a slipped decimal → lat 481.3) can never produce a project the loader later rejects (Fable
+ *  C1). Assumes finite inputs — the numeric field's `Number.isFinite` gate filters NaN/±Infinity first;
+ *  `firstProjectError` is the save-time net for anything that still slips through. */
+export function clampLonLat(p: LonLat): LonLat {
+  return {
+    lon: Math.min(180, Math.max(-180, p.lon)),
+    lat: Math.min(90, Math.max(-90, p.lat)),
+  };
+}
 
 export const zVec3 = z.tuple([z.number().finite(), z.number().finite(), z.number().finite()]);
 
@@ -137,6 +148,21 @@ export function safeParseProject(raw: unknown) {
 
 export function parseSettings(raw: unknown): Settings {
   return zSettings.parse(migrateSettings(raw));
+}
+
+/** The save-time safety net for Fable C1: the editor must NEVER write a document its own loader would
+ *  reject (a lon/lat out of range, a non-finite coordinate), which would lock the whole project out of
+ *  the app on the next open. Returns a short human reason a project is unsavable, or null if it's valid.
+ *  A precise field path is included when zod supplies one ("objects → 0 → position → lat: …"). */
+export function firstProjectError(raw: unknown): string | null {
+  const res = safeParseProject(raw);
+  if (res.success) return null;
+  const err = res.error;
+  if (err instanceof UnsupportedSchemaVersionError) return err.message;
+  const issue = err.issues[0];
+  if (!issue) return "the project has an invalid value";
+  const where = issue.path.length > 0 ? issue.path.map(String).join(" → ") : "project";
+  return `${where}: ${issue.message}`;
 }
 
 // ── Export-time guard ────────────────────────────────────────────────────────

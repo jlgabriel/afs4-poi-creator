@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
+  clampLonLat,
+  firstProjectError,
   isExportablePoiName,
   migrateProject,
   parseProject,
@@ -103,6 +105,32 @@ describe("parseSettings", () => {
   });
   it("rejects an unknown tile provider", () => {
     expect(() => parseSettings({ ...validSettings(), tiles: { provider: "bing" } })).toThrow();
+  });
+});
+
+describe("clampLonLat — keep a coordinate in the range the loader enforces (Fable C1)", () => {
+  it("clamps out-of-range values to the WGS84 edges", () => {
+    expect(clampLonLat({ lon: 481.3, lat: 200 })).toEqual({ lon: 180, lat: 90 });
+    expect(clampLonLat({ lon: -181, lat: -91 })).toEqual({ lon: -180, lat: -90 });
+  });
+  it("leaves an in-range coordinate untouched", () => {
+    expect(clampLonLat({ lon: 11.85, lat: 48.376 })).toEqual({ lon: 11.85, lat: 48.376 });
+  });
+});
+
+describe("firstProjectError — the save-time safety net (Fable C1)", () => {
+  it("returns null for a valid project", () => {
+    expect(firstProjectError(validProject())).toBeNull();
+  });
+  it("names the offending field for an out-of-range latitude", () => {
+    const bad = { ...validProject(), reference: { lon: 0, lat: 200 } };
+    expect(firstProjectError(bad)).toContain("lat");
+  });
+  it("catches a non-finite coordinate (Infinity from a bad numeric entry)", () => {
+    expect(firstProjectError(withFirstObject({ position: { lon: Infinity, lat: 0 } }))).not.toBeNull();
+  });
+  it("reports an unreadable schemaVersion in words", () => {
+    expect(firstProjectError({ schemaVersion: 2 })).toContain("schemaVersion");
   });
 });
 

@@ -3,7 +3,8 @@
 // dialogs, the renderer only says WHAT). Every command no-ops without the bridge so preview stays
 // safe; the buttons are also disabled there, this is belt-and-suspenders.
 import * as mutate from "../../core/project/mutate";
-import type { PlacedXref } from "../../core/project/types";
+import { firstProjectError } from "../../core/project/schemas";
+import type { PlacedXref, Project } from "../../core/project/types";
 import type { PctError } from "../../shared/pctApi";
 import { editorStore } from "../state/editorStore";
 import { DEFAULT_CAMERA } from "../state/store";
@@ -12,6 +13,21 @@ import { getPct } from "./pct";
 /** Minimal error surfacing for M1e-5 — a proper toast/banner is M2. */
 function reportError(error: PctError): void {
   window.alert(error.message);
+}
+
+/** Save-time safety net for Fable C1: the editor must never write a document its own loader would
+ *  reject (an out-of-range or non-finite coordinate), which would lock the project out on the next
+ *  open. The Inspector's input clamps stop the common cases; this closes the whole class for any path
+ *  that slips through. Returns the project to write, or null after warning (nothing is written). */
+function validatedProjectToSave(): Project | null {
+  const project = editorStore.getState().serialize();
+  const problem = firstProjectError(project);
+  if (problem === null) return project;
+  reportError({
+    code: "invalid-project",
+    message: `Can't save — the project has a value Aerofly would reject (${problem}). Nothing was written; fix it and save again.`,
+  });
+  return null;
 }
 
 /** New blank project (no IPC). Confirms first if there are unsaved changes. */
@@ -39,7 +55,9 @@ export async function doOpen(): Promise<void> {
 export async function doSave(): Promise<void> {
   const pct = getPct();
   if (!pct) return;
-  const res = await pct.saveProject(editorStore.getState().serialize());
+  const project = validatedProjectToSave();
+  if (project === null) return;
+  const res = await pct.saveProject(project);
   if (!res.ok) return reportError(res.error);
   if (res.value === null) return; // user cancelled the Save-As dialog
   editorStore.getState().markSaved(res.value.path);
@@ -50,7 +68,9 @@ export async function doSave(): Promise<void> {
 export async function doSaveAs(): Promise<void> {
   const pct = getPct();
   if (!pct) return;
-  const res = await pct.saveProjectAs(editorStore.getState().serialize());
+  const project = validatedProjectToSave();
+  if (project === null) return;
+  const res = await pct.saveProjectAs(project);
   if (!res.ok) return reportError(res.error);
   if (res.value === null) return; // user cancelled the dialog
   editorStore.getState().markSaved(res.value.path);
