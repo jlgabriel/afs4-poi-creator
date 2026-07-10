@@ -52,10 +52,12 @@ interface Entry {
   handle?: L.CircleMarker; // present only while selected & unlocked (the rotate grip)
 }
 
-// One drag at a time; `mode` routes the shared map mousemove/mouseup. A move tracks the cursor delta
-// from grab; a rotate tracks the bearing anchor→cursor (and the start angle, to skip a no-op release).
+// One drag at a time; `mode` routes the shared mousemove/mouseup. A move tracks the cursor delta from
+// grab and keeps the latest previewed `anchor` (so a release OUTSIDE the map — where there is no map
+// latlng — still commits the right spot, Fable I2); a rotate tracks the bearing anchor→cursor (and the
+// start angle, to skip a no-op release), already release-position-independent via `bearing`.
 type Drag =
-  | { mode: "move"; id: string; startAnchor: LonLat; startMouse: L.LatLng; moved: boolean }
+  | { mode: "move"; id: string; startAnchor: LonLat; startMouse: L.LatLng; anchor: LonLat; moved: boolean }
   | {
       mode: "rotate";
       id: string;
@@ -77,12 +79,15 @@ export class FootprintLayer {
   ) {
     this.group = L.layerGroup().addTo(map);
     map.on("mousemove", this.onMouseMove);
-    map.on("mouseup", this.onMouseUp);
+    // mouseup on the DOCUMENT, not the map: the Inspector and catalog flank the map, so releasing a drag
+    // over them never fired the map's mouseup — the object stayed glued to the cursor with the button up
+    // and the next click committed the move anywhere (Fable I2). document-level catches the release anywhere.
+    document.addEventListener("mouseup", this.onMouseUp);
   }
 
   destroy(): void {
     this.map.off("mousemove", this.onMouseMove);
-    this.map.off("mouseup", this.onMouseUp);
+    document.removeEventListener("mouseup", this.onMouseUp);
     if (this.drag) this.map.dragging.enable();
     this.drag = null;
     this.group.remove();
@@ -91,13 +96,16 @@ export class FootprintLayer {
 
   /** Reconcile the drawn layers with the current objects + selection. O(changed). */
   sync(objects: PlacedXref[], index: Map<string, CatalogObject>, selection: Set<string>): void {
+    // A Rescan swaps in a fresh catalog Map (loadCatalog), so every footprint's bbox / missing state may
+    // differ even though the object references are untouched — force a rebuild of existing entries (I3).
+    const indexChanged = this.index !== index;
     this.index = index;
     const seen = new Set<string>();
     for (const obj of objects) {
       seen.add(obj.id);
       const selected = selection.has(obj.id);
       const prev = this.entries.get(obj.id);
-      switch (diffEntry(prev, obj, selected)) {
+      switch (diffEntry(prev, obj, selected, indexChanged)) {
         case "skip":
           break;
         case "restyle":
@@ -241,6 +249,7 @@ export class FootprintLayer {
       id,
       startAnchor: entry.obj.position,
       startMouse: e.latlng,
+      anchor: entry.obj.position, // latest previewed spot; updated each mousemove, committed on release
       moved: false,
     };
   };
@@ -271,6 +280,7 @@ export class FootprintLayer {
         lon: d.startAnchor.lon + (e.latlng.lng - d.startMouse.lng),
         lat: d.startAnchor.lat + (e.latlng.lat - d.startMouse.lat),
       };
+      d.anchor = anchor; // remember it so a release outside the map commits this spot (I2)
       entry.poly.setLatLngs(this.cornersAt(anchor, entry.obj, cat).map(toLatLng));
       entry.anchor.setLatLng(toLatLng(anchor));
       entry.heading.setLatLngs([toLatLng(anchor), toLatLng(this.headingAt(anchor, entry.obj, cat))]);
@@ -288,17 +298,16 @@ export class FootprintLayer {
     }
   };
 
-  private onMouseUp = (e: L.LeafletMouseEvent): void => {
+  // A DOM listener (document-level), so it needs no map latlng: a move commits the last previewed
+  // `anchor` and a rotate the last `bearing`, both tracked during onMouseMove (Fable I2).
+  private onMouseUp = (): void => {
     const d = this.drag;
     if (!d) return;
     this.drag = null;
     this.map.dragging.enable();
     if (!d.moved) return; // a click, not a drag — selection is handled by the polygon click
     if (d.mode === "move") {
-      this.cb.onMove(d.id, {
-        lon: d.startAnchor.lon + (e.latlng.lng - d.startMouse.lng),
-        lat: d.startAnchor.lat + (e.latlng.lat - d.startMouse.lat),
-      });
+      this.cb.onMove(d.id, d.anchor);
     } else if (d.bearing !== d.startDir) {
       this.cb.onRotate(d.id, d.bearing); // skip a no-op release (snapped back to the start angle)
     }

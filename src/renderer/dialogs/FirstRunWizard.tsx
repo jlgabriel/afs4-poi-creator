@@ -24,10 +24,14 @@ export function FirstRunWizard({ onDone }: { onDone: () => void }): React.ReactE
     if (!pct) return;
     let cancelled = false;
     void (async () => {
-      const paths = await pct.detectPaths();
+      const [paths, settings] = await Promise.all([pct.detectPaths(), pct.getSettings()]);
       if (cancelled) return;
       setCandidates(paths.installDirs);
-      setUserDir(paths.userDir);
+      // Seed the POI-install user dir from the SAVED setting first, falling back to auto-detect only on a
+      // true first run (no saved value). This flow is reused for Rescan and `finish()` writes afs4UserDir
+      // unconditionally — seeding from detect alone silently wiped a hand-set path when auto-detect can't
+      // find it (a non-standard Documents folder), breaking the next export (Fable I1).
+      setUserDir(settings.afs4UserDir ?? paths.userDir);
       setInstallDir(paths.installDirs[0] ?? null);
     })();
     return () => {

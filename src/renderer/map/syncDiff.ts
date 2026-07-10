@@ -6,15 +6,20 @@
 import type { PlacedXref } from "../../core/project/types";
 
 /** `skip` = untouched, `restyle` = only the selection flag flipped (same object reference),
- *  `rebuild` = geometry (object reference) changed, or the entry is brand new. */
+ *  `rebuild` = geometry (object reference) changed, the catalog changed, or the entry is brand new. */
 export type SyncAction = "skip" | "restyle" | "rebuild";
 
+/** `indexChanged` = the catalog index was swapped (a Rescan). It changes an object's footprint bbox and
+ *  its missing (red) state even though the object reference is untouched, so the reference-diff must NOT
+ *  skip it — force a rebuild of every existing entry (Fable I3). */
 export function diffEntry(
   prev: { obj: PlacedXref; selected: boolean } | undefined,
   obj: PlacedXref,
   selected: boolean,
+  indexChanged = false,
 ): SyncAction {
   if (!prev) return "rebuild";
+  if (indexChanged) return "rebuild";
   if (prev.obj === obj && prev.selected === selected) return "skip";
   if (prev.obj === obj) return "restyle";
   return "rebuild";

@@ -36,4 +36,13 @@ describe("diffEntry — the O(changed) sync decision", () => {
     expect(diffEntry({ obj: obj(), selected: false }, obj(), false)).toBe("rebuild");
     expect(diffEntry({ obj: obj(), selected: true }, obj(), true)).toBe("rebuild");
   });
+
+  it("rebuilds an otherwise-unchanged object when the catalog index changed (a Rescan) — Fable I3", () => {
+    const o = obj();
+    // same reference + same selection, but the catalog was swapped → its bbox/missing state may differ
+    expect(diffEntry({ obj: o, selected: false }, o, false, true)).toBe("rebuild");
+    expect(diffEntry({ obj: o, selected: true }, o, true, true)).toBe("rebuild");
+    // and it still skips when the index did NOT change (the common, hot path)
+    expect(diffEntry({ obj: o, selected: false }, o, false, false)).toBe("skip");
+  });
 });
