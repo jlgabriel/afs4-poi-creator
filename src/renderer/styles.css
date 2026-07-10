@@ -407,6 +407,22 @@ body {
   background: #f1f5f9;
   text-align: center;
 }
+.pct-text {
+  font: inherit;
+  padding: 4px 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  background: #fff;
+  color: #0f172a;
+  min-width: 0;
+}
+.pct-lock {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #334155;
+}
 
 /* Height control. */
 .pct-height {
@@ -452,9 +468,32 @@ body {
   color: #64748b;
 }
 .pct-height-resolved {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   font-size: 12px;
   color: #94a3b8;
   font-variant-numeric: tabular-nums;
+}
+.pct-linkbtn {
+  font: inherit;
+  font-size: 12px;
+  padding: 2px 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  background: #fff;
+  color: #2563eb;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.pct-linkbtn:disabled {
+  color: #94a3b8;
+  cursor: default;
+}
+.pct-fetch-err {
+  font-size: 12px;
+  color: #b45309;
 }
 
 /* Placed list (right column, below the inspector). */

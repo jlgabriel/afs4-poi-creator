@@ -2,10 +2,16 @@
 // condition). Radio: Terrain / Terrain + offset / ASL, a metres field, and ±0.5 / ±5 m nudge buttons.
 // Nudging a terrain-mode object silently PROMOTES it to terrain-offset (the store's nudgeHeight does
 // this) so "lift it half a metre" is one click, never a mode dialog. The resolved-ASL readout shows
-// only when already known — the network elevation fetch itself is M2 (resolvedElev stays empty here).
+// the terrain elevation under the object once fetched — the lazy network lookup (M2d) is the "Fetch
+// elevation" button, which populates the store's ephemeral resolvedElev cache via app/commands.
+import { useState } from "react";
 import { editorStore } from "../state/editorStore";
 import type { HeightSpec } from "../../core/project/types";
+import { fetchElevation } from "../app/commands";
+import { hasPct } from "../app/pct";
 import { NumberInput } from "./NumberInput";
+
+const NO_BRIDGE = "Not available in browser preview";
 
 const MODES: readonly { mode: HeightSpec["mode"]; label: string }[] = [
   { mode: "terrain", label: "Terrain" },
@@ -21,6 +27,19 @@ interface HeightControlProps {
 
 export function HeightControl({ id, height, resolvedAsl }: HeightControlProps): React.ReactElement {
   const store = editorStore.getState;
+
+  // Local fetch state. ObjectFields is keyed by object id, so this component remounts on selection
+  // change → fetching/fetchErr reset per object automatically (no stale spinner from a prior object).
+  const [fetching, setFetching] = useState(false);
+  const [fetchErr, setFetchErr] = useState<string | null>(null);
+  const bridge = hasPct();
+  const onFetch = async (): Promise<void> => {
+    setFetching(true);
+    setFetchErr(null);
+    const r = await fetchElevation(id);
+    setFetching(false);
+    if (!r.ok) setFetchErr(r.message);
+  };
 
   const selectMode = (mode: HeightSpec["mode"]): void => {
     if (mode === height.mode) return;
@@ -81,12 +100,24 @@ export function HeightControl({ id, height, resolvedAsl }: HeightControlProps): 
         <span className="pct-unit">m</span>
       </div>
       <div className="pct-height-resolved">
-        {resolvedAsl !== undefined
-          ? `≈ ${resolvedAsl.toFixed(1)} m ASL`
-          : height.mode === "asl"
-            ? "absolute metres ASL"
-            : "resolved at export"}
+        <span>
+          {resolvedAsl !== undefined
+            ? `terrain ≈ ${resolvedAsl.toFixed(1)} m ASL`
+            : height.mode === "asl"
+              ? "absolute metres ASL"
+              : "resolved at export"}
+        </span>
+        <button
+          type="button"
+          className="pct-linkbtn"
+          onClick={() => void onFetch()}
+          disabled={fetching || !bridge}
+          title={bridge ? "Look up the terrain elevation under this object" : NO_BRIDGE}
+        >
+          {fetching ? "Fetching…" : resolvedAsl !== undefined ? "Refetch" : "Fetch elevation"}
+        </button>
       </div>
+      {fetchErr !== null && <div className="pct-fetch-err">{fetchErr}</div>}
     </div>
   );
 }

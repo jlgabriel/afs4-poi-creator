@@ -304,6 +304,40 @@ describe("resolved-elevation cache", () => {
     store.getState().moveObject("a", { lon: 10.01, lat: 48.01 });
     expect(store.getState().resolvedElev.has("a")).toBe(false);
   });
+
+  it("setResolvedElev is ephemeral — no dirty, no undo, no autosave", () => {
+    const { store, persist } = makeStore({ initialProject: baseProject([xref("a")]) });
+    store.getState().setResolvedElev("a", 437.5);
+    const s = store.getState();
+    expect(s.resolvedElev.get("a")).toBe(437.5);
+    expect(s.dirty).toBe(false);
+    expect(s.undoStack).toHaveLength(0);
+    expect(persist).not.toHaveBeenCalled();
+  });
+});
+
+describe("M2d inspector mutations", () => {
+  it("scale / label / lock each commit exactly one undo entry", () => {
+    const { store } = makeStore({ initialProject: baseProject([xref("a")]) });
+    store.getState().scaleObject("a", 2);
+    store.getState().setLabel("a", "north hangar");
+    store.getState().setLocked("a", true);
+    const o = store.getState().project.objects[0];
+    expect(o.scale).toBe(2);
+    expect(o.label).toBe("north hangar");
+    expect(o.locked).toBe(true);
+    expect(store.getState().undoStack).toHaveLength(3);
+  });
+
+  it("clearing the label and unlocking DROP the optional fields", () => {
+    const init = baseProject([xref("a", { label: "x", locked: true })]);
+    const { store } = makeStore({ initialProject: init });
+    store.getState().setLabel("a", undefined);
+    store.getState().setLocked("a", false);
+    const o = store.getState().project.objects[0];
+    expect("label" in o).toBe(false);
+    expect("locked" in o).toBe(false);
+  });
 });
 
 describe("lifecycle", () => {
