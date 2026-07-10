@@ -33,6 +33,7 @@ import {
 } from "./installer";
 import {
   autosaveShadow,
+  clearShadow,
   loadShadow,
   openProject,
   saveProject,
@@ -183,6 +184,13 @@ export function registerIpc(): void {
     }
   });
   ipcMain.handle("pct:loadShadow", (): Project | null => loadShadow(userData()));
+  ipcMain.handle("pct:clearShadow", (): void => {
+    try {
+      clearShadow(userData());
+    } catch {
+      /* best-effort, same as autosaveShadow */
+    }
+  });
 
   // ── Elevation / export / install (M1e-2b) ──
   ipcMain.handle("pct:resolveHeights", (_e, objects: PlacedXref[]) =>

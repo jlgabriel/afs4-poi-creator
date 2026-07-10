@@ -19,6 +19,7 @@ export function doNew(): void {
   const store = editorStore.getState();
   if (store.dirty && !window.confirm("Discard unsaved changes and start a new project?")) return;
   store.newProject(mutate.createProject({ name: "", camera: DEFAULT_CAMERA }));
+  void getPct()?.clearShadow(); // the discarded document's shadow is moot; a fresh edit re-arms it
 }
 
 /** Open a project file (main runs the dialog + validates). */
@@ -31,6 +32,7 @@ export async function doOpen(): Promise<void> {
   if (!res.ok) return reportError(res.error);
   if (res.value === null) return; // user cancelled the dialog
   editorStore.getState().openProject(res.value.path, res.value.project);
+  void pct.clearShadow(); // the opened file IS the saved state → drop the previous doc's shadow
 }
 
 /** Save the current project (main saves to the known path, or prompts Save-As the first time). */
@@ -41,6 +43,22 @@ export async function doSave(): Promise<void> {
   if (!res.ok) return reportError(res.error);
   if (res.value === null) return; // user cancelled the Save-As dialog
   editorStore.getState().markSaved(res.value.path);
+  void pct.clearShadow(); // work is now durable in the file → no crash-recovery copy needed
+}
+
+// ── Crash-recovery banner (M2e). The shadow found at boot sits in store.pendingRecovery; the banner
+// resolves it exactly once. Restore loads it as unsaved work; Discard drops it (store + disk shadow). ──
+
+/** Load the pending crash-recovery shadow as unsaved work. */
+export function restoreRecovery(): void {
+  const pending = editorStore.getState().pendingRecovery;
+  if (pending !== null) editorStore.getState().recoverProject(pending);
+}
+
+/** Dismiss the recovery offer and delete the shadow so it never prompts again. */
+export function discardRecovery(): void {
+  editorStore.getState().setPendingRecovery(null);
+  void getPct()?.clearShadow();
 }
 
 export type FetchResult = { ok: true } | { ok: false; message: string };

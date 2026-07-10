@@ -3,6 +3,7 @@
 // grid; the Export dialog is a fixed-position overlay, so its DOM position in the tree doesn't matter.
 import { useState } from "react";
 import { TopBar } from "./TopBar";
+import { RecoveryBanner } from "./RecoveryBanner";
 import { CatalogPanel } from "../catalog/CatalogPanel";
 import { MapView } from "../map/MapView";
 import { Inspector } from "../inspector/Inspector";
@@ -16,6 +17,7 @@ export function AppShell({ onRescan }: { onRescan: () => void }): React.ReactEle
   return (
     <div className="pct-app">
       <TopBar onRescan={onRescan} onExport={() => setExportOpen(true)} />
+      <RecoveryBanner />
       <CatalogPanel />
       <MapView />
       <div className="pct-right">

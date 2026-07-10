@@ -340,6 +340,56 @@ describe("M2d inspector mutations", () => {
   });
 });
 
+describe("M2e crash-recovery + autosave lifecycle", () => {
+  it("recoverProject loads the shadow as UNSAVED (dirty), resets history/selection, adopts its camera, clears the banner", () => {
+    const { store } = makeStore();
+    store.getState().renameProject("scratch"); // some history to prove it's reset
+    store.getState().select(["ghost"]);
+    const shadow = baseProject([xref("r1")]);
+    shadow.camera = { lon: 7, lat: 46, zoom: 16 };
+    store.getState().setPendingRecovery(shadow);
+    store.getState().recoverProject(shadow);
+    const s = store.getState();
+    expect(s.project.objects.map((o) => o.id)).toEqual(["r1"]);
+    expect(s.dirty).toBe(true); // recovered work is unsaved
+    expect(s.projectPath).toBeNull();
+    expect(s.undoStack).toHaveLength(0);
+    expect(s.redoStack).toHaveLength(0);
+    expect(s.selection).toEqual([]);
+    expect(s.mapView).toEqual({ lon: 7, lat: 46, zoom: 16 });
+    expect(s.pendingRecovery).toBeNull(); // banner dismissed by the load
+  });
+
+  it("setPendingRecovery is ephemeral — no dirty, no undo", () => {
+    const { store } = makeStore();
+    store.getState().setPendingRecovery(baseProject([xref("a")]));
+    expect(store.getState().pendingRecovery).not.toBeNull();
+    expect(store.getState().dirty).toBe(false);
+    expect(store.getState().undoStack).toHaveLength(0);
+    store.getState().setPendingRecovery(null);
+    expect(store.getState().pendingRecovery).toBeNull();
+  });
+
+  it("markSaved cancels a pending autosave — a save never leaves a stale shadow behind", () => {
+    vi.useFakeTimers();
+    const { store, persist } = makeStore({ autosaveMs: 500 });
+    store.getState().renameProject("edit"); // schedules the autosave
+    store.getState().markSaved("/p.json"); // must cancel it
+    vi.advanceTimersByTime(500);
+    expect(persist).not.toHaveBeenCalled();
+    expect(store.getState().dirty).toBe(false);
+  });
+
+  it("loading a document cancels the OUTGOING doc's pending autosave", () => {
+    vi.useFakeTimers();
+    const { store, persist } = makeStore({ autosaveMs: 500 });
+    store.getState().renameProject("edit"); // schedules autosave for the current doc
+    store.getState().newProject(baseProject()); // load() cancels it
+    vi.advanceTimersByTime(500);
+    expect(persist).not.toHaveBeenCalled();
+  });
+});
+
 describe("lifecycle", () => {
   it("openProject resets history, dirty, selection, and adopts the project's camera", () => {
     const { store } = makeStore();

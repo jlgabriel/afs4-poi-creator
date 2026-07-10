@@ -38,11 +38,18 @@ export function useBootstrap(): Bootstrap {
     }
 
     void (async () => {
-      const [settings, cached] = await Promise.all([pct.getSettings(), pct.getCachedCatalog()]);
+      const [settings, cached, shadow] = await Promise.all([
+        pct.getSettings(),
+        pct.getCachedCatalog(),
+        pct.loadShadow(), // a crash-recovery copy from a previous session, or null
+      ]);
       if (cancelled) return;
       if (cached !== null && decideBootPhase(settings, cached) === "editor") {
         store.loadCatalog(cached);
         store.newProject(mutate.createProject({ name: "", camera: DEFAULT_CAMERA }));
+        // Offer recovery non-blockingly: stash the shadow so the editor shows a Restore/Discard banner
+        // (RecoveryBanner). newProject cleared pendingRecovery, so set it AFTER.
+        if (shadow !== null) store.setPendingRecovery(shadow);
         setPhase("editor");
       } else {
         setPhase("wizard");

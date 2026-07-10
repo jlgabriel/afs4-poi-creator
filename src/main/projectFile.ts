@@ -8,7 +8,7 @@
 // untrusted input → parseProject validates it (throws Zod / UnsupportedSchemaVersionError, which
 // ipc.ts maps to envelopes); SAVE writes renderer-owned, already-valid state as-is.
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import type { Project } from "../core/project/types";
 import { parseProject, safeParseProject } from "../core/project/schemas";
@@ -90,4 +90,10 @@ export function loadShadow(userDataDir: string): Project | null {
   } catch {
     return null;
   }
+}
+
+/** Drop the shadow — after a save (the work is now durable in the file) or when the user declines
+ *  recovery. Best-effort: `force` means a missing file is not an error. */
+export function clearShadow(userDataDir: string): void {
+  rmSync(shadowFile(userDataDir), { force: true });
 }

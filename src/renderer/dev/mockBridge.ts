@@ -93,19 +93,52 @@ function mockSettings(installDir: string | null): Settings {
   };
 }
 
+/** A synthetic crash-recovery shadow for the `?mockpct&recover` harness — a couple of placed objects
+ *  near Bex/CH so the RecoveryBanner has real content to restore. */
+function recoverShadow(catalog: Catalog): Project {
+  const at = (lon: number, lat: number, over: Partial<Project["objects"][number]> = {}) => ({
+    id: `rec-${lon}-${lat}`,
+    kind: "xref" as const,
+    name: catalog.xref[0].name,
+    position: { lon, lat },
+    height: { mode: "terrain" as const },
+    direction: 0,
+    scale: 1,
+    ...over,
+  });
+  return {
+    schemaVersion: 1,
+    app: "pct",
+    name: "Recovered session",
+    poiName: "recovered",
+    createdAt: "2026-07-09T00:00:00Z",
+    modifiedAt: "2026-07-09T00:00:00Z",
+    reference: null,
+    camera: { lon: 6.9847, lat: 46.2569, zoom: 16 },
+    objects: [
+      at(6.9847, 46.2569),
+      at(6.985, 46.2572, { id: "rec-b", direction: 90, height: { mode: "asl", value: 500 } }),
+    ],
+  };
+}
+
 export function installMockBridge(): void {
   // If a real bridge already exists (e.g. someone loads a ?mockpct URL inside Electron-dev), leave it
   // alone — window.pct there is a read-only contextBridge binding and assigning over it throws.
   if ((window as unknown as { pct?: PctApi }).pct) return;
 
   const catalog = buildBigCatalog();
-  let settings = mockSettings(null); // installDir null → useBootstrap sends us to the wizard
+  // `?mockpct&recover` simulates a returning user whose last session crashed: a cached catalog +
+  // known install dir (→ editor, not wizard) AND a shadow to recover, so the RecoveryBanner shows.
+  const wantRecover = location.search.includes("recover");
+  let settings = mockSettings(wantRecover ? "C:/Mock/Aerofly FS 4" : null); // null installDir → wizard
   const noop = async (): Promise<void> => {};
+  let shadow: Project | null = wantRecover ? recoverShadow(catalog) : null;
 
   const api: PctApi = {
     detectPaths: async () => ({ installDirs: ["C:/Mock/Aerofly FS 4"], userDir: "C:/Mock/User" }),
     scan: async () => ({ ok: true, value: catalog }),
-    getCachedCatalog: async () => null, // nothing cached → wizard
+    getCachedCatalog: async () => (wantRecover ? catalog : null), // recover → editor; else wizard
     getSettings: async () => settings,
     setSettings: async (patch) => {
       settings = { ...settings, ...patch };
@@ -116,7 +149,10 @@ export function installMockBridge(): void {
     saveProject: async () => ({ ok: true, value: { path: "C:/Mock/project.json" } }),
     saveProjectAs: async () => ({ ok: true, value: { path: "C:/Mock/project.json" } }),
     autosaveShadow: noop,
-    loadShadow: async () => null,
+    loadShadow: async () => shadow,
+    clearShadow: async () => {
+      shadow = null;
+    },
     resolveHeights: async (objects) => ({
       ok: true,
       value: objects.map((o) => ({ ...o, heightAsl: 100 })),

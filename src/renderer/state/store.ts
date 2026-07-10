@@ -85,6 +85,7 @@ export interface EditorState {
   mapView: Camera; // the LIVE camera; stamped into the document only at save
   cameraEpoch: number; // bumps on document load (open/new) → MapView re-centers; pan never bumps it
   resolvedElev: Map<string, number>; // id → terrain ASL under it, for the inspector; drop on move
+  pendingRecovery: Project | null; // a crash-recovery shadow found at boot, awaiting Restore/Discard
 
   // ── low-level (exposed for the map layer + tests) ──
   commit: (fn: (p: Project) => Project) => void;
@@ -95,6 +96,7 @@ export interface EditorState {
   loadCatalog: (catalog: Catalog) => void;
   openProject: (path: string | null, project: Project) => void;
   newProject: (project: Project) => void;
+  recoverProject: (project: Project) => void; // load a crash-recovery shadow as UNSAVED (dirty) work
   markSaved: (path: string | null) => void;
 
   // ── selection / placement / filter (ephemeral) ──
@@ -123,6 +125,7 @@ export interface EditorState {
   setMapView: (camera: Camera) => void;
   flyTo: (p: LonLat) => void;
   setResolvedElev: (id: string, terrainAsl: number) => void;
+  setPendingRecovery: (project: Project | null) => void;
 
   // ── history ──
   undo: () => void;
@@ -171,6 +174,15 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
           deps.persist(serializeProject(get()));
         }, deps.autosaveMs);
       };
+      // Drop a pending autosave so it can't fire AFTER a save/load and resurrect a stale shadow (the
+      // false-recovery bug). markSaved + load call this; the shadow's lifecycle is then owned by the
+      // explicit save/new/open path (commands.ts clears it) and fresh edits re-arm autosave.
+      const cancelAutosave = (): void => {
+        if (autosaveTimer) {
+          clearTimeout(autosaveTimer);
+          autosaveTimer = null;
+        }
+      };
 
       // THE chokepoint: push prev → set next → dirty → clear redo → autosave. A no-op transform
       // (mutate.ts returns the same reference) changes nothing and never pollutes the undo stack.
@@ -211,18 +223,21 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
         return selection.filter((id) => ids.has(id));
       };
 
-      // The fresh-document reset shared by open/new.
-      const load = (project: Project, projectPath: string | null): void => {
+      // The fresh-document reset shared by open/new/recover. `dirty` is false for open/new (the doc
+      // matches a saved file or is blank) and true for recover (unsaved work restored from a shadow).
+      const load = (project: Project, projectPath: string | null, dirty = false): void => {
         coalesce = null;
+        cancelAutosave(); // a pending autosave belonged to the OUTGOING document — don't let it fire
         set((s) => ({
           project,
           projectPath,
-          dirty: false,
+          dirty,
           undoStack: [],
           redoStack: [],
           selection: [],
           placing: null,
           resolvedElev: new Map(),
+          pendingRecovery: null, // a fresh document clears any recovery banner
           mapView: project.camera,
           cameraEpoch: s.cameraEpoch + 1, // re-center the map on the incoming document (P1-4 / A#4)
         }));
@@ -242,6 +257,7 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
         mapView: deps.initialProject.camera,
         cameraEpoch: 0,
         resolvedElev: new Map(),
+        pendingRecovery: null,
 
         commit,
         commitCoalesced,
@@ -251,8 +267,11 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
           set({ catalog, catalogIndex: new Map(catalog.xref.map((o) => [o.name, o])) }),
         openProject: (path, project) => load(project, path),
         newProject: (project) => load(project, null),
-        markSaved: (path) =>
-          set((s) => ({ project: serializeProject(s), projectPath: path, dirty: false })),
+        recoverProject: (project) => load(project, null, true), // no path yet; unsaved → dirty
+        markSaved: (path) => {
+          cancelAutosave(); // we just saved — a pending autosave would only rewrite a now-stale shadow
+          set((s) => ({ project: serializeProject(s), projectPath: path, dirty: false }));
+        },
 
         select: (ids, additive = false) =>
           set((s) => ({ selection: additive ? [...new Set([...s.selection, ...ids])] : [...ids] })),
@@ -352,6 +371,7 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
             resolvedElev.set(id, terrainAsl);
             return { resolvedElev };
           }),
+        setPendingRecovery: (project) => set({ pendingRecovery: project }),
 
         undo: () => {
           const { undoStack } = get();

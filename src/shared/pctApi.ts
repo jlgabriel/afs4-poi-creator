@@ -69,6 +69,7 @@ export interface PctApi {
   saveProjectAs(project: Project): Promise<PctResult<{ path: string } | null>>;
   autosaveShadow(project: Project): Promise<void>;
   loadShadow(): Promise<Project | null>;
+  clearShadow(): Promise<void>; // drop the shadow after a save or a declined recovery
 
   resolveHeights(objects: PlacedXref[]): Promise<PctResult<ResolvedXref[]>>;
   // `null` value = the user cancelled the choose-folder dialog (target "install" never cancels).

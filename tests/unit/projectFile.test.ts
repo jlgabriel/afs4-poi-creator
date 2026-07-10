@@ -6,6 +6,7 @@ import type { Project } from "../../src/core/project/types";
 import { UnsupportedSchemaVersionError } from "../../src/core/project/schemas";
 import {
   autosaveShadow,
+  clearShadow,
   getCurrentProjectPath,
   loadShadow,
   openProject,
@@ -118,5 +119,14 @@ describe("autosaveShadow / loadShadow", () => {
   it("returns null on an unreadable schemaVersion", () => {
     writeFileSync(path.join(tmp, "shadow.json"), JSON.stringify({ schemaVersion: 99 }), "utf8");
     expect(loadShadow(tmp)).toBeNull();
+  });
+  it("clearShadow removes the shadow", () => {
+    autosaveShadow(tmp, proj({ name: "Doomed" }));
+    expect(loadShadow(tmp)).not.toBeNull();
+    clearShadow(tmp);
+    expect(loadShadow(tmp)).toBeNull();
+  });
+  it("clearShadow with no shadow present is a no-op (never throws)", () => {
+    expect(() => clearShadow(tmp)).not.toThrow();
   });
 });

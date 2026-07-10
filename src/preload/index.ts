@@ -17,6 +17,7 @@ const pct: PctApi = {
   saveProjectAs: (project) => ipcRenderer.invoke("pct:saveProjectAs", project),
   autosaveShadow: (project) => ipcRenderer.invoke("pct:autosaveShadow", project),
   loadShadow: () => ipcRenderer.invoke("pct:loadShadow"),
+  clearShadow: () => ipcRenderer.invoke("pct:clearShadow"),
   resolveHeights: (objects) => ipcRenderer.invoke("pct:resolveHeights", objects),
   exportPoi: (project, opts) => ipcRenderer.invoke("pct:exportPoi", project, opts),
   uninstallPoi: (folderName) => ipcRenderer.invoke("pct:uninstallPoi", folderName),
