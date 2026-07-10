@@ -189,6 +189,35 @@ body {
   font-variant-numeric: tabular-nums;
   opacity: 0.8;
 }
+/* Map-style quick switch — a segmented control in the dark top bar (overrides .pct-topbar button). */
+.pct-tileswitch {
+  display: flex;
+  border: 1px solid #4b5563;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.pct-tileswitch button {
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 10px;
+  border: none;
+  border-left: 1px solid #4b5563;
+  border-radius: 0;
+  background: #1f2937;
+  color: #cbd5e1;
+  cursor: pointer;
+}
+.pct-tileswitch button:first-child {
+  border-left: none;
+}
+.pct-tileswitch button.on {
+  background: #2563eb;
+  color: #fff;
+}
+.pct-tileswitch button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
 
 /* Panel chrome (catalog + inspector). */
 .pct-panel-title {

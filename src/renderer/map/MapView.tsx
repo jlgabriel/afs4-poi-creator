@@ -10,22 +10,15 @@ import "leaflet/dist/leaflet.css";
 import { shallow } from "zustand/shallow";
 import { editorStore, useEditor } from "../state/editorStore";
 import type { TilesConfig } from "../state/store";
+import { tileSourceFor } from "./tileProviders";
 import { FootprintLayer } from "./FootprintLayer";
 
-// Esri World Imagery (design §4 default). CSP allows server.arcgisonline.com img-src (and, since M2h,
-// any https host so a user's custom XYZ provider works — main/index.ts).
-const ESRI_URL =
-  "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
-const ESRI_ATTR =
-  'Tiles &copy; <a href="https://www.esri.com/">Esri</a> — Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community';
-
-/** The tile layer for the current provider: Esri, or a user's custom XYZ template (falling back to
- *  Esri if the custom URL is blank). Overzoom (maxNativeZoom < maxZoom) keeps metre-precise placement. */
+/** The tile layer for the current provider (Esri satellite / OSM streets / custom XYZ). Overzoom
+ *  (maxNativeZoom < maxZoom) keeps metre-precise placement usable past the source's native resolution.
+ *  CSP allows any https host since M2h (main/index.ts), so a custom provider works packaged too. */
 function buildTileLayer(tiles: TilesConfig): L.TileLayer {
-  const custom = tiles.provider === "custom" && !!tiles.customUrl;
-  const url = custom ? (tiles.customUrl as string) : ESRI_URL;
-  const attribution = custom ? (tiles.customAttribution ?? "") : ESRI_ATTR;
-  return L.tileLayer(url, { maxNativeZoom: 19, maxZoom: 22, attribution });
+  const src = tileSourceFor(tiles);
+  return L.tileLayer(src.url, { maxNativeZoom: src.maxNativeZoom, maxZoom: 22, attribution: src.attribution });
 }
 
 export function MapView(): React.ReactElement {

@@ -85,7 +85,7 @@ export const zSettings = z.looseObject({
   installDir: z.string().nullable(),
   afs4UserDir: z.string().nullable(),
   tiles: z.looseObject({
-    provider: z.enum(["esri", "custom"]),
+    provider: z.enum(["esri", "osm", "custom"]),
     customUrl: z.string().optional(),
     customAttribution: z.string().optional(),
   }),

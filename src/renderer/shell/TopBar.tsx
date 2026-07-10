@@ -6,12 +6,42 @@
 import { useState } from "react";
 import { editorStore, useEditor } from "../state/editorStore";
 import { hasPct } from "../app/pct";
-import { doNew, doOpen, doSave, doSaveAs } from "../app/commands";
+import { doNew, doOpen, doSave, doSaveAs, setTileProvider } from "../app/commands";
+import { PROVIDER_LABEL, type TileProvider } from "../map/tileProviders";
 
 const NO_PCT = "Not available in browser preview";
 
 /** Filename of the open project.json (main owns the real path; this is display-only, P0-2). */
 const basename = (p: string): string => p.split(/[\\/]/).pop() || p;
+
+/** Quick map-style switch (design §4): Satellite (Esri) / Streets (OSM) / Custom, so the user can flip
+ *  when Esri lacks imagery in an area — without opening Settings. Custom is enabled only once a URL is
+ *  configured there. Each click swaps the map live and persists the choice (setTileProvider). */
+function MapStyleSwitch(): React.ReactElement {
+  const provider = useEditor((s) => s.tiles.provider);
+  const hasCustomUrl = useEditor((s) => Boolean(s.tiles.customUrl));
+  const options: TileProvider[] = ["esri", "osm", "custom"];
+  return (
+    <div className="pct-tileswitch" role="group" aria-label="Map style">
+      {options.map((p) => {
+        const disabled = p === "custom" && !hasCustomUrl;
+        return (
+          <button
+            key={p}
+            type="button"
+            className={provider === p ? "on" : undefined}
+            aria-pressed={provider === p}
+            disabled={disabled}
+            title={disabled ? "Set a custom tile URL in Settings" : `${PROVIDER_LABEL[p]} map`}
+            onClick={() => setTileProvider(p)}
+          >
+            {PROVIDER_LABEL[p]}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 /** Editable project name — local draft committed on blur/Enter (one undo entry, not one per key). */
 function ProjectNameField(): React.ReactElement {
@@ -99,6 +129,7 @@ export function TopBar({ onExport, onRescan, onSettings }: TopBarProps): React.R
       </button>
 
       <span className="pct-spacer" />
+      <MapStyleSwitch />
       <span className="pct-readout">
         {objCount} {objCount === 1 ? "object" : "objects"}
       </span>

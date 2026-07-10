@@ -72,6 +72,15 @@ export function discardRecovery(): void {
   void getPct()?.clearShadow();
 }
 
+/** Switch the map tile provider (TopBar quick-switch / Settings). Swaps the map live via the store,
+ *  and persists to settings.json so the choice survives a restart. Keeps any configured custom URL so
+ *  toggling Satellite ↔ Streets ↔ Custom never loses it. No-ops the persist without the bridge. */
+export function setTileProvider(provider: "esri" | "osm" | "custom"): void {
+  const tiles = { ...editorStore.getState().tiles, provider };
+  editorStore.getState().setTiles(tiles); // live tile swap (MapView subscribes)
+  void getPct()?.setSettings({ tiles }); // persist (best-effort; absent in the preview harness)
+}
+
 export type FetchResult = { ok: true } | { ok: false; message: string };
 
 /** Fetch the terrain elevation under one object and cache it for the inspector (design §5: the height

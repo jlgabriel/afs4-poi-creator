@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import type { Settings } from "../../core/project/types";
 import { editorStore } from "../state/editorStore";
 import type { TilesConfig } from "../state/store";
+import type { TileProvider } from "../map/tileProviders";
 import { getPct } from "../app/pct";
 
 const dash = (p: string | null): string => (p !== null && p.length > 0 ? p : "— not set —");
@@ -23,7 +24,7 @@ export function SettingsDialog({
   const [loaded, setLoaded] = useState(false);
   const [installDir, setInstallDir] = useState<string | null>(null);
   const [userDir, setUserDir] = useState<string | null>(null);
-  const [provider, setProvider] = useState<"esri" | "custom">("esri");
+  const [provider, setProvider] = useState<TileProvider>("esri");
   const [customUrl, setCustomUrl] = useState("");
   const [customAttr, setCustomAttr] = useState("");
   const [elevation, setElevation] = useState<"open-meteo" | "none">("open-meteo");
@@ -77,7 +78,7 @@ export function SettingsDialog({
             customUrl: customUrl.trim() || undefined,
             customAttribution: customAttr.trim() || undefined,
           }
-        : { provider: "esri" };
+        : { provider }; // "esri" | "osm"
     await pct.setSettings({
       installDir,
       afs4UserDir: userDir,
@@ -138,7 +139,16 @@ export function SettingsDialog({
                   checked={provider === "esri"}
                   onChange={() => setProvider("esri")}
                 />
-                Esri World Imagery (default)
+                Esri World Imagery — satellite (default)
+              </label>
+              <label className="pct-radio">
+                <input
+                  type="radio"
+                  name="tiles"
+                  checked={provider === "osm"}
+                  onChange={() => setProvider("osm")}
+                />
+                OpenStreetMap — streets (full coverage where satellite is missing)
               </label>
               <label className="pct-radio">
                 <input

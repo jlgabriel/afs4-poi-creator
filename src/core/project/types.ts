@@ -109,7 +109,7 @@ export interface Settings {
   installDir: string | null; // AFS4 install (read: scenery/xref)
   afs4UserDir: string | null; // AFS4 user folder (write: scenery/poi)
   tiles: {
-    provider: "esri" | "custom";
+    provider: "esri" | "osm" | "custom"; // esri satellite (default) · OSM streets · custom XYZ URL
     customUrl?: string; // XYZ template, user-supplied
     customAttribution?: string;
   };
