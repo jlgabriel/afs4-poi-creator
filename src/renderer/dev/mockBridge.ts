@@ -9,7 +9,7 @@
 // the real scanner uses, so object field shapes match production exactly.
 import type { Catalog, CatalogObject, Project, Settings } from "../../core/project/types";
 import { categorize, displayName } from "../../core/catalog/categorize";
-import type { PctApi } from "../../shared/pctApi";
+import type { InstalledPoi, PctApi } from "../../shared/pctApi";
 
 // A spread of real-ish name stems across the catalog's categories, expanded with numeric suffixes to
 // ~900 entries so the list is production-scale.
@@ -134,6 +134,13 @@ export function installMockBridge(): void {
   let settings = mockSettings(wantRecover ? "C:/Mock/Aerofly FS 4" : null); // null installDir → wizard
   const noop = async (): Promise<void> => {};
   let shadow: Project | null = wantRecover ? recoverShadow(catalog) : null;
+  // A couple of PCT-authored POIs + one built-in, so the export dialog's installed-list + Uninstall are
+  // exercisable in the preview harness. uninstallPoi mutates this; install adds to it.
+  let installedPois: InstalledPoi[] = [
+    { folderName: "e00367n4801_france", byPct: true },
+    { folderName: "e00698n4627_suiza", byPct: true },
+    { folderName: "toulouse_city", byPct: false },
+  ];
 
   const api: PctApi = {
     detectPaths: async () => ({ installDirs: ["C:/Mock/Aerofly FS 4"], userDir: "C:/Mock/User" }),
@@ -157,12 +164,22 @@ export function installMockBridge(): void {
       ok: true,
       value: objects.map((o) => ({ ...o, heightAsl: 100 })),
     }),
-    exportPoi: async () => ({
-      ok: true,
-      value: { folderName: "mock", path: "C:/Mock/poi", installed: false, warnings: [] },
-    }),
-    uninstallPoi: async () => ({ ok: true, value: undefined }),
-    listInstalledPois: async () => [],
+    exportPoi: async (_project, opts) => {
+      const installed = opts.target === "install";
+      const folderName = "e00698n4627_recovered";
+      if (installed && !installedPois.some((p) => p.folderName === folderName)) {
+        installedPois = [...installedPois, { folderName, byPct: true }];
+      }
+      const path = installed
+        ? `C:/Mock/Aerofly FS 4/scenery/poi/${folderName}`
+        : `C:/Mock/Exports/${folderName}`;
+      return { ok: true, value: { folderName, path, installed, warnings: [] } };
+    },
+    uninstallPoi: async (folderName) => {
+      installedPois = installedPois.filter((p) => p.folderName !== folderName);
+      return { ok: true, value: undefined };
+    },
+    listInstalledPois: async () => installedPois,
     revealInFolder: noop,
   };
 

@@ -834,3 +834,42 @@ body {
   margin: 0;
   padding-left: 18px;
 }
+
+/* Installed-POI manager (export dialog, M2g). */
+.pct-installed {
+  margin-top: 6px;
+  padding-top: 10px;
+  border-top: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.pct-installed-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 140px;
+  overflow-y: auto;
+}
+.pct-installed-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pct-installed-row .pct-path {
+  flex: 1 1 auto;
+}
+.pct-installed-row button {
+  flex: none;
+  font: inherit;
+  font-size: 12px;
+  padding: 3px 10px;
+  border: 1px solid #fca5a5;
+  border-radius: 4px;
+  background: #fff;
+  color: #b91c1c;
+  cursor: pointer;
+}

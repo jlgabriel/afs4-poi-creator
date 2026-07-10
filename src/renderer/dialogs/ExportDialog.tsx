@@ -1,11 +1,12 @@
-// ExportDialog.tsx — the minimal export/install dialog (design §5). Slug (live-validated) + anchor
+// ExportDialog.tsx — the export/install dialog (design §5). Slug (live-validated) + anchor
 // (auto-centroid or current map center) + a live folder-name preview that mirrors planExport exactly
-// (poiFolderName(reference ?? centroid(objects), poiName)). "Install into AFS4" calls exportPoi; a
-// needs-elevation envelope is answered by the inline base-elevation field (offline fallback), and
-// success shows the path + Reveal + the restart note. The chrome is previewable without the bridge —
-// only the Install action needs it. Overwrite / uninstall / export-to-folder are M2.
-import { useState } from "react";
-import type { ExportOptions, InstallResult, PctError } from "../../shared/pctApi";
+// (poiFolderName(reference ?? centroid(objects), poiName)). A destination radio picks Install into AFS4
+// vs Export to a folder (target "install" | "choose-folder"); a needs-elevation envelope is answered by
+// the inline base-elevation field (offline fallback); a folder-exists refusal offers overwrite. Below
+// the form, a list of PCT-installed POIs with per-row Uninstall (M2g). The chrome is previewable
+// without the bridge — only the write actions need it.
+import { useCallback, useEffect, useState } from "react";
+import type { ExportOptions, InstallResult, InstalledPoi, PctError } from "../../shared/pctApi";
 import type { LonLat } from "../../core/project/types";
 import { centroid, poiFolderName } from "../../core/geo/poiName";
 import { isExportablePoiName } from "../../core/project/schemas";
@@ -15,6 +16,56 @@ import { getPct } from "../app/pct";
 function sameRef(a: LonLat | null, b: LonLat | null): boolean {
   if (a === null || b === null) return a === b;
   return a.lon === b.lon && a.lat === b.lat;
+}
+
+/** The installed-POI manager below the export form (design §5). Lists what's under scenery/poi/ and
+ *  offers Uninstall only for PCT-authored folders (byPct = carries our README marker → safe to delete);
+ *  built-in / third-party POIs are shown but left untouched. Refetches after each uninstall. */
+function InstalledPois(): React.ReactElement | null {
+  const pct = getPct();
+  const [rows, setRows] = useState<InstalledPoi[] | null>(null);
+
+  const refresh = useCallback(() => {
+    if (!pct) {
+      setRows([]);
+      return;
+    }
+    void pct.listInstalledPois().then(setRows);
+  }, [pct]);
+  useEffect(refresh, [refresh]);
+
+  const uninstall = async (folderName: string): Promise<void> => {
+    if (!pct) return;
+    if (!window.confirm(`Remove the installed POI "${folderName}"? This deletes its scenery/poi folder.`))
+      return;
+    const res = await pct.uninstallPoi(folderName);
+    if (res.ok) refresh();
+    else window.alert(res.error.message);
+  };
+
+  if (rows === null || rows.length === 0) return null; // hide the section until there's something to show
+
+  return (
+    <div className="pct-installed">
+      <div className="pct-field-label">Installed POIs</div>
+      <ul className="pct-installed-list">
+        {rows.map((p) => (
+          <li key={p.folderName} className="pct-installed-row">
+            <code className="pct-path">{p.folderName}</code>
+            {p.byPct ? (
+              <button type="button" onClick={() => void uninstall(p.folderName)}>
+                Uninstall
+              </button>
+            ) : (
+              <span className="pct-field-meta" title="Not installed by PCT — left untouched">
+                built-in
+              </span>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 }
 
 function messageFor(error: PctError): string {
@@ -37,6 +88,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }): React.ReactE
 
   const [slug, setSlug] = useState(storePoiName);
   const [refMode, setRefMode] = useState<"auto" | "map">(storeRef !== null ? "map" : "auto");
+  const [target, setTarget] = useState<ExportOptions["target"]>("install");
   const [baseElev, setBaseElev] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -60,11 +112,12 @@ export function ExportDialog({ onClose }: { onClose: () => void }): React.ReactE
       return;
     }
     if (res.error.code === "folder-exists" && !opts.overwrite) {
+      const where = opts.target === "install" ? "installed POI" : "folder";
       const replace = window.confirm(
-        `A POI folder "${res.error.folderName}" already exists.\n\nReplace the installed POI?`,
+        `A POI folder "${res.error.folderName}" already exists.\n\nReplace the existing ${where}?`,
       );
       if (replace) return install({ ...opts, overwrite: true });
-      setError(`Kept the existing "${res.error.folderName}". Rename the POI to install a separate copy.`);
+      setError(`Kept the existing "${res.error.folderName}". Rename the POI to write a separate copy.`);
       return;
     }
     setError(messageFor(res.error));
@@ -86,7 +139,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }): React.ReactE
     const desiredRef = refMode === "map" ? { lon: mapView.lon, lat: mapView.lat } : null;
     if (!sameRef(store.project.reference, desiredRef)) store.setReference(desiredRef);
 
-    const opts: ExportOptions = { target: "install", overwrite: false };
+    const opts: ExportOptions = { target, overwrite: false };
     if (baseElevation !== undefined) opts.baseElevation = baseElevation;
 
     await install(opts);
@@ -104,7 +157,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }): React.ReactE
 
         {result !== null ? (
           <div className="pct-export-done">
-            <p className="pct-ok">Installed to:</p>
+            <p className="pct-ok">{result.installed ? "Installed to:" : "Exported to:"}</p>
             <code className="pct-path">{result.path}</code>
             {result.warnings.length > 0 && (
               <ul className="pct-warnings">
@@ -115,9 +168,15 @@ export function ExportDialog({ onClose }: { onClose: () => void }): React.ReactE
                 ))}
               </ul>
             )}
-            <p>
-              <strong>Restart Aerofly FS 4 to see your POI.</strong>
-            </p>
+            {result.installed ? (
+              <p>
+                <strong>Restart Aerofly FS 4 to see your POI.</strong>
+              </p>
+            ) : (
+              <p>
+                Copy this folder into your Aerofly FS 4 <code>scenery/poi</code> to install it.
+              </p>
+            )}
             <div className="pct-modal-actions">
               <button onClick={() => void pct?.revealInFolder(result.folderName)}>Reveal in folder</button>
               <span className="pct-spacer" />
@@ -166,6 +225,28 @@ export function ExportDialog({ onClose }: { onClose: () => void }): React.ReactE
             </label>
 
             <div className="pct-field pct-field-col">
+              <span className="pct-field-label">Destination</span>
+              <label className="pct-radio">
+                <input
+                  type="radio"
+                  name="target"
+                  checked={target === "install"}
+                  onChange={() => setTarget("install")}
+                />
+                Install into Aerofly FS 4
+              </label>
+              <label className="pct-radio">
+                <input
+                  type="radio"
+                  name="target"
+                  checked={target === "choose-folder"}
+                  onChange={() => setTarget("choose-folder")}
+                />
+                Export to a folder…
+              </label>
+            </div>
+
+            <div className="pct-field pct-field-col">
               <span className="pct-field-label">Folder name</span>
               <code className="pct-path">{folderName ?? "(enter a valid POI name)"}</code>
             </div>
@@ -179,13 +260,18 @@ export function ExportDialog({ onClose }: { onClose: () => void }): React.ReactE
               <button
                 className="pct-primary"
                 disabled={!validSlug || busy || !pct || objects.length === 0}
-                title={pct ? undefined : "Install runs in the desktop app"}
+                title={pct ? undefined : "Export runs in the desktop app"}
                 onClick={() => void doExport()}
               >
-                {busy ? "Exporting…" : "Install into AFS4"}
+                {busy
+                  ? "Working…"
+                  : target === "install"
+                    ? "Install into AFS4"
+                    : "Export to folder…"}
               </button>
             </div>
-            {!pct && <p className="pct-empty">Install runs in the desktop app (npm run dev).</p>}
+            {!pct && <p className="pct-empty">Export runs in the desktop app (npm run dev).</p>}
+            <InstalledPois />
           </>
         )}
       </div>
