@@ -24,3 +24,8 @@ catalog.json
 .idea/
 .DS_Store
 Thumbs.db
+
+# local-only — internal design/review docs and local editor/preview config.
+# Kept on disk (shared with Claude locally); never pushed to GitHub.
+docs/
+.claude/
