@@ -29,19 +29,19 @@ const BARREL: ResolvedXref = {
 // the cultivation format; never let it drift silently.
 const GOLDEN_TOC = `<[file][][]
     <[cultivation][][]
-        <[string8][coordinate_system][lonlat]>
+        <[string8u][coordinate_system][lonlat]>
         <[list_xref][xref_list][]
-            <[xref][element][]
-                <[vector3_float64][position][11.8500000 48.3760000 520.00]>
-                <[float64][direction][90]>
-                <[float32][scale_factor][1]>
+            <[xref][element][0]
                 <[string8u][name][tower00_small_plates_ds_00_08_08]>
+                <[vector3_float64][position][11.8500000 48.3760000 520.00]>
+                <[float32][direction][90]>
+                <[float32][scale_factor][1]>
             >
-            <[xref][element][]
-                <[vector3_float64][position][11.8501000 48.3761000 519.50]>
-                <[float64][direction][0]>
-                <[float32][scale_factor][0.5]>
+            <[xref][element][1]
                 <[string8u][name][barrelRedNew]>
+                <[vector3_float64][position][11.8501000 48.3761000 519.50]>
+                <[float32][direction][0]>
+                <[float32][scale_factor][0.5]>
             >
         >
     >
@@ -66,7 +66,7 @@ describe("buildToc — cultivation list_xref", () => {
     expect(buildToc([])).toBe(
       "<[file][][]\n" +
         "    <[cultivation][][]\n" +
-        "        <[string8][coordinate_system][lonlat]>\n" +
+        "        <[string8u][coordinate_system][lonlat]>\n" +
         "        <[list_xref][xref_list][]\n" +
         "        >\n" +
         "    >\n" +
