@@ -5,7 +5,8 @@
 // actions (→ commit → mutate.ts), keeping the map's O(changed) footprint diff intact.
 import { useEffect } from "react";
 import { editorStore } from "../state/editorStore";
-import { arrowToVector, isEditableTarget } from "./keyboard";
+import { arrowToVector, isEditableTarget, lifecycleShortcut } from "./keyboard";
+import { doNew, doOpen, doSave, doSaveAs } from "./commands";
 
 export function useKeyboardShortcuts(): void {
   useEffect(() => {
@@ -14,9 +15,22 @@ export function useKeyboardShortcuts(): void {
       // so without this the focus guard below lets Delete/arrows/Ctrl+Z mutate the document behind the
       // modal (P1-2). aria-modal is the semantic signal every PCT modal sets — covers Settings in M2 too.
       if (document.querySelector('[aria-modal="true"]') !== null) return;
-      if (isEditableTarget(document.activeElement)) return; // don't hijack typing (P1-4)
-      const store = editorStore.getState();
       const mod = e.ctrlKey || e.metaKey;
+
+      // Project-lifecycle chords (Ctrl+S / Shift+S / O / N) fire BEFORE the focus guard — Ctrl+S must
+      // save even while the cursor is in an inspector field. They no-op without the bridge (preview).
+      const life = lifecycleShortcut(e.key, mod, e.shiftKey);
+      if (life !== null) {
+        e.preventDefault(); // else the browser saves the page / opens a file / spawns a window
+        if (life === "save") void doSave();
+        else if (life === "save-as") void doSaveAs();
+        else if (life === "open") void doOpen();
+        else doNew();
+        return;
+      }
+
+      if (isEditableTarget(document.activeElement)) return; // edit shortcuts don't hijack typing (P1-4)
+      const store = editorStore.getState();
       const key = e.key.toLowerCase();
 
       if (mod && key === "z") {

@@ -6,9 +6,12 @@
 import { useState } from "react";
 import { editorStore, useEditor } from "../state/editorStore";
 import { hasPct } from "../app/pct";
-import { doNew, doOpen, doSave } from "../app/commands";
+import { doNew, doOpen, doSave, doSaveAs } from "../app/commands";
 
 const NO_PCT = "Not available in browser preview";
+
+/** Filename of the open project.json (main owns the real path; this is display-only, P0-2). */
+const basename = (p: string): string => p.split(/[\\/]/).pop() || p;
 
 /** Editable project name — local draft committed on blur/Enter (one undo entry, not one per key). */
 function ProjectNameField(): React.ReactElement {
@@ -42,6 +45,7 @@ interface TopBarProps {
 export function TopBar({ onExport, onRescan }: TopBarProps): React.ReactElement {
   const dirty = useEditor((s) => s.dirty);
   const objCount = useEditor((s) => s.project.objects.length);
+  const projectPath = useEditor((s) => s.projectPath);
   const pct = hasPct();
 
   return (
@@ -51,6 +55,11 @@ export function TopBar({ onExport, onRescan }: TopBarProps): React.ReactElement 
       <span className={dirty ? "pct-dirty on" : "pct-dirty"} title={dirty ? "Unsaved changes" : "Saved"}>
         ●
       </span>
+      {projectPath !== null && (
+        <span className="pct-filepath" title={projectPath}>
+          {basename(projectPath)}
+        </span>
+      )}
 
       <button type="button" onClick={doNew}>
         New
@@ -60,6 +69,14 @@ export function TopBar({ onExport, onRescan }: TopBarProps): React.ReactElement 
       </button>
       <button type="button" onClick={() => void doSave()} disabled={!pct} title={pct ? undefined : NO_PCT}>
         Save
+      </button>
+      <button
+        type="button"
+        onClick={() => void doSaveAs()}
+        disabled={!pct}
+        title={pct ? "Save under a new file" : NO_PCT}
+      >
+        Save As…
       </button>
 
       <span className="pct-divider" />

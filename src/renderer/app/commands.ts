@@ -46,6 +46,17 @@ export async function doSave(): Promise<void> {
   void pct.clearShadow(); // work is now durable in the file → no crash-recovery copy needed
 }
 
+/** Save the project under a NEW path (main always prompts), adopting it as the current file. */
+export async function doSaveAs(): Promise<void> {
+  const pct = getPct();
+  if (!pct) return;
+  const res = await pct.saveProjectAs(editorStore.getState().serialize());
+  if (!res.ok) return reportError(res.error);
+  if (res.value === null) return; // user cancelled the dialog
+  editorStore.getState().markSaved(res.value.path);
+  void pct.clearShadow();
+}
+
 // ── Crash-recovery banner (M2e). The shadow found at boot sits in store.pendingRecovery; the banner
 // resolves it exactly once. Restore loads it as unsaved work; Discard drops it (store + disk shadow). ──
 

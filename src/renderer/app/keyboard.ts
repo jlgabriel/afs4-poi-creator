@@ -15,6 +15,25 @@ export interface NudgeVec {
   bearingDeg: number; // compass, clockwise, 0 = North (matches PlacedXref.direction + geo.destination)
 }
 
+export type LifecycleAction = "save" | "save-as" | "open" | "new";
+
+/** Map a Ctrl/Cmd chord to a project-lifecycle action (design §5): Ctrl+S save, Ctrl+Shift+S Save As,
+ *  Ctrl+O open, Ctrl+N new. Null for anything else. Unlike the edit shortcuts these fire regardless of
+ *  input focus (you save mid-edit), so the hook resolves them BEFORE the focus guard. */
+export function lifecycleShortcut(key: string, mod: boolean, shift: boolean): LifecycleAction | null {
+  if (!mod) return null;
+  switch (key.toLowerCase()) {
+    case "s":
+      return shift ? "save-as" : "save";
+    case "o":
+      return "open";
+    case "n":
+      return "new";
+    default:
+      return null;
+  }
+}
+
 /** Map an arrow key to a metre nudge along a compass bearing (Shift = the 5 m big step). Null for any
  *  non-arrow key. Up = North, Down = South, Right = East, Left = West. */
 export function arrowToVector(key: string, shift: boolean): NudgeVec | null {
