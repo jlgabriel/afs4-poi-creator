@@ -40,6 +40,7 @@ export function MapView(): React.ReactElement {
     const layer = new FootprintLayer(map, {
       onSelect: (id, additive) => editorStore.getState().select([id], additive),
       onMove: (id, p) => editorStore.getState().moveObject(id, p),
+      onRotate: (id, deg) => editorStore.getState().rotateObject(id, deg),
     });
 
     // Paint now, then re-paint whenever objects / catalog / selection change — subscribed OUTSIDE

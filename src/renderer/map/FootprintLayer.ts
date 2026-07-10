@@ -10,19 +10,25 @@
 //   • Drag is layer-local: on polygon mousedown we disable map dragging and, on each map mousemove,
 //     edit the polygon/anchor/heading lat-lngs DIRECTLY — the store is untouched until mouseup fires
 //     exactly ONE onMove (one undo entry). The inspector's numbers may lag the drag; that's fine.
+//   • Rotate mirrors move: a handle drawn past the footprint's nose is grabbed the same way; each
+//     mousemove re-lays the polygon/heading/handle at the new bearing (Shift snaps to 5°, design §5),
+//     and the store is untouched until mouseup fires exactly ONE onRotate (one undo entry).
 //   • No L.Icon.Default (the Leaflet-under-Vite broken-marker-PNG trap): anchor = circleMarker,
-//     heading tick = polyline, footprint = polygon. Zero image assets.
-//   • bubblingMouseEvents:false on the polygon so a select-click never also fires the map's
-//     click-to-place, and grabbing a footprint never starts a map pan.
+//     heading tick = polyline, footprint = polygon, rotate handle = circleMarker. Zero image assets.
+//   • bubblingMouseEvents:false on the polygon AND the handle so a select-click never also fires the
+//     map's click-to-place, and grabbing a footprint or handle never starts a map pan.
 
 import * as L from "leaflet";
 import type { CatalogObject, LonLat, PlacedXref, Vec3 } from "../../core/project/types";
 import { footprintCorners, headingMarker } from "../../core/geo/footprint";
+import { destination, initialBearing } from "../../core/geo/geo";
 import { diffEntry } from "./syncDiff";
+import { snapAngle } from "./rotate";
 
 export interface FootprintCallbacks {
   onSelect(id: string, additive: boolean): void;
   onMove(id: string, p: LonLat): void; // fired once on drag END (undo-friendly)
+  onRotate(id: string, deg: number): void; // fired once on handle-drag END (undo-friendly)
 }
 
 const COLOR = "#3b82f6"; // normal footprint (blue, the ACT idiom)
@@ -31,6 +37,8 @@ const COLOR_MISSING = "#ef4444"; // object not in the catalog → red dashed pla
 const PLACEHOLDER_M = 5; // half-extent of the 10×10 m square drawn for catalog-missing objects
 const PH_MIN: Vec3 = [-PLACEHOLDER_M, -PLACEHOLDER_M, 0];
 const PH_MAX: Vec3 = [PLACEHOLDER_M, PLACEHOLDER_M, 0];
+const SNAP_DEG = 5; // Shift-snap increment for the rotate handle (design §5)
+const HANDLE_MARGIN_M = 6; // gap in metres between the footprint's farthest corner and the handle
 
 const toLatLng = (p: LonLat): L.LatLngExpression => [p.lat, p.lon];
 
@@ -41,14 +49,27 @@ interface Entry {
   poly: L.Polygon;
   anchor: L.CircleMarker;
   heading: L.Polyline;
+  handle?: L.CircleMarker; // present only while selected & unlocked (the rotate grip)
 }
+
+// One drag at a time; `mode` routes the shared map mousemove/mouseup. A move tracks the cursor delta
+// from grab; a rotate tracks the bearing anchor→cursor (and the start angle, to skip a no-op release).
+type Drag =
+  | { mode: "move"; id: string; startAnchor: LonLat; startMouse: L.LatLng; moved: boolean }
+  | {
+      mode: "rotate";
+      id: string;
+      anchor: LonLat;
+      startDir: number;
+      bearing: number;
+      moved: boolean;
+    };
 
 export class FootprintLayer {
   private readonly group: L.LayerGroup;
   private readonly entries = new Map<string, Entry>();
   private index: Map<string, CatalogObject> = new Map();
-  private drag: { id: string; startAnchor: LonLat; startMouse: L.LatLng; moved: boolean } | null =
-    null;
+  private drag: Drag | null = null;
 
   constructor(
     private readonly map: L.Map,
@@ -91,13 +112,41 @@ export class FootprintLayer {
     for (const id of [...this.entries.keys()]) if (!seen.has(id)) this.remove(id);
   }
 
-  private cornersAt(anchor: LonLat, obj: PlacedXref, cat: CatalogObject | undefined): LonLat[] {
+  // ── geometry helpers (the optional `direction` lets a rotate-drag preview an un-committed bearing) ──
+  private cornersAt(
+    anchor: LonLat,
+    obj: PlacedXref,
+    cat: CatalogObject | undefined,
+    direction = obj.direction,
+  ): LonLat[] {
     const [min, max] = cat ? [cat.bbMin, cat.bbMax] : [PH_MIN, PH_MAX];
-    return footprintCorners(anchor, min, max, obj.direction, obj.scale);
+    return footprintCorners(anchor, min, max, direction, obj.scale);
   }
 
-  private headingAt(anchor: LonLat, obj: PlacedXref, cat: CatalogObject | undefined): LonLat {
-    return headingMarker(anchor, cat ? cat.bbMax : PH_MAX, obj.direction, obj.scale);
+  private headingAt(
+    anchor: LonLat,
+    obj: PlacedXref,
+    cat: CatalogObject | undefined,
+    direction = obj.direction,
+  ): LonLat {
+    return headingMarker(anchor, cat ? cat.bbMax : PH_MAX, direction, obj.scale);
+  }
+
+  /** Distance from the anchor to the rotate handle: past the farthest bbox corner so the grip always
+   *  sits clear of the footprint whatever the box's shape (RCT's handleDistFor idiom). */
+  private handleDist(obj: PlacedXref, cat: CatalogObject | undefined): number {
+    const [min, max] = cat ? [cat.bbMin, cat.bbMax] : [PH_MIN, PH_MAX];
+    const ext = Math.max(Math.abs(min[0]), Math.abs(max[0]), Math.abs(min[1]), Math.abs(max[1]));
+    return ext * obj.scale + HANDLE_MARGIN_M;
+  }
+
+  private handleAt(
+    anchor: LonLat,
+    obj: PlacedXref,
+    cat: CatalogObject | undefined,
+    direction = obj.direction,
+  ): LonLat {
+    return destination(anchor, this.handleDist(obj, cat), direction);
   }
 
   private add(obj: PlacedXref, selected: boolean): void {
@@ -131,7 +180,9 @@ export class FootprintLayer {
     this.group.addLayer(poly);
     this.group.addLayer(heading);
     this.group.addLayer(anchor);
-    this.entries.set(obj.id, { obj, selected, missing, poly, anchor, heading });
+    const entry: Entry = { obj, selected, missing, poly, anchor, heading };
+    this.entries.set(obj.id, entry);
+    this.syncHandle(entry, selected); // draw the grip if this object came in selected
   }
 
   private restyle(entry: Entry, selected: boolean): void {
@@ -139,6 +190,7 @@ export class FootprintLayer {
     entry.poly.setStyle({ color, weight: selected ? 3 : 2 });
     entry.heading.setStyle({ color });
     entry.anchor.setStyle({ color });
+    this.syncHandle(entry, selected); // a restyle is a selection flip (same ref) → add/remove the grip
     entry.selected = selected;
   }
 
@@ -148,7 +200,35 @@ export class FootprintLayer {
     this.group.removeLayer(e.poly);
     this.group.removeLayer(e.heading);
     this.group.removeLayer(e.anchor);
+    if (e.handle) this.group.removeLayer(e.handle);
     this.entries.delete(id);
+  }
+
+  // ── the rotate handle (drawn only while selected & unlocked) ──
+  private syncHandle(entry: Entry, selected: boolean): void {
+    const want = selected && !entry.obj.locked;
+    if (want && !entry.handle) {
+      entry.handle = this.makeHandle(entry.obj);
+      this.group.addLayer(entry.handle);
+    } else if (!want && entry.handle) {
+      this.group.removeLayer(entry.handle);
+      entry.handle = undefined;
+    }
+  }
+
+  private makeHandle(obj: PlacedXref): L.CircleMarker {
+    const cat = this.index.get(obj.name);
+    const handle = L.circleMarker(toLatLng(this.handleAt(obj.position, obj, cat)), {
+      radius: 6,
+      color: COLOR_SELECTED,
+      weight: 2,
+      fillColor: "#ffffff",
+      fillOpacity: 1,
+      className: "pct-rotate-handle",
+      bubblingMouseEvents: false, // grabbing the grip never starts a map pan or a place-click
+    });
+    handle.on("mousedown", () => this.onGrabHandle(obj.id));
+    return handle;
   }
 
   // ── drag (layer-local preview → one commit on release) ──
@@ -156,7 +236,27 @@ export class FootprintLayer {
     const entry = this.entries.get(id);
     if (!entry || entry.obj.locked) return;
     this.map.dragging.disable();
-    this.drag = { id, startAnchor: entry.obj.position, startMouse: e.latlng, moved: false };
+    this.drag = {
+      mode: "move",
+      id,
+      startAnchor: entry.obj.position,
+      startMouse: e.latlng,
+      moved: false,
+    };
+  };
+
+  private onGrabHandle = (id: string): void => {
+    const entry = this.entries.get(id);
+    if (!entry || entry.obj.locked) return;
+    this.map.dragging.disable();
+    this.drag = {
+      mode: "rotate",
+      id,
+      anchor: entry.obj.position,
+      startDir: entry.obj.direction,
+      bearing: entry.obj.direction,
+      moved: false,
+    };
   };
 
   private onMouseMove = (e: L.LeafletMouseEvent): void => {
@@ -164,15 +264,28 @@ export class FootprintLayer {
     if (!d) return;
     const entry = this.entries.get(d.id);
     if (!entry) return;
-    d.moved = true;
-    const anchor: LonLat = {
-      lon: d.startAnchor.lon + (e.latlng.lng - d.startMouse.lng),
-      lat: d.startAnchor.lat + (e.latlng.lat - d.startMouse.lat),
-    };
     const cat = this.index.get(entry.obj.name);
-    entry.poly.setLatLngs(this.cornersAt(anchor, entry.obj, cat).map(toLatLng));
-    entry.anchor.setLatLng(toLatLng(anchor));
-    entry.heading.setLatLngs([toLatLng(anchor), toLatLng(this.headingAt(anchor, entry.obj, cat))]);
+    d.moved = true;
+    if (d.mode === "move") {
+      const anchor: LonLat = {
+        lon: d.startAnchor.lon + (e.latlng.lng - d.startMouse.lng),
+        lat: d.startAnchor.lat + (e.latlng.lat - d.startMouse.lat),
+      };
+      entry.poly.setLatLngs(this.cornersAt(anchor, entry.obj, cat).map(toLatLng));
+      entry.anchor.setLatLng(toLatLng(anchor));
+      entry.heading.setLatLngs([toLatLng(anchor), toLatLng(this.headingAt(anchor, entry.obj, cat))]);
+      entry.handle?.setLatLng(toLatLng(this.handleAt(anchor, entry.obj, cat)));
+    } else {
+      let bearing = initialBearing(d.anchor, { lon: e.latlng.lng, lat: e.latlng.lat });
+      if (e.originalEvent.shiftKey) bearing = snapAngle(bearing, SNAP_DEG);
+      d.bearing = bearing;
+      entry.poly.setLatLngs(this.cornersAt(d.anchor, entry.obj, cat, bearing).map(toLatLng));
+      entry.heading.setLatLngs([
+        toLatLng(d.anchor),
+        toLatLng(this.headingAt(d.anchor, entry.obj, cat, bearing)),
+      ]);
+      entry.handle?.setLatLng(toLatLng(this.handleAt(d.anchor, entry.obj, cat, bearing)));
+    }
   };
 
   private onMouseUp = (e: L.LeafletMouseEvent): void => {
@@ -181,9 +294,13 @@ export class FootprintLayer {
     this.drag = null;
     this.map.dragging.enable();
     if (!d.moved) return; // a click, not a drag — selection is handled by the polygon click
-    this.cb.onMove(d.id, {
-      lon: d.startAnchor.lon + (e.latlng.lng - d.startMouse.lng),
-      lat: d.startAnchor.lat + (e.latlng.lat - d.startMouse.lat),
-    });
+    if (d.mode === "move") {
+      this.cb.onMove(d.id, {
+        lon: d.startAnchor.lon + (e.latlng.lng - d.startMouse.lng),
+        lat: d.startAnchor.lat + (e.latlng.lat - d.startMouse.lat),
+      });
+    } else if (d.bearing !== d.startDir) {
+      this.cb.onRotate(d.id, d.bearing); // skip a no-op release (snapped back to the start angle)
+    }
   };
 }

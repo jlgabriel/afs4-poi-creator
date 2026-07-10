@@ -62,6 +62,11 @@ body {
 .pct-map.placing {
   cursor: crosshair;
 }
+/* The rotate handle (design §5): a grab cursor so the amber grip past the footprint reads as
+   draggable. The class lands on the circleMarker's SVG <path> via L.circleMarker({ className }). */
+.pct-rotate-handle {
+  cursor: grab;
+}
 
 /* Side panels. */
 .pct-catalog,
