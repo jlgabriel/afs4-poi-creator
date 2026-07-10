@@ -48,6 +48,13 @@ body {
   grid-column: 2;
   grid-row: 3;
   min-height: 0;
+  /* Trap Leaflet's internal stacking. Leaflet's map-pane uses `transform` (its own stacking context)
+     and its panes/controls carry z-index 200–1000; without a stacking context here those compete at
+     the root and, after a live tile-layer swap, can paint OVER the top bar — pushing the airport
+     dropdown BEHIND the map. An explicit z-index (with the relative position Leaflet already sets) makes
+     .pct-map its own context, so all of that is capped below the top bar's z-index:5. */
+  position: relative;
+  z-index: 0;
 }
 .pct-right {
   grid-column: 3;
