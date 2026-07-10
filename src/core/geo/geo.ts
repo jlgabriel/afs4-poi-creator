@@ -54,3 +54,13 @@ export function destination(p: LonLat, distanceM: number, bearingDeg: number): L
     );
   return { lon: lon2 * R2D, lat: lat2 * R2D };
 }
+
+/** Nudge a point by (east, north) metres — a compass-consistent wrapper over `destination`
+ *  (0 = North, 90 = East). Either component may be negative; (0, 0) returns the point unchanged.
+ *  Used for the project-global export shift (design: Project.shift / forum #12). */
+export function shiftEastNorth(p: LonLat, east: number, north: number): LonLat {
+  if (east === 0 && north === 0) return p;
+  const distanceM = Math.hypot(east, north);
+  const bearingDeg = (Math.atan2(east, north) * R2D + 360) % 360;
+  return destination(p, distanceM, bearingDeg);
+}

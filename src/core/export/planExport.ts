@@ -6,6 +6,7 @@
 
 import type { ExportPlan, PoiFile, Project, ResolvedXref } from "../project/types";
 import { centroid, poiFolderName } from "../geo/poiName";
+import { shiftEastNorth } from "../geo/geo";
 import { buildToc } from "./tocWriter";
 import { buildTsl } from "./tslWriter";
 
@@ -34,20 +35,30 @@ function buildReadme(project: Project, resolved: ResolvedXref[]): string {
 
 /** Plan the POI package. `project.reference` sets the folder-name anchor; when null it falls
  *  back to the centroid of the placed objects (design §2.2). */
+/** Apply the project's global export shift (forum #12) to every object's position: nudge each one
+ *  `shift` metres east/north. The height was resolved at the object's REAL location, so shifting the
+ *  horizontal coordinate afterwards is correct — it only lines the objects up with FS4's satellite
+ *  tiles. A zero/absent shift returns the same array (no-op), keeping the golden output stable. */
+function applyShift(resolved: ResolvedXref[], shift: Project["shift"]): ResolvedXref[] {
+  if (!shift || (shift.east === 0 && shift.north === 0)) return resolved;
+  return resolved.map((o) => ({ ...o, position: shiftEastNorth(o.position, shift.east, shift.north) }));
+}
+
 export function planExport(project: Project, resolved: ResolvedXref[]): ExportPlan {
   const warnings: string[] = [];
   if (resolved.length === 0) {
     warnings.push("The POI has no objects — nothing will appear in the sim.");
   }
 
-  const ref = project.reference ?? centroid(resolved.map((o) => o.position));
+  const objects = applyShift(resolved, project.shift);
+  const ref = project.reference ?? centroid(objects.map((o) => o.position));
   const folderName = poiFolderName(ref, project.poiName);
-  const tocFileName = resolved.length > 0 ? POI_BASENAME : null;
+  const tocFileName = objects.length > 0 ? POI_BASENAME : null;
 
   const files: PoiFile[] = [
     { relPath: `${POI_BASENAME}.tsl`, content: buildTsl({ name: project.name, tocFileName }) },
-    { relPath: `${POI_BASENAME}.toc`, content: buildToc(resolved) },
-    { relPath: "README.txt", content: buildReadme(project, resolved) },
+    { relPath: `${POI_BASENAME}.toc`, content: buildToc(objects) },
+    { relPath: "README.txt", content: buildReadme(project, objects) },
   ];
 
   return { folderName, files, warnings };

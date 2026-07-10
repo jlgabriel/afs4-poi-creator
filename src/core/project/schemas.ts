@@ -55,6 +55,12 @@ export const zHeightSpec = z.discriminatedUnion("mode", [
   z.object({ mode: z.literal("asl"), value: z.number().finite() }),
 ]);
 
+/** Optional global export shift (metres, east/north). See Project.shift / types.ts PoiShift. */
+export const zShift = z.object({
+  east: z.number().finite(),
+  north: z.number().finite(),
+});
+
 // ── Project model ────────────────────────────────────────────────────────────
 
 export const zPlacedXref = z.looseObject({
@@ -87,6 +93,7 @@ export const zProject = z.looseObject({
   reference: zLonLat.nullable(),
   camera: zCamera,
   objects: z.array(zPlacedXref),
+  shift: zShift.optional(),
 });
 
 // ── Settings ─────────────────────────────────────────────────────────────────

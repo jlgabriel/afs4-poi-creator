@@ -69,6 +69,15 @@ export interface PlacedXref {
   locked?: boolean; // optional: ignore drags (dense-scene safety)
 }
 
+/** Global horizontal shift applied to EVERY object at export time: nudge each position `east`
+ *  metres east and `north` metres north (either can be negative). Corrects a systematic offset
+ *  between the map base (Esri/OSM) and FS4's own satellite tiles — the "Shift airport" input the
+ *  ACT gained (forum #12). Distinct from the per-object vertical HeightSpec "offset". */
+export interface PoiShift {
+  east: number; // metres, + = east
+  north: number; // metres, + = north
+}
+
 /** The editable working file (`project.json`). */
 export interface Project {
   schemaVersion: 1;
@@ -80,6 +89,7 @@ export interface Project {
   reference: LonLat | null; // POI anchor → folder coords; null = auto (centroid at export)
   camera: { lon: number; lat: number; zoom: number }; // last map view
   objects: PlacedXref[];
+  shift?: PoiShift; // optional global export shift (forum #12); absent = none
 }
 
 // ── Export (design §3.4) ────────────────────────────────────────────────────

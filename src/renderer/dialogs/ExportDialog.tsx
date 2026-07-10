@@ -12,6 +12,7 @@ import { centroid, poiFolderName } from "../../core/geo/poiName";
 import { isExportablePoiName } from "../../core/project/schemas";
 import { editorStore, useEditor } from "../state/editorStore";
 import { getPct } from "../app/pct";
+import { NumberInput } from "../inspector/NumberInput";
 
 function sameRef(a: LonLat | null, b: LonLat | null): boolean {
   if (a === null || b === null) return a === b;
@@ -84,12 +85,15 @@ export function ExportDialog({ onClose }: { onClose: () => void }): React.ReactE
   const objects = useEditor((s) => s.project.objects);
   const storePoiName = useEditor((s) => s.project.poiName);
   const storeRef = useEditor((s) => s.project.reference);
+  const storeShift = useEditor((s) => s.project.shift);
   const mapView = useEditor((s) => s.mapView);
 
   const [slug, setSlug] = useState(storePoiName);
   const [refMode, setRefMode] = useState<"auto" | "map">(storeRef !== null ? "map" : "auto");
   const [target, setTarget] = useState<ExportOptions["target"]>("install");
   const [baseElev, setBaseElev] = useState("");
+  const [shiftEast, setShiftEast] = useState(storeShift?.east ?? 0);
+  const [shiftNorth, setShiftNorth] = useState(storeShift?.north ?? 0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<InstallResult | null>(null);
@@ -139,6 +143,10 @@ export function ExportDialog({ onClose }: { onClose: () => void }): React.ReactE
     if (slug !== store.project.poiName) store.setPoiName(slug);
     const desiredRef = refMode === "map" ? { lon: mapView.lon, lat: mapView.lat } : null;
     if (!sameRef(store.project.reference, desiredRef)) store.setReference(desiredRef);
+    const curShift = store.project.shift ?? { east: 0, north: 0 };
+    if (shiftEast !== curShift.east || shiftNorth !== curShift.north) {
+      store.setShift({ east: shiftEast, north: shiftNorth });
+    }
 
     const opts: ExportOptions = { target, overwrite: false };
     if (baseElevation !== undefined) opts.baseElevation = baseElevation;
@@ -224,6 +232,20 @@ export function ExportDialog({ onClose }: { onClose: () => void }): React.ReactE
                 onChange={(e) => setBaseElev(e.target.value)}
               />
             </label>
+
+            <div className="pct-field pct-field-col">
+              <span className="pct-field-label">Shift — metres (line objects up with FS4's tiles)</span>
+              <div className="pct-shift-row">
+                <label className="pct-shift-cell">
+                  <span className="pct-field-meta">East + / West −</span>
+                  <NumberInput value={shiftEast} onCommit={setShiftEast} ariaLabel="Shift east, metres" />
+                </label>
+                <label className="pct-shift-cell">
+                  <span className="pct-field-meta">North + / South −</span>
+                  <NumberInput value={shiftNorth} onCommit={setShiftNorth} ariaLabel="Shift north, metres" />
+                </label>
+              </div>
+            </div>
 
             <div className="pct-field pct-field-col">
               <span className="pct-field-label">Destination</span>

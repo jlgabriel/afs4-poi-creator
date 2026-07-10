@@ -4,6 +4,8 @@ import { buildToc } from "../../src/core/export/tocWriter";
 import { buildTsl } from "../../src/core/export/tslWriter";
 import { planExport, POI_README_MARKER } from "../../src/core/export/planExport";
 import { parseTm, child } from "../../src/core/tm/tmParser";
+import { shiftEastNorth } from "../../src/core/geo/geo";
+import { fmtLonLat, fmtMeters } from "../../src/core/tm/tmEmit";
 
 // Two placed objects, heights already resolved to ASL — the shape the exporter consumes.
 const TOWER: ResolvedXref = {
@@ -132,5 +134,23 @@ describe("planExport", () => {
     const plan = planExport(project, []);
     expect(plan.warnings.length).toBe(1);
     expect(plan.files.find((f) => f.relPath === "poi.tsl")!.content).not.toContain("cultivation");
+  });
+
+  it("a zero or absent shift leaves the .toc positions untouched", () => {
+    expect(planExport(project, [TOWER, BARREL]).files[1].content).toBe(GOLDEN_TOC);
+    const zero = planExport({ ...project, shift: { east: 0, north: 0 } }, [TOWER, BARREL]);
+    expect(zero.files[1].content).toBe(GOLDEN_TOC);
+  });
+
+  it("bakes the global shift into every object's .toc position (forum #12)", () => {
+    const shift = { east: 12, north: -8 };
+    const toc = planExport({ ...project, shift }, [TOWER, BARREL]).files[1].content;
+    for (const o of [TOWER, BARREL]) {
+      const p = shiftEastNorth(o.position, shift.east, shift.north);
+      expect(toc).toContain(
+        `<[vector3_float64][position][${fmtLonLat(p.lon)} ${fmtLonLat(p.lat)} ${fmtMeters(o.heightAsl)}]>`,
+      );
+    }
+    expect(toc).not.toContain(fmtLonLat(TOWER.position.lon)); // original coord is gone
   });
 });

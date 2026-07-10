@@ -8,7 +8,7 @@
 // testable and replayable. The one impure seam is id minting (createXref / duplicateObject), which
 // accepts an override so tests stay deterministic.
 
-import type { HeightSpec, LonLat, PlacedXref, Project } from "./types";
+import type { HeightSpec, LonLat, PlacedXref, PoiShift, Project } from "./types";
 
 const nowIso = (): string => new Date().toISOString();
 
@@ -167,6 +167,12 @@ export function renameProject(project: Project, name: string, now = nowIso()): P
 
 export function setPoiName(project: Project, poiName: string, now = nowIso()): Project {
   return { ...project, poiName, modifiedAt: now };
+}
+
+/** Set the global export shift (metres, east/north). Applied to every object's position at export
+ *  (planExport); stored on the document so a Save/reopen remembers it. */
+export function setShift(project: Project, shift: PoiShift, now = nowIso()): Project {
+  return { ...project, shift, modifiedAt: now };
 }
 
 /** Persist the last map view. View state, but it lives in the document, so it bumps modifiedAt;

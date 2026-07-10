@@ -24,6 +24,7 @@ import type {
   HeightSpec,
   LonLat,
   PlacedXref,
+  PoiShift,
   Project,
   Settings,
 } from "../../core/project/types";
@@ -133,6 +134,7 @@ export interface EditorState {
   setReference: (ref: LonLat | null) => void;
   renameProject: (name: string) => void;
   setPoiName: (poiName: string) => void;
+  setShift: (shift: PoiShift) => void;
   duplicateSelection: (offsetM?: number) => void;
   deleteSelection: () => void;
 
@@ -344,6 +346,7 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
         setReference: (ref) => commit((proj) => mutate.setReference(proj, ref)),
         renameProject: (name) => commit((proj) => mutate.renameProject(proj, name)),
         setPoiName: (poiName) => commit((proj) => mutate.setPoiName(proj, poiName)),
+        setShift: (shift) => commit((proj) => mutate.setShift(proj, shift)),
 
         duplicateSelection: (offsetM = 5) => {
           const { selection } = get();
