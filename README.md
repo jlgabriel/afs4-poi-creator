@@ -8,9 +8,7 @@ POI‑folder conventions.
 > **Status:** M0 (core + scanner), the M1 **export core + CLI**, and the **Electron shell** (first‑run
 > wizard, satellite map, catalog, inspector, export/install) are done and green. Dev builds + a
 > Playwright/Electron smoke are wired (see [Desktop app & builds](#desktop-app--builds)); M1 closes on
-> the in‑sim sign‑off flight. See
-> [`docs/PCT_DESIGN__FABLE__20260706.md`](docs/PCT_DESIGN__FABLE__20260706.md) for the full design &
-> milestone plan, and [`docs/FORMAT-FINDINGS.md`](docs/FORMAT-FINDINGS.md) for the in-sim format matrix.
+> the in‑sim sign‑off flight.
 
 ## What M0 delivers
 
