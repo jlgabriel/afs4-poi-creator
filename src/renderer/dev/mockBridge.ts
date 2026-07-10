@@ -148,7 +148,14 @@ export function installMockBridge(): void {
     getCachedCatalog: async () => (wantRecover ? catalog : null), // recover → editor; else wizard
     getSettings: async () => settings,
     setSettings: async (patch) => {
-      settings = { ...settings, ...patch };
+      // Deep-merge the nested objects like the real writeSettings (main/settings.ts) so a partial
+      // tiles/elevation patch keeps its siblings.
+      settings = {
+        ...settings,
+        ...patch,
+        tiles: { ...settings.tiles, ...(patch.tiles ?? {}) },
+        elevation: { ...settings.elevation, ...(patch.elevation ?? {}) },
+      };
       return settings;
     },
     chooseDirectory: async () => "C:/Mock/Aerofly FS 4",

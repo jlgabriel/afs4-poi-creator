@@ -46,6 +46,7 @@ export function useBootstrap(): Bootstrap {
       if (cancelled) return;
       if (cached !== null && decideBootPhase(settings, cached) === "editor") {
         store.loadCatalog(cached);
+        store.setTiles(settings.tiles); // adopt the saved tile provider before the map mounts
         store.newProject(mutate.createProject({ name: "", camera: DEFAULT_CAMERA }));
         // Offer recovery non-blockingly: stash the shadow so the editor shows a Restore/Discard banner
         // (RecoveryBanner). newProject cleared pendingRecovery, so set it AFTER.

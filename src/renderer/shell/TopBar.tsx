@@ -40,9 +40,10 @@ function ProjectNameField(): React.ReactElement {
 interface TopBarProps {
   onExport?: () => void; // wired in M1e-5f
   onRescan?: () => void; // wired in M1e-5e
+  onSettings?: () => void; // wired in M2h
 }
 
-export function TopBar({ onExport, onRescan }: TopBarProps): React.ReactElement {
+export function TopBar({ onExport, onRescan, onSettings }: TopBarProps): React.ReactElement {
   const dirty = useEditor((s) => s.dirty);
   const objCount = useEditor((s) => s.project.objects.length);
   const projectPath = useEditor((s) => s.projectPath);
@@ -93,7 +94,9 @@ export function TopBar({ onExport, onRescan }: TopBarProps): React.ReactElement 
       >
         Rescan
       </button>
-      {/* Settings is M2 — hidden until then (a disabled button reads as broken; Rescan is the M1 path). */}
+      <button type="button" onClick={onSettings} disabled={!onSettings}>
+        Settings
+      </button>
 
       <span className="pct-spacer" />
       <span className="pct-readout">

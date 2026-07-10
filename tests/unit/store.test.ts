@@ -390,6 +390,18 @@ describe("M2e crash-recovery + autosave lifecycle", () => {
   });
 });
 
+describe("M2h tile config", () => {
+  it("setTiles updates the map provider without dirtying the document (reference data)", () => {
+    const { store, persist } = makeStore();
+    const tiles = { provider: "custom" as const, customUrl: "https://t/{z}/{x}/{y}.png" };
+    store.getState().setTiles(tiles);
+    expect(store.getState().tiles).toEqual(tiles);
+    expect(store.getState().dirty).toBe(false);
+    expect(store.getState().undoStack).toHaveLength(0);
+    expect(persist).not.toHaveBeenCalled();
+  });
+});
+
 describe("lifecycle", () => {
   it("openProject resets history, dirty, selection, and adopts the project's camera", () => {
     const { store } = makeStore();

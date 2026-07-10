@@ -12,9 +12,14 @@ const RENDERER_URL = process.env["ELECTRON_RENDERER_URL"];
 // Packaged-renderer CSP. NOT applied in dev: Vite HMR injects an inline react-refresh preamble + a
 // ws: connection that a strict policy would block. The dev renderer is a local-only page; the
 // packaged app is what loads untrusted project.json, and that's where the CSP matters.
+//
+// img-src allows any https host (not just Esri/OSM) so the Settings dialog's custom XYZ tile provider
+// works (design §4 escape-hatch, Fable P1-6 "relax only img-src to https:"). Low risk here: tile URLs
+// come only from the user's own Settings, never from the untrusted project.json (which is names + coords,
+// no image refs). script/connect stay locked to 'self'.
 const CSP =
   "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; " +
-  "img-src 'self' data: blob: https://server.arcgisonline.com https://tile.openstreetmap.org; " +
+  "img-src 'self' data: blob: https:; " +
   "connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'";
 
 function createWindow(): void {

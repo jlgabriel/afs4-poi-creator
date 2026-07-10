@@ -25,11 +25,16 @@ import type {
   LonLat,
   PlacedXref,
   Project,
+  Settings,
 } from "../../core/project/types";
 import { destination } from "../../core/geo/geo";
 import * as mutate from "../../core/project/mutate";
 
 export type Camera = Project["camera"];
+/** The map tile config the renderer needs (a view of Settings.tiles). Held in the store so MapView can
+ *  swap the tile layer live when Settings changes it, without a full remount. */
+export type TilesConfig = Settings["tiles"];
+export const DEFAULT_TILES: TilesConfig = { provider: "esri" };
 export interface Filter {
   query: string;
   category: string | null;
@@ -70,6 +75,7 @@ export interface EditorState {
   // ── reference data (loaded, not part of the document) ──
   catalog: Catalog | null;
   catalogIndex: Map<string, CatalogObject>; // by exact name
+  tiles: TilesConfig; // map tile provider (from Settings); MapView subscribes → live tile swap
 
   // ── DOCUMENT (snapshotted / dirtied / autosaved) ──
   project: Project;
@@ -94,6 +100,7 @@ export interface EditorState {
 
   // ── lifecycle ──
   loadCatalog: (catalog: Catalog) => void;
+  setTiles: (tiles: TilesConfig) => void;
   openProject: (path: string | null, project: Project) => void;
   newProject: (project: Project) => void;
   recoverProject: (project: Project) => void; // load a crash-recovery shadow as UNSAVED (dirty) work
@@ -246,6 +253,7 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
       return {
         catalog: null,
         catalogIndex: new Map(),
+        tiles: DEFAULT_TILES,
         project: deps.initialProject,
         projectPath: null,
         dirty: false,
@@ -265,6 +273,7 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
 
         loadCatalog: (catalog) =>
           set({ catalog, catalogIndex: new Map(catalog.xref.map((o) => [o.name, o])) }),
+        setTiles: (tiles) => set({ tiles }),
         openProject: (path, project) => load(project, path),
         newProject: (project) => load(project, null),
         recoverProject: (project) => load(project, null, true), // no path yet; unsaved → dirty

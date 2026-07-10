@@ -9,14 +9,20 @@ import { MapView } from "../map/MapView";
 import { Inspector } from "../inspector/Inspector";
 import { PlacedList } from "../placed/PlacedList";
 import { ExportDialog } from "../dialogs/ExportDialog";
+import { SettingsDialog } from "../dialogs/SettingsDialog";
 import { useKeyboardShortcuts } from "../app/useKeyboardShortcuts";
 
 export function AppShell({ onRescan }: { onRescan: () => void }): React.ReactElement {
   useKeyboardShortcuts();
   const [exportOpen, setExportOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   return (
     <div className="pct-app">
-      <TopBar onRescan={onRescan} onExport={() => setExportOpen(true)} />
+      <TopBar
+        onRescan={onRescan}
+        onExport={() => setExportOpen(true)}
+        onSettings={() => setSettingsOpen(true)}
+      />
       <RecoveryBanner />
       <CatalogPanel />
       <MapView />
@@ -25,6 +31,9 @@ export function AppShell({ onRescan }: { onRescan: () => void }): React.ReactEle
         <PlacedList />
       </div>
       {exportOpen && <ExportDialog onClose={() => setExportOpen(false)} />}
+      {settingsOpen && (
+        <SettingsDialog onClose={() => setSettingsOpen(false)} onRescan={onRescan} />
+      )}
     </div>
   );
 }

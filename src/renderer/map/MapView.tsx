@@ -9,13 +9,24 @@ import * as L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { shallow } from "zustand/shallow";
 import { editorStore, useEditor } from "../state/editorStore";
+import type { TilesConfig } from "../state/store";
 import { FootprintLayer } from "./FootprintLayer";
 
-// Esri World Imagery (design §4 default). CSP already allows server.arcgisonline.com img-src.
+// Esri World Imagery (design §4 default). CSP allows server.arcgisonline.com img-src (and, since M2h,
+// any https host so a user's custom XYZ provider works — main/index.ts).
 const ESRI_URL =
   "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
 const ESRI_ATTR =
   'Tiles &copy; <a href="https://www.esri.com/">Esri</a> — Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community';
+
+/** The tile layer for the current provider: Esri, or a user's custom XYZ template (falling back to
+ *  Esri if the custom URL is blank). Overzoom (maxNativeZoom < maxZoom) keeps metre-precise placement. */
+function buildTileLayer(tiles: TilesConfig): L.TileLayer {
+  const custom = tiles.provider === "custom" && !!tiles.customUrl;
+  const url = custom ? (tiles.customUrl as string) : ESRI_URL;
+  const attribution = custom ? (tiles.customAttribution ?? "") : ESRI_ATTR;
+  return L.tileLayer(url, { maxNativeZoom: 19, maxZoom: 22, attribution });
+}
 
 export function MapView(): React.ReactElement {
   const ref = useRef<HTMLDivElement>(null);
@@ -33,9 +44,16 @@ export function MapView(): React.ReactElement {
       [cam0.lat, cam0.lon],
       cam0.zoom,
     );
-    // maxNativeZoom < maxZoom = OVERZOOM: keep zooming past native tile resolution so metre-precise
-    // placement stays usable instead of hitting gray tiles (P1-5).
-    L.tileLayer(ESRI_URL, { maxNativeZoom: 19, maxZoom: 22, attribution: ESRI_ATTR }).addTo(map);
+    // Tile layer built from the store's tile config; swapped live when Settings changes the provider
+    // (subscribed below), so the user sees Esri ↔ custom XYZ without an app restart.
+    let tileLayer = buildTileLayer(editorStore.getState().tiles).addTo(map);
+    const unsubTiles = editorStore.subscribe(
+      (s) => s.tiles,
+      (tiles) => {
+        tileLayer.remove();
+        tileLayer = buildTileLayer(tiles).addTo(map);
+      },
+    );
 
     const layer = new FootprintLayer(map, {
       onSelect: (id, additive) => editorStore.getState().select([id], additive),
@@ -91,6 +109,7 @@ export function MapView(): React.ReactElement {
       window.removeEventListener("keydown", onKey);
       unsub();
       unsubCamera();
+      unsubTiles();
       layer.destroy();
       map.remove(); // frees the container so StrictMode's second mount can re-init it
     };
