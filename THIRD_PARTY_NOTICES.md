@@ -95,7 +95,20 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ---
 
+## Bundled data
+
+**Airport list** — `data/aerofly-data/` bundles a pinned snapshot of the **fboes/aerofly-data** airport
+dataset, used by the top-bar airport search to recenter the map. It is data, not code (no npm
+dependency), so it is not in the table above:
+
+> Airport data © fboes/aerofly-data (MIT), derived from OurAirports (Public Domain).
+
+fboes/aerofly-data is MIT-licensed (© Frank Boës); the underlying airport coordinates come from
+OurAirports, released into the Public Domain. Bundling was OK'd by the author. See
+[`data/aerofly-data/SOURCE.md`](data/aerofly-data/SOURCE.md) for provenance and the refresh procedure.
+
+---
+
 *Map tiles are fetched at runtime from Esri World Imagery and OpenStreetMap (or a user-configured
 XYZ source); they are services, not bundled code, and their required attribution is shown on the
-map. When the fboes `aerofly-data` airport dataset is bundled (planned for M3), add its MIT notice
-(© Frank Boës) here.*
+map.*

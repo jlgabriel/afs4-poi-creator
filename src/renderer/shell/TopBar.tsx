@@ -8,6 +8,7 @@ import { editorStore, useEditor } from "../state/editorStore";
 import { hasPct } from "../app/pct";
 import { doNew, doOpen, doSave, doSaveAs, setTileProvider } from "../app/commands";
 import { PROVIDER_LABEL, type TileProvider } from "../map/tileProviders";
+import { AirportSearch } from "./AirportSearch";
 
 const NO_PCT = "Not available in browser preview";
 
@@ -129,6 +130,7 @@ export function TopBar({ onExport, onRescan, onSettings }: TopBarProps): React.R
       </button>
 
       <span className="pct-spacer" />
+      <AirportSearch />
       <MapStyleSwitch />
       <span className="pct-readout">
         {objCount} {objCount === 1 ? "object" : "objects"}

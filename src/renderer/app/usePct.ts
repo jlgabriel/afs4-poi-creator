@@ -10,6 +10,7 @@ import * as mutate from "../../core/project/mutate";
 import { editorStore } from "../state/editorStore";
 import { DEFAULT_CAMERA } from "../state/store";
 import { DEMO_CATALOG, demoProject } from "../dev/devFixtures";
+import { AIRPORTS } from "../data/airports";
 import { getPct } from "./pct";
 import { decideBootPhase } from "./bootPhase";
 
@@ -28,6 +29,10 @@ export function useBootstrap(): Bootstrap {
     let cancelled = false;
     const pct = getPct();
     const store = editorStore.getState();
+
+    // Bundled sim-airport list for the TopBar search — the same static data on every path (preview or
+    // real), so load it once before the branch. Reference data: never saved, never on the undo stack.
+    store.loadAirports(AIRPORTS);
 
     // Preview / browser harness: no bridge → seed the demo so the map + panels are interactive.
     if (!pct) {

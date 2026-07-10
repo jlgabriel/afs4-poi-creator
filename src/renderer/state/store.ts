@@ -27,6 +27,7 @@ import type {
   Project,
   Settings,
 } from "../../core/project/types";
+import type { Airport } from "../../core/airports/types";
 import { destination } from "../../core/geo/geo";
 import * as mutate from "../../core/project/mutate";
 
@@ -44,6 +45,11 @@ const UNDO_CAP = 50; // design §3.6: snapshot stacks capped at 50
 /** The blank-project world view (new project before the user navigates). Exported for the shell's
  *  New / bootstrap paths so they don't duplicate the literal. */
 export const DEFAULT_CAMERA: Camera = { lon: 0, lat: 20, zoom: 2 };
+
+/** flyTo target zoom for an airport pick: wide enough to frame the whole field/runway. The default
+ *  flyTo zoom (≥17) is object-placement close — too tight to see an airport — so the airport search
+ *  passes this instead. */
+export const AIRPORT_ZOOM = 13;
 
 const capUndo = (stack: Project[]): Project[] =>
   stack.length > UNDO_CAP ? stack.slice(stack.length - UNDO_CAP) : stack;
@@ -75,6 +81,7 @@ export interface EditorState {
   // ── reference data (loaded, not part of the document) ──
   catalog: Catalog | null;
   catalogIndex: Map<string, CatalogObject>; // by exact name
+  airports: Airport[]; // sim airport list (bundled), for the TopBar search → flyTo; never saved
   tiles: TilesConfig; // map tile provider (from Settings); MapView subscribes → live tile swap
 
   // ── DOCUMENT (snapshotted / dirtied / autosaved) ──
@@ -100,6 +107,7 @@ export interface EditorState {
 
   // ── lifecycle ──
   loadCatalog: (catalog: Catalog) => void;
+  loadAirports: (airports: Airport[]) => void;
   setTiles: (tiles: TilesConfig) => void;
   openProject: (path: string | null, project: Project) => void;
   newProject: (project: Project) => void;
@@ -130,7 +138,7 @@ export interface EditorState {
 
   // ── camera + resolved elevation (ephemeral) ──
   setMapView: (camera: Camera) => void;
-  flyTo: (p: LonLat) => void;
+  flyTo: (p: LonLat, zoom?: number) => void;
   setResolvedElev: (id: string, terrainAsl: number) => void;
   setPendingRecovery: (project: Project | null) => void;
 
@@ -253,6 +261,7 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
       return {
         catalog: null,
         catalogIndex: new Map(),
+        airports: [],
         tiles: DEFAULT_TILES,
         project: deps.initialProject,
         projectPath: null,
@@ -273,6 +282,7 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
 
         loadCatalog: (catalog) =>
           set({ catalog, catalogIndex: new Map(catalog.xref.map((o) => [o.name, o])) }),
+        loadAirports: (airports) => set({ airports }),
         setTiles: (tiles) => set({ tiles }),
         openProject: (path, project) => load(project, path),
         newProject: (project) => load(project, null),
@@ -366,12 +376,14 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
         },
 
         setMapView: (camera) => set({ mapView: camera }),
-        // Recenter the map on a point (placed-list double-click). Reuses the cameraEpoch channel the
-        // MapView already watches — a bump means "follow mapView now"; pan/zoom never bump it, so this
-        // is the one imperative recenter besides document load. Zoom in a little if we're far out.
-        flyTo: (p) =>
+        // Recenter the map on a point (placed-list double-click; airport search). Reuses the
+        // cameraEpoch channel the MapView already watches — a bump means "follow mapView now"; pan/zoom
+        // never bump it, so this is the one imperative recenter besides document load. Callers may pass
+        // a target zoom (the airport search uses AIRPORT_ZOOM to frame the field); the default zooms in
+        // a little if we're far out but never zooms back out.
+        flyTo: (p, zoom) =>
           set((s) => ({
-            mapView: { lon: p.lon, lat: p.lat, zoom: Math.max(s.mapView.zoom, 17) },
+            mapView: { lon: p.lon, lat: p.lat, zoom: zoom ?? Math.max(s.mapView.zoom, 17) },
             cameraEpoch: s.cameraEpoch + 1,
           })),
         setResolvedElev: (id, terrainAsl) =>

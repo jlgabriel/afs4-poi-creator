@@ -223,11 +223,12 @@ export function SettingsDialog({
             <details className="pct-about">
               <summary>About &amp; attributions</summary>
               <p className="pct-field-meta">
-                PCT — POI Creation Tool (MIT). Builds installable Aerofly FS 4 POIs from your own install;
-                ships no IPACS assets.
+                PCT — POI Creation Tool (GPL-3.0-or-later). Builds installable Aerofly FS 4 POIs from your
+                own install; ships no IPACS assets.
               </p>
               <ul className="pct-about-list">
                 <li>Map: Leaflet (BSD-2) · Esri World Imagery · OpenStreetMap (ODbL)</li>
+                <li>Airports: fboes/aerofly-data (MIT) · OurAirports (Public Domain)</li>
                 <li>Elevation: Open-Meteo (CC-BY 4.0)</li>
                 <li>UI: React (MIT) · Zustand (MIT) · built with Electron + Vite</li>
               </ul>

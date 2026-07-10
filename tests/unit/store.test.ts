@@ -276,6 +276,13 @@ describe("camera — capture-on-save, not mutate-on-pan", () => {
     store.getState().flyTo({ lon: 1, lat: 2 });
     expect(store.getState().mapView.zoom).toBe(20); // don't zoom back out
   });
+
+  it("flyTo honours an explicit target zoom (airport search frames the field, not object-close)", () => {
+    const { store } = makeStore();
+    store.getState().setMapView({ lon: 0, lat: 0, zoom: 20 }); // already closer than 17
+    store.getState().flyTo({ lon: 2.5479, lat: 49.0097 }, 13);
+    expect(store.getState().mapView).toEqual({ lon: 2.5479, lat: 49.0097, zoom: 13 }); // exact override
+  });
 });
 
 describe("autosave debounce", () => {
@@ -447,5 +454,13 @@ describe("lifecycle", () => {
     };
     store.getState().loadCatalog(catalog);
     expect(store.getState().catalogIndex.get("tower_a")?.displayName).toBe("Tower A");
+  });
+
+  it("loadAirports holds the airport list as ephemeral reference data (never dirties the document)", () => {
+    const { store, persist } = makeStore();
+    store.getState().loadAirports([{ icao: "LFPG", name: "Charles de Gaulle", lat: 49.0097, lon: 2.5479 }]);
+    expect(store.getState().airports).toHaveLength(1);
+    expect(store.getState().dirty).toBe(false);
+    expect(persist).not.toHaveBeenCalled();
   });
 });
