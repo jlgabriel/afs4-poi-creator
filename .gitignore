@@ -25,6 +25,11 @@ catalog.json
 .DS_Store
 Thumbs.db
 
+# Local probe / test projects (Juan's own, used for the in-sim gate). Kept on disk, not committed;
+# root-anchored so a future curated examples/suiza.json is unaffected.
+/italia.json
+/suiza*.json
+
 # local-only — internal design/review docs and local editor/preview config.
 # Kept on disk (shared with Claude locally); never pushed to GitHub.
 docs/

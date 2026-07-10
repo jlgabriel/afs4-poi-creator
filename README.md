@@ -5,12 +5,42 @@ installable `scenery/poi/` package. A sibling to
 [afs4‑pylon‑race](https://github.com/jlgabriel/afs4-pylon-race); shares its geometry and
 POI‑folder conventions.
 
-> **Status:** M0 (core + scanner), the M1 **export core + CLI**, and the **Electron shell** (first‑run
-> wizard, satellite map, catalog, inspector, export/install) are done and green. Dev builds + a
-> Playwright/Electron smoke are wired (see [Desktop app & builds](#desktop-app--builds)); M1 closes on
-> the in‑sim sign‑off flight.
+> **Status:** the scanner, export core + CLI, and the full **Electron editor** (first‑run wizard,
+> satellite/streets map, object catalog, inspector, airport search, per‑object height, export/install &
+> uninstall) are built and green — unit + golden tests, typecheck, and a Playwright/Electron smoke, all
+> run in [CI](.github/workflows/ci.yml). Preparing the first public release (**0.1.0**); the export
+> format is confirmed in‑sim. Builds are unsigned in v1.
 
-## What M0 delivers
+## For Aerofly FS 4 users
+
+PCT lets you decorate the world in Aerofly FS 4 with the sim's **own built‑in objects** — hangars,
+towers, terminals, vehicles, parked aircraft, street lamps, and more — with no modelling and no file
+editing. You place them on a real satellite map, and PCT writes a standard **POI scenery folder** you
+drop into Aerofly.
+
+**It ships no Aerofly content.** PCT reads the object catalog from *your* installed copy of the sim, so
+you only ever place objects you already own.
+
+1. **Install PCT** — download the build for your OS from the
+   [Releases](https://github.com/jlgabriel/afs4-poi-creator/releases) page (Windows installer or
+   portable · macOS dmg · Linux AppImage). Builds are **unsigned**, so the first launch needs one extra
+   click — see [Desktop app & builds](#desktop-app--builds).
+2. **Point PCT at your sim** — on first run the wizard auto‑detects your Aerofly install and user
+   folders.
+3. **Place objects** — search the catalog, click to drop an object on the map, then drag / rotate /
+   scale it and fine‑tune its height in the inspector.
+4. **Export & install** — *Export POI → Install into Aerofly FS 4* writes the folder into your
+   `scenery/poi/`; restart Aerofly and fly to the area. The same dialog can **uninstall** POIs that PCT
+   made.
+
+**The POI packages you create are yours.** They're the program's output and are **not** covered by
+PCT's GPL license — share or sell them however you like.
+
+## For developers
+
+The rest of this README is developer‑facing — architecture, commands, and builds.
+
+### What the pure core delivers
 
 A pure, CLI‑verifiable data layer that reads Aerofly's built‑in object catalog straight
 from the sim's plain‑text `.tmi` index files — **no asset extraction, no IPACS bytes copied**:
@@ -33,7 +63,7 @@ npm install
 npm test                 # vitest over core/ (unit + golden; self-contained)
 npm run scan -- --install "D:\SteamLibrary\steamapps\common\Aerofly FS 4 Flight Simulator"
 npm run export -- examples/tower.project.json --install   # build a POI and install it into scenery/poi/
-npm run gen:categories   # regenerate core/catalog/categories.data.ts from docs/ (names only)
+npm run gen:categories   # regenerate the category table from docs/ (local-only; output is committed, so clones don't need docs/)
 npm run typecheck
 ```
 

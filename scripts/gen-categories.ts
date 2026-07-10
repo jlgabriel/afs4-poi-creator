@@ -3,6 +3,11 @@
 // names under the ACT/FS4 section headings. Each name is mapped to a PCT
 // display category (design §2.4). NAMES ONLY — no dimensions, no IPACS asset bytes.
 //
+// NOTE: docs/ is LOCAL-ONLY (gitignored — it holds local reference material), so this generator
+// only runs in a full local checkout. Public clones do NOT need it: the generated
+// src/core/catalog/categories.data.ts IS committed, so the app builds without docs/. Re-run this
+// only when the format bible itself changes.
+//
 // Run: npm run gen:categories
 import { readFileSync, writeFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
