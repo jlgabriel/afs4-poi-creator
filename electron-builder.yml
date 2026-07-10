@@ -5,7 +5,7 @@
 # `files` only needs to allow the electron-vite output + package.json.
 appId: com.jlgabriel.pct
 productName: PCT
-copyright: © 2026 Juan Luis Gabriel — MIT
+copyright: © 2026 Juan Luis Gabriel — GPL-3.0-or-later
 
 directories:
   buildResources: resources
@@ -14,6 +14,8 @@ directories:
 files:
   - out/**
   - package.json
+  - LICENSE
+  - THIRD_PARTY_NOTICES.md
   - "!**/*.map"
 
 asar: true

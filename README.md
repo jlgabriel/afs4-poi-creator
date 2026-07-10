@@ -74,4 +74,17 @@ enter the repo. Test fixtures use invented names.
 
 ## License
 
-MIT © Juan Luis Gabriel
+**GPL-3.0-or-later** © 2026 Juan Luis Gabriel
+
+PCT is free software: you can redistribute it and/or modify it under the terms of the GNU
+General Public License as published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version. PCT is distributed in the hope that it will be
+useful, but **WITHOUT ANY WARRANTY**; without even the implied warranty of merchantability or
+fitness for a particular purpose. See the [`LICENSE`](LICENSE) file for the full text.
+
+**The POI packages you create with PCT are your own.** They are the program's output and are
+**not** covered by the GPL — do with them whatever you like.
+
+PCT bundles third‑party components (Leaflet, React, Zustand, Zod, Electron, and others) under
+their own permissive licenses; their notices are preserved in
+[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
