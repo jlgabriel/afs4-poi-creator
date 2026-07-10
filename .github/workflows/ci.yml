@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# A newer push on the same branch/PR cancels the in-flight run (saves Actions minutes).
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: typecheck · unit · guards
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - run: npm ci
+
+      # IPACS-derived scanned data (real object names + real dimensions) must NEVER be committed.
+      # It's gitignored (catalog.json / *.catalog.json) and regenerated at runtime; CI turns a stray
+      # commit into a hard failure. See .gitignore and the design's M3 CI note.
+      - name: Guard — no catalog.json is tracked
+        run: |
+          tracked="$(git ls-files '*catalog.json')"
+          if [ -n "$tracked" ]; then
+            echo "::error::catalog.json is tracked but must stay gitignored (IPACS-derived data):"
+            echo "$tracked"
+            exit 1
+          fi
+          echo "OK — no catalog.json tracked."
+
+      - name: Typecheck (both tsconfigs)
+        run: npm run typecheck
+
+      - name: Unit + golden tests
+        run: npm test
+
+  e2e:
+    name: electron smoke (packaged CSP)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - run: npm ci
+
+      # The e2e specs launch the BUILT Electron app via Playwright's `_electron`. On Linux that needs
+      # Chromium's shared system libraries (Electron bundles Chromium) plus a virtual display. We reuse
+      # `playwright install-deps` for the libs and xvfb for the display — no browser download is needed
+      # (the app drives Electron's own Chromium).
+      - name: Install Chromium/Electron system libraries
+        run: npx --yes playwright install-deps chromium
+
+      - name: e2e — build + Electron smoke under xvfb
+        run: xvfb-run -a npm run test:e2e
