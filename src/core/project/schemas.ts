@@ -18,6 +18,14 @@ export const CURRENT_SETTINGS_VERSION = 1;
  *  isSafePoiFolderName in geo/poiName.ts — keep the two in sync. */
 export const POI_SLUG_RE = /^[a-z0-9_]+$/;
 
+/** A placed object's `name` is a catalog object id. Every scanned/.tmi name is `[A-Za-z0-9_]` (verified:
+ *  837/837 in categories.data.ts), so we allow that plus `.`/`-` as headroom and reject the rest. This
+ *  stops an untrusted, forum-shared project.json from smuggling a `]` (or a newline) into the value —
+ *  the TM grammar has NO escape, so that would truncate and corrupt the emitted `poi.toc` written into
+ *  the user's scenery/poi/ (Fable A — the C2 class, but via a foreign project.json rather than
+ *  project.name). tocWriter runs the name through `sanitizeValue` as well, as defence in depth. */
+export const XREF_NAME_RE = /^[A-Za-z0-9_.-]+$/;
+
 /** Thrown when a file's schemaVersion is one this build cannot (yet) read. */
 export class UnsupportedSchemaVersionError extends Error {
   constructor(
@@ -66,7 +74,7 @@ export const zShift = z.object({
 export const zPlacedXref = z.looseObject({
   id: z.string().min(1),
   kind: z.literal("xref"),
-  name: z.string().min(1),
+  name: z.string().min(1).regex(XREF_NAME_RE, "must be a catalog object id (letters, digits, _ . -)"),
   position: zLonLat,
   height: zHeightSpec,
   direction: z.number().finite(),

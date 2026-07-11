@@ -16,14 +16,17 @@
 // file (2026-07-10); the new byte layout is pending re-confirmation in the M3 in-sim gate.
 
 import type { ResolvedXref } from "../project/types";
-import { tag, block, fmtLonLat, fmtMeters, fmtNum } from "../tm/tmEmit";
+import { tag, block, sanitizeValue, fmtLonLat, fmtMeters, fmtNum } from "../tm/tmEmit";
 
 function xrefElement(o: ResolvedXref, index: number): string[] {
   const position = `${fmtLonLat(o.position.lon)} ${fmtLonLat(o.position.lat)} ${fmtMeters(o.heightAsl)}`;
   // Field order + tag types mirror the canonical cultivation layout: name first, direction is float32,
   // and the element carries its list index ([0], [1], …) exactly as the sim's own files do.
   return block("xref", "element", String(index), [
-    tag("string8u", "name", o.name),
+    // sanitizeValue as defence in depth: the schema (XREF_NAME_RE) already rejects a name with a `]` on
+    // load, but never emit an un-escaped user-influenced value into the .toc — a stray `]` would truncate
+    // the element and corrupt the file (Fable A). Catalog names are slugs, so this is a no-op for them.
+    tag("string8u", "name", sanitizeValue(o.name)),
     tag("vector3_float64", "position", position),
     tag("float32", "direction", fmtNum(o.direction, 3)),
     tag("float32", "scale_factor", fmtNum(o.scale, 4)),

@@ -10,6 +10,7 @@ import "leaflet/dist/leaflet.css";
 import { shallow } from "zustand/shallow";
 import { editorStore, useEditor } from "../state/editorStore";
 import type { TilesConfig } from "../state/store";
+import { wrapLon } from "../../core/geo/geo";
 import { tileSourceFor } from "./tileProviders";
 import { FootprintLayer } from "./FootprintLayer";
 
@@ -81,7 +82,9 @@ export function MapView(): React.ReactElement {
     // Empty-map click = place the armed object (footprint clicks don't bubble here → select ≠ place).
     const onClick = (e: L.LeafletMouseEvent): void => {
       const s = editorStore.getState();
-      if (s.placing !== null) s.placeAt({ lon: e.latlng.lng, lat: e.latlng.lat });
+      // wrapLon: a click in a repeated world-copy (low-zoom pan) hands us lng >180 / <-180 — the same
+      // real point, but out of the range the loader accepts. Wrap it so the placed object stays valid.
+      if (s.placing !== null) s.placeAt({ lon: wrapLon(e.latlng.lng), lat: e.latlng.lat });
       else s.clearSelection();
     };
     map.on("click", onClick);
@@ -89,7 +92,9 @@ export function MapView(): React.ReactElement {
     // Camera is EPHEMERAL (P1-4): capture the live view on pan/zoom, never dirtying the document.
     const onMoveEnd = (): void => {
       const c = map.getCenter();
-      editorStore.getState().setMapView({ lon: c.lng, lat: c.lat, zoom: map.getZoom() });
+      // Wrap the live camera's longitude too: it becomes the export anchor when "Current map center" is
+      // chosen, so a pan into a world-copy would otherwise write an out-of-range reference (Fable B1).
+      editorStore.getState().setMapView({ lon: wrapLon(c.lng), lat: c.lat, zoom: map.getZoom() });
     };
     map.on("moveend", onMoveEnd);
 

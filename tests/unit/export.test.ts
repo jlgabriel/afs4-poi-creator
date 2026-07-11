@@ -3,7 +3,7 @@ import type { Project, ResolvedXref } from "../../src/core/project/types";
 import { buildToc } from "../../src/core/export/tocWriter";
 import { buildTsl } from "../../src/core/export/tslWriter";
 import { planExport, POI_README_MARKER } from "../../src/core/export/planExport";
-import { parseTm, child } from "../../src/core/tm/tmParser";
+import { parseTm, child, findAll } from "../../src/core/tm/tmParser";
 import { shiftEastNorth } from "../../src/core/geo/geo";
 import { fmtLonLat, fmtMeters } from "../../src/core/tm/tmEmit";
 
@@ -74,6 +74,12 @@ describe("buildToc — cultivation list_xref", () => {
         "    >\n" +
         ">\n",
     );
+  });
+  it("sanitises a grammar-breaking ] in an object name so the .toc stays parseable (Fable A)", () => {
+    const toc = buildToc([{ ...TOWER, name: "lamp]evil" }]);
+    expect(toc).toContain("<[string8u][name][lamp)evil]>"); // ] → ) ; the schema also rejects it on load
+    const el = findAll(parseTm(toc), "xref")[0]; // the file still parses to ONE well-formed xref element
+    expect(child(el, "name")?.value).toBe("lamp)evil");
   });
 });
 

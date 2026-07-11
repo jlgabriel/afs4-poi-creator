@@ -21,7 +21,7 @@
 import * as L from "leaflet";
 import type { CatalogObject, LonLat, PlacedXref, Vec3 } from "../../core/project/types";
 import { footprintCorners, headingMarker } from "../../core/geo/footprint";
-import { destination, initialBearing } from "../../core/geo/geo";
+import { destination, initialBearing, wrapLon } from "../../core/geo/geo";
 import { diffEntry } from "./syncDiff";
 import { snapAngle } from "./rotate";
 
@@ -307,7 +307,9 @@ export class FootprintLayer {
     this.map.dragging.enable();
     if (!d.moved) return; // a click, not a drag — selection is handled by the polygon click
     if (d.mode === "move") {
-      this.cb.onMove(d.id, d.anchor);
+      // Wrap only at COMMIT, never in the live preview: dragging across the antimeridian stays visually
+      // continuous, while the spot handed to the store is normalised into the loader's range (Fable B1).
+      this.cb.onMove(d.id, { lon: wrapLon(d.anchor.lon), lat: d.anchor.lat });
     } else if (d.bearing !== d.startDir) {
       this.cb.onRotate(d.id, d.bearing); // skip a no-op release (snapped back to the start angle)
     }

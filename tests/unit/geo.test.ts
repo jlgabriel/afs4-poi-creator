@@ -4,6 +4,7 @@ import {
   initialBearing,
   destination,
   shiftEastNorth,
+  wrapLon,
   EARTH_RADIUS_M,
 } from "../../src/core/geo/geo";
 
@@ -81,5 +82,49 @@ describe("shiftEastNorth — (east, north) metres → point", () => {
     const west = destination(A, 100, 270);
     expect(w.lon).toBeCloseTo(west.lon, 12);
     expect(w.lat).toBeCloseTo(west.lat, 12);
+  });
+
+  it("wraps a shift that pushes a near-antimeridian object past ±180 (Fable B/shift)", () => {
+    const near = { lon: 179.9995, lat: -16.5 }; // ~Fiji, just west of the antimeridian
+    const out = shiftEastNorth(near, 200, 0); // 200 m east → across +180
+    expect(out.lon).toBeGreaterThanOrEqual(-180);
+    expect(out.lon).toBeLessThan(180); // in range → the loader accepts it
+    expect(out.lon).toBeLessThan(0); // wrapped onto the western side
+    expect(out.lon).toBeCloseTo(-179.9986, 3);
+    // wrap preserved the REAL location: still ~200 m from the origin (haversine is antimeridian-safe).
+    expect(haversine(near, out)).toBeCloseTo(200, 1);
+  });
+});
+
+describe("wrapLon — normalise a longitude into WGS84 [-180, 180)", () => {
+  it("passes in-range longitudes through byte-identical (no float noise on valid coords)", () => {
+    for (const lon of [0, 45, -45, 179.9999, -179.9999, -180, 11.85, 123.456789]) {
+      expect(wrapLon(lon)).toBe(lon);
+    }
+  });
+
+  it("maps the +180 edge to -180 (the same antimeridian point)", () => {
+    expect(wrapLon(180)).toBe(-180);
+  });
+
+  it("wraps just past the antimeridian to the same real point", () => {
+    expect(wrapLon(181)).toBeCloseTo(-179, 12);
+    expect(wrapLon(-181)).toBeCloseTo(179, 12);
+    expect(wrapLon(180.001)).toBeCloseTo(-179.999, 12);
+  });
+
+  it("wraps repeated world-copies (multi-turn longitudes)", () => {
+    expect(wrapLon(360)).toBe(0);
+    expect(wrapLon(540)).toBe(-180); // 540 ≡ 180 ≡ -180
+    expect(wrapLon(720 + 45)).toBeCloseTo(45, 12);
+    expect(wrapLon(-1000)).toBeCloseTo(80, 12); // -1000 + 3·360
+  });
+
+  it("always lands in [-180, 180)", () => {
+    for (const lon of [180, 181, -181, 360, 540, -540, 1000, -1000, 179.9999999]) {
+      const w = wrapLon(lon);
+      expect(w).toBeGreaterThanOrEqual(-180);
+      expect(w).toBeLessThan(180);
+    }
   });
 });

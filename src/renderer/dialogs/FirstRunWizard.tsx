@@ -26,13 +26,20 @@ export function FirstRunWizard({ onDone }: { onDone: () => void }): React.ReactE
     void (async () => {
       const [paths, settings] = await Promise.all([pct.detectPaths(), pct.getSettings()]);
       if (cancelled) return;
-      setCandidates(paths.installDirs);
-      // Seed the POI-install user dir from the SAVED setting first, falling back to auto-detect only on a
-      // true first run (no saved value). This flow is reused for Rescan and `finish()` writes afs4UserDir
-      // unconditionally — seeding from detect alone silently wiped a hand-set path when auto-detect can't
-      // find it (a non-standard Documents folder), breaking the next export (Fable I1).
+      // Seed BOTH dirs from the SAVED settings first, falling back to auto-detect only on a true first
+      // run (no saved value). This flow is reused for Rescan and `finish()` writes both unconditionally,
+      // so seeding from auto-detect alone silently wiped a hand-set path when detect can't find it (a
+      // non-standard install / Documents folder), breaking the next export (Fable I1 — the afs4UserDir
+      // half shipped in a0e557e; the installDir half is this fix). Also surface a saved-but-undetected
+      // install dir as a candidate so it shows up selected in the list, not only as the radio value.
+      const savedInstall = settings.installDir;
+      setCandidates(
+        savedInstall !== null && !paths.installDirs.includes(savedInstall)
+          ? [savedInstall, ...paths.installDirs]
+          : paths.installDirs,
+      );
       setUserDir(settings.afs4UserDir ?? paths.userDir);
-      setInstallDir(paths.installDirs[0] ?? null);
+      setInstallDir(savedInstall ?? paths.installDirs[0] ?? null);
     })();
     return () => {
       cancelled = true;

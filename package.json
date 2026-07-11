@@ -3,9 +3,18 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "PCT — POI Creation Tool: place Aerofly FS4 built-in objects on a satellite map and export an installable POI. M0: pure TypeScript core + headless scanner.",
+  "description": "PCT — POI Creation Tool: place Aerofly FS 4 built-in objects on a satellite map and export an installable POI folder. Ships zero IPACS assets — scans your own install.",
   "license": "GPL-3.0-or-later",
   "author": "Juan Luis Gabriel",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jlgabriel/afs4-poi-creator.git"
+  },
+  "homepage": "https://github.com/jlgabriel/afs4-poi-creator#readme",
+  "bugs": "https://github.com/jlgabriel/afs4-poi-creator/issues",
+  "engines": {
+    "node": ">=20"
+  },
   "main": "./out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",

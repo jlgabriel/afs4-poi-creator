@@ -9,7 +9,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { ExportOptions, InstallResult, InstalledPoi, PctError } from "../../shared/pctApi";
 import type { LonLat } from "../../core/project/types";
 import { centroid, poiFolderName } from "../../core/geo/poiName";
-import { isExportablePoiName } from "../../core/project/schemas";
+import { firstProjectError, isExportablePoiName } from "../../core/project/schemas";
 import { editorStore, useEditor } from "../state/editorStore";
 import { getPct } from "../app/pct";
 import { NumberInput } from "../inspector/NumberInput";
@@ -146,6 +146,17 @@ export function ExportDialog({ onClose }: { onClose: () => void }): React.ReactE
     const curShift = store.project.shift ?? { east: 0, north: 0 };
     if (shiftEast !== curShift.east || shiftNorth !== curShift.north) {
       store.setShift({ east: shiftEast, north: shiftNorth });
+    }
+
+    // Export-time twin of the C1 save-net (commands.ts): never write a POI the loader would reject.
+    // The export path bypasses doSave, so without this an out-of-range coordinate that Save refuses could
+    // still land in scenery/poi (Fable B2). Belt-and-suspenders now that B1 wraps the map inputs, but it
+    // closes the class and mirrors save. store.serialize() reads the live state, so it reflects the
+    // reference/shift/slug just persisted above.
+    const problem = firstProjectError(store.serialize());
+    if (problem !== null) {
+      setError(`Can't export — the project has a value Aerofly would reject (${problem}). Fix it and try again.`);
+      return;
     }
 
     const opts: ExportOptions = { target, overwrite: false };

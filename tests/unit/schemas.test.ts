@@ -64,6 +64,9 @@ describe("parseProject — accepts valid input and round-trips", () => {
     const parsed = parseProject(raw) as unknown as Record<string, unknown>;
     expect(parsed.futureField).toEqual({ hello: 1 });
   });
+  it("accepts a catalog-style object name with . and - (the headroom charset, Fable A)", () => {
+    expect(() => parseProject(withFirstObject({ name: "obj-name.v2_00" }))).not.toThrow();
+  });
 });
 
 describe("parseProject — rejects malformed input (untrusted forum files)", () => {
@@ -73,6 +76,8 @@ describe("parseProject — rejects malformed input (untrusted forum files)", () 
     ["unknown height mode", withFirstObject({ height: { mode: "floating" } })],
     ["kind not xref", withFirstObject({ kind: "plant" })],
     ["missing name", withoutFirstObjectKey("name")],
+    ["object name with a grammar-breaking ]", withFirstObject({ name: "lamp]evil" })],
+    ["object name with a space (not a catalog id)", withFirstObject({ name: "two words" })],
     ["wrong app tag", { ...validProject(), app: "other" }],
     ["not an object", 42],
   ];
@@ -131,6 +136,9 @@ describe("firstProjectError — the save-time safety net (Fable C1)", () => {
   });
   it("reports an unreadable schemaVersion in words", () => {
     expect(firstProjectError({ schemaVersion: 2 })).toContain("schemaVersion");
+  });
+  it("rejects an object name that would break the .toc grammar (Fable A)", () => {
+    expect(firstProjectError(withFirstObject({ name: "lamp]evil" }))).not.toBeNull();
   });
 });
 

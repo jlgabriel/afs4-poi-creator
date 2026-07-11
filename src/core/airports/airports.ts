@@ -28,23 +28,33 @@ export function parseAirportCoordinates(raw: unknown, coreIcaos?: ReadonlySet<st
   return out;
 }
 
-/** Rank airports for a typeahead query. Case-insensitive; tiers, highest first:
- *    1. ICAO exact      ("LFPG" → LFPG)
- *    2. ICAO prefix     ("LFP"  → LFPG, LFPO, …)
- *    3. name substring  ("charles" → LFPG)
+/** Fold a string for accent- AND case-insensitive matching: NFD-decompose (so an accented letter
+ *  becomes base + a combining mark), drop every combining mark (Unicode Nonspacing_Mark, `\p{Mn}`),
+ *  then lowercase. So a name whose real spelling carries an accent — "Zurich", "...Merino Benitez" —
+ *  matches a query typed without it ("zurich", "benitez"). 858 of the 7845 names carry diacritics, and
+ *  the name tier is the one that saves a user who doesn't know the ICAO, so folding it is what makes
+ *  that tier actually work (Fable A1). */
+export function foldForSearch(s: string): string {
+  return s.normalize("NFD").replace(/\p{Mn}/gu, "").toLowerCase();
+}
+
+/** Rank airports for a typeahead query. Case- AND accent-insensitive; tiers, highest first:
+ *    1. ICAO exact      ("LFPG" -> LFPG)
+ *    2. ICAO prefix     ("LFP"  -> LFPG, LFPO, ...)
+ *    3. name substring  ("charles" -> LFPG; "zurich" -> LSZH)
  *  A blank query returns nothing (the dropdown stays closed). 7845 rows is tiny — a full linear scan
- *  per keystroke is well under a millisecond, so there is no index to keep in sync. */
+ *  per keystroke is a couple of milliseconds at most, so there is no index to keep in sync. */
 export function searchAirports(airports: Airport[], query: string, limit = 20): Airport[] {
-  const q = query.trim().toLowerCase();
+  const q = foldForSearch(query.trim());
   if (q === "") return [];
   const exact: Airport[] = [];
   const prefix: Airport[] = [];
   const nameHit: Airport[] = [];
   for (const a of airports) {
-    const icao = a.icao.toLowerCase();
+    const icao = a.icao.toLowerCase(); // ICAO codes are ASCII -> lowercase is enough, no fold needed
     if (icao === q) exact.push(a);
     else if (icao.startsWith(q)) prefix.push(a);
-    else if (a.name.toLowerCase().includes(q)) nameHit.push(a);
+    else if (foldForSearch(a.name).includes(q)) nameHit.push(a);
   }
   return [...exact, ...prefix, ...nameHit].slice(0, limit);
 }

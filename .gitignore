@@ -34,3 +34,8 @@ Thumbs.db
 # Kept on disk (shared with Claude locally); never pushed to GitHub.
 docs/
 .claude/
+
+# Local reference material — reference only, NEVER publish.
+# Local reference material,
+# kept on disk, root-anchored so nothing here is ever `git add`-ed.
+/_local_reference/
