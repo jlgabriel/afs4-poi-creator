@@ -7,8 +7,8 @@
 //
 // The tag set + order mirrors a REAL, proven-working text .tsl — the Race App's installed POI
 // (…/scenery/poi/<coord>_mi_primera_carrera/…tsl), which AFS4 loads fine — minus the empty
-// place-level `geometry` tag it carried: the format's author confirmed that tag
-// is optional and drops without replacement (forum, 2026-07-08), so we omit it. PCT's .tsl then
+// place-level `geometry` tag it carried: the format's author confirmed on the forum that tag
+// is optional and drops without replacement (2026-07-08), so we omit it. PCT's .tsl then
 // differs from that known-good file only in that `cultivation` points at a .toc instead of being
 // empty (and no inline objects). The sim ships its own POIs
 // binary-packed, so this text form + in-sim testing is the only way to confirm:
