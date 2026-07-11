@@ -52,8 +52,8 @@ jobs:
 
       - run: npm ci
 
-      # electron-vite build → electron-builder. Icons aren't in resources/ yet (M3 TODO), so expect a
-      # non-fatal "default Electron icon" warning here.
+      # electron-vite build → electron-builder, which picks up the app icons from resources/ (icon.ico /
+      # icon.icns / icon.png) automatically.
       - name: Build installers
         run: ${{ matrix.run }}
 

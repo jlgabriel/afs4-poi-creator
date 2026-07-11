@@ -29,6 +29,7 @@ Thumbs.db
 # root-anchored so a future curated examples/suiza.json is unaffected.
 /italia.json
 /suiza*.json
+/desierto*.json
 
 # local-only — internal design/review docs and local editor/preview config.
 # Kept on disk (shared with Claude locally); never pushed to GitHub.
