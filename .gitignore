@@ -35,7 +35,6 @@ Thumbs.db
 docs/
 .claude/
 
-# Local reference material — reference only, NEVER publish.
-# Local reference material,
-# kept on disk, root-anchored so nothing here is ever `git add`-ed.
+# Local reference material — never published. Kept on disk, root-anchored
+# so nothing here is ever `git add`-ed.
 /_local_reference/

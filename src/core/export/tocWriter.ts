@@ -4,8 +4,7 @@
 // This is what makes PCT different from the Race App exporter: the Race App bundles .tmb
 // models and lists them inline in the .tsl; PCT ships no bytes and instead references the
 // sim's built-in objects through a cultivation `list_xref`. Field order, tag types and the
-// per-element index all follow the canonical hand-authored cultivation
-// (the canonical cultivation layout — the reference layout). Each
+// per-element index all follow the canonical hand-authored cultivation layout. Each
 // xref element carries, IN THIS ORDER:
 //   name                        — the exact xref id
 //   position [lon lat height]   — height is ASL for POIs (design R1 / matrix V2)
@@ -13,7 +12,7 @@
 //   scale_factor                — uniform
 //
 // Output is byte-exact and golden-tested. The cultivation layout now mirrors the canonical
-// file (2026-07-10); the new byte layout is pending re-confirmation in the M3 in-sim gate.
+// reference (2026-07-10); the new byte layout is pending re-confirmation in the M3 in-sim gate.
 
 import type { ResolvedXref } from "../project/types";
 import { tag, block, sanitizeValue, fmtLonLat, fmtMeters, fmtNum } from "../tm/tmEmit";
