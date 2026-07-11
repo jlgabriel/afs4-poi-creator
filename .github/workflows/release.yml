@@ -1,0 +1,92 @@
+name: Release
+
+# Builds the cross-platform installers and publishes them as a *draft* GitHub Release when a version
+# tag is pushed. Trigger it with:
+#
+#     git tag v0.1.0 && git push origin v0.1.0
+#
+# Each installer is built on its OWN native runner: electron-builder cannot cross-compile the macOS
+# .dmg from Windows/Linux, so the Mac artifacts must come from a macOS runner. GitHub-hosted macOS
+# runners are FREE for public repos (10x-metered on private ones) — flip the repo public before
+# tagging. The result lands as a DRAFT: review it, paste in the "unidentified developer" install
+# notes (builds are unsigned by design — see electron-builder.yml), then hit Publish.
+#
+# This workflow only packages + publishes; ci.yml already runs typecheck/unit/e2e on the commit.
+
+on:
+  push:
+    tags:
+      - "v*"
+
+# GITHUB_TOKEN needs write access to create the release and attach the installers.
+permissions:
+  contents: write
+
+# Never cancel a half-finished release — queue instead. (ci.yml cancels in-progress; a release must not.)
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: build · ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      # One OS hiccup shouldn't sink the others — keep the Windows/Linux artifacts even if macOS fails.
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            run: npm run build:win     # NSIS setup .exe + portable .exe (x64)
+          - os: macos-latest
+            run: npm run build:mac     # .dmg + .zip (arm64 + x64) — the arm runner cross-builds the x64 slice
+          - os: ubuntu-latest
+            run: npm run build:linux   # .AppImage (x64)
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - run: npm ci
+
+      # electron-vite build → electron-builder. Icons aren't in resources/ yet (M3 TODO), so expect a
+      # non-fatal "default Electron icon" warning here.
+      - name: Build installers
+        run: ${{ matrix.run }}
+
+      # Upload only the user-facing installers — skip electron-builder's *.yml / *.blockmap auto-update
+      # sidecars and the unpacked app dirs. Artifact names must be unique per job on upload-artifact@v4.
+      - name: Upload installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: installers-${{ matrix.os }}
+          if-no-files-found: error
+          path: |
+            dist/*.exe
+            dist/*.dmg
+            dist/*.zip
+            dist/*.AppImage
+
+  release:
+    name: draft GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      # Pull every OS's installers back into one flat dist/ folder (merge-multiple flattens them).
+      - name: Download installers
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: installers-*
+          merge-multiple: true
+
+      # Preinstalled GitHub CLI (first-party — no third-party action holding a write token). The pushed
+      # tag becomes both the release tag and its title; --generate-notes seeds the body from the commits
+      # since the previous tag. Draft, so nothing goes public until you review and click Publish.
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/* --draft --generate-notes
