@@ -18,8 +18,8 @@ POI-folder conventions.
 > desktop editor (first-run wizard, satellite/streets map, object catalog, inspector, airport
 > search, per-object height, export / install / uninstall) are built and tested — unit + golden
 > tests, typecheck, and an Electron smoke test, all green in [CI](.github/workflows/ci.yml). The
-> export format is **confirmed working in the sim**. Builds are currently **unsigned** and don't
-> carry a custom icon yet, so your OS will warn you once on first launch — see
+> export format is **confirmed working in the sim**. Builds are currently **unsigned**, so your OS will warn
+> you once on first launch — see
 > [Installing PCT](#installing-pct).
 
 ## What it is
