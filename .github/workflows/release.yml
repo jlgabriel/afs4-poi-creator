@@ -89,4 +89,6 @@ jobs:
       - name: Create draft release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" dist/* --draft --generate-notes
+        # --repo is required because this job has no checkout (only the downloaded artifacts), so gh has
+        # no local git remote to infer the target repository from — without it: "not a git repository".
+        run: gh release create "$GITHUB_REF_NAME" dist/* --draft --generate-notes --repo "$GITHUB_REPOSITORY"
