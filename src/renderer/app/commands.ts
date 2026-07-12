@@ -101,7 +101,7 @@ export function setTileProvider(provider: "esri" | "osm" | "custom"): void {
   void getPct()?.setSettings({ tiles }); // persist (best-effort; absent in the preview harness)
 }
 
-export type FetchResult = { ok: true } | { ok: false; message: string };
+export type FetchResult = { ok: true; asl: number } | { ok: false; message: string };
 
 /** Fetch the terrain elevation under one object and cache it for the inspector (design §5: the height
  *  control "shows the resolved effective ASL value once elevation is known, fetched lazily"). The store
@@ -122,5 +122,5 @@ export async function fetchElevation(id: string): Promise<FetchResult> {
   const terrainAsl = res.value[0]?.heightAsl;
   if (terrainAsl === undefined) return { ok: false, message: "No elevation returned." };
   editorStore.getState().setResolvedElev(id, terrainAsl);
-  return { ok: true };
+  return { ok: true, asl: terrainAsl };
 }

@@ -61,9 +61,11 @@ export function footprintCorners(
   ];
 }
 
-/** Tip of the "which way is it facing" arrow: a point on the model's +Y (front) axis at the
- *  bounding box's forward edge (bbMax.y), rotated by `direction`. At direction 0 it points due
- *  North; the editor draws a tick from the anchor to here so orientation is readable at a glance. */
+/** Tip of the orientation tick: a point on the model's +Y axis at the bounding box's forward edge
+ *  (bbMax.y), rotated by `direction`. This marks the model's OWN +Y axis — a fixed alignment
+ *  reference, NOT a "this is the front" claim: an object's authored front varies per model (many
+ *  face +X / East at direction 0), so only the +Y axis itself is guaranteed. The editor draws a tick
+ *  from the anchor to here so the rotation is readable at a glance; at direction 0 it points due North. */
 export function headingMarker(
   anchor: LonLat,
   bbMax: Vec3,

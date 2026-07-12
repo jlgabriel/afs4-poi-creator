@@ -50,13 +50,39 @@ into your finished POIs — just the *names* of the objects you chose.
 **The POIs you create are yours.** They're the program's output and are **not** covered by PCT's
 license — share them, post them, or sell them however you like.
 
+### Good to know
+
+Two things about the editor that trip people up (both are correct — just not obvious):
+
+- **"Direction °"** is the raw rotation stored in the object's `.toc`, **not** a compass heading. `0`
+  is the object's built-in pose, and that pose **varies per object** (many face east at `0`), so there
+  is no single "north = 0" rule to apply. The value increases clockwise and is normalised to 0–360°.
+  The tick on the map marks the model's own axis so you can watch it turn — to line an object up, match
+  its **footprint rectangle** to the imagery, which is always correct regardless of the authored front.
+- **Height modes** — Aerofly's built-in library objects have no auto-height, so PCT always writes an
+  **absolute** elevation (metres ASL). *Terrain* looks up the ground height and bakes it in; *Terrain +
+  offset* adds metres on top (rooftop items); *ASL* is a value you type. So "Terrain" does **not** mean
+  `0` — it means the resolved ground elevation.
+
 ### Installing PCT
 
 Builds are **unsigned** for now, so the operating system warns you the first time you open one:
 
 - **Windows** — SmartScreen shows "Windows protected your PC" → **More info → Run anyway**.
-- **macOS** — Gatekeeper says the app "cannot be opened" → **right-click the app → Open → Open**
-  (or System Settings → Privacy & Security → **Open Anyway**).
+- **macOS ("cannot be opened")** — right-click the app → **Open → Open**, or System Settings →
+  Privacy & Security → **Open Anyway**. (This is the warning you'll usually get on the Intel build.)
+
+On **Apple Silicon** you may instead see **"PCT.app is damaged and can't be opened."** It isn't
+damaged — it's the same unsigned-app quarantine — but on Apple chips it can't be cleared from the
+menus. Drag **PCT.app** into your **Applications** folder, then run this once in **Terminal** and open
+it normally:
+
+```
+xattr -cr /Applications/PCT.app
+```
+
+Prefer the **`arm64`** download on Apple Silicon; the Intel build also works but runs under Rosetta,
+which Apple is retiring.
 
 This is normal for a small open-source project without a paid signing certificate; the source is all
 here for anyone who wants to check it or [build it themselves](#build-it-yourself).

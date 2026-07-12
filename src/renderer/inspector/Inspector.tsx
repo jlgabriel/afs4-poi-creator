@@ -97,7 +97,12 @@ function ObjectFields({
 
       <div className="pct-field pct-field-row">
         <label className="pct-field-col">
-          <span className="pct-field-label">Direction °</span>
+          <span
+            className="pct-field-label"
+            title="Raw rotation stored in the .toc — not a compass heading. 0 = the object's built-in pose (varies per object); increases clockwise, normalized to 0–360°. To align, match the footprint rectangle to the imagery."
+          >
+            Direction °
+          </span>
           <NumberInput
             id="pct-inspector-direction"
             value={obj.direction}

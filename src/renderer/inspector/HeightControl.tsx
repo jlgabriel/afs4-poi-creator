@@ -41,6 +41,25 @@ export function HeightControl({ id, height, resolvedAsl }: HeightControlProps): 
     if (!r.ok) setFetchErr(r.message);
   };
 
+  // Just switched to ASL with no known ground height: look up the terrain elevation and bake it as the
+  // ASL value — but only while the field is still the untouched 0 seed AND the object is still in ASL
+  // mode (the user may have typed or switched modes during the async fetch). Turns "switch to ASL" from
+  // a silent drop to sea level into a sensible ground-level start. (Adds a second undo step.)
+  const seedAslFromTerrain = async (): Promise<void> => {
+    setFetching(true);
+    setFetchErr(null);
+    const r = await fetchElevation(id);
+    setFetching(false);
+    if (!r.ok) {
+      setFetchErr(r.message);
+      return;
+    }
+    const cur = store().project.objects.find((o) => o.id === id);
+    if (cur?.height.mode === "asl" && cur.height.value === 0) {
+      store().setHeight(id, { mode: "asl", value: r.asl });
+    }
+  };
+
   const selectMode = (mode: HeightSpec["mode"]): void => {
     if (mode === height.mode) return;
     if (mode === "terrain") store().setHeight(id, { mode: "terrain" });
@@ -49,11 +68,13 @@ export function HeightControl({ id, height, resolvedAsl }: HeightControlProps): 
         mode: "terrain-offset",
         offset: height.mode === "terrain-offset" ? height.offset : 0,
       });
-    else
-      store().setHeight(id, {
-        mode: "asl",
-        value: height.mode === "asl" ? height.value : (resolvedAsl ?? 0),
-      });
+    else {
+      // Switching to ASL. Seed from the ground height we already know; otherwise auto-fetch it (M2d) so
+      // the object doesn't silently drop to 0 m = sea level. Falls back to 0 + the fetch error if the
+      // lookup is unavailable (offline / browser preview) — the user still sees what happened.
+      store().setHeight(id, { mode: "asl", value: resolvedAsl ?? 0 });
+      if (resolvedAsl === undefined && bridge) void seedAslFromTerrain();
+    }
   };
 
   // The metres field edits the offset (terrain-offset) or the absolute value (asl); terrain has none.
@@ -65,7 +86,12 @@ export function HeightControl({ id, height, resolvedAsl }: HeightControlProps): 
 
   return (
     <div className="pct-height">
-      <div className="pct-field-label">Height</div>
+      <div
+        className="pct-field-label"
+        title="Library objects have no auto-height, so PCT always writes an absolute elevation (m ASL). Terrain = look up and bake the ground height; Terrain + offset = ground + metres (rooftops); ASL = a value you type. Terrain does not mean 0."
+      >
+        Height
+      </div>
       <div className="pct-radio-row">
         {MODES.map((m) => (
           <label key={m.mode} className="pct-radio">
@@ -105,7 +131,7 @@ export function HeightControl({ id, height, resolvedAsl }: HeightControlProps): 
             ? `terrain ≈ ${resolvedAsl.toFixed(1)} m ASL`
             : height.mode === "asl"
               ? "absolute metres ASL"
-              : "resolved at export"}
+              : "resolved to absolute ASL at export"}
         </span>
         <button
           type="button"
