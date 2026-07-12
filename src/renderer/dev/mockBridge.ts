@@ -24,6 +24,7 @@ const STEMS = [
   "watertower_round",
   "reservoir_tank",
   "jetway_a",
+  "jetway_footway",
   "pbridge_double",
   "staticpeople_standing",
   "people_walking",
@@ -45,7 +46,7 @@ const STEMS = [
 function buildBigCatalog(): Catalog {
   const xref: CatalogObject[] = [];
   const bundle = "xref_mock";
-  // ~35 variants per stem × 26 stems ≈ 910 objects.
+  // ~35 variants per stem × 27 stems ≈ 945 objects.
   for (const stem of STEMS) {
     for (let i = 0; i < 35; i++) {
       const suffix = `_ds_${String(i).padStart(2, "0")}_08_08`;

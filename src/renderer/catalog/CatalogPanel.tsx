@@ -13,6 +13,7 @@ import { List, type RowComponentProps } from "react-window";
 import type { CatalogObject } from "../../core/project/types";
 import { editorStore, useEditor } from "../state/editorStore";
 import { matchesFilter } from "./catalogFilter";
+import { isBrowsable } from "./browseVisibility";
 import { buildCatalogTree } from "./catalogTree";
 import { CategoryTree } from "./CategoryTree";
 import { CategoryIcon } from "./categoryIcon";
@@ -75,17 +76,19 @@ export function CatalogPanel(): React.ReactElement {
   const filter = useEditor((s) => s.filter);
   const placing = useEditor((s) => s.placing);
 
-  const tree = useMemo(() => (catalog ? buildCatalogTree(catalog.xref) : null), [catalog]);
+  // Browse view hides objects that only make sense assembled inside an airport (the loose jetway
+  // parts) — a DISPLAY filter, so the tree counts and the gallery agree while the full catalog and
+  // its name→object index keep every object placeable/exportable. Computed once per catalog load.
+  const browsable = useMemo(() => (catalog ? catalog.xref.filter(isBrowsable) : []), [catalog]);
+
+  const tree = useMemo(() => (catalog ? buildCatalogTree(browsable) : null), [catalog, browsable]);
 
   // The input reflects filter.query immediately; the list filters on the DEFERRED query so typing is
   // never blocked by the row re-render (see the perf note above).
   const deferredQuery = useDeferredValue(filter.query);
   const objects = useMemo(
-    () =>
-      catalog
-        ? catalog.xref.filter((o) => matchesFilter(o, { category: filter.category, query: deferredQuery }))
-        : [],
-    [catalog, filter.category, deferredQuery],
+    () => browsable.filter((o) => matchesFilter(o, { category: filter.category, query: deferredQuery })),
+    [browsable, filter.category, deferredQuery],
   );
 
   // Stable across renders: reads the live `placing` at click time rather than closing over this
