@@ -18,6 +18,7 @@
 
 import { createStore, type Mutate, type StoreApi } from "zustand/vanilla";
 import { subscribeWithSelector } from "zustand/middleware";
+import { byDisplayName } from "../catalog/sortObjects";
 import type {
   Catalog,
   CatalogObject,
@@ -282,8 +283,15 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
         commitCoalesced,
         serialize: () => serializeProject(get()),
 
-        loadCatalog: (catalog) =>
-          set({ catalog, catalogIndex: new Map(catalog.xref.map((o) => [o.name, o])) }),
+        loadCatalog: (catalog) => {
+          // Browse the catalog A–Z instead of raw .tmi scan order (community request — chrispriv &
+          // Michael). Sorted here at the renderer funnel (not in buildCatalog) so users booting from a
+          // cached catalog get it without a Rescan. Array.sort is stable, so same-name install/user
+          // duplicates keep their order — the name→object index below (last-wins = user wins) and the
+          // self-sorting category tree are both unaffected.
+          const xref = [...catalog.xref].sort(byDisplayName);
+          set({ catalog: { ...catalog, xref }, catalogIndex: new Map(xref.map((o) => [o.name, o])) });
+        },
         loadAirports: (airports) => set({ airports }),
         setTiles: (tiles) => set({ tiles }),
         openProject: (path, project) => load(project, path),

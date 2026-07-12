@@ -62,7 +62,7 @@ export function PlacedList(): React.ReactElement {
                 <span className="pct-placed-text">
                   <span className="pct-placed-name">{o.label || cat?.displayName || o.name}</span>
                   <span className="pct-placed-meta">
-                    {o.position.lat.toFixed(4)}, {o.position.lon.toFixed(4)}
+                    lon {o.position.lon.toFixed(6)} · lat {o.position.lat.toFixed(6)}
                     {o.locked ? " · locked" : ""}
                   </span>
                 </span>

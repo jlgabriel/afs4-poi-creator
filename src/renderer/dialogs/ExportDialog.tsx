@@ -222,6 +222,11 @@ export function ExportDialog({ onClose }: { onClose: () => void }): React.ReactE
             </label>
 
             <div className="pct-field pct-field-col">
+              <span className="pct-field-label">Folder name</span>
+              <code className="pct-path">{folderName ?? "(enter a valid POI name)"}</code>
+            </div>
+
+            <div className="pct-field pct-field-col">
               <span className="pct-field-label">Anchor (folder coordinates)</span>
               <label className="pct-radio">
                 <input type="radio" name="refmode" checked={refMode === "auto"} onChange={() => setRefMode("auto")} />
@@ -278,11 +283,6 @@ export function ExportDialog({ onClose }: { onClose: () => void }): React.ReactE
                 />
                 Export to a folder…
               </label>
-            </div>
-
-            <div className="pct-field pct-field-col">
-              <span className="pct-field-label">Folder name</span>
-              <code className="pct-path">{folderName ?? "(enter a valid POI name)"}</code>
             </div>
 
             {error !== null && <p className="pct-warn">{error}</p>}

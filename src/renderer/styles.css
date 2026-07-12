@@ -1004,6 +1004,14 @@ body {
 }
 .pct-installed-row .pct-path {
   flex: 1 1 auto;
+  min-width: 0; /* shrink below content width instead of shoving the badge/button off the row */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pct-installed-row .pct-field-meta {
+  flex: none; /* the "built-in" badge keeps its space — a long folder name truncates, never hides it */
+  white-space: nowrap;
 }
 .pct-installed-row button {
   flex: none;

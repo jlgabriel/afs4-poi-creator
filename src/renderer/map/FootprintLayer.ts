@@ -34,6 +34,7 @@ export interface FootprintCallbacks {
 const COLOR = "#3b82f6"; // normal footprint (blue, the ACT idiom)
 const COLOR_SELECTED = "#f59e0b"; // amber highlight
 const COLOR_MISSING = "#ef4444"; // object not in the catalog → red dashed placeholder
+const COLOR_HANDLE = "#06b6d4"; // rotate grip — cyan (complementary to the amber selection) so the drag control never reads as the object itself
 const PLACEHOLDER_M = 5; // half-extent of the 10×10 m square drawn for catalog-missing objects
 const PH_MIN: Vec3 = [-PLACEHOLDER_M, -PLACEHOLDER_M, 0];
 const PH_MAX: Vec3 = [PLACEHOLDER_M, PLACEHOLDER_M, 0];
@@ -228,9 +229,9 @@ export class FootprintLayer {
     const cat = this.index.get(obj.name);
     const handle = L.circleMarker(toLatLng(this.handleAt(obj.position, obj, cat)), {
       radius: 6,
-      color: COLOR_SELECTED,
+      color: COLOR_HANDLE,
       weight: 2,
-      fillColor: "#ffffff",
+      fillColor: COLOR_HANDLE, // solid cyan grip — distinct from the object's hollow amber anchor dot
       fillOpacity: 1,
       className: "pct-rotate-handle",
       bubblingMouseEvents: false, // grabbing the grip never starts a map pan or a place-click
