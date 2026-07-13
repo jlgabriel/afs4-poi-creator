@@ -130,7 +130,7 @@ export interface Project {
   modifiedAt: string; // ISO 8601
   reference: LonLat | null; // POI anchor → folder coords; null = auto (centroid at export)
   camera: { lon: number; lat: number; zoom: number }; // last map view
-  objects: PlacedXref[];
+  objects: PlacedObject[]; // xref + v0.2 airport_light / light, discriminated on `kind`
   shift?: PoiShift; // optional global export shift (forum #12); absent = none
 }
 

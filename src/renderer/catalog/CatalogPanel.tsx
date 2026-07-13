@@ -12,11 +12,13 @@ import { memo, useCallback, useDeferredValue, useMemo } from "react";
 import { List, type RowComponentProps } from "react-window";
 import type { CatalogObject } from "../../core/project/types";
 import { editorStore, useEditor } from "../state/editorStore";
+import type { PlacingSpec } from "../state/store";
 import { matchesFilter } from "./catalogFilter";
 import { isBrowsable } from "./browseVisibility";
 import { buildCatalogTree } from "./catalogTree";
 import { CategoryTree } from "./CategoryTree";
 import { CategoryIcon } from "./categoryIcon";
+import { LightsSection } from "./LightsSection";
 
 const ROW_H = 64; // must match .pct-row height budget in styles.css (card + row padding)
 
@@ -49,7 +51,7 @@ const ObjectCard = memo(function ObjectCard({ o, armed, onArm }: ObjectCardProps
 
 interface RowProps {
   objects: CatalogObject[];
-  placing: string | null;
+  placing: PlacingSpec | null;
   onArm: (name: string) => void;
 }
 
@@ -64,9 +66,10 @@ function Row({
   onArm,
 }: RowComponentProps<RowProps>): React.ReactElement {
   const o = objects[index];
+  const armed = placing?.kind === "xref" && placing.name === o.name;
   return (
     <div className="pct-row" style={style} {...ariaAttributes}>
-      <ObjectCard o={o} armed={placing === o.name} onArm={onArm} />
+      <ObjectCard o={o} armed={armed} onArm={onArm} />
     </div>
   );
 }
@@ -95,7 +98,8 @@ export function CatalogPanel(): React.ReactElement {
   // render's value, so rows don't all re-render on every keystroke.
   const onArm = useCallback((name: string) => {
     const cur = editorStore.getState().placing;
-    editorStore.getState().armPlacement(cur === name ? null : name);
+    const armed = cur?.kind === "xref" && cur.name === name;
+    editorStore.getState().armPlacement(armed ? null : { kind: "xref", name });
   }, []);
 
   const onSelectCategory = useCallback(
@@ -130,6 +134,7 @@ export function CatalogPanel(): React.ReactElement {
           />
         )}
       </div>
+      <LightsSection />
     </section>
   );
 }

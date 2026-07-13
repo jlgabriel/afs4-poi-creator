@@ -138,7 +138,11 @@ export const zProject = z.looseObject({
   modifiedAt: z.string(),
   reference: zLonLat.nullable(),
   camera: zCamera,
-  objects: z.array(zPlacedXref),
+  // Discriminated on `kind` — an xref-only project (pre-v0.2) still validates, and a `kind` outside
+  // the three arms is a precise error rather than a silent drop. schemaVersion stays 1 (the seam was
+  // designed for this): bumping it would lock older builds out of every v0.2-saved project, including
+  // pure-xref ones people share on the forum.
+  objects: z.array(z.discriminatedUnion("kind", [zPlacedXref, zPlacedAirportLight, zPlacedLight])),
   shift: zShift.optional(),
 });
 

@@ -31,6 +31,8 @@ type IconKey =
 function iconKey(category: string): IconKey {
   const c = category.toLowerCase();
   if (c === "aircraft") return "plane";
+  if (c.startsWith("lights/")) return "light"; // v0.2 airport lights
+
   if (c.startsWith("vehicles/")) {
     if (c.includes("truck") || c.includes("airport") || c.includes("caravan")) return "truck";
     return "car";

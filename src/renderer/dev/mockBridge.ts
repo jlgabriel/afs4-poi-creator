@@ -7,7 +7,7 @@
 // wizard path with a FULL ~900-object catalog — impossible to reach in the demo-seed preview. This lets
 // `preview:renderer` reproduce it. The synthetic catalog is built with the SAME core categorize/displayName
 // the real scanner uses, so object field shapes match production exactly.
-import type { Catalog, CatalogObject, Project, Settings } from "../../core/project/types";
+import type { Catalog, CatalogObject, PlacedXref, Project, Settings } from "../../core/project/types";
 import { categorize, displayName } from "../../core/catalog/categorize";
 import type { InstalledPoi, PctApi } from "../../shared/pctApi";
 
@@ -97,7 +97,7 @@ function mockSettings(installDir: string | null): Settings {
 /** A synthetic crash-recovery shadow for the `?mockpct&recover` harness — a couple of placed objects
  *  near Bex/CH so the RecoveryBanner has real content to restore. */
 function recoverShadow(catalog: Catalog): Project {
-  const at = (lon: number, lat: number, over: Partial<Project["objects"][number]> = {}) => ({
+  const at = (lon: number, lat: number, over: Partial<PlacedXref> = {}) => ({
     id: `rec-${lon}-${lat}`,
     kind: "xref" as const,
     name: catalog.xref[0].name,

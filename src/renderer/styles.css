@@ -1024,3 +1024,70 @@ body {
   color: #b91c1c;
   cursor: pointer;
 }
+
+/* v0.2 lights — dropdown, colour swatches, and the Catalog "Lights" section. */
+.pct-select {
+  font: inherit;
+  padding: 4px 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  background: #fff;
+  color: #0f172a;
+  min-width: 0;
+  cursor: pointer;
+}
+.pct-select:disabled {
+  color: #94a3b8;
+  background: #f1f5f9;
+  cursor: default;
+}
+.pct-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.pct-swatch {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 2px solid #cbd5e1;
+  border-radius: 5px;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.15); /* keeps a white swatch visible on white */
+}
+.pct-swatch:hover {
+  border-color: #94a3b8;
+}
+.pct-swatch.sel {
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.45);
+}
+.pct-lights {
+  border-top: 1px solid #e2e8f0;
+  padding-top: 4px;
+}
+.pct-lights-summary {
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+  cursor: pointer;
+  padding: 4px 2px;
+  user-select: none;
+}
+.pct-lights-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 4px 2px 2px;
+}
+.pct-lights-list .pct-obj-card {
+  height: auto;
+  min-height: 44px;
+}
+.pct-lights-hint {
+  padding: 6px 4px;
+  font-size: 12px;
+  margin: 0;
+}

@@ -15,7 +15,7 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import type { LonLat, PlacedXref, ResolvedXref } from "../core/project/types";
+import type { LonLat, PlacedObject, ResolvedObject } from "../core/project/types";
 import { NeedsElevationError, resolveHeight } from "../core/export/heights";
 
 const GRID_DECIMALS = 4; // 1e-4° ≈ 11 m — the dedupe/cache grid resolution
@@ -126,10 +126,10 @@ async function fetchElevations(
  *  needing terrain) when the provider is "none", the network/response fails, or — defensively — any
  *  terrain object is left unresolved, so a lookup miss can never silently become 0 m ASL. */
 export async function resolveHeights(
-  objects: PlacedXref[],
+  objects: PlacedObject[],
   provider: ElevationProvider,
   opts: ResolveOptions = {},
-): Promise<ResolvedXref[]> {
+): Promise<ResolvedObject[]> {
   const needTerrain = objects.filter((o) => o.height.mode !== "asl");
   const elev = new Map<string, number>();
 
@@ -170,13 +170,13 @@ export async function resolveHeights(
     }
   }
 
-  const missing: PlacedXref[] = [];
-  const resolved = objects.map((o): ResolvedXref => {
+  const missing: PlacedObject[] = [];
+  const resolved = objects.map((o): ResolvedObject => {
     const { height, ...rest } = o;
     const terrain = elev.get(keyOf(o.position)) ?? null;
     const h = resolveHeight(height, terrain);
     if (h === null) missing.push(o);
-    return { ...rest, heightAsl: h ?? 0 };
+    return { ...rest, heightAsl: h ?? 0 } as ResolvedObject;
   });
   if (missing.length > 0) throw new NeedsElevationError(missing);
   return resolved;

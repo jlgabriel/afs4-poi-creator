@@ -3,23 +3,35 @@
 // from OUTSIDE React by a store subscription, and per-mousemove drag updates must never round-trip
 // through React state.
 //
+// Two entry shapes share one layer + one drag machinery (Fable v0.2: extend, don't add a sibling
+// layer): xref objects draw as a footprint POLYGON with an anchor, heading tick and rotate handle;
+// v0.2 lights draw as a fixed-size point MARKER (a circleMarker coloured by the light itself), with an
+// amber halo ring for selection so the colour you're editing stays visible. Both use the same
+// select-click, the same layer-local move drag, and the same document-level mouseup.
+//
 // P1-5 contract honoured here:
 //   • Reference-diff sync — mutate.ts guarantees structural sharing, so an object whose reference AND
 //     selected flag are unchanged is SKIPPED; a selection-only change RESTYLES in place; a geometry
 //     change REBUILDS. That keeps sync O(changed), which is what holds drag/undo at 60 fps.
-//   • Drag is layer-local: on polygon mousedown we disable map dragging and, on each map mousemove,
-//     edit the polygon/anchor/heading lat-lngs DIRECTLY — the store is untouched until mouseup fires
-//     exactly ONE onMove (one undo entry). The inspector's numbers may lag the drag; that's fine.
-//   • Rotate mirrors move: a handle drawn past the footprint's nose is grabbed the same way; each
-//     mousemove re-lays the polygon/heading/handle at the new bearing (Shift snaps to 5°, design §5),
-//     and the store is untouched until mouseup fires exactly ONE onRotate (one undo entry).
-//   • No L.Icon.Default (the Leaflet-under-Vite broken-marker-PNG trap): anchor = circleMarker,
-//     heading tick = polyline, footprint = polygon, rotate handle = circleMarker. Zero image assets.
-//   • bubblingMouseEvents:false on the polygon AND the handle so a select-click never also fires the
-//     map's click-to-place, and grabbing a footprint or handle never starts a map pan.
+//   • Drag is layer-local: on body mousedown we disable map dragging and, on each map mousemove, edit
+//     the shape's lat-lngs DIRECTLY — the store is untouched until mouseup fires exactly ONE onMove.
+//   • Rotate (footprint only) mirrors move: a handle past the footprint's nose is grabbed the same way;
+//     each mousemove re-lays the polygon/heading/handle at the new bearing (Shift snaps to 5°).
+//   • No L.Icon.Default (the Leaflet-under-Vite broken-marker-PNG trap): every mark is a vector
+//     circleMarker / polyline / polygon. Zero image assets.
+//   • bubblingMouseEvents:false on the interactive body AND the handle so a select-click never also
+//     fires the map's click-to-place, and grabbing a shape or handle never starts a map pan.
 
 import * as L from "leaflet";
-import type { CatalogObject, LonLat, PlacedXref, Vec3 } from "../../core/project/types";
+import type {
+  CatalogObject,
+  LonLat,
+  PlacedAirportLight,
+  PlacedLight,
+  PlacedObject,
+  PlacedXref,
+  Vec3,
+} from "../../core/project/types";
 import { footprintCorners, headingMarker } from "../../core/geo/footprint";
 import { destination, initialBearing, wrapLon } from "../../core/geo/geo";
 import { diffEntry } from "./syncDiff";
@@ -35,15 +47,39 @@ const COLOR = "#3b82f6"; // normal footprint (blue, the ACT idiom)
 const COLOR_SELECTED = "#f59e0b"; // amber highlight
 const COLOR_MISSING = "#ef4444"; // object not in the catalog → red dashed placeholder
 const COLOR_HANDLE = "#06b6d4"; // rotate grip — cyan (complementary to the amber selection) so the drag control never reads as the object itself
+const LIGHT_OUTLINE = "#0f172a"; // dark ring around a light marker so a white/pale fill reads on satellite imagery
 const PLACEHOLDER_M = 5; // half-extent of the 10×10 m square drawn for catalog-missing objects
 const PH_MIN: Vec3 = [-PLACEHOLDER_M, -PLACEHOLDER_M, 0];
 const PH_MAX: Vec3 = [PLACEHOLDER_M, PLACEHOLDER_M, 0];
 const SNAP_DEG = 5; // Shift-snap increment for the rotate handle (design §5)
 const HANDLE_MARGIN_M = 6; // gap in metres between the footprint's farthest corner and the handle
+const LIGHT_RADIUS = 6; // light marker radius, pixels (zoom-independent — a point fixture, not a footprint)
 
 const toLatLng = (p: LonLat): L.LatLngExpression => [p.lat, p.lon];
 
-interface Entry {
+// airport-light configuration colour letters → marker fill (first letter wins; empty → white default).
+const LIGHT_LETTER: Record<string, string> = {
+  b: "#3b82f6",
+  g: "#22c55e",
+  r: "#ef4444",
+  w: "#ffffff",
+  y: "#eab308",
+};
+
+const hex2 = (v: number): string =>
+  Math.round(Math.max(0, Math.min(1, v)) * 255)
+    .toString(16)
+    .padStart(2, "0");
+
+/** The map fill colour for a light: its configuration letter (airport_light) or its RGB (point light). */
+function lightColor(obj: PlacedAirportLight | PlacedLight): string {
+  if (obj.kind === "airport_light") return LIGHT_LETTER[obj.configuration[0]] ?? "#ffffff";
+  const [r, g, b] = obj.color;
+  return `#${hex2(r)}${hex2(g)}${hex2(b)}`;
+}
+
+interface FootprintEntry {
+  shape: "footprint";
   obj: PlacedXref;
   selected: boolean;
   missing: boolean;
@@ -52,6 +88,15 @@ interface Entry {
   heading: L.Polyline;
   handle?: L.CircleMarker; // present only while selected & unlocked (the rotate grip)
 }
+interface PointEntry {
+  shape: "point";
+  obj: PlacedAirportLight | PlacedLight;
+  selected: boolean;
+  missing: boolean; // always false for now (lights render regardless of catalog presence)
+  body: L.CircleMarker;
+  halo?: L.CircleMarker; // amber selection ring, present only while selected
+}
+type Entry = FootprintEntry | PointEntry;
 
 // One drag at a time; `mode` routes the shared mousemove/mouseup. A move tracks the cursor delta from
 // grab and keeps the latest previewed `anchor` (so a release OUTSIDE the map — where there is no map
@@ -96,7 +141,7 @@ export class FootprintLayer {
   }
 
   /** Reconcile the drawn layers with the current objects + selection. O(changed). */
-  sync(objects: PlacedXref[], index: Map<string, CatalogObject>, selection: Set<string>): void {
+  sync(objects: PlacedObject[], index: Map<string, CatalogObject>, selection: Set<string>): void {
     // A Rescan swaps in a fresh catalog Map (loadCatalog), so every footprint's bbox / missing state may
     // differ even though the object references are untouched — force a rebuild of existing entries (I3).
     const indexChanged = this.index !== index;
@@ -121,7 +166,8 @@ export class FootprintLayer {
     for (const id of [...this.entries.keys()]) if (!seen.has(id)) this.remove(id);
   }
 
-  // ── geometry helpers (the optional `direction` lets a rotate-drag preview an un-committed bearing) ──
+  // ── geometry helpers (footprint only; the optional `direction` lets a rotate-drag preview an
+  //    un-committed bearing) ──
   private cornersAt(
     anchor: LonLat,
     obj: PlacedXref,
@@ -158,7 +204,12 @@ export class FootprintLayer {
     return destination(anchor, this.handleDist(obj, cat), direction);
   }
 
-  private add(obj: PlacedXref, selected: boolean): void {
+  private add(obj: PlacedObject, selected: boolean): void {
+    if (obj.kind === "xref") this.addFootprint(obj, selected);
+    else this.addPoint(obj, selected);
+  }
+
+  private addFootprint(obj: PlacedXref, selected: boolean): void {
     const cat = this.index.get(obj.name);
     const missing = cat === undefined;
     const color = selected ? COLOR_SELECTED : missing ? COLOR_MISSING : COLOR;
@@ -189,32 +240,60 @@ export class FootprintLayer {
     this.group.addLayer(poly);
     this.group.addLayer(heading);
     this.group.addLayer(anchor);
-    const entry: Entry = { obj, selected, missing, poly, anchor, heading };
+    const entry: FootprintEntry = { shape: "footprint", obj, selected, missing, poly, anchor, heading };
     this.entries.set(obj.id, entry);
     this.syncHandle(entry, selected); // draw the grip if this object came in selected
   }
 
+  private addPoint(obj: PlacedAirportLight | PlacedLight, selected: boolean): void {
+    const body = L.circleMarker(toLatLng(obj.position), {
+      radius: LIGHT_RADIUS,
+      color: LIGHT_OUTLINE, // dark ring so a white/pale fill reads on imagery
+      weight: 1.5,
+      fillColor: lightColor(obj),
+      fillOpacity: 0.95,
+      bubblingMouseEvents: false,
+    });
+    body.on("click", (e) => this.cb.onSelect(obj.id, e.originalEvent.shiftKey));
+    body.on("mousedown", (e) => this.onGrab(obj.id, e));
+
+    this.group.addLayer(body);
+    const entry: PointEntry = { shape: "point", obj, selected, missing: false, body };
+    this.entries.set(obj.id, entry);
+    this.syncHalo(entry, selected);
+  }
+
   private restyle(entry: Entry, selected: boolean): void {
-    const color = selected ? COLOR_SELECTED : entry.missing ? COLOR_MISSING : COLOR;
-    entry.poly.setStyle({ color, weight: selected ? 3 : 2 });
-    entry.heading.setStyle({ color });
-    entry.anchor.setStyle({ color });
-    this.syncHandle(entry, selected); // a restyle is a selection flip (same ref) → add/remove the grip
+    if (entry.shape === "footprint") {
+      const color = selected ? COLOR_SELECTED : entry.missing ? COLOR_MISSING : COLOR;
+      entry.poly.setStyle({ color, weight: selected ? 3 : 2 });
+      entry.heading.setStyle({ color });
+      entry.anchor.setStyle({ color });
+      this.syncHandle(entry, selected); // a restyle is a selection flip (same ref) → add/remove the grip
+    } else {
+      // a light keeps its OWN colour when selected — only the amber halo appears/disappears
+      this.syncHalo(entry, selected);
+    }
     entry.selected = selected;
   }
 
   private remove(id: string): void {
     const e = this.entries.get(id);
     if (!e) return;
-    this.group.removeLayer(e.poly);
-    this.group.removeLayer(e.heading);
-    this.group.removeLayer(e.anchor);
-    if (e.handle) this.group.removeLayer(e.handle);
+    if (e.shape === "footprint") {
+      this.group.removeLayer(e.poly);
+      this.group.removeLayer(e.heading);
+      this.group.removeLayer(e.anchor);
+      if (e.handle) this.group.removeLayer(e.handle);
+    } else {
+      this.group.removeLayer(e.body);
+      if (e.halo) this.group.removeLayer(e.halo);
+    }
     this.entries.delete(id);
   }
 
-  // ── the rotate handle (drawn only while selected & unlocked) ──
-  private syncHandle(entry: Entry, selected: boolean): void {
+  // ── the rotate handle (footprint only; drawn while selected & unlocked) ──
+  private syncHandle(entry: FootprintEntry, selected: boolean): void {
     const want = selected && !entry.obj.locked;
     if (want && !entry.handle) {
       entry.handle = this.makeHandle(entry.obj);
@@ -222,6 +301,24 @@ export class FootprintLayer {
     } else if (!want && entry.handle) {
       this.group.removeLayer(entry.handle);
       entry.handle = undefined;
+    }
+  }
+
+  // ── the selection halo (point lights; an amber ring so the light's own colour stays visible) ──
+  private syncHalo(entry: PointEntry, selected: boolean): void {
+    if (selected && !entry.halo) {
+      entry.halo = L.circleMarker(toLatLng(entry.obj.position), {
+        radius: LIGHT_RADIUS + 4,
+        color: COLOR_SELECTED,
+        weight: 2,
+        fill: false,
+        interactive: false,
+      });
+      this.group.addLayer(entry.halo);
+      entry.halo.bringToBack();
+    } else if (!selected && entry.halo) {
+      this.group.removeLayer(entry.halo);
+      entry.halo = undefined;
     }
   }
 
@@ -257,7 +354,7 @@ export class FootprintLayer {
 
   private onGrabHandle = (id: string): void => {
     const entry = this.entries.get(id);
-    if (!entry || entry.obj.locked) return;
+    if (!entry || entry.shape !== "footprint" || entry.obj.locked) return;
     this.map.dragging.disable();
     this.drag = {
       mode: "rotate",
@@ -269,12 +366,25 @@ export class FootprintLayer {
     };
   };
 
+  /** Re-lay a shape at a previewed anchor during a move drag (kind-dispatched geometry). */
+  private previewMove(entry: Entry, anchor: LonLat): void {
+    if (entry.shape === "footprint") {
+      const cat = this.index.get(entry.obj.name);
+      entry.poly.setLatLngs(this.cornersAt(anchor, entry.obj, cat).map(toLatLng));
+      entry.anchor.setLatLng(toLatLng(anchor));
+      entry.heading.setLatLngs([toLatLng(anchor), toLatLng(this.headingAt(anchor, entry.obj, cat))]);
+      entry.handle?.setLatLng(toLatLng(this.handleAt(anchor, entry.obj, cat)));
+    } else {
+      entry.body.setLatLng(toLatLng(anchor));
+      entry.halo?.setLatLng(toLatLng(anchor));
+    }
+  }
+
   private onMouseMove = (e: L.LeafletMouseEvent): void => {
     const d = this.drag;
     if (!d) return;
     const entry = this.entries.get(d.id);
     if (!entry) return;
-    const cat = this.index.get(entry.obj.name);
     d.moved = true;
     if (d.mode === "move") {
       const anchor: LonLat = {
@@ -282,11 +392,9 @@ export class FootprintLayer {
         lat: d.startAnchor.lat + (e.latlng.lat - d.startMouse.lat),
       };
       d.anchor = anchor; // remember it so a release outside the map commits this spot (I2)
-      entry.poly.setLatLngs(this.cornersAt(anchor, entry.obj, cat).map(toLatLng));
-      entry.anchor.setLatLng(toLatLng(anchor));
-      entry.heading.setLatLngs([toLatLng(anchor), toLatLng(this.headingAt(anchor, entry.obj, cat))]);
-      entry.handle?.setLatLng(toLatLng(this.handleAt(anchor, entry.obj, cat)));
-    } else {
+      this.previewMove(entry, anchor);
+    } else if (entry.shape === "footprint") {
+      const cat = this.index.get(entry.obj.name);
       let bearing = initialBearing(d.anchor, { lon: e.latlng.lng, lat: e.latlng.lat });
       if (e.originalEvent.shiftKey) bearing = snapAngle(bearing, SNAP_DEG);
       d.bearing = bearing;
@@ -306,7 +414,7 @@ export class FootprintLayer {
     if (!d) return;
     this.drag = null;
     this.map.dragging.enable();
-    if (!d.moved) return; // a click, not a drag — selection is handled by the polygon click
+    if (!d.moved) return; // a click, not a drag — selection is handled by the shape's click
     if (d.mode === "move") {
       // Wrap only at COMMIT, never in the live preview: dragging across the antimeridian stays visually
       // continuous, while the spot handed to the store is normalised into the loader's range (Fable B1).

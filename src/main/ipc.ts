@@ -8,7 +8,7 @@ import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
 import type { OpenDialogOptions, SaveDialogOptions } from "electron";
 import { existsSync } from "node:fs";
 import { ZodError } from "zod";
-import type { Catalog, PlacedXref, Project, ResolvedXref, Settings } from "../core/project/types";
+import type { Catalog, PlacedObject, Project, ResolvedObject, Settings } from "../core/project/types";
 import type {
   DetectResult,
   ExportOptions,
@@ -193,9 +193,9 @@ export function registerIpc(): void {
   });
 
   // ── Elevation / export / install (M1e-2b) ──
-  ipcMain.handle("pct:resolveHeights", (_e, objects: PlacedXref[]) =>
+  ipcMain.handle("pct:resolveHeights", (_e, objects: PlacedObject[]) =>
     guarded(
-      (): Promise<ResolvedXref[]> =>
+      (): Promise<ResolvedObject[]> =>
         resolveHeights(objects, currentSettings().elevation.provider, {
           cacheDir: userData(),
           version: app.getVersion(),

@@ -80,7 +80,7 @@ describe("undo / redo", () => {
   it("round-trips and prunes selection to surviving ids", () => {
     const { store } = makeStore();
     const s = store.getState();
-    s.armPlacement("tower");
+    s.armPlacement({ kind: "xref", name: "tower" });
     s.placeAt({ lon: 10, lat: 48 }); // adds id0, selects it
     expect(store.getState().project.objects).toHaveLength(1);
     expect(store.getState().selection).toEqual(["id0"]);
@@ -114,12 +114,30 @@ describe("placeAt", () => {
   it("adds + selects the object and keeps placement armed for multi-drop", () => {
     const { store } = makeStore();
     const s = store.getState();
-    s.armPlacement("tower");
+    s.armPlacement({ kind: "xref", name: "tower" });
     s.placeAt({ lon: 10, lat: 48 });
     const st = store.getState();
     expect(st.project.objects[0]).toMatchObject({ id: "id0", name: "tower" });
     expect(st.selection).toEqual(["id0"]);
-    expect(st.placing).toBe("tower"); // still armed
+    expect(st.placing).toEqual({ kind: "xref", name: "tower" }); // still armed
+  });
+
+  it("places an airport light from an airport_light spec", () => {
+    const { store } = makeStore();
+    store.getState().armPlacement({ kind: "airport_light", name: "runway_edge_light" });
+    store.getState().placeAt({ lon: 10, lat: 48 });
+    expect(store.getState().project.objects[0]).toMatchObject({
+      id: "id0",
+      kind: "airport_light",
+      typeName: "runway_edge_light",
+    });
+  });
+
+  it("places a parametric point light from a light spec", () => {
+    const { store } = makeStore();
+    store.getState().armPlacement({ kind: "light" });
+    store.getState().placeAt({ lon: 10, lat: 48 });
+    expect(store.getState().project.objects[0]).toMatchObject({ id: "id0", kind: "light" });
   });
 });
 
@@ -226,7 +244,7 @@ describe("deleteSelection / duplicateSelection", () => {
 
     const st = store.getState();
     expect(st.project.objects).toHaveLength(2);
-    const copy = st.project.objects[1];
+    const copy = st.project.objects[1] as PlacedXref;
     expect(copy.name).toBe("tower");
     expect(copy.position.lon).toBeGreaterThan(10); // moved east
     expect(copy.position.lat).toBeCloseTo(48, 4);
@@ -329,7 +347,7 @@ describe("M2d inspector mutations", () => {
     store.getState().scaleObject("a", 2);
     store.getState().setLabel("a", "north hangar");
     store.getState().setLocked("a", true);
-    const o = store.getState().project.objects[0];
+    const o = store.getState().project.objects[0] as PlacedXref;
     expect(o.scale).toBe(2);
     expect(o.label).toBe("north hangar");
     expect(o.locked).toBe(true);

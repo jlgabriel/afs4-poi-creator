@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
   addObject,
+  createAirportLight,
+  createLight,
   createProject,
   createXref,
   duplicateObject,
@@ -9,20 +11,32 @@ import {
   renameProject,
   rotateObject,
   scaleObject,
+  setAirportLightType,
   setCamera,
+  setConfiguration,
+  setFlashing,
+  setGroupIndex,
   setHeight,
+  setIntensity,
   setLabel,
+  setLightColor,
   setLocked,
   setPoiName,
   setReference,
 } from "../../src/core/project/mutate";
-import type { PlacedXref, Project } from "../../src/core/project/types";
+import type {
+  PlacedAirportLight,
+  PlacedLight,
+  PlacedObject,
+  PlacedXref,
+  Project,
+} from "../../src/core/project/types";
 
 const CAMERA = { lon: 11.86, lat: 48.37, zoom: 15 };
 const NOW = "2026-07-07T00:00:00.000Z";
 const LATER = "2026-07-07T01:00:00.000Z";
 
-function baseProject(objects: PlacedXref[] = []): Project {
+function baseProject(objects: PlacedObject[] = []): Project {
   return { ...createProject({ name: "t", camera: CAMERA, now: NOW }), objects };
 }
 const xref = (id: string, over: Partial<PlacedXref> = {}) =>
@@ -80,8 +94,8 @@ describe("object mutations are pure & immutable", () => {
     expect(moved.objects[1]).toBe(p0.objects[1]); // sibling kept by reference
     expect(p0.objects[0].position).toEqual({ lon: 11.86, lat: 48.37 }); // input untouched
 
-    expect(rotateObject(p0, "a", -45, LATER).objects[0].direction).toBe(315); // normalised
-    expect(scaleObject(p0, "a", 2.5, LATER).objects[0].scale).toBe(2.5);
+    expect((rotateObject(p0, "a", -45, LATER).objects[0] as PlacedXref).direction).toBe(315); // normalised
+    expect((scaleObject(p0, "a", 2.5, LATER).objects[0] as PlacedXref).scale).toBe(2.5);
     expect(setHeight(p0, "a", { mode: "asl", value: 520 }, LATER).objects[0].height).toEqual({
       mode: "asl",
       value: 520,
@@ -107,6 +121,74 @@ describe("object mutations are pure & immutable", () => {
     expect(dup.objects).toHaveLength(2);
     expect(dup.objects[1]).toMatchObject({ id: "a2", scale: 3, name: "tower_x" });
     expect(duplicateObject(p0, "zzz")).toBe(p0);
+  });
+});
+
+describe("v0.2 light factories", () => {
+  it("createAirportLight applies defaults (terrain, orientation 0, default colour, group 0)", () => {
+    const l = createAirportLight("runway_edge_light", { lon: 11, lat: 48 }, { id: "al" });
+    expect(l).toMatchObject({
+      id: "al",
+      kind: "airport_light",
+      typeName: "runway_edge_light",
+      orientation: 0,
+      configuration: "",
+      groupIndex: 0,
+      height: { mode: "terrain" },
+    });
+  });
+  it("createAirportLight normalises orientation and honours overrides", () => {
+    expect(createAirportLight("x", { lon: 0, lat: 0 }, { orientation: -90 }).orientation).toBe(270);
+    expect(
+      createAirportLight("x", { lon: 0, lat: 0 }, { configuration: "wr", groupIndex: 3 }),
+    ).toMatchObject({ configuration: "wr", groupIndex: 3 });
+  });
+  it("createLight defaults to steady white, mid intensity, lifted +3 m off terrain", () => {
+    const l = createLight({ lon: 11, lat: 48 }, { id: "pl" });
+    expect(l).toMatchObject({
+      id: "pl",
+      kind: "light",
+      color: [1, 1, 1],
+      intensity: 1000,
+      flashing: [0, 0, 0, 0],
+      groupIndex: 0,
+      height: { mode: "terrain-offset", offset: 3 },
+    });
+  });
+});
+
+describe("v0.2 kind-aware mutations", () => {
+  const airport = (id: string, over: Partial<PlacedAirportLight> = {}): PlacedAirportLight =>
+    createAirportLight("runway_edge_light", { lon: 11, lat: 48 }, { id, ...over });
+  const point = (id: string, over: Partial<PlacedLight> = {}): PlacedLight =>
+    createLight({ lon: 11, lat: 48 }, { id, ...over });
+
+  it("rotateObject drives orientation for airport_light and is a no-op for a point light", () => {
+    const p0 = baseProject([airport("a"), point("b")]);
+    const rotated = rotateObject(p0, "a", -45, LATER);
+    expect((rotated.objects[0] as PlacedAirportLight).orientation).toBe(315); // normalised
+    // a point light has no rotation → same reference, no modifiedAt bump
+    expect(rotateObject(p0, "b", 90, LATER)).toBe(p0);
+  });
+
+  it("scaleObject is a no-op for lights (no scale field)", () => {
+    const p0 = baseProject([airport("a")]);
+    expect(scaleObject(p0, "a", 2, LATER)).toBe(p0);
+  });
+
+  it("light setters update only the matching kind, and no-op on the wrong kind", () => {
+    const p0 = baseProject([airport("a"), point("b")]);
+    expect((setConfiguration(p0, "a", "gy", LATER).objects[0] as PlacedAirportLight).configuration).toBe("gy");
+    expect((setAirportLightType(p0, "a", "papi_3_light", LATER).objects[0] as PlacedAirportLight).typeName).toBe("papi_3_light");
+    expect((setLightColor(p0, "b", [1, 0, 0], LATER).objects[1] as PlacedLight).color).toEqual([1, 0, 0]);
+    expect((setIntensity(p0, "b", 50000, LATER).objects[1] as PlacedLight).intensity).toBe(50000);
+    expect((setFlashing(p0, "b", [1, 0, 3, 0], LATER).objects[1] as PlacedLight).flashing).toEqual([1, 0, 3, 0]);
+    // group_index is carried by both light kinds
+    expect((setGroupIndex(p0, "a", 3, LATER).objects[0] as PlacedAirportLight).groupIndex).toBe(3);
+    expect((setGroupIndex(p0, "b", 2, LATER).objects[1] as PlacedLight).groupIndex).toBe(2);
+    // wrong-kind setters are no-ops (same project reference)
+    expect(setConfiguration(p0, "b", "r", LATER)).toBe(p0); // b is a point light
+    expect(setLightColor(p0, "a", [0, 1, 0], LATER)).toBe(p0); // a is an airport light
   });
 });
 

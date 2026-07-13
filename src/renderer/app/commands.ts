@@ -4,7 +4,7 @@
 // safe; the buttons are also disabled there, this is belt-and-suspenders.
 import * as mutate from "../../core/project/mutate";
 import { firstProjectError } from "../../core/project/schemas";
-import type { PlacedXref, Project } from "../../core/project/types";
+import type { PlacedObject, Project } from "../../core/project/types";
 import type { PctError } from "../../shared/pctApi";
 import { editorStore } from "../state/editorStore";
 import { DEFAULT_CAMERA } from "../state/store";
@@ -116,7 +116,7 @@ export async function fetchElevation(id: string): Promise<FetchResult> {
   if (!pct) return { ok: false, message: "Elevation lookup needs the desktop app." };
   const obj = editorStore.getState().project.objects.find((o) => o.id === id);
   if (!obj) return { ok: false, message: "Object no longer exists." };
-  const probe: PlacedXref = { ...obj, height: { mode: "terrain" } };
+  const probe: PlacedObject = { ...obj, height: { mode: "terrain" } };
   const res = await pct.resolveHeights([probe]);
   if (!res.ok) return { ok: false, message: res.error.message };
   const terrainAsl = res.value[0]?.heightAsl;

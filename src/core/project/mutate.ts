@@ -8,7 +8,17 @@
 // testable and replayable. The one impure seam is id minting (createXref / duplicateObject), which
 // accepts an override so tests stay deterministic.
 
-import type { HeightSpec, LonLat, PlacedXref, PoiShift, Project } from "./types";
+import type {
+  HeightSpec,
+  LonLat,
+  PlacedAirportLight,
+  PlacedLight,
+  PlacedObject,
+  PlacedXref,
+  PoiShift,
+  Project,
+  Vec3,
+} from "./types";
 
 const nowIso = (): string => new Date().toISOString();
 
@@ -42,6 +52,49 @@ export function createXref(
   return base;
 }
 
+/** A fresh airport light with sensible defaults (terrain height, orientation 0, the fixture's own
+ *  default colour, night group 0). `typeName` is a CatalogAirportLight name (no "al_"). */
+export function createAirportLight(
+  typeName: string,
+  position: LonLat,
+  overrides: Partial<PlacedAirportLight> = {},
+): PlacedAirportLight {
+  const base: PlacedAirportLight = {
+    id: overrides.id ?? randomId(),
+    kind: "airport_light",
+    typeName,
+    position: overrides.position ?? position,
+    height: overrides.height ?? { mode: "terrain" },
+    orientation: overrides.orientation !== undefined ? norm360(overrides.orientation) : 0,
+    configuration: overrides.configuration ?? "",
+    groupIndex: overrides.groupIndex ?? 0,
+  };
+  if (overrides.label !== undefined && overrides.label !== "") base.label = overrides.label;
+  if (overrides.locked) base.locked = true;
+  return base;
+}
+
+/** A fresh parametric point light. Defaults to steady white at a middling intensity, lifted +3 m off
+ *  the terrain so a point light isn't buried at ground level (unlike a fixture that sits on it). */
+export function createLight(
+  position: LonLat,
+  overrides: Partial<PlacedLight> = {},
+): PlacedLight {
+  const base: PlacedLight = {
+    id: overrides.id ?? randomId(),
+    kind: "light",
+    position: overrides.position ?? position,
+    height: overrides.height ?? { mode: "terrain-offset", offset: 3 },
+    color: overrides.color ?? [1, 1, 1],
+    intensity: overrides.intensity ?? 1000,
+    flashing: overrides.flashing ?? [0, 0, 0, 0],
+    groupIndex: overrides.groupIndex ?? 0,
+  };
+  if (overrides.label !== undefined && overrides.label !== "") base.label = overrides.label;
+  if (overrides.locked) base.locked = true;
+  return base;
+}
+
 /** A fresh empty project with M1 defaults. Used by the first-run wizard and New Project. */
 export function createProject(params: {
   name: string;
@@ -66,27 +119,29 @@ export function createProject(params: {
 
 // ── Internal helpers ─────────────────────────────────────────────────────────
 
-/** Apply `patch` to the object with `id`, bumping modifiedAt. If no object matches, return the
- *  project unchanged (same reference) so callers/undo can detect the no-op. */
+/** Apply `patch` to the object with `id`, bumping modifiedAt. If no object matches — OR the patch
+ *  returns the SAME reference (a kind-specific mutation that doesn't apply to this object's kind, e.g.
+ *  scaling a light) — return the project unchanged (same reference) so callers/undo detect the no-op. */
 function updateOne(
   project: Project,
   id: string,
-  patch: (o: PlacedXref) => PlacedXref,
+  patch: (o: PlacedObject) => PlacedObject,
   now: string,
 ): Project {
-  let hit = false;
+  let changed = false;
   const objects = project.objects.map((o) => {
     if (o.id !== id) return o;
-    hit = true;
-    return patch(o);
+    const next = patch(o);
+    if (next !== o) changed = true;
+    return next;
   });
-  return hit ? { ...project, objects, modifiedAt: now } : project;
+  return changed ? { ...project, objects, modifiedAt: now } : project;
 }
 
 // ── Object mutations ─────────────────────────────────────────────────────────
 
-export function addObject(project: Project, xref: PlacedXref, now = nowIso()): Project {
-  return { ...project, objects: [...project.objects, xref], modifiedAt: now };
+export function addObject(project: Project, obj: PlacedObject, now = nowIso()): Project {
+  return { ...project, objects: [...project.objects, obj], modifiedAt: now };
 }
 
 export function removeObject(project: Project, id: string, now = nowIso()): Project {
@@ -96,15 +151,18 @@ export function removeObject(project: Project, id: string, now = nowIso()): Proj
     : { ...project, objects, modifiedAt: now };
 }
 
+/** Copy an object with a fresh id, appended. `overrides` is limited to the kind-agnostic fields a
+ *  duplicate actually re-pins (a new id + an offset position); the copy keeps the source's kind and
+ *  every kind-specific field. */
 export function duplicateObject(
   project: Project,
   id: string,
-  overrides: Partial<PlacedXref> = {},
+  overrides: { id?: string; position?: LonLat } = {},
   now = nowIso(),
 ): Project {
   const src = project.objects.find((o) => o.id === id);
   if (!src) return project;
-  const copy: PlacedXref = { ...src, ...overrides, id: overrides.id ?? randomId() };
+  const copy: PlacedObject = { ...src, ...overrides, id: overrides.id ?? randomId() };
   return { ...project, objects: [...project.objects, copy], modifiedAt: now };
 }
 
@@ -112,17 +170,68 @@ export function moveObject(project: Project, id: string, position: LonLat, now =
   return updateOne(project, id, (o) => ({ ...o, position }), now);
 }
 
-/** Set absolute heading; the value is normalised to [0, 360) (clockwise, 0 = North). */
-export function rotateObject(project: Project, id: string, direction: number, now = nowIso()): Project {
-  return updateOne(project, id, (o) => ({ ...o, direction: norm360(direction) }), now);
+/** Set absolute heading, normalised to [0, 360). Drives the xref `direction` and the airport-light
+ *  `orientation` (both raw model rotations); a point light has no rotation, so it's a no-op there. One
+ *  function so the map's single rotate-handle path stays kind-agnostic. */
+export function rotateObject(project: Project, id: string, deg: number, now = nowIso()): Project {
+  return updateOne(
+    project,
+    id,
+    (o) =>
+      o.kind === "xref"
+        ? { ...o, direction: norm360(deg) }
+        : o.kind === "airport_light"
+          ? { ...o, orientation: norm360(deg) }
+          : o,
+    now,
+  );
 }
 
+/** Uniform scale — xref only (lights have no scale); a no-op for the light kinds. */
 export function scaleObject(project: Project, id: string, scale: number, now = nowIso()): Project {
-  return updateOne(project, id, (o) => ({ ...o, scale }), now);
+  return updateOne(project, id, (o) => (o.kind === "xref" ? { ...o, scale } : o), now);
 }
 
 export function setHeight(project: Project, id: string, height: HeightSpec, now = nowIso()): Project {
   return updateOne(project, id, (o) => ({ ...o, height }), now);
+}
+
+// ── Airport-light / light field setters (v0.2; kind-guarded → no-op on the wrong kind) ─────────────
+
+export function setAirportLightType(project: Project, id: string, typeName: string, now = nowIso()): Project {
+  return updateOne(project, id, (o) => (o.kind === "airport_light" ? { ...o, typeName } : o), now);
+}
+
+/** Colour letters (0–2 of b/g/r/w/y). Empty = the fixture's own default colour. */
+export function setConfiguration(project: Project, id: string, configuration: string, now = nowIso()): Project {
+  return updateOne(project, id, (o) => (o.kind === "airport_light" ? { ...o, configuration } : o), now);
+}
+
+export function setLightColor(project: Project, id: string, color: Vec3, now = nowIso()): Project {
+  return updateOne(project, id, (o) => (o.kind === "light" ? { ...o, color } : o), now);
+}
+
+export function setIntensity(project: Project, id: string, intensity: number, now = nowIso()): Project {
+  return updateOne(project, id, (o) => (o.kind === "light" ? { ...o, intensity } : o), now);
+}
+
+export function setFlashing(
+  project: Project,
+  id: string,
+  flashing: [number, number, number, number],
+  now = nowIso(),
+): Project {
+  return updateOne(project, id, (o) => (o.kind === "light" ? { ...o, flashing } : o), now);
+}
+
+/** Night-visibility group — carried by both light kinds. */
+export function setGroupIndex(project: Project, id: string, groupIndex: number, now = nowIso()): Project {
+  return updateOne(
+    project,
+    id,
+    (o) => (o.kind === "airport_light" || o.kind === "light" ? { ...o, groupIndex } : o),
+    now,
+  );
 }
 
 /** Set or clear the optional note. An empty/undefined label removes the field. */

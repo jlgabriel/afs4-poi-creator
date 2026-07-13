@@ -9,7 +9,7 @@
 //      every dialog; the renderer only says WHAT (save / save-as / install / choose-folder), never
 //      WHERE. (Paths flowing back OUT, for display, are fine — they are main-produced.)
 // Types only, no runtime code — safe to import from any target (main / preload / renderer).
-import type { Catalog, PlacedXref, Project, ResolvedXref, Settings } from "../core/project/types";
+import type { Catalog, PlacedObject, Project, ResolvedObject, Settings } from "../core/project/types";
 
 export interface DetectResult {
   installDirs: string[];
@@ -18,7 +18,7 @@ export interface DetectResult {
 
 /** Discriminated, serialization-safe error surface — plain data, survives IPC intact. */
 export type PctError =
-  | { code: "needs-elevation"; message: string; points: PlacedXref[] }
+  | { code: "needs-elevation"; message: string; points: PlacedObject[] }
   | { code: "no-xref"; message: string; installDir: string }
   | { code: "unsupported-schema"; message: string; found: unknown }
   | { code: "invalid-project"; message: string }
@@ -71,7 +71,7 @@ export interface PctApi {
   loadShadow(): Promise<Project | null>;
   clearShadow(): Promise<void>; // drop the shadow after a save or a declined recovery
 
-  resolveHeights(objects: PlacedXref[]): Promise<PctResult<ResolvedXref[]>>;
+  resolveHeights(objects: PlacedObject[]): Promise<PctResult<ResolvedObject[]>>;
   // `null` value = the user cancelled the choose-folder dialog (target "install" never cancels).
   exportPoi(project: Project, opts: ExportOptions): Promise<PctResult<InstallResult | null>>;
   uninstallPoi(folderName: string): Promise<PctResult<void>>;

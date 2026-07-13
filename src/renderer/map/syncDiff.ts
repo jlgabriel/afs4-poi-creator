@@ -3,7 +3,7 @@
 // `window` at module load). mutate.ts keeps untouched objects at the same reference, so the layer can
 // skip them and only rebuild what actually changed, keeping sync O(changed).
 
-import type { PlacedXref } from "../../core/project/types";
+import type { PlacedObject } from "../../core/project/types";
 
 /** `skip` = untouched, `restyle` = only the selection flag flipped (same object reference),
  *  `rebuild` = geometry (object reference) changed, the catalog changed, or the entry is brand new. */
@@ -13,8 +13,8 @@ export type SyncAction = "skip" | "restyle" | "rebuild";
  *  its missing (red) state even though the object reference is untouched, so the reference-diff must NOT
  *  skip it — force a rebuild of every existing entry (Fable I3). */
 export function diffEntry(
-  prev: { obj: PlacedXref; selected: boolean } | undefined,
-  obj: PlacedXref,
+  prev: { obj: PlacedObject; selected: boolean } | undefined,
+  obj: PlacedObject,
   selected: boolean,
   indexChanged = false,
 ): SyncAction {

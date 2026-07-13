@@ -21,13 +21,14 @@ import { subscribeWithSelector } from "zustand/middleware";
 import { byDisplayName } from "../catalog/sortObjects";
 import type {
   Catalog,
+  CatalogAirportLight,
   CatalogObject,
   HeightSpec,
   LonLat,
-  PlacedXref,
   PoiShift,
   Project,
   Settings,
+  Vec3,
 } from "../../core/project/types";
 import type { Airport } from "../../core/airports/types";
 import { destination } from "../../core/geo/geo";
@@ -42,6 +43,13 @@ export interface Filter {
   query: string;
   category: string | null;
 }
+
+/** What click-to-place is armed for. `name` is the xref catalog name or the airport-light typeName;
+ *  a point light is parametric (no name). null = nothing armed. */
+export type PlacingSpec =
+  | { kind: "xref"; name: string }
+  | { kind: "airport_light"; name: string }
+  | { kind: "light" };
 
 const UNDO_CAP = 50; // design §3.6: snapshot stacks capped at 50
 /** The blank-project world view (new project before the user navigates). Exported for the shell's
@@ -82,7 +90,8 @@ function nudgeHeightSpec(h: HeightSpec, delta: number): HeightSpec {
 export interface EditorState {
   // ── reference data (loaded, not part of the document) ──
   catalog: Catalog | null;
-  catalogIndex: Map<string, CatalogObject>; // by exact name
+  catalogIndex: Map<string, CatalogObject>; // xref, by exact name
+  airportLightIndex: Map<string, CatalogAirportLight>; // v0.2 airport lights, by typeName
   airports: Airport[]; // sim airport list (bundled), for the TopBar search → flyTo; never saved
   tiles: TilesConfig; // map tile provider (from Settings); MapView subscribes → live tile swap
 
@@ -95,7 +104,7 @@ export interface EditorState {
 
   // ── EPHEMERAL (never undo, never autosaved) ──
   selection: string[]; // placed-object ids (multi-select ready)
-  placing: string | null; // catalog name armed for click-to-place
+  placing: PlacingSpec | null; // what click-to-place is armed for (xref / airport_light / point light)
   filter: Filter;
   mapView: Camera; // the LIVE camera; stamped into the document only at save
   cameraEpoch: number; // bumps on document load (open/new) → MapView re-centers; pan never bumps it
@@ -119,7 +128,7 @@ export interface EditorState {
   // ── selection / placement / filter (ephemeral) ──
   select: (ids: string[], additive?: boolean) => void;
   clearSelection: () => void;
-  armPlacement: (name: string | null) => void;
+  armPlacement: (spec: PlacingSpec | null) => void;
   setFilter: (patch: Partial<Filter>) => void;
   placeAt: (p: LonLat) => void;
 
@@ -132,6 +141,13 @@ export interface EditorState {
   nudgeHeight: (id: string, deltaM: number) => void;
   setLabel: (id: string, label: string | undefined) => void;
   setLocked: (id: string, locked: boolean) => void;
+  // v0.2 light-field mutations (kind-guarded in mutate.ts → no-op on the wrong kind)
+  setAirportLightType: (id: string, typeName: string) => void;
+  setConfiguration: (id: string, configuration: string) => void;
+  setLightColor: (id: string, color: Vec3) => void;
+  setIntensity: (id: string, intensity: number) => void;
+  setFlashing: (id: string, flashing: [number, number, number, number]) => void;
+  setGroupIndex: (id: string, groupIndex: number) => void;
   setReference: (ref: LonLat | null) => void;
   renameProject: (name: string) => void;
   setPoiName: (poiName: string) => void;
@@ -264,6 +280,7 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
       return {
         catalog: null,
         catalogIndex: new Map(),
+        airportLightIndex: new Map(),
         airports: [],
         tiles: DEFAULT_TILES,
         project: deps.initialProject,
@@ -290,7 +307,11 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
           // duplicates keep their order — the name→object index below (last-wins = user wins) and the
           // self-sorting category tree are both unaffected.
           const xref = [...catalog.xref].sort(byDisplayName);
-          set({ catalog: { ...catalog, xref }, catalogIndex: new Map(xref.map((o) => [o.name, o])) });
+          set({
+            catalog: { ...catalog, xref },
+            catalogIndex: new Map(xref.map((o) => [o.name, o])),
+            airportLightIndex: new Map(catalog.airportLights.map((l) => [l.typeName, l])),
+          });
         },
         loadAirports: (airports) => set({ airports }),
         setTiles: (tiles) => set({ tiles }),
@@ -309,10 +330,16 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
         setFilter: (patch) => set((s) => ({ filter: { ...s.filter, ...patch } })),
 
         placeAt: (p) => {
-          const name = get().placing;
-          if (name === null) return;
+          const spec = get().placing;
+          if (spec === null) return;
           const id = deps.newId();
-          commit((proj) => mutate.addObject(proj, mutate.createXref(name, p, { id })));
+          const obj =
+            spec.kind === "xref"
+              ? mutate.createXref(spec.name, p, { id })
+              : spec.kind === "airport_light"
+                ? mutate.createAirportLight(spec.name, p, { id })
+                : mutate.createLight(p, { id });
+          commit((proj) => mutate.addObject(proj, obj));
           set({ selection: [id] }); // select the fresh object; placement stays armed (multi-drop)
         },
 
@@ -351,6 +378,14 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
           }),
         setLabel: (id, label) => commit((proj) => mutate.setLabel(proj, id, label)),
         setLocked: (id, locked) => commit((proj) => mutate.setLocked(proj, id, locked)),
+        setAirportLightType: (id, typeName) =>
+          commit((proj) => mutate.setAirportLightType(proj, id, typeName)),
+        setConfiguration: (id, configuration) =>
+          commit((proj) => mutate.setConfiguration(proj, id, configuration)),
+        setLightColor: (id, color) => commit((proj) => mutate.setLightColor(proj, id, color)),
+        setIntensity: (id, intensity) => commit((proj) => mutate.setIntensity(proj, id, intensity)),
+        setFlashing: (id, flashing) => commit((proj) => mutate.setFlashing(proj, id, flashing)),
+        setGroupIndex: (id, groupIndex) => commit((proj) => mutate.setGroupIndex(proj, id, groupIndex)),
         setReference: (ref) => commit((proj) => mutate.setReference(proj, ref)),
         renameProject: (name) => commit((proj) => mutate.renameProject(proj, name)),
         setPoiName: (poiName) => commit((proj) => mutate.setPoiName(proj, poiName)),

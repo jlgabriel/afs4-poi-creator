@@ -5,13 +5,13 @@
 // takes a terrain elevation you already have (or null) and does the arithmetic. The networked
 // per-point lookup (Open-Meteo) lands later in main/elevation.ts and feeds the same shape.
 
-import type { HeightSpec, PlacedXref, ResolvedXref } from "../project/types";
+import type { HeightSpec, PlacedObject, ResolvedObject } from "../project/types";
 
 /** Objects that couldn't be resolved because their height is terrain-relative but no terrain
  *  elevation was available. The UI/CLI catches this and asks for a manual base elevation. */
 export class NeedsElevationError extends Error {
-  readonly points: PlacedXref[];
-  constructor(points: PlacedXref[]) {
+  readonly points: PlacedObject[];
+  constructor(points: PlacedObject[]) {
     super(`${points.length} object(s) need a terrain elevation to resolve their height`);
     this.name = "NeedsElevationError";
     this.points = points;
@@ -35,15 +35,15 @@ export function resolveHeight(spec: HeightSpec, terrainAsl: number | null): numb
  *  the manual/offline fallback (design §7 R1). `terrainAsl` null means "no elevation": any
  *  non-`asl` object then can't resolve, and the call throws NeedsElevationError listing them. */
 export function resolveHeightsFlat(
-  objects: PlacedXref[],
+  objects: PlacedObject[],
   terrainAsl: number | null,
-): ResolvedXref[] {
-  const missing: PlacedXref[] = [];
-  const resolved = objects.map((o): ResolvedXref => {
-    const { height, ...rest } = o; // drop HeightSpec; ResolvedXref carries heightAsl instead
+): ResolvedObject[] {
+  const missing: PlacedObject[] = [];
+  const resolved = objects.map((o): ResolvedObject => {
+    const { height, ...rest } = o; // drop HeightSpec; Resolved* carries heightAsl instead
     const h = resolveHeight(height, terrainAsl);
     if (h === null) missing.push(o);
-    return { ...rest, heightAsl: h ?? 0 };
+    return { ...rest, heightAsl: h ?? 0 } as ResolvedObject;
   });
   if (missing.length > 0) throw new NeedsElevationError(missing);
   return resolved;

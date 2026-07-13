@@ -7,13 +7,36 @@
 // Not virtualized: a POI is tens-to-low-hundreds of objects, not the catalog's 911; if dense scenes
 // ever make this janky, it takes the same react-window treatment the catalog got.
 import { useMemo } from "react";
+import type { PlacedObject } from "../../core/project/types";
 import { editorStore, useEditor } from "../state/editorStore";
+import type { EditorState } from "../state/store";
 import { CategoryIcon } from "../catalog/categoryIcon";
+
+/** The icon category + display name for a placed row, resolved per kind against the catalog indexes. */
+function rowInfo(
+  o: PlacedObject,
+  catalogIndex: EditorState["catalogIndex"],
+  airportLightIndex: EditorState["airportLightIndex"],
+): { category: string; name: string } {
+  if (o.kind === "xref") {
+    const cat = catalogIndex.get(o.name);
+    return { category: cat?.category ?? "various", name: o.label || cat?.displayName || o.name };
+  }
+  if (o.kind === "airport_light") {
+    const meta = airportLightIndex.get(o.typeName);
+    return {
+      category: meta?.category ?? "lights/other",
+      name: o.label || meta?.displayName || o.typeName,
+    };
+  }
+  return { category: "lights/point", name: o.label || "Point light" };
+}
 
 export function PlacedList(): React.ReactElement {
   const objects = useEditor((s) => s.project.objects);
   const selection = useEditor((s) => s.selection);
   const catalogIndex = useEditor((s) => s.catalogIndex);
+  const airportLightIndex = useEditor((s) => s.airportLightIndex);
   const selSet = useMemo(() => new Set(selection), [selection]);
   const hasSelection = selection.length > 0;
 
@@ -46,7 +69,7 @@ export function PlacedList(): React.ReactElement {
           <p className="pct-empty">No objects yet — click the map to place one.</p>
         ) : (
           objects.map((o) => {
-            const cat = catalogIndex.get(o.name);
+            const info = rowInfo(o, catalogIndex, airportLightIndex);
             const selected = selSet.has(o.id);
             return (
               <button
@@ -54,13 +77,13 @@ export function PlacedList(): React.ReactElement {
                 type="button"
                 className={selected ? "pct-placed-row sel" : "pct-placed-row"}
                 aria-pressed={selected}
-                title={o.name}
+                title={info.name}
                 onClick={(e) => editorStore.getState().select([o.id], e.shiftKey)}
                 onDoubleClick={() => editorStore.getState().flyTo(o.position)}
               >
-                <CategoryIcon category={cat?.category ?? "various"} />
+                <CategoryIcon category={info.category} />
                 <span className="pct-placed-text">
-                  <span className="pct-placed-name">{o.label || cat?.displayName || o.name}</span>
+                  <span className="pct-placed-name">{info.name}</span>
                   <span className="pct-placed-meta">
                     lon {o.position.lon.toFixed(6)} · lat {o.position.lat.toFixed(6)}
                     {o.locked ? " · locked" : ""}
