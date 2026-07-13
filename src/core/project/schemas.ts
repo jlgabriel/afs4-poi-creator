@@ -83,6 +83,44 @@ export const zPlacedXref = z.looseObject({
   locked: z.boolean().optional(),
 });
 
+/** An airport-light `configuration`: 0–2 colour letters from [bgrwy]. Empty = the fixture's own
+ *  default colour (valid — used in the in-sim gate). 1 letter = all-around, 2 = a direction + its
+ *  opposite (format bible). Upper bound of 2 mirrors the grammar; the UI constrains further. */
+export const CONFIGURATION_RE = /^[bgrwy]{0,2}$/;
+
+// v0.2 lights. Permissive-on-load / constrained-at-the-editor: e.g. `color` accepts the whole 0..1
+// continuum in case the in-sim gate later proves continuous RGB, while the Inspector offers only the
+// valid corners for now. These validate the two new placed kinds; they wire into zProject.objects
+// (as a discriminated union on `kind`) when the lights UI slice flips Project.objects to PlacedObject.
+export const zPlacedAirportLight = z.looseObject({
+  id: z.string().min(1),
+  kind: z.literal("airport_light"),
+  typeName: z.string().min(1).regex(XREF_NAME_RE, "must be an airport-light type name"),
+  position: zLonLat,
+  height: zHeightSpec,
+  orientation: z.number().finite(),
+  configuration: z.string().regex(CONFIGURATION_RE, "0–2 colour letters from b/g/r/w/y"),
+  groupIndex: z.number().int().nonnegative(),
+  label: z.string().optional(),
+  locked: z.boolean().optional(),
+});
+
+const zUnit = z.number().finite().min(0).max(1);
+const zNonNeg = z.number().finite().nonnegative();
+
+export const zPlacedLight = z.looseObject({
+  id: z.string().min(1),
+  kind: z.literal("light"),
+  position: zLonLat,
+  height: zHeightSpec,
+  color: z.tuple([zUnit, zUnit, zUnit]),
+  intensity: zNonNeg,
+  flashing: z.tuple([zNonNeg, zNonNeg, zNonNeg, zNonNeg]),
+  groupIndex: z.number().int().nonnegative(),
+  label: z.string().optional(),
+  locked: z.boolean().optional(),
+});
+
 // loose (like the document top level) so a project written by a newer PCT that adds camera fields
 // round-trips without loss — zod v4 z.object would strip them (Fable review nit).
 export const zCamera = z.looseObject({

@@ -5,8 +5,9 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { buildCatalog, type BuildResult, type TmiSource } from "../core/catalog/buildCatalog";
+import { buildAirportLights, type AirportLightFile } from "../core/catalog/airportLights";
 import type { Catalog } from "../core/project/types";
-import { findTmi, resolveXrefDir } from "./afs4Paths";
+import { findTmb, findTmi, resolveAirportLightsDir, resolveXrefDir } from "./afs4Paths";
 
 /** Thrown when the given install dir has no scenery/xref with .tmi files. */
 export class NoXrefError extends Error {
@@ -41,7 +42,20 @@ export function scanXref(
     }
   }
 
-  return buildCatalog(sources, { installDir, userXrefDir: userDir, scannedAt });
+  // v0.2 airport lights: enumerate airport_lights/**/*.tmb from the INSTALL — filenames only, no bytes
+  // read (the .tmb is opaque IPACS binary). type_name = basename minus "al_"; see core/catalog/airportLights.
+  const airportLightFiles: AirportLightFile[] = [];
+  const alDir = resolveAirportLightsDir(installDir);
+  if (alDir) {
+    for (const p of findTmb(alDir)) {
+      airportLightFiles.push({ folder: path.basename(path.dirname(p)), base: path.basename(p, ".tmb") });
+    }
+  }
+  const { lights, warnings: lightWarnings } = buildAirportLights(airportLightFiles);
+
+  const result = buildCatalog(sources, { installDir, userXrefDir: userDir, scannedAt }, lights);
+  result.warnings.push(...lightWarnings);
+  return result;
 }
 
 const cacheFile = (userDataDir: string): string => path.join(userDataDir, "catalog.json");

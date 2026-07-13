@@ -32,6 +32,19 @@ export interface BundleInfo {
   count: number; // entries parsed
 }
 
+/** One airport-light fixture, enumerated from the install's `airport_lights` folder (v0.2). Unlike
+ *  CatalogObject there is NO `.tmi` and NO bounding box — these are point light fixtures, not
+ *  footprint objects. `typeName` is the exact string8u written into a POI `.toc` (the `.tmb`
+ *  basename minus the `al_` prefix). PCT never opens the `.tmb` (opaque IPACS binary); the "scan"
+ *  is pure name derivation, so it ships zero proprietary bytes — even stronger than the `.tmi` case. */
+export interface CatalogAirportLight {
+  typeName: string; // ".tmb basename minus al_", e.g. "runway_edge_light" — the .toc type_name
+  folder: string; // provenance: the al_<type> folder it came from, e.g. "al_runway_edge_light"
+  source: "install";
+  category: string; // display taxonomy path, e.g. "lights/runway"
+  displayName: string; // derived pretty label, e.g. "Runway Edge Light"
+}
+
 /** The scanned catalog cache. Written to Electron userData at runtime; never committed. */
 export interface Catalog {
   schemaVersion: 1;
@@ -41,7 +54,7 @@ export interface Catalog {
   bundles: BundleInfo[];
   xref: CatalogObject[];
   plants: []; // reserved (M4+)
-  airportLights: []; // reserved
+  airportLights: CatalogAirportLight[]; // v0.2 — scanned from airport_lights/ (empty on a pre-v0.2 cache)
   animated: []; // reserved
 }
 
@@ -55,19 +68,48 @@ export type HeightSpec =
   | { mode: "terrain-offset"; offset: number } // terrain + N metres (rooftop items)
   | { mode: "asl"; value: number }; // absolute metres ASL, user-entered
 
-/** One placed built-in object in a project. Portable: names + coordinates + transforms only,
- *  no assets, no absolute paths. `name` survives even if the opener's catalog lacks it. */
-export interface PlacedXref {
+/** Fields shared by every placed object, whatever its kind. Portable: coordinates + a HeightSpec
+ *  only, no assets, no absolute paths. The `kind`-specific interfaces below extend this. */
+export interface PlacedBase {
   id: string; // uuid v4
-  kind: "xref"; // discriminator; "plant" | "light" | … arrive M4+
-  name: string; // exact catalog name — the value written to the .toc
   position: LonLat;
   height: HeightSpec;
-  direction: number; // degrees, clockwise positive, [0, 360) (spec: negative = CCW)
-  scale: number; // uniform scale_factor, > 0, default 1
   label?: string; // optional user note
   locked?: boolean; // optional: ignore drags (dense-scene safety)
 }
+
+/** One placed built-in object in a project. `name` survives even if the opener's catalog lacks it. */
+export interface PlacedXref extends PlacedBase {
+  kind: "xref"; // discriminator
+  name: string; // exact catalog name — the value written to the .toc
+  direction: number; // degrees, clockwise positive, [0, 360) (spec: negative = CCW)
+  scale: number; // uniform scale_factor, > 0, default 1
+}
+
+/** One placed airport-light fixture (v0.2). Placed BY NAME like an xref, plus a colour + orientation.
+ *  Emitted into the POI `.toc` `list_airport_light`. Height is absolute metres ASL, same rule as xref
+ *  (in-sim gate confirmed 2026-07-12: a height-614 probe floated +30 m over 584 m terrain). */
+export interface PlacedAirportLight extends PlacedBase {
+  kind: "airport_light"; // discriminator; mirrors the .toc element tag
+  typeName: string; // CatalogAirportLight.typeName — the .toc type_name (no "al_")
+  orientation: number; // degrees the light is illuminated toward
+  configuration: string; // colour letters, 0–2 of [bgrwy]; "" = the fixture's own default colour
+  groupIndex: number; // night-visibility group (0 = ±40 min around night … 3 = 24 h)
+}
+
+/** One placed generic parametric point light (v0.2). No catalog — fully described by its parameters.
+ *  Emitted into the POI `.toc` `list_light`. Height is absolute metres ASL (same in-sim gate). */
+export interface PlacedLight extends PlacedBase {
+  kind: "light"; // discriminator
+  color: Vec3; // RGB, each channel 0..1 (the 8 corners: 000 black … 111 white)
+  intensity: number; // 0 = out … 100000 = big
+  flashing: [number, number, number, number]; // [A B C D]: A cycle, B sequence, C flash-length, D unused (0)
+  groupIndex: number; // night-visibility group
+}
+
+/** Any placed object, discriminated on `kind`. (Project.objects widens to this when the v0.2 lights
+ *  UI lands; the format/scanner plumbing below is built and golden-tested first.) */
+export type PlacedObject = PlacedXref | PlacedAirportLight | PlacedLight;
 
 /** Global horizontal shift applied to EVERY object at export time: nudge each position `east`
  *  metres east and `north` metres north (either can be negative). Corrects a systematic offset
@@ -94,10 +136,18 @@ export interface Project {
 
 // ── Export (design §3.4) ────────────────────────────────────────────────────
 
-/** A PlacedXref with its height already resolved to absolute metres ASL. */
+/** A placed object with its height already resolved to absolute metres ASL (the shape the exporter
+ *  consumes). One per kind so the union stays discriminated on `kind` for the emitter. */
 export interface ResolvedXref extends Omit<PlacedXref, "height"> {
   heightAsl: number;
 }
+export interface ResolvedAirportLight extends Omit<PlacedAirportLight, "height"> {
+  heightAsl: number;
+}
+export interface ResolvedLight extends Omit<PlacedLight, "height"> {
+  heightAsl: number;
+}
+export type ResolvedObject = ResolvedXref | ResolvedAirportLight | ResolvedLight;
 
 /** One file to write into the POI folder. */
 export interface PoiFile {

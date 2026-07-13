@@ -22,6 +22,34 @@ export function findTmi(root: string, out: string[] = []): string[] {
   return out;
 }
 
+/** Recursively collect every .tmb file under `root` (unreadable dirs skipped). Mirrors findTmi — used
+ *  for the v0.2 airport-light library, where fixtures are `.tmb` (not `.tmi`) and carry no bounding box. */
+export function findTmb(root: string, out: string[] = []): string[] {
+  let entries;
+  try {
+    entries = readdirSync(root, { withFileTypes: true });
+  } catch {
+    return out;
+  }
+  for (const e of entries) {
+    const full = path.join(root, e.name);
+    if (e.isDirectory()) findTmb(full, out);
+    else if (e.isFile() && e.name.toLowerCase().endsWith(".tmb")) out.push(full);
+  }
+  return out;
+}
+
+/** The airport-light library dir (`<install>/airport_lights`), or null if absent. Install-only —
+ *  there is no known user-dir airport-light concept. */
+export function resolveAirportLightsDir(installArg: string): string | null {
+  const candidates = [path.join(installArg, "airport_lights")];
+  if (path.basename(installArg).toLowerCase() === "airport_lights") candidates.unshift(installArg);
+  for (const c of candidates) {
+    if (existsSync(c) && statSync(c).isDirectory()) return c;
+  }
+  return null;
+}
+
 /** Resolve an install root (or a scenery/xref dir) to the directory that holds the .tmi files. */
 export function resolveXrefDir(installArg: string): string | null {
   const candidates = [path.join(installArg, "scenery", "xref"), path.join(installArg, "xref")];

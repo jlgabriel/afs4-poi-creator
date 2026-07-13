@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { buildCatalog, type TmiSource } from "../../src/core/catalog/buildCatalog";
+import { buildAirportLights, type AirportLightFile } from "../../src/core/catalog/airportLights";
 import type { Catalog } from "../../src/core/project/types";
 
 // Opt-in LOCAL test — validates the whole pipeline against a REAL Aerofly FS 4 install.
@@ -30,7 +31,25 @@ function findTmi(root: string, out: string[] = []): string[] {
   return out;
 }
 
+function findAirportLightsDir(): string | null {
+  for (const base of CANDIDATES) {
+    const a = path.join(base, "airport_lights");
+    if (existsSync(a) && statSync(a).isDirectory()) return a;
+  }
+  return null;
+}
+
+function findTmb(root: string, out: string[] = []): string[] {
+  for (const e of readdirSync(root, { withFileTypes: true })) {
+    const full = path.join(root, e.name);
+    if (e.isDirectory()) findTmb(full, out);
+    else if (e.name.toLowerCase().endsWith(".tmb")) out.push(full);
+  }
+  return out;
+}
+
 const xref = findXref();
+const airportLightsDir = findAirportLightsDir();
 
 describe.skipIf(!xref)("real AFS4 install (local, opt-in)", () => {
   let catalog: Catalog;
@@ -73,5 +92,21 @@ describe.skipIf(!xref)("real AFS4 install (local, opt-in)", () => {
   it("categorizes ≥95% of objects outside other/*", () => {
     const fb = catalog.xref.filter((o) => o.category.startsWith("other/")).length;
     expect(1 - fb / catalog.xref.length).toBeGreaterThanOrEqual(0.95);
+  });
+});
+
+describe.skipIf(!airportLightsDir)("real AFS4 airport lights (local, opt-in)", () => {
+  it("derives exactly 22 placeable type_names, incl. runway_edge_light, sans the _model helper", () => {
+    const dir = airportLightsDir as string;
+    const files: AirportLightFile[] = findTmb(dir).map((p) => ({
+      folder: path.basename(path.dirname(p)),
+      base: path.basename(p, ".tmb"),
+    }));
+    const { lights, warnings } = buildAirportLights(files);
+    const names = lights.map((l) => l.typeName);
+    expect(lights).toHaveLength(22);
+    expect(names).toContain("runway_edge_light");
+    expect(names).not.toContain("center_line_light_model");
+    expect(warnings).toEqual([]);
   });
 });

@@ -4,7 +4,7 @@
 
 import { parseTmi } from "./tmiParser";
 import { categorize, displayName } from "./categorize";
-import type { Catalog, CatalogObject, BundleInfo } from "../project/types";
+import type { Catalog, CatalogAirportLight, CatalogObject, BundleInfo } from "../project/types";
 
 export interface TmiSource {
   path: string;
@@ -22,6 +22,7 @@ const round2 = (v: number): number => Math.round(v * 100) / 100;
 export function buildCatalog(
   sources: TmiSource[],
   meta: { installDir: string; userXrefDir: string | null; scannedAt: string },
+  airportLights: CatalogAirportLight[] = [],
 ): BuildResult {
   const warnings: string[] = [];
   const bundles: BundleInfo[] = [];
@@ -61,7 +62,7 @@ export function buildCatalog(
     bundles,
     xref,
     plants: [],
-    airportLights: [],
+    airportLights,
     animated: [],
   };
   return { catalog, warnings };

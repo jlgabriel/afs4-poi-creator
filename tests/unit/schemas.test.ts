@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   clampLonLat,
+  CONFIGURATION_RE,
   firstProjectError,
   isExportablePoiName,
   migrateProject,
@@ -8,6 +9,8 @@ import {
   parseSettings,
   safeParseProject,
   UnsupportedSchemaVersionError,
+  zPlacedAirportLight,
+  zPlacedLight,
 } from "../../src/core/project/schemas";
 import { createProject, createXref } from "../../src/core/project/mutate";
 import type { Project, Settings } from "../../src/core/project/types";
@@ -150,5 +153,64 @@ describe("isExportablePoiName", () => {
     for (const s of ["", "Munich", "a b", "a-b", "café"]) {
       expect(isExportablePoiName(s)).toBe(false);
     }
+  });
+});
+
+// ── v0.2 lights (schemas defined + tested here; wired into zProject with the lights UI slice) ──
+
+describe("zPlacedAirportLight", () => {
+  const valid = {
+    id: "a",
+    kind: "airport_light",
+    typeName: "runway_edge_light",
+    position: { lon: -116.78, lat: 34.85 },
+    height: { mode: "terrain" },
+    orientation: 90,
+    configuration: "wr",
+    groupIndex: 0,
+  };
+  it("accepts a valid airport light", () => {
+    expect(zPlacedAirportLight.safeParse(valid).success).toBe(true);
+  });
+  it("accepts an empty configuration (the fixture's own default colour)", () => {
+    expect(zPlacedAirportLight.safeParse({ ...valid, configuration: "" }).success).toBe(true);
+  });
+  it("rejects a 3-letter or non-bgrwy configuration", () => {
+    expect(zPlacedAirportLight.safeParse({ ...valid, configuration: "wrg" }).success).toBe(false);
+    expect(zPlacedAirportLight.safeParse({ ...valid, configuration: "xz" }).success).toBe(false);
+  });
+  it("rejects a grammar-breaking ] in typeName and a negative group_index", () => {
+    expect(zPlacedAirportLight.safeParse({ ...valid, typeName: "evil]x" }).success).toBe(false);
+    expect(zPlacedAirportLight.safeParse({ ...valid, groupIndex: -1 }).success).toBe(false);
+  });
+});
+
+describe("zPlacedLight", () => {
+  const valid = {
+    id: "b",
+    kind: "light",
+    position: { lon: -116.78, lat: 34.85 },
+    height: { mode: "asl", value: 584 },
+    color: [1, 0, 1],
+    intensity: 10000,
+    flashing: [1, 0, 3, 0],
+    groupIndex: 0,
+  };
+  it("accepts a valid point light", () => {
+    expect(zPlacedLight.safeParse(valid).success).toBe(true);
+  });
+  it("rejects a colour channel outside 0..1", () => {
+    expect(zPlacedLight.safeParse({ ...valid, color: [2, 0, 0] }).success).toBe(false);
+  });
+  it("rejects a negative intensity and a mis-sized flashing tuple", () => {
+    expect(zPlacedLight.safeParse({ ...valid, intensity: -1 }).success).toBe(false);
+    expect(zPlacedLight.safeParse({ ...valid, flashing: [1, 0, 3] }).success).toBe(false);
+  });
+});
+
+describe("CONFIGURATION_RE", () => {
+  it("matches 0–2 colour letters and rejects the rest", () => {
+    for (const s of ["", "r", "wr", "gy", "ww"]) expect(CONFIGURATION_RE.test(s)).toBe(true);
+    for (const s of ["wrg", "x", "R", "w r"]) expect(CONFIGURATION_RE.test(s)).toBe(false);
   });
 });
