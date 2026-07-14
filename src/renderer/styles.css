@@ -103,10 +103,31 @@ body {
 .pct-map.placing {
   cursor: crosshair;
 }
-/* The rotate handle (design §5): a grab cursor so the amber grip past the footprint reads as
-   draggable. The class lands on the circleMarker's SVG <path> via L.circleMarker({ className }). */
+/* The rotate handle (design §5): a grab cursor so the cyan grip reads as draggable — past the footprint
+   for an xref, at the end of the orientation tick for an airport light. The class lands on the
+   circleMarker's SVG <path> via L.circleMarker({ className }). */
 .pct-rotate-handle {
   cursor: grab;
+}
+/* Live degree readout bound to the grip while rotating (the store isn't touched until release, so this is
+   the only place the angle you're dragging TO is visible). Doubled selector to outrank .leaflet-tooltip's
+   own white balloon + arrow, whatever the stylesheet order. pointer-events:none so it can never eat the
+   drag it is reporting on. */
+.leaflet-tooltip.pct-rotate-tip {
+  padding: 1px 5px;
+  border: none;
+  border-radius: 4px;
+  background: #0f172a;
+  box-shadow: none;
+  color: #f8fafc;
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.leaflet-tooltip.pct-rotate-tip::before {
+  display: none;
 }
 
 /* Side panels. */
@@ -729,12 +750,34 @@ body {
   flex-direction: column;
 }
 .pct-placed-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
   font-size: 12px;
   font-weight: 600;
   color: #0f172a;
+}
+.pct-placed-label {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+/* "missing" = the named object/fixture isn't in this install, so the sim will silently skip it. flex:none
+   keeps the badge visible — a long object name truncates, it never pushes the flag out of the row (the
+   same lesson as .pct-installed-row .pct-field-meta). */
+.pct-placed-missing {
+  flex: none;
+  padding: 0 4px;
+  border: 1px solid #fecaca;
+  border-radius: 4px;
+  background: #fee2e2;
+  color: #b91c1c;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 15px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
 }
 .pct-placed-meta {
   font-size: 11px;

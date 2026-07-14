@@ -39,14 +39,26 @@ const LightCard = memo(function LightCard({
   );
 });
 
+const POINT_TITLE = "Point light (custom)";
+
 export function LightsSection(): React.ReactElement {
   const lights = useEditor((s) => s.catalog?.airportLights);
   const placing = useEditor((s) => s.placing);
+  // The search box sits ABOVE both sections, so it has to filter both — it used to silently skip Lights,
+  // leaving all 23 fixtures on screen while the xref gallery narrowed to one hit. Not deferred like the
+  // gallery's: 23 cards re-render for free, the ~900 are the ones that needed the deferred pass.
+  const query = useEditor((s) => s.filter.query);
+  const q = query.trim().toLowerCase();
 
-  const sorted = useMemo(
-    () => (lights ? [...lights].sort((a, b) => a.displayName.localeCompare(b.displayName)) : []),
-    [lights],
-  );
+  const sorted = useMemo(() => {
+    const all = lights ? [...lights].sort((a, b) => a.displayName.localeCompare(b.displayName)) : [];
+    if (!q) return all;
+    return all.filter(
+      (l) => l.displayName.toLowerCase().includes(q) || l.typeName.toLowerCase().includes(q),
+    );
+  }, [lights, q]);
+
+  const showPoint = !q || POINT_TITLE.toLowerCase().includes(q);
 
   const armAirportLight = useCallback((typeName: string) => {
     const cur = editorStore.getState().placing;
@@ -61,15 +73,17 @@ export function LightsSection(): React.ReactElement {
 
   return (
     <details className="pct-lights">
-      <summary className="pct-lights-summary">Lights ({sorted.length + 1})</summary>
+      <summary className="pct-lights-summary">Lights ({sorted.length + (showPoint ? 1 : 0)})</summary>
       <div className="pct-lights-list">
-        <LightCard
-          icon="lights/point"
-          title="Point light (custom)"
-          subtitle="parametric · colour + intensity + flash"
-          armed={placing?.kind === "light"}
-          onArm={armPointLight}
-        />
+        {showPoint && (
+          <LightCard
+            icon="lights/point"
+            title={POINT_TITLE}
+            subtitle="parametric · colour + intensity + flash"
+            armed={placing?.kind === "light"}
+            onArm={armPointLight}
+          />
+        )}
         {sorted.map((l) => (
           <LightCard
             key={l.typeName}
@@ -80,9 +94,11 @@ export function LightsSection(): React.ReactElement {
             onArm={() => armAirportLight(l.typeName)}
           />
         ))}
-        {/* Airport-light fixtures come from the install scan. A catalog cached before v0.2 (or the very
-            first boot) carries none, so nudge the user to Rescan — the point light above needs no scan. */}
-        {sorted.length === 0 && (
+        {/* Two different empty states. With a query it's "your search found nothing here"; with no query
+            it's "you have no fixtures at all" — which for a catalog cached before v0.2 (or a first boot)
+            means Rescan, since the fixtures come from the install scan (the point light above needs none). */}
+        {sorted.length === 0 && !showPoint && <p className="pct-empty">No matching lights</p>}
+        {sorted.length === 0 && !q && (
           <p className="pct-empty pct-lights-hint">Rescan to load airport lights from your install.</p>
         )}
       </div>

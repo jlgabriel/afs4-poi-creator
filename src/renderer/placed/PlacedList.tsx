@@ -7,30 +7,9 @@
 // Not virtualized: a POI is tens-to-low-hundreds of objects, not the catalog's 911; if dense scenes
 // ever make this janky, it takes the same react-window treatment the catalog got.
 import { useMemo } from "react";
-import type { PlacedObject } from "../../core/project/types";
 import { editorStore, useEditor } from "../state/editorStore";
-import type { EditorState } from "../state/store";
 import { CategoryIcon } from "../catalog/categoryIcon";
-
-/** The icon category + display name for a placed row, resolved per kind against the catalog indexes. */
-function rowInfo(
-  o: PlacedObject,
-  catalogIndex: EditorState["catalogIndex"],
-  airportLightIndex: EditorState["airportLightIndex"],
-): { category: string; name: string } {
-  if (o.kind === "xref") {
-    const cat = catalogIndex.get(o.name);
-    return { category: cat?.category ?? "various", name: o.label || cat?.displayName || o.name };
-  }
-  if (o.kind === "airport_light") {
-    const meta = airportLightIndex.get(o.typeName);
-    return {
-      category: meta?.category ?? "lights/other",
-      name: o.label || meta?.displayName || o.typeName,
-    };
-  }
-  return { category: "lights/point", name: o.label || "Point light" };
-}
+import { rowInfo } from "./rowInfo";
 
 export function PlacedList(): React.ReactElement {
   const objects = useEditor((s) => s.project.objects);
@@ -83,7 +62,20 @@ export function PlacedList(): React.ReactElement {
               >
                 <CategoryIcon category={info.category} />
                 <span className="pct-placed-text">
-                  <span className="pct-placed-name">{info.name}</span>
+                  <span className="pct-placed-name">
+                    <span className="pct-placed-label">{info.name}</span>
+                    {/* The map already draws it red-dashed, but a dense scene hides that — the list is
+                        where you actually notice "this one won't render" before you export. The badge holds
+                        its space; a long name truncates instead of pushing the flag out of sight. */}
+                    {info.missing && (
+                      <span
+                        className="pct-placed-missing"
+                        title="Not in your install — the sim will skip it"
+                      >
+                        missing
+                      </span>
+                    )}
+                  </span>
                   <span className="pct-placed-meta">
                     lon {o.position.lon.toFixed(6)} · lat {o.position.lat.toFixed(6)}
                     {o.locked ? " · locked" : ""}

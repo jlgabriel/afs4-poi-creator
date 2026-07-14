@@ -159,7 +159,11 @@ function XrefFields({
         </span>
       </div>
       <div className="pct-field-meta">
-        {meta ? `${meta.category} · ${meta.bundle}` : <span className="pct-warn">not in catalog</span>}
+        {meta ? (
+          `${meta.category} · ${meta.bundle}`
+        ) : (
+          <span className="pct-warn">not in your install — the sim will skip it</span>
+        )}
       </div>
 
       <PositionRow obj={obj} />
@@ -168,7 +172,7 @@ function XrefFields({
         <label className="pct-field-col">
           <span
             className="pct-field-label"
-            title="Raw rotation stored in the .toc — not a compass heading. 0 = the object's built-in pose (varies per object); increases clockwise, normalized to 0–360°. To align, match the footprint rectangle to the imagery."
+            title="Raw rotation stored in the .toc — not a compass heading. 0 = the object's built-in pose (varies per object); increases clockwise, normalized to 0–360°. Drag the cyan handle on the map (hold Shift to snap to 5°) or type it here; to align, match the footprint rectangle to the imagery."
           >
             Direction °
           </span>
@@ -284,6 +288,14 @@ function AirportLightFields({
         </span>
       </div>
 
+      <div className="pct-field-meta">
+        {meta ? (
+          meta.category
+        ) : (
+          <span className="pct-warn">not in your install — the sim will skip it</span>
+        )}
+      </div>
+
       <label className="pct-field pct-field-col">
         <span className="pct-field-label">Fixture</span>
         <select
@@ -291,6 +303,14 @@ function AirportLightFields({
           value={obj.typeName}
           onChange={(e) => store().setAirportLightType(obj.id, e.target.value)}
         >
+          {/* A <select> whose value matches no <option> renders BLANK — so a project shared from a forum
+              user with a fixture we don't have used to show an empty, lying dropdown. Carry the dangling
+              name as a disabled option so the field states what it actually holds. */}
+          {!meta && (
+            <option value={obj.typeName} disabled>
+              {obj.typeName} (missing)
+            </option>
+          )}
           {(fixtures ?? []).map((l) => (
             <option key={l.typeName} value={l.typeName}>
               {l.displayName}
@@ -304,11 +324,14 @@ function AirportLightFields({
       <label className="pct-field pct-field-col">
         <span
           className="pct-field-label"
-          title="Raw rotation the light shines toward (model axis, not a compass heading). Drag the map handle or type it here. Matters when the colour has an opposite."
+          title="Raw rotation the light shines toward (model axis, not a compass heading). Drag the cyan handle on the map (hold Shift to snap to 5°) or type it here. Matters when the colour has an opposite."
         >
           Orientation °
         </span>
         <NumberInput
+          // Same id as the xref's Direction field: the `R` shortcut focuses "the rotation field", and the
+          // kind dispatch renders exactly one of the two, so they can never collide.
+          id="pct-inspector-direction"
           value={obj.orientation}
           format={(n) => n.toFixed(1)}
           onCommit={(d) => store().rotateObject(obj.id, d)}

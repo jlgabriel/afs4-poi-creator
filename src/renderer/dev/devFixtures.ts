@@ -71,5 +71,11 @@ export function demoProject(): Project {
     p,
     mutate.createLight({ lon: 11.8594, lat: 48.3701 }, { color: [1, 0, 0], intensity: 10000 }),
   );
+  // A fixture DELIBERATELY absent from DEMO_CATALOG — the "shared project references a fixture you don't
+  // have" case, so the missing (red-dashed) state is drivable in the preview harness without a real scan.
+  p = mutate.addObject(
+    p,
+    mutate.createAirportLight("pct_demo_missing_fixture", { lon: 11.8591, lat: 48.3696 }),
+  );
   return p;
 }

@@ -15,8 +15,11 @@
 //     change REBUILDS. That keeps sync O(changed), which is what holds drag/undo at 60 fps.
 //   • Drag is layer-local: on body mousedown we disable map dragging and, on each map mousemove, edit
 //     the shape's lat-lngs DIRECTLY — the store is untouched until mouseup fires exactly ONE onMove.
-//   • Rotate (footprint only) mirrors move: a handle past the footprint's nose is grabbed the same way;
-//     each mousemove re-lays the polygon/heading/handle at the new bearing (Shift snaps to 5°).
+//   • Rotate mirrors move, for BOTH shapes: a cyan grip is grabbed the same way and each mousemove re-lays
+//     the shape at the new bearing (Shift snaps to 5°), with a live degree tooltip on the grip since the
+//     store isn't touched until release. An xref hangs its grip past the footprint's nose; an airport light
+//     is a point, so a short orientation tick carries the grip instead. A parametric point light has no
+//     orientation (mutate.rotateObject no-ops for it) and therefore no grip.
 //   • No L.Icon.Default (the Leaflet-under-Vite broken-marker-PNG trap): every mark is a vector
 //     circleMarker / polyline / polygon. Zero image assets.
 //   • bubblingMouseEvents:false on the interactive body AND the handle so a select-click never also
@@ -24,6 +27,7 @@
 
 import * as L from "leaflet";
 import type {
+  CatalogAirportLight,
   CatalogObject,
   LonLat,
   PlacedAirportLight,
@@ -34,7 +38,7 @@ import type {
 } from "../../core/project/types";
 import { footprintCorners, headingMarker } from "../../core/geo/footprint";
 import { destination, initialBearing, wrapLon } from "../../core/geo/geo";
-import { diffEntry } from "./syncDiff";
+import { diffEntry, isMissing } from "./syncDiff";
 import { snapAngle } from "./rotate";
 
 export interface FootprintCallbacks {
@@ -54,6 +58,11 @@ const PH_MAX: Vec3 = [PLACEHOLDER_M, PLACEHOLDER_M, 0];
 const SNAP_DEG = 5; // Shift-snap increment for the rotate handle (design §5)
 const HANDLE_MARGIN_M = 6; // gap in metres between the footprint's farthest corner and the handle
 const LIGHT_RADIUS = 6; // light marker radius, pixels (zoom-independent — a point fixture, not a footprint)
+// An airport light is a POINT — it has no footprint whose nose the grip can sit past, so its grip hangs a
+// fixed distance in METRES along the orientation (same `destination` pipeline the footprint handle uses).
+// Metres, not pixels: a pixel offset would need a re-layout on every zoom; at the zoom levels lights are
+// actually edited at (17–19) 8 m reads as a comfortable 25–60 px.
+const LIGHT_HANDLE_DIST_M = 8;
 
 const toLatLng = (p: LonLat): L.LatLngExpression => [p.lat, p.lon];
 
@@ -78,6 +87,15 @@ function lightColor(obj: PlacedAirportLight | PlacedLight): string {
   return `#${hex2(r)}${hex2(g)}${hex2(b)}`;
 }
 
+/** The orientation a rotate-grip edits, or null for a kind that has none. A parametric point light has no
+ *  orientation at all (mutate.rotateObject is a deliberate no-op for it), so it gets no grip: an
+ *  interactive control that commits nothing is a lie. */
+function orientationOf(obj: PlacedObject): number | null {
+  if (obj.kind === "xref") return obj.direction;
+  if (obj.kind === "airport_light") return obj.orientation;
+  return null;
+}
+
 interface FootprintEntry {
   shape: "footprint";
   obj: PlacedXref;
@@ -92,9 +110,11 @@ interface PointEntry {
   shape: "point";
   obj: PlacedAirportLight | PlacedLight;
   selected: boolean;
-  missing: boolean; // always false for now (lights render regardless of catalog presence)
+  missing: boolean; // airport_light whose fixture isn't in the scanned install (a point light never is)
   body: L.CircleMarker;
   halo?: L.CircleMarker; // amber selection ring, present only while selected
+  tick?: L.Polyline; // orientation tick body→grip (airport_light, while selected & unlocked)
+  handle?: L.CircleMarker; // the rotate grip at the tick's end (same kind/lock rules as `tick`)
 }
 type Entry = FootprintEntry | PointEntry;
 
@@ -117,6 +137,7 @@ export class FootprintLayer {
   private readonly group: L.LayerGroup;
   private readonly entries = new Map<string, Entry>();
   private index: Map<string, CatalogObject> = new Map();
+  private lightIndex: Map<string, CatalogAirportLight> = new Map();
   private drag: Drag | null = null;
 
   constructor(
@@ -141,11 +162,18 @@ export class FootprintLayer {
   }
 
   /** Reconcile the drawn layers with the current objects + selection. O(changed). */
-  sync(objects: PlacedObject[], index: Map<string, CatalogObject>, selection: Set<string>): void {
-    // A Rescan swaps in a fresh catalog Map (loadCatalog), so every footprint's bbox / missing state may
-    // differ even though the object references are untouched — force a rebuild of existing entries (I3).
-    const indexChanged = this.index !== index;
+  sync(
+    objects: PlacedObject[],
+    index: Map<string, CatalogObject>,
+    lightIndex: Map<string, CatalogAirportLight>,
+    selection: Set<string>,
+  ): void {
+    // A Rescan swaps in fresh catalog Maps (loadCatalog replaces BOTH in one set()), so every footprint's
+    // bbox and every entry's missing state may differ even though the object references are untouched —
+    // force a rebuild of existing entries (I3). Watching both indexes keeps lights covered too.
+    const indexChanged = this.index !== index || this.lightIndex !== lightIndex;
     this.index = index;
+    this.lightIndex = lightIndex;
     const seen = new Set<string>();
     for (const obj of objects) {
       seen.add(obj.id);
@@ -211,7 +239,7 @@ export class FootprintLayer {
 
   private addFootprint(obj: PlacedXref, selected: boolean): void {
     const cat = this.index.get(obj.name);
-    const missing = cat === undefined;
+    const missing = cat === undefined; // the isMissing() predicate for an xref; `cat` is already in hand
     const color = selected ? COLOR_SELECTED : missing ? COLOR_MISSING : COLOR;
 
     const poly = L.polygon(this.cornersAt(obj.position, obj, cat).map(toLatLng), {
@@ -246,21 +274,27 @@ export class FootprintLayer {
   }
 
   private addPoint(obj: PlacedAirportLight | PlacedLight, selected: boolean): void {
+    // A fixture the install doesn't have renders as NOTHING in the sim, so it must not be drawn as a
+    // happy light: it takes the xref's red-dashed idiom. There is no "its own colour" to show — the
+    // fixture that would define it doesn't exist here.
+    const missing = isMissing(obj, this.index, this.lightIndex);
     const body = L.circleMarker(toLatLng(obj.position), {
       radius: LIGHT_RADIUS,
-      color: LIGHT_OUTLINE, // dark ring so a white/pale fill reads on imagery
-      weight: 1.5,
-      fillColor: lightColor(obj),
-      fillOpacity: 0.95,
+      color: missing ? COLOR_MISSING : LIGHT_OUTLINE, // dark ring so a white/pale fill reads on imagery
+      weight: missing ? 2 : 1.5,
+      dashArray: missing ? "3,3" : undefined,
+      fillColor: missing ? COLOR_MISSING : lightColor(obj),
+      fillOpacity: missing ? 0.35 : 0.95,
       bubblingMouseEvents: false,
     });
     body.on("click", (e) => this.cb.onSelect(obj.id, e.originalEvent.shiftKey));
     body.on("mousedown", (e) => this.onGrab(obj.id, e));
 
     this.group.addLayer(body);
-    const entry: PointEntry = { shape: "point", obj, selected, missing: false, body };
+    const entry: PointEntry = { shape: "point", obj, selected, missing, body };
     this.entries.set(obj.id, entry);
     this.syncHalo(entry, selected);
+    this.syncPointHandle(entry, selected); // orientation grip if this light came in selected
   }
 
   private restyle(entry: Entry, selected: boolean): void {
@@ -273,6 +307,7 @@ export class FootprintLayer {
     } else {
       // a light keeps its OWN colour when selected — only the amber halo appears/disappears
       this.syncHalo(entry, selected);
+      this.syncPointHandle(entry, selected);
     }
     entry.selected = selected;
   }
@@ -288,6 +323,8 @@ export class FootprintLayer {
     } else {
       this.group.removeLayer(e.body);
       if (e.halo) this.group.removeLayer(e.halo);
+      if (e.tick) this.group.removeLayer(e.tick);
+      if (e.handle) this.group.removeLayer(e.handle);
     }
     this.entries.delete(id);
   }
@@ -322,9 +359,39 @@ export class FootprintLayer {
     }
   }
 
-  private makeHandle(obj: PlacedXref): L.CircleMarker {
-    const cat = this.index.get(obj.name);
-    const handle = L.circleMarker(toLatLng(this.handleAt(obj.position, obj, cat)), {
+  // ── the orientation grip for an airport light (a POINT: no footprint to hang the grip off, so a short
+  //    tick out along the orientation carries it — see LIGHT_HANDLE_DIST_M) ──
+  private lightHandleAt(obj: PlacedAirportLight, anchor: LonLat, orientation = obj.orientation): LonLat {
+    return destination(anchor, LIGHT_HANDLE_DIST_M, orientation);
+  }
+
+  private syncPointHandle(entry: PointEntry, selected: boolean): void {
+    // Only an airport_light has an orientation to drag (orientationOf); a parametric point light gets no
+    // grip. The Inspector has promised "drag the map handle" since v0.2 — this is what keeps that promise.
+    const want = selected && !entry.obj.locked && entry.obj.kind === "airport_light";
+    if (want && !entry.handle) {
+      const obj = entry.obj as PlacedAirportLight;
+      const tip = this.lightHandleAt(obj, obj.position);
+      entry.tick = L.polyline([toLatLng(obj.position), toLatLng(tip)], {
+        color: COLOR_HANDLE,
+        weight: 2,
+        interactive: false,
+      });
+      entry.handle = this.makeGrip(tip, obj.id);
+      this.group.addLayer(entry.tick);
+      this.group.addLayer(entry.handle);
+    } else if (!want && entry.handle) {
+      if (entry.tick) this.group.removeLayer(entry.tick);
+      this.group.removeLayer(entry.handle);
+      entry.tick = undefined;
+      entry.handle = undefined;
+    }
+  }
+
+  /** The cyan rotate grip. One factory for both shapes, so the footprint's grip and the light's grip are
+   *  the same control with the same affordance — and `onGrabHandle` stays kind-agnostic. */
+  private makeGrip(at: LonLat, id: string): L.CircleMarker {
+    const grip = L.circleMarker(toLatLng(at), {
       radius: 6,
       color: COLOR_HANDLE,
       weight: 2,
@@ -333,8 +400,13 @@ export class FootprintLayer {
       className: "pct-rotate-handle",
       bubblingMouseEvents: false, // grabbing the grip never starts a map pan or a place-click
     });
-    handle.on("mousedown", () => this.onGrabHandle(obj.id));
-    return handle;
+    grip.on("mousedown", () => this.onGrabHandle(id));
+    return grip;
+  }
+
+  private makeHandle(obj: PlacedXref): L.CircleMarker {
+    const cat = this.index.get(obj.name);
+    return this.makeGrip(this.handleAt(obj.position, obj, cat), obj.id);
   }
 
   // ── drag (layer-local preview → one commit on release) ──
@@ -354,16 +426,24 @@ export class FootprintLayer {
 
   private onGrabHandle = (id: string): void => {
     const entry = this.entries.get(id);
-    if (!entry || entry.shape !== "footprint" || entry.obj.locked) return;
+    if (!entry || entry.obj.locked) return;
+    // Kind-agnostic: whatever `orientationOf` yields is what the grip edits, and `cb.onRotate` →
+    // store.rotateObject → mutate.rotateObject already routes it to the right field per kind (xref
+    // `direction` / airport_light `orientation`). A kind with no orientation never gets a grip at all.
+    const dir = orientationOf(entry.obj);
+    if (dir === null) return;
     this.map.dragging.disable();
-    this.drag = {
-      mode: "rotate",
-      id,
-      anchor: entry.obj.position,
-      startDir: entry.obj.direction,
-      bearing: entry.obj.direction,
-      moved: false,
-    };
+    this.drag = { mode: "rotate", id, anchor: entry.obj.position, startDir: dir, bearing: dir, moved: false };
+    // The store isn't touched until release (the gesture-end contract), so without this the angle you are
+    // dragging to is invisible. A live tooltip on the grip is the cheapest honest readout.
+    entry.handle
+      ?.bindTooltip(`${Math.round(dir)}°`, {
+        permanent: true,
+        direction: "top",
+        offset: [0, -8],
+        className: "pct-rotate-tip",
+      })
+      .openTooltip();
   };
 
   /** Re-lay a shape at a previewed anchor during a move drag (kind-dispatched geometry). */
@@ -377,6 +457,11 @@ export class FootprintLayer {
     } else {
       entry.body.setLatLng(toLatLng(anchor));
       entry.halo?.setLatLng(toLatLng(anchor));
+      if (entry.tick && entry.handle && entry.obj.kind === "airport_light") {
+        const tip = this.lightHandleAt(entry.obj, anchor);
+        entry.tick.setLatLngs([toLatLng(anchor), toLatLng(tip)]);
+        entry.handle.setLatLng(toLatLng(tip));
+      }
     }
   }
 
@@ -393,17 +478,24 @@ export class FootprintLayer {
       };
       d.anchor = anchor; // remember it so a release outside the map commits this spot (I2)
       this.previewMove(entry, anchor);
-    } else if (entry.shape === "footprint") {
-      const cat = this.index.get(entry.obj.name);
+    } else {
       let bearing = initialBearing(d.anchor, { lon: e.latlng.lng, lat: e.latlng.lat });
       if (e.originalEvent.shiftKey) bearing = snapAngle(bearing, SNAP_DEG);
       d.bearing = bearing;
-      entry.poly.setLatLngs(this.cornersAt(d.anchor, entry.obj, cat, bearing).map(toLatLng));
-      entry.heading.setLatLngs([
-        toLatLng(d.anchor),
-        toLatLng(this.headingAt(d.anchor, entry.obj, cat, bearing)),
-      ]);
-      entry.handle?.setLatLng(toLatLng(this.handleAt(d.anchor, entry.obj, cat, bearing)));
+      if (entry.shape === "footprint") {
+        const cat = this.index.get(entry.obj.name);
+        entry.poly.setLatLngs(this.cornersAt(d.anchor, entry.obj, cat, bearing).map(toLatLng));
+        entry.heading.setLatLngs([
+          toLatLng(d.anchor),
+          toLatLng(this.headingAt(d.anchor, entry.obj, cat, bearing)),
+        ]);
+        entry.handle?.setLatLng(toLatLng(this.handleAt(d.anchor, entry.obj, cat, bearing)));
+      } else if (entry.obj.kind === "airport_light") {
+        const tip = this.lightHandleAt(entry.obj, d.anchor, bearing);
+        entry.tick?.setLatLngs([toLatLng(d.anchor), toLatLng(tip)]);
+        entry.handle?.setLatLng(toLatLng(tip));
+      }
+      entry.handle?.setTooltipContent(`${Math.round(bearing)}°`);
     }
   };
 
@@ -414,6 +506,9 @@ export class FootprintLayer {
     if (!d) return;
     this.drag = null;
     this.map.dragging.enable();
+    // The live-degree tooltip belongs to the gesture, not to the grip: it must go on ANY release, drag or
+    // not (a click on the grip that never moved would otherwise leave it stuck open).
+    if (d.mode === "rotate") this.entries.get(d.id)?.handle?.unbindTooltip();
     if (!d.moved) return; // a click, not a drag — selection is handled by the shape's click
     if (d.mode === "move") {
       // Wrap only at COMMIT, never in the live preview: dragging across the antimeridian stays visually
