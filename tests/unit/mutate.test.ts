@@ -10,6 +10,7 @@ import {
   removeObject,
   renameProject,
   rotateObject,
+  SCALE_MIN,
   scaleObject,
   setAirportLightType,
   setCamera,
@@ -174,6 +175,18 @@ describe("v0.2 kind-aware mutations", () => {
   it("scaleObject is a no-op for lights (no scale field)", () => {
     const p0 = baseProject([airport("a")]);
     expect(scaleObject(p0, "a", 2, LATER)).toBe(p0);
+  });
+
+  // tocWriter emits scale_factor with 4 decimals, so 0.00004 serialized to the literal "0" — a project
+  // that loads fine but exports an object scaled to nothing. Clamp the DATA, so the Inspector shows what
+  // actually gets written.
+  it("scaleObject clamps a scale too small to survive the .toc's 4 decimals", () => {
+    const p0 = baseProject([xref("a")]);
+    expect((scaleObject(p0, "a", 0.00004, LATER).objects[0] as PlacedXref).scale).toBe(SCALE_MIN);
+    expect((scaleObject(p0, "a", 0, LATER).objects[0] as PlacedXref).scale).toBe(SCALE_MIN);
+    expect((scaleObject(p0, "a", -3, LATER).objects[0] as PlacedXref).scale).toBe(SCALE_MIN);
+    // and a normal scale is untouched
+    expect((scaleObject(p0, "a", 0.5, LATER).objects[0] as PlacedXref).scale).toBe(0.5);
   });
 
   it("light setters update only the matching kind, and no-op on the wrong kind", () => {

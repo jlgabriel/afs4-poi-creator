@@ -400,7 +400,7 @@ export class FootprintLayer {
       className: "pct-rotate-handle",
       bubblingMouseEvents: false, // grabbing the grip never starts a map pan or a place-click
     });
-    grip.on("mousedown", () => this.onGrabHandle(id));
+    grip.on("mousedown", (e) => this.onGrabHandle(id, e));
     return grip;
   }
 
@@ -410,7 +410,14 @@ export class FootprintLayer {
   }
 
   // ── drag (layer-local preview → one commit on release) ──
+  // Left button ONLY. Leaflet's mousedown fires for any button, so a right-click (to reach a browser/OS
+  // context menu) or a middle-click started a real drag that no matching mouseup ever ended cleanly.
+  private static isPrimary(e: L.LeafletMouseEvent): boolean {
+    return e.originalEvent.button === 0;
+  }
+
   private onGrab = (id: string, e: L.LeafletMouseEvent): void => {
+    if (!FootprintLayer.isPrimary(e)) return;
     const entry = this.entries.get(id);
     if (!entry || entry.obj.locked) return;
     this.map.dragging.disable();
@@ -424,7 +431,8 @@ export class FootprintLayer {
     };
   };
 
-  private onGrabHandle = (id: string): void => {
+  private onGrabHandle = (id: string, e: L.LeafletMouseEvent): void => {
+    if (!FootprintLayer.isPrimary(e)) return;
     const entry = this.entries.get(id);
     if (!entry || entry.obj.locked) return;
     // Kind-agnostic: whatever `orientationOf` yields is what the grip edits, and `cb.onRotate` →

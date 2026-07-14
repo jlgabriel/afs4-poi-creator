@@ -12,6 +12,9 @@ import { getPct } from "../app/pct";
 
 const dash = (p: string | null): string => (p !== null && p.length > 0 ? p : "— not set —");
 const looksLikeXyz = (url: string): boolean => /\{z\}/.test(url) && /\{x\}/.test(url) && /\{y\}/.test(url);
+/** The packaged app's CSP allows `img-src https:` only, so an http:// tile source silently loads NOTHING
+ *  — a blank map with no error anywhere. The URL was validated for {z}/{x}/{y} but never for its scheme. */
+const isHttps = (url: string): boolean => /^https:\/\//i.test(url.trim());
 
 export function SettingsDialog({
   onClose,
@@ -198,6 +201,12 @@ export function SettingsDialog({
                   />
                   {customUrl.trim() !== "" && !looksLikeXyz(customUrl) && (
                     <span className="pct-warn">URL should contain {"{z}"}, {"{x}"} and {"{y}"} placeholders.</span>
+                  )}
+                  {customUrl.trim() !== "" && !isHttps(customUrl) && (
+                    <span className="pct-warn">
+                      URL must start with <code>https://</code> — the packaged app blocks other schemes and
+                      the map just goes blank.
+                    </span>
                   )}
                 </>
               )}

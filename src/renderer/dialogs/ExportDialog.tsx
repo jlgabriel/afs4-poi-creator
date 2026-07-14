@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { ExportOptions, InstallResult, InstalledPoi, PctError } from "../../shared/pctApi";
 import type { LonLat } from "../../core/project/types";
+import { shiftEastNorth } from "../../core/geo/geo";
 import { centroid, poiFolderName } from "../../core/geo/poiName";
 import { firstProjectError, isExportablePoiName } from "../../core/project/schemas";
 import { editorStore, useEditor } from "../state/editorStore";
@@ -58,8 +59,10 @@ function InstalledPois(): React.ReactElement | null {
                 Uninstall
               </button>
             ) : (
-              <span className="pct-field-meta" title="Not installed by PCT — left untouched">
-                built-in
+              // NOT "built-in": the sim's own POIs are packed inside the install, so everything in the
+              // user's scenery/poi/ is third-party or hand-made. It's simply not ours to delete.
+              <span className="pct-field-meta" title="PCT didn't create this one — it is left untouched">
+                not by PCT
               </span>
             )}
           </li>
@@ -71,8 +74,12 @@ function InstalledPois(): React.ReactElement | null {
 
 function messageFor(error: PctError): string {
   switch (error.code) {
-    case "needs-elevation":
-      return "Elevation service unavailable — enter a base elevation (m ASL) below and export again.";
+    case "needs-elevation": {
+      // The envelope carries the objects it couldn't resolve — say how many, so "enter a base elevation"
+      // reads as a concrete instruction about YOUR scene rather than a generic service complaint.
+      const n = error.points.length;
+      return `Couldn't get the terrain elevation for ${n} object${n === 1 ? "" : "s"} — enter a base elevation (m ASL) below and export again.`;
+    }
     case "folder-exists":
       return `A POI folder "${error.folderName}" already exists.`;
     default:
@@ -99,8 +106,14 @@ export function ExportDialog({ onClose }: { onClose: () => void }): React.ReactE
   const [result, setResult] = useState<InstallResult | null>(null);
 
   const validSlug = isExportablePoiName(slug);
+  // Mirror planExport EXACTLY: it shifts every object first, THEN centroids (an explicit reference is used
+  // as-is and never shifted). The preview skipped the shift, so with a non-zero shift in "auto" mode the
+  // folder name shown here was not the folder name written — and the folder name is the coordinate the sim
+  // finds the POI by. shiftEastNorth is a no-op at (0,0), so the common case is unchanged.
   const previewRef: LonLat =
-    refMode === "map" ? { lon: mapView.lon, lat: mapView.lat } : centroid(objects.map((o) => o.position));
+    refMode === "map"
+      ? { lon: mapView.lon, lat: mapView.lat }
+      : centroid(objects.map((o) => shiftEastNorth(o.position, shiftEast, shiftNorth)));
   const folderName = validSlug ? poiFolderName(previewRef, slug) : null;
 
   // One install attempt. On a folder-exists refusal, offer to replace and retry with overwrite — the
@@ -170,7 +183,10 @@ export function ExportDialog({ onClose }: { onClose: () => void }): React.ReactE
       <div className="pct-modal-card">
         <div className="pct-modal-head">
           <h2>Export POI</h2>
-          <button className="pct-close" onClick={onClose} aria-label="Close">
+          {/* Locked while a write is in flight. Closing mid-install did NOT cancel anything — main was
+              already writing into scenery/poi/ — it just tore down the only surface that would have told
+              the user it worked and that Aerofly needs a restart. */}
+          <button className="pct-close" onClick={onClose} disabled={busy} aria-label="Close">
             ×
           </button>
         </div>
@@ -289,7 +305,9 @@ export function ExportDialog({ onClose }: { onClose: () => void }): React.ReactE
             {objects.length === 0 && <p className="pct-empty">No objects placed — the POI would be empty.</p>}
 
             <div className="pct-modal-actions">
-              <button onClick={onClose}>Cancel</button>
+              <button onClick={onClose} disabled={busy}>
+                Cancel
+              </button>
               <span className="pct-spacer" />
               <button
                 className="pct-primary"

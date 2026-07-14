@@ -73,7 +73,9 @@ export function useKeyboardShortcuts(): void {
       const vec = arrowToVector(e.key, e.shiftKey);
       if (vec !== null && store.selection.length > 0) {
         e.preventDefault(); // else arrows scroll the panels
-        for (const id of store.selection) store.nudgePosition(id, vec.deltaM, vec.bearingDeg);
+        // ONE call for the whole selection: looping per object made each keypress push N undo entries,
+        // because the store's coalescing key alternated between them and never engaged (Fable I4).
+        store.nudgeSelection(vec.deltaM, vec.bearingDeg);
       }
     };
 

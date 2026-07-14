@@ -134,7 +134,8 @@ export interface EditorState {
 
   // ── document mutations (gesture-end / explicit — drag PREVIEW never hits the store) ──
   moveObject: (id: string, p: LonLat) => void;
-  nudgePosition: (id: string, deltaM: number, bearingDeg: number) => void;
+  /** Arrow-key nudge of the WHOLE selection, as ONE undo entry per gesture (Fable I4). */
+  nudgeSelection: (deltaM: number, bearingDeg: number) => void;
   rotateObject: (id: string, deg: number) => void;
   scaleObject: (id: string, f: number) => void;
   setHeight: (id: string, h: HeightSpec) => void;
@@ -353,18 +354,30 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
             return { resolvedElev };
           });
         },
-        // Relative move by metres along a compass bearing — the keyboard arrow-nudge (design §5).
-        // Coalesces like nudgeHeight so holding an arrow is ONE undo entry, and drops the resolved
-        // elevation exactly as moveObject does (same terrain-changed reasoning, P2-8).
-        nudgePosition: (id, deltaM, bearingDeg) => {
-          commitCoalesced(`${id}:pos`, (proj) => {
-            const o = proj.objects.find((x) => x.id === id);
-            return o ? mutate.moveObject(proj, id, destination(o.position, deltaM, bearingDeg)) : proj;
-          });
+        // Relative move by metres along a compass bearing — the keyboard arrow-nudge (design §5). Moves
+        // the WHOLE selection in ONE commit, and coalesces like nudgeHeight so holding an arrow is one
+        // undo entry, not one per frame.
+        //
+        // This used to be per-object, coalescing on a `${id}:pos` key. With 2+ selected the caller looped,
+        // so the key ALTERNATED between objects and the coalescing run never continued: every keypress
+        // pushed N undo entries, and holding an arrow flooded the 50-entry cap in about a second — taking
+        // the real history with it (Fable I4). Multi-select is reachable by shift+click on both the map
+        // and the placed list, so this was a live footgun, not a theoretical one. One key for the whole
+        // gesture is the fix; a single-object selection is just the N=1 case.
+        nudgeSelection: (deltaM, bearingDeg) => {
+          const ids = get().selection;
+          if (ids.length === 0) return;
+          commitCoalesced("selection:pos", (proj) =>
+            ids.reduce((p, id) => {
+              const o = p.objects.find((x) => x.id === id);
+              return o ? mutate.moveObject(p, id, destination(o.position, deltaM, bearingDeg)) : p;
+            }, proj),
+          );
+          // they moved → the terrain under them changed → drop their cached elevations (P2-8)
           set((s) => {
-            if (!s.resolvedElev.has(id)) return s;
+            if (!ids.some((id) => s.resolvedElev.has(id))) return s;
             const resolvedElev = new Map(s.resolvedElev);
-            resolvedElev.delete(id);
+            for (const id of ids) resolvedElev.delete(id);
             return { resolvedElev };
           });
         },

@@ -187,9 +187,17 @@ export function rotateObject(project: Project, id: string, deg: number, now = no
   );
 }
 
+/** The smallest scale that survives the trip to the `.toc`. The schema only demands a POSITIVE scale, but
+ *  tocWriter emits `scale_factor` with 4 decimals — so anything under 0.00005 rounds to the literal text
+ *  "0", i.e. a project that loads fine but exports an object scaled to nothing. Clamp the DATA, not the
+ *  emit: then the Inspector shows what actually gets written, instead of a number the export quietly lies
+ *  about. */
+export const SCALE_MIN = 0.0001;
+
 /** Uniform scale — xref only (lights have no scale); a no-op for the light kinds. */
 export function scaleObject(project: Project, id: string, scale: number, now = nowIso()): Project {
-  return updateOne(project, id, (o) => (o.kind === "xref" ? { ...o, scale } : o), now);
+  const clamped = Math.max(SCALE_MIN, scale);
+  return updateOne(project, id, (o) => (o.kind === "xref" ? { ...o, scale: clamped } : o), now);
 }
 
 export function setHeight(project: Project, id: string, height: HeightSpec, now = nowIso()): Project {

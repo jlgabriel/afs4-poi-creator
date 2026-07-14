@@ -185,15 +185,16 @@ describe("nudgeHeight — promotion + coalescing", () => {
   });
 });
 
-describe("nudgePosition — coalescing + elevation drop", () => {
+describe("nudgeSelection — coalescing + elevation drop", () => {
   it("coalesces a rapid east run into one undo entry, and undo restores the origin", () => {
     const { store, clock } = makeStore({ coalesceMs: 800 });
     store.getState().openProject("/p", baseProject([xref("a", { position: { lon: 10, lat: 48 } })]));
+    store.getState().select(["a"]);
 
     clock.t = 1000;
-    store.getState().nudgePosition("a", 5, 90); // east, undo entry #1
+    store.getState().nudgeSelection(5, 90); // east, undo entry #1
     clock.t = 1200;
-    store.getState().nudgePosition("a", 5, 90); // within window → coalesced
+    store.getState().nudgeSelection(5, 90); // within window → coalesced
 
     const st = store.getState();
     expect(st.project.objects[0].position.lon).toBeGreaterThan(10); // moved east
@@ -204,18 +205,55 @@ describe("nudgePosition — coalescing + elevation drop", () => {
     expect(store.getState().project.objects[0].position).toEqual({ lon: 10, lat: 48 });
   });
 
-  it("drops the object's cached terrain elevation (like moveObject)", () => {
-    const { store } = makeStore();
-    store.getState().openProject("/p", baseProject([xref("a")]));
-    store.getState().setResolvedElev("a", 500);
-    store.getState().nudgePosition("a", 0.5, 0);
-    expect(store.getState().resolvedElev.has("a")).toBe(false);
+  // Fable I4 — the actual bug. The old per-object nudge coalesced on a `${id}:pos` key, so with 2+
+  // selected the key alternated and the run NEVER continued: one keypress = N undo entries, and a held
+  // arrow flooded the 50-entry cap in about a second, taking the real history with it.
+  it("moves a MULTI selection as one undo entry per gesture, and one undo restores them all", () => {
+    const { store, clock } = makeStore({ coalesceMs: 800 });
+    store.getState().openProject(
+      "/p",
+      baseProject([
+        xref("a", { position: { lon: 10, lat: 48 } }),
+        xref("b", { position: { lon: 11, lat: 49 } }),
+      ]),
+    );
+    store.getState().select(["a", "b"]);
+
+    clock.t = 1000;
+    store.getState().nudgeSelection(5, 90);
+    clock.t = 1100;
+    store.getState().nudgeSelection(5, 90);
+    clock.t = 1200;
+    store.getState().nudgeSelection(5, 90);
+
+    const st = store.getState();
+    expect(st.undoStack).toHaveLength(1); // was 6 (3 keypresses × 2 objects)
+    expect(st.project.objects[0].position.lon).toBeGreaterThan(10); // BOTH moved
+    expect(st.project.objects[1].position.lon).toBeGreaterThan(11);
+
+    store.getState().undo();
+    const back = store.getState().project.objects;
+    expect(back[0].position).toEqual({ lon: 10, lat: 48 });
+    expect(back[1].position).toEqual({ lon: 11, lat: 49 });
   });
 
-  it("no-ops on a missing id (no undo entry, stays clean)", () => {
+  it("drops every moved object's cached terrain elevation (like moveObject)", () => {
+    const { store } = makeStore();
+    store.getState().openProject("/p", baseProject([xref("a"), xref("b")]));
+    store.getState().setResolvedElev("a", 500);
+    store.getState().setResolvedElev("b", 600);
+    store.getState().select(["a", "b"]);
+    store.getState().nudgeSelection(0.5, 0);
+    expect(store.getState().resolvedElev.has("a")).toBe(false);
+    expect(store.getState().resolvedElev.has("b")).toBe(false);
+  });
+
+  it("no-ops with an empty selection, and on a selection of ghosts (stays clean)", () => {
     const { store } = makeStore();
     store.getState().openProject("/p", baseProject([xref("a")]));
-    store.getState().nudgePosition("ghost", 5, 90);
+    store.getState().nudgeSelection(5, 90); // nothing selected
+    store.getState().select(["ghost"]);
+    store.getState().nudgeSelection(5, 90); // selected id isn't in the document
     expect(store.getState().undoStack).toHaveLength(0);
     expect(store.getState().dirty).toBe(false);
   });
