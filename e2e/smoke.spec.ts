@@ -53,8 +53,11 @@ test("first run: boots the wizard and advances to the install step", async () =>
   }
 });
 
-test("seeded cache: boots the editor with a live map and no CSP violations", async () => {
-  const userData = tempUserData("editor");
+const E2E_OBJECT = "tower00_small_plates_ds_00_08_08";
+
+/** userData seeded with a settings.json + catalog.json, so decideBootPhase() lands on the editor. */
+function seedEditor(tag: string): string {
+  const userData = tempUserData(tag);
   const settings: Settings = {
     schemaVersion: 1,
     installDir: userData, // any non-null path → decideBootPhase() picks "editor"
@@ -72,7 +75,7 @@ test("seeded cache: boots the editor with a live map and no CSP violations", asy
     bundles: [],
     xref: [
       {
-        name: "tower00_small_plates_ds_00_08_08",
+        name: E2E_OBJECT,
         bundle: "e2e",
         source: "install",
         bbMin: [-4, -4, 0],
@@ -90,8 +93,11 @@ test("seeded cache: boots the editor with a live map and no CSP violations", asy
   };
   writeFileSync(path.join(userData, "settings.json"), JSON.stringify(settings));
   writeFileSync(path.join(userData, "catalog.json"), JSON.stringify(catalog));
+  return userData;
+}
 
-  const app = await launch(userData);
+test("seeded cache: boots the editor with a live map and no CSP violations", async () => {
+  const app = await launch(seedEditor("editor"));
   try {
     const page = await app.firstWindow();
     const seen = watch(page);
@@ -101,6 +107,38 @@ test("seeded cache: boots the editor with a live map and no CSP violations", asy
     // Give Leaflet time to fire its tile requests, then assert the prod CSP didn't refuse them.
     await page.waitForTimeout(2500);
     expect(seen.csp, seen.csp.join("\n")).toEqual([]);
+    expect(seen.errors.map(String), seen.errors.join("\n")).toEqual([]);
+  } finally {
+    await app.close();
+  }
+});
+
+// Fable I7, closed here instead of by a manual check nobody remembers to repeat. The Inspector's Copy
+// button calls navigator.clipboard.writeText, while main denies EVERY permission request app-wide
+// (index.ts setPermissionRequestHandler → cb(false)). Electron can route clipboard-sanitized-write
+// through that handler, in which case Copy silently does nothing — a button that lies. The clipboard is
+// read back from the MAIN process (Electron's own clipboard module), so this asserts the real thing and
+// never needs a clipboard-READ permission in the renderer.
+test("the Inspector's Copy button really reaches the clipboard (deny-all permissions notwithstanding)", async () => {
+  const app = await launch(seedEditor("clipboard"));
+  try {
+    const page = await app.firstWindow();
+    const seen = watch(page);
+
+    // A sentinel first: if the assertion below passes, we know it was Copy that changed the clipboard.
+    await app.evaluate(({ clipboard }) => clipboard.writeText("PCT_E2E_SENTINEL"));
+
+    // Arm the catalog card, drop the object on the map (placeAt selects it) → the Inspector shows it.
+    await page.getByRole("button", { name: "E2E Tower" }).click();
+    await page.locator(".pct-map").click({ position: { x: 200, y: 200 } });
+    await expect(page.locator(".pct-inspector .pct-field-title")).toHaveText("E2E Tower");
+
+    // The button's accessible name is its CONTENT ("Copy"); the title is only a fallback.
+    await page.getByRole("button", { name: "Copy", exact: true }).click();
+    await expect
+      .poll(() => app.evaluate(({ clipboard }) => clipboard.readText()))
+      .toBe(E2E_OBJECT);
+
     expect(seen.errors.map(String), seen.errors.join("\n")).toEqual([]);
   } finally {
     await app.close();

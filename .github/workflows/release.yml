@@ -39,13 +39,14 @@ jobs:
           - os: windows-latest
             run: npm run build:win     # NSIS setup .exe + portable .exe (x64)
           - os: macos-latest
-            run: npm run build:mac     # .dmg + .zip (arm64 + x64) — the arm runner cross-builds the x64 slice
+            run: npm run build:mac     # .dmg (arm64 + x64) — the arm runner cross-builds the x64 slice.
+                                       # It also produces .zip files; those are not published (see Upload).
           - os: ubuntu-latest
             run: npm run build:linux   # .AppImage (x64)
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: "24"
           cache: npm
@@ -58,16 +59,20 @@ jobs:
         run: ${{ matrix.run }}
 
       # Upload only the user-facing installers — skip electron-builder's *.yml / *.blockmap auto-update
-      # sidecars and the unpacked app dirs. Artifact names must be unique per job on upload-artifact@v4.
+      # sidecars and the unpacked app dirs. Artifact names must be unique per job (since v4).
+      #
+      # The macOS .zip is built (electron-builder's mac target defaults to dmg+zip) but deliberately NOT
+      # uploaded: the .dmg is the one macOS users want, and shipping both put two near-identical assets per
+      # architecture on the release page for no benefit. We drop it HERE rather than in electron-builder.yml
+      # so the change is one line and needs no macOS machine to verify.
       - name: Upload installers
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: installers-${{ matrix.os }}
           if-no-files-found: error
           path: |
             dist/*.exe
             dist/*.dmg
-            dist/*.zip
             dist/*.AppImage
 
   release:
@@ -77,7 +82,7 @@ jobs:
     steps:
       # Pull every OS's installers back into one flat dist/ folder (merge-multiple flattens them).
       - name: Download installers
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           path: dist
           pattern: installers-*

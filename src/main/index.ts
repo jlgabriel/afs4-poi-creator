@@ -69,8 +69,15 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
-  // Deny every permission request app-wide (no camera/mic/geolocation/notifications are needed).
-  session.defaultSession.setPermissionRequestHandler((_wc, _perm, cb) => cb(false));
+  // Deny every permission request app-wide (no camera/mic/geolocation/notifications are needed) — with
+  // exactly ONE exception. Electron routes navigator.clipboard.writeText through this handler, so the
+  // blanket cb(false) made the Inspector's Copy button silently do nothing: it looked like it worked and
+  // never touched the clipboard (Fable I7 — suspected, and confirmed by the e2e, which found the
+  // clipboard still holding its sentinel after a click). Writing SANITIZED text from our own sandboxed
+  // renderer is the narrowest grant that makes the button honest; clipboard READ stays denied.
+  session.defaultSession.setPermissionRequestHandler((_wc, permission, cb) =>
+    cb(permission === "clipboard-sanitized-write"),
+  );
 
   // CSP for the packaged renderer only (see note above).
   if (!RENDERER_URL) {
