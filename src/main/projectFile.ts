@@ -8,10 +8,11 @@
 // untrusted input → parseProject validates it (throws Zod / UnsupportedSchemaVersionError, which
 // ipc.ts maps to envelopes); SAVE writes renderer-owned, already-valid state as-is.
 
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync } from "node:fs";
 import path from "node:path";
 import type { Project } from "../core/project/types";
 import { parseProject, safeParseProject } from "../core/project/schemas";
+import { writeFileAtomic } from "./fsAtomic";
 
 /** Returns a chosen absolute path, or null if the user cancelled the dialog. */
 export type PickPath = () => Promise<string | null> | string | null;
@@ -30,9 +31,10 @@ function readProjectFile(file: string): Project {
   return parseProject(JSON.parse(readFileSync(file, "utf8"))); // untrusted → validate (may throw)
 }
 
+// Atomic (tmp + rename): a crash mid-save must not shred the user's project file — the previous save is
+// the thing they'd fall back on (Fable I5). Same for the sidecar and the shadow below.
 function writeProjectFile(file: string, project: Project): void {
-  mkdirSync(path.dirname(file), { recursive: true });
-  writeFileSync(file, JSON.stringify(project, null, 2), "utf8");
+  writeFileAtomic(file, JSON.stringify(project, null, 2));
 }
 
 /** Open+validate a project the user picks. Returns null on cancel; sets the current path on success.
@@ -75,7 +77,7 @@ export async function saveProjectAs(
  *  currentPath — the sidecar is a companion copy, not "the open file". */
 export function writeProjectSidecar(destDir: string, project: Project): string {
   const name = `${project.poiName || "project"}.json`;
-  writeFileSync(path.join(destDir, name), JSON.stringify(project, null, 2), "utf8");
+  writeFileAtomic(path.join(destDir, name), JSON.stringify(project, null, 2));
   return name;
 }
 
@@ -85,9 +87,11 @@ export function writeProjectSidecar(destDir: string, project: Project): string {
 
 const shadowFile = (userDataDir: string): string => path.join(userDataDir, "shadow.json");
 
+// The MOST important atomic write in the app: a crash DURING the shadow write is exactly the scenario
+// recovery exists for, and a half-written shadow makes loadShadow return null — the safety net gone at the
+// only moment it was ever needed (Fable I5).
 export function autosaveShadow(userDataDir: string, project: Project): void {
-  mkdirSync(userDataDir, { recursive: true });
-  writeFileSync(shadowFile(userDataDir), JSON.stringify(project), "utf8");
+  writeFileAtomic(shadowFile(userDataDir), JSON.stringify(project));
 }
 
 /** The last shadowed project, or null if absent/corrupt/unreadable-version (recovery is optional). */

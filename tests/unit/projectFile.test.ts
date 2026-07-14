@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import type { Project } from "../../src/core/project/types";
@@ -149,5 +149,43 @@ describe("writeProjectSidecar (forum #89-3)", () => {
     setCurrentProjectPath(null);
     writeProjectSidecar(tmp, proj({ poiName: "x" }));
     expect(getCurrentProjectPath()).toBeNull();
+  });
+});
+
+// Fable I5. Every durable write went straight at its destination, so a crash mid-write replaced a good
+// file with a truncated one — worst of all for the SHADOW, whose entire job is to survive a crash. They
+// now write to a scratch file and rename it into place; a rename is atomic, so a reader only ever sees the
+// old file or the new one. These assert the observable half of that: the scratch never survives a write,
+// and a second write genuinely replaces the first.
+describe("durable writes are atomic", () => {
+  const scratch = (f: string): string => `${f}.pct-tmp`;
+
+  it("leaves no scratch file behind after a save", async () => {
+    const file = path.join(tmp, "p.json");
+    await saveProject(proj({ name: "A" }), pick(file));
+    expect(existsSync(file)).toBe(true);
+    expect(existsSync(scratch(file))).toBe(false);
+  });
+
+  it("leaves no scratch behind for the shadow or the sidecar", () => {
+    autosaveShadow(tmp, proj({ name: "S" }));
+    writeProjectSidecar(tmp, proj({ poiName: "side" }));
+    expect(existsSync(scratch(path.join(tmp, "shadow.json")))).toBe(false);
+    expect(existsSync(scratch(path.join(tmp, "side.json")))).toBe(false);
+  });
+
+  it("a re-save fully replaces the previous file (rename over an existing one)", async () => {
+    const file = path.join(tmp, "p.json");
+    setCurrentProjectPath(file);
+    await saveProject(proj({ name: "First" }), noPick);
+    await saveProject(proj({ name: "Second" }), noPick);
+    expect(JSON.parse(readFileSync(file, "utf8")).name).toBe("Second");
+    expect(existsSync(scratch(file))).toBe(false);
+  });
+
+  it("a re-shadow replaces the previous shadow", () => {
+    autosaveShadow(tmp, proj({ name: "Old" }));
+    autosaveShadow(tmp, proj({ name: "New" }));
+    expect(loadShadow(tmp)?.name).toBe("New");
   });
 });

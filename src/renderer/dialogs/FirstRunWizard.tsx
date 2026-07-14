@@ -11,6 +11,8 @@ import { bundleSummary } from "./bundleSummary";
 
 type Step = "welcome" | "install" | "scanning" | "result";
 
+const WARN_SHOWN = 8; // a badly damaged .tmi can emit hundreds — show a sample, count the rest
+
 export function FirstRunWizard({ onDone }: { onDone: () => void }): React.ReactElement {
   const pct = getPct();
   const [step, setStep] = useState<Step>("welcome");
@@ -19,6 +21,7 @@ export function FirstRunWizard({ onDone }: { onDone: () => void }): React.ReactE
   const [installDir, setInstallDir] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [catalog, setCatalog] = useState<Catalog | null>(null);
+  const [warnings, setWarnings] = useState<string[]>([]);
 
   useEffect(() => {
     if (!pct) return;
@@ -76,7 +79,8 @@ export function FirstRunWizard({ onDone }: { onDone: () => void }): React.ReactE
       setStep("install");
       return;
     }
-    setCatalog(res.value);
+    setCatalog(res.value.catalog);
+    setWarnings(res.value.warnings);
     setStep("result");
   };
 
@@ -157,6 +161,36 @@ export function FirstRunWizard({ onDone }: { onDone: () => void }): React.ReactE
                 </div>
               ))}
             </div>
+
+            {/* Parse problems used to be dropped in main: the catalog just came out smaller and the user
+                had no way to tell a damaged install from a PCT bug. Folded away — it's informational, and
+                a badly damaged .tmi can produce hundreds of lines. */}
+            {warnings.length > 0 && (
+              <details className="pct-scan-warnings">
+                <summary className="pct-warn">
+                  {warnings.length} catalog {warnings.length === 1 ? "entry" : "entries"} could not be read
+                  — those objects are missing
+                </summary>
+                <ul className="pct-warnings">
+                  {warnings.slice(0, WARN_SHOWN).map((w, i) => (
+                    <li key={i}>{w}</li>
+                  ))}
+                </ul>
+                {warnings.length > WARN_SHOWN && (
+                  <p className="pct-field-meta">…and {warnings.length - WARN_SHOWN} more.</p>
+                )}
+              </details>
+            )}
+
+            {/* Without a user folder the catalog still loads and objects still place — but Export has
+                nowhere to install to. Say it HERE, not at the end of the user's first POI. */}
+            {userDir === null && (
+              <p className="pct-warn">
+                No Aerofly FS 4 user folder found. You can place objects, but installing a POI needs it —
+                set it in Settings.
+              </p>
+            )}
+
             <div className="pct-wizard-actions">
               <button onClick={() => setStep("install")}>Back</button>
               <span className="pct-spacer" />

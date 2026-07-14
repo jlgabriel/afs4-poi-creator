@@ -25,6 +25,7 @@ interface Args {
   afs4Dir?: string;
   out: string;
   baseElevation: number | null;
+  baseElevationRaw?: string; // kept only to quote the bad value back in the error
 }
 
 function parseArgs(argv: string[]): Args {
@@ -34,8 +35,10 @@ function parseArgs(argv: string[]): Args {
     if (a === "--install") args.install = true;
     else if (a === "--afs4-dir") args.afs4Dir = argv[++i];
     else if (a === "--out") args.out = argv[++i];
-    else if (a === "--base-elevation") args.baseElevation = Number(argv[++i]);
-    else if (!a.startsWith("--") && !args.project) args.project = a;
+    else if (a === "--base-elevation") {
+      args.baseElevationRaw = argv[++i];
+      args.baseElevation = Number(args.baseElevationRaw);
+    } else if (!a.startsWith("--") && !args.project) args.project = a;
   }
   return args;
 }
@@ -76,6 +79,15 @@ function main(): number {
   if (!args.project) {
     console.error(
       "Usage: npm run export -- <project.json> [--install] [--afs4-dir <dir>] [--out <dir>] [--base-elevation <m>]",
+    );
+    return 2;
+  }
+  // `Number("584m")` / a missing value → NaN, which sailed straight through resolveHeightsFlat and got
+  // emitted as the literal text "NaN" in the .toc's position — a POI the sim silently won't place, and the
+  // headless path the in-sim gate probes are built with. Fail loudly instead.
+  if (args.baseElevation !== null && !Number.isFinite(args.baseElevation)) {
+    console.error(
+      `ERROR: --base-elevation expects a number in metres ASL, got ${JSON.stringify(args.baseElevationRaw ?? "")}.`,
     );
     return 2;
   }

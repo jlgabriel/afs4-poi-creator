@@ -1,5 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import type { ExportPlan } from "../../src/core/project/types";
@@ -68,6 +76,37 @@ describe("writePoi", () => {
       UnsafeFolderNameError,
     );
   });
+
+  // Fable I5. writePoi used to write straight into the destination, deleting the previous POI FIRST on an
+  // overwrite — so a failure part-way through (a full disk) destroyed the working POI and left a partial
+  // one in its place. Now it stages the whole thing beside the destination and swaps it in with one rename.
+  //
+  // The failure is injected portably: file 2's relPath nests UNDER file 1's filename, so mkdirSync of its
+  // parent hits an existing FILE and throws (EEXIST/ENOTDIR) half-way through the loop.
+  const brokenPlan = (folderName: string): ExportPlan => ({
+    folderName,
+    files: [
+      { relPath: "poi.tsl", content: "TSL\n" },
+      { relPath: "poi.tsl/nope.txt", content: "boom" }, // parent is a file → mkdir throws
+    ],
+    warnings: [],
+  });
+
+  it("leaves the PREVIOUS POI intact when an overwrite fails part-way through", () => {
+    const root = poiRoot(tmp);
+    writePoi(plan(SAFE, "GOOD\n"), root, { overwrite: false });
+    expect(() => writePoi(brokenPlan(SAFE), root, { overwrite: true })).toThrow();
+    // the old POI is still there, complete and unharmed — not deleted, not half-replaced
+    expect(readFileSync(path.join(root, SAFE, "poi.toc"), "utf8")).toBe("GOOD\n");
+    expect(existsSync(path.join(root, SAFE, "README.txt"))).toBe(true);
+  });
+
+  it("leaves NO partial POI behind when a fresh write fails part-way through", () => {
+    const root = poiRoot(tmp);
+    expect(() => writePoi(brokenPlan(SAFE), root, { overwrite: false })).toThrow();
+    expect(existsSync(path.join(root, SAFE))).toBe(false); // no half-written POI in scenery/poi/
+    expect(readdirSync(root)).toEqual([]); // and no staging scratch left lying around either
+  });
 });
 
 describe("resolvePoiPath", () => {
@@ -115,5 +154,12 @@ describe("listInstalledPois", () => {
 
   it("returns an empty list when scenery/poi does not exist", () => {
     expect(listInstalledPois(tmp)).toEqual([]);
+  });
+
+  it("ignores a staging folder left behind by an interrupted write", () => {
+    const root = poiRoot(tmp);
+    writePoi(plan(SAFE), root, { overwrite: false });
+    mkdirSync(path.join(root, `${SAFE}.pct-staging`), { recursive: true }); // crash scratch
+    expect(listInstalledPois(tmp).map((p) => p.folderName)).toEqual([SAFE]);
   });
 });

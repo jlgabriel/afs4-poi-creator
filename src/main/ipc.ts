@@ -16,6 +16,7 @@ import type {
   InstalledPoi,
   PctError,
   PctResult,
+  ScanResult,
 } from "../shared/pctApi";
 import { NeedsElevationError, resolveHeightsFlat } from "../core/export/heights";
 import { planExport } from "../core/export/planExport";
@@ -41,7 +42,7 @@ import {
   writeProjectSidecar,
 } from "./projectFile";
 import { NoXrefError, readCatalogCache, scanXref, writeCatalogCache } from "./scan";
-import { readSettings, writeSettings } from "./settings";
+import { normalizeUserDir, readSettings, writeSettings } from "./settings";
 
 const PROJECT_FILTER = [{ name: "PCT project", extensions: ["json"] }];
 
@@ -161,11 +162,14 @@ export function registerIpc(): void {
   );
 
   ipcMain.handle("pct:scan", (_e, installDir: string, userXrefDir: string | null) =>
-    guarded((): Catalog => {
-      const { catalog } = scanXref(installDir, userXrefDir);
+    guarded((): ScanResult => {
+      const { catalog, warnings } = scanXref(installDir, userXrefDir);
       writeCatalogCache(userData(), catalog);
       writeSettings(userData(), { lastScanAt: catalog.scannedAt }, documents());
-      return catalog;
+      // The scan's warnings (a corrupt .tmi, an entry with no bounding box) used to be dropped on the
+      // floor: the catalog simply came out smaller and nothing said why, so a missing object read as a
+      // PCT bug. Hand them back — the wizard's result step shows them.
+      return { catalog, warnings };
     }),
   );
 
@@ -177,12 +181,18 @@ export function registerIpc(): void {
   );
   ipcMain.handle(
     "pct:chooseDirectory",
-    (_e, purpose: "install-dir" | "user-dir"): Promise<string | null> =>
-      pickDirectory(
+    async (_e, purpose: "install-dir" | "user-dir"): Promise<string | null> => {
+      const dir = await pickDirectory(
         purpose === "install-dir"
           ? "Select the Aerofly FS 4 install folder"
-          : "Select the Aerofly FS 4 user folder",
-      ),
+          : "Select the Aerofly FS 4 user folder — the one that CONTAINS scenery/",
+      );
+      // Correct the path HERE, where main hands it back: browse to …\scenery\poi (the old "POI install
+      // target" label invited exactly that) and Settings now shows the corrected …\Aerofly FS 4 straight
+      // away, instead of quietly writing into …\scenery\poi\scenery\poi\ at the next export. Main owns
+      // paths (P0-2), so main owns the correction — the renderer just displays what it is given.
+      return dir !== null && purpose === "user-dir" ? normalizeUserDir(dir) : dir;
+    },
   );
 
   // ── Project files (M1e-2b) — main owns the path + dialogs ──

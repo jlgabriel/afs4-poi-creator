@@ -9,12 +9,26 @@
 // it must sit where disk is touched — and every path is resolved strictly inside its root, so PCT can
 // only ever create or delete folders it could have produced (design §3.4 safety note).
 
-import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import path from "node:path";
 import type { ExportPlan } from "../core/project/types";
 import type { InstalledPoi } from "../shared/pctApi";
 import { POI_README_MARKER } from "../core/export/planExport";
 import { isSafePoiFolderName } from "../core/geo/poiName";
+
+/** Scratch folder built beside the destination and swapped in with a single rename (see writePoi).
+ *  Deliberately NOT a valid POI folder name — isSafePoiFolderName rejects it — so one left behind by a
+ *  crash is never listed as installed nor offered for uninstall. */
+const STAGING_SUFFIX = ".pct-staging";
 
 /** A folder name that isn't a safe coord-prefixed slug reached the write boundary — refuse it. */
 export class UnsafeFolderNameError extends Error {
@@ -63,12 +77,24 @@ export function writePoi(plan: ExportPlan, root: string, opts: { overwrite: bool
   if (overwrote && !opts.overwrite) throw new FolderExistsError(plan.folderName);
 
   mkdirSync(root, { recursive: true });
-  if (overwrote) rmSync(dest, { recursive: true, force: true });
-  mkdirSync(dest, { recursive: true });
-  for (const f of plan.files) {
-    const p = path.join(dest, f.relPath);
-    mkdirSync(path.dirname(p), { recursive: true });
-    writeFileSync(p, f.content, "utf8"); // keep \n endings — AFS4 text files use LF
+  // Build the POI in a sibling staging folder and swap it in with ONE rename. Writing straight into
+  // `dest` meant a failure part-way through the loop (a full disk) left a PARTIAL POI in scenery/poi/ —
+  // and on overwrite the old, WORKING POI had already been deleted, so the user lost both (Fable I5).
+  // Now the destination changes only once the replacement is complete on disk.
+  const staging = dest + STAGING_SUFFIX;
+  rmSync(staging, { recursive: true, force: true }); // scratch from an interrupted earlier write
+  try {
+    mkdirSync(staging, { recursive: true }); // explicit: a plan with no files must still stage a folder
+    for (const f of plan.files) {
+      const p = path.join(staging, f.relPath);
+      mkdirSync(path.dirname(p), { recursive: true });
+      writeFileSync(p, f.content, "utf8"); // keep \n endings — AFS4 text files use LF
+    }
+    if (overwrote) rmSync(dest, { recursive: true, force: true });
+    renameSync(staging, dest);
+  } catch (e) {
+    rmSync(staging, { recursive: true, force: true }); // leave no half-built POI behind
+    throw e;
   }
   return { folderName: plan.folderName, path: dest, overwrote };
 }
@@ -82,12 +108,21 @@ export function installPoiFolder(
   opts: { overwrite: boolean },
 ): WriteResult {
   const folderName = path.basename(srcFolder);
-  const dest = resolvePoiPath(poiRoot(afs4UserDir), folderName);
+  const root = poiRoot(afs4UserDir);
+  const dest = resolvePoiPath(root, folderName);
   const overwrote = existsSync(dest);
   if (overwrote && !opts.overwrite) throw new FolderExistsError(folderName);
-  mkdirSync(poiRoot(afs4UserDir), { recursive: true });
-  if (overwrote) rmSync(dest, { recursive: true, force: true });
-  cpSync(srcFolder, dest, { recursive: true });
+  mkdirSync(root, { recursive: true });
+  const staging = dest + STAGING_SUFFIX; // stage + swap, same reason as writePoi
+  rmSync(staging, { recursive: true, force: true });
+  try {
+    cpSync(srcFolder, staging, { recursive: true });
+    if (overwrote) rmSync(dest, { recursive: true, force: true });
+    renameSync(staging, dest);
+  } catch (e) {
+    rmSync(staging, { recursive: true, force: true });
+    throw e;
+  }
   return { folderName, path: dest, overwrote };
 }
 
@@ -112,6 +147,7 @@ export function listInstalledPois(afs4UserDir: string): InstalledPoi[] {
   const out: InstalledPoi[] = [];
   for (const e of entries) {
     if (!e.isDirectory()) continue;
+    if (e.name.endsWith(STAGING_SUFFIX)) continue; // scratch from an interrupted write — not a POI
     const byPct = isSafePoiFolderName(e.name) && hasPctMarker(path.join(root, e.name));
     out.push({ folderName: e.name, byPct });
   }

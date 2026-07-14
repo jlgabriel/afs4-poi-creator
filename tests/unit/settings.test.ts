@@ -1,12 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { readSettings, writeSettings } from "../../src/main/settings";
 
 let tmp: string;
+let realDir: string; // writeSettings now refuses a directory that isn't on disk (Fable I6)
 beforeEach(() => {
   tmp = mkdtempSync(path.join(os.tmpdir(), "pct-set-"));
+  realDir = path.join(tmp, "install");
+  mkdirSync(realDir, { recursive: true });
 });
 afterEach(() => {
   rmSync(tmp, { recursive: true, force: true });
@@ -14,9 +17,9 @@ afterEach(() => {
 
 describe("settings read/write", () => {
   it("round-trips a written value", () => {
-    writeSettings(tmp, { installDir: "/x", elevation: { provider: "none" } });
+    writeSettings(tmp, { installDir: realDir, elevation: { provider: "none" } });
     const s = readSettings(tmp);
-    expect(s.installDir).toBe("/x");
+    expect(s.installDir).toBe(realDir);
     expect(s.elevation.provider).toBe("none");
   });
 

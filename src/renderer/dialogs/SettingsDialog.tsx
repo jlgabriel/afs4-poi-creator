@@ -29,6 +29,7 @@ export function SettingsDialog({
   const [customAttr, setCustomAttr] = useState("");
   const [elevation, setElevation] = useState<"open-meteo" | "none">("open-meteo");
   const [busy, setBusy] = useState(false);
+  const [pathNote, setPathNote] = useState<string | null>(null);
 
   // Load current settings once (or store defaults when there's no bridge — the dialog stays previewable).
   useEffect(() => {
@@ -71,6 +72,7 @@ export function SettingsDialog({
   const save = async (): Promise<void> => {
     if (!pct) return;
     setBusy(true);
+    setPathNote(null);
     const tiles: TilesConfig =
       provider === "custom"
         ? {
@@ -79,7 +81,7 @@ export function SettingsDialog({
             customAttribution: customAttr.trim() || undefined,
           }
         : { provider }; // "esri" | "osm"
-    await pct.setSettings({
+    const saved = await pct.setSettings({
       installDir,
       afs4UserDir: userDir,
       tiles,
@@ -87,6 +89,17 @@ export function SettingsDialog({
     });
     editorStore.getState().setTiles(tiles); // swap the map tile layer live (MapView subscribes)
     setBusy(false);
+
+    // Main sanity-checks the folders it is about to write into: a …\scenery\poi mis-nesting is corrected,
+    // a folder that isn't on disk is refused. If what came back isn't what we sent, SHOW it rather than
+    // closing on a value the user never saw — a settings dialog that silently saves something else is
+    // just a slower version of the bug.
+    if (saved.afs4UserDir !== userDir || saved.installDir !== installDir) {
+      setUserDir(saved.afs4UserDir);
+      setInstallDir(saved.installDir);
+      setPathNote("PCT adjusted a folder path — check it above, then Save again.");
+      return;
+    }
     onClose();
   };
 
@@ -121,13 +134,21 @@ export function SettingsDialog({
             </div>
 
             <div className="pct-field pct-field-col">
-              <span className="pct-field-label">Aerofly FS 4 user folder (POI install target)</span>
+              {/* NOT "(POI install target)". That label made this read as "the folder POIs go into", so
+                  the obvious thing to browse to was …\scenery\poi — and PCT then installed into
+                  …\scenery\poi\scenery\poi\. Name the folder, then say what PCT does under it. */}
+              <span className="pct-field-label">Aerofly FS 4 user folder</span>
               <code className="pct-path">{dash(userDir)}</code>
               <div className="pct-settings-actions">
                 <button type="button" disabled={!pct} onClick={() => void changeDir("user-dir")}>
                   Change…
                 </button>
               </div>
+              <span className="pct-field-meta">
+                The folder that contains <code>scenery\</code> — usually Documents\Aerofly FS 4. PCT
+                installs POIs into <code>&lt;this folder&gt;\scenery\poi\</code>.
+              </span>
+              {pathNote !== null && <span className="pct-warn">{pathNote}</span>}
             </div>
 
             <div className="pct-field pct-field-col">

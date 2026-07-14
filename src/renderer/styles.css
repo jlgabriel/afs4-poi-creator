@@ -1020,6 +1020,20 @@ body {
   margin: 0;
   padding-left: 18px;
 }
+/* Scan warnings in the wizard's result step: a damaged .tmi can emit a lot of lines, so they live behind
+   a fold — visible enough that a shrunken catalog is never a mystery, quiet enough not to alarm. */
+.pct-scan-warnings {
+  margin: 8px 0;
+  font-size: 12px;
+}
+.pct-scan-warnings > summary {
+  cursor: pointer;
+}
+.pct-scan-warnings .pct-warnings {
+  margin-top: 6px;
+  color: #64748b;
+  word-break: break-word;
+}
 
 /* Installed-POI manager (export dialog, M2g). */
 .pct-installed {

@@ -27,6 +27,14 @@ export type PctError =
 
 export type PctResult<T> = { ok: true; value: T } | { ok: false; error: PctError };
 
+/** What a scan produced. `warnings` are NON-fatal parse problems (a corrupt .tmi, an entry missing its
+ *  bounding box): the catalog is still usable, just smaller. They used to be discarded in main, which
+ *  meant an object silently absent from the catalog looked like a PCT bug rather than a damaged install. */
+export interface ScanResult {
+  catalog: Catalog;
+  warnings: string[];
+}
+
 export interface InstallResult {
   folderName: string;
   path: string; // where the POI folder landed (main-produced; safe to reveal)
@@ -54,7 +62,7 @@ export interface ExportOptions {
  *  project method means the user cancelled a dialog. */
 export interface PctApi {
   detectPaths(): Promise<DetectResult>;
-  scan(installDir: string, userXrefDir: string | null): Promise<PctResult<Catalog>>;
+  scan(installDir: string, userXrefDir: string | null): Promise<PctResult<ScanResult>>;
   getCachedCatalog(): Promise<Catalog | null>;
   getSettings(): Promise<Settings>;
   setSettings(patch: Partial<Settings>): Promise<Settings>;
