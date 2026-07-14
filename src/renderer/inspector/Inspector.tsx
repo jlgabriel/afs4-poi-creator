@@ -336,6 +336,62 @@ const COLOR_CORNERS: Array<[string, Vec3]> = [
 ];
 const sameColor = (a: Vec3, b: Vec3): boolean => a[0] === b[0] && a[1] === b[1] && a[2] === b[2];
 
+/** Flash pattern [A B C D] editor (types.ts: A cycle · B sequence · C flash-length · D unused). The
+ *  checkbox toggles steady↔flashing; when on, A/B/C are editable. Staggering B (sequence) across a row
+ *  of point lights is how you build a "running light" sweep (forum #94) — the reason a raw [A B C D]
+ *  editor beats a single on/off toggle. D stays as-is (unused, 0). */
+function FlashingField({
+  id,
+  value,
+}: {
+  id: string;
+  value: [number, number, number, number];
+}): React.ReactElement {
+  const store = editorStore.getState;
+  const on = value.some((n) => n > 0);
+  const setPart = (i: 0 | 1 | 2, n: number): void => {
+    const next: [number, number, number, number] = [value[0], value[1], value[2], value[3]];
+    next[i] = Math.max(0, n);
+    store().setFlashing(id, next);
+  };
+  const parts: Array<[0 | 1 | 2, string, string]> = [
+    [0, "Cycle", "A — cycle time (bigger = slower blink)"],
+    [1, "Sequence", "B — sequence / phase. Stagger 1, 2, 3… across lights for a running-light sweep."],
+    [2, "Length", "C — flash length"],
+  ];
+  return (
+    <div className="pct-field pct-field-col">
+      <label className="pct-lock">
+        <input
+          type="checkbox"
+          checked={on}
+          onChange={(e) => store().setFlashing(id, e.target.checked ? [1, 0, 3, 0] : [0, 0, 0, 0])}
+        />
+        <span title="Blink pattern [A B C D]. Steady = all zero. Toggle on to edit cycle, sequence and flash length.">
+          Flashing
+        </span>
+      </label>
+      {on && (
+        <div className="pct-field pct-field-row">
+          {parts.map(([i, label, tip]) => (
+            <label key={label} className="pct-field-col">
+              <span className="pct-field-label" title={tip}>
+                {label}
+              </span>
+              <NumberInput
+                value={value[i]}
+                format={(n) => String(Math.round(n))}
+                onCommit={(v) => setPart(i, v)}
+                ariaLabel={`Flash ${label}`}
+              />
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function LightFields({
   obj,
   resolvedAsl,
@@ -344,10 +400,11 @@ function LightFields({
   resolvedAsl: number | undefined;
 }): React.ReactElement {
   const store = editorStore.getState;
-  const flashing = obj.flashing[0] > 0;
   return (
     <div className="pct-inspector-body">
       <div className="pct-field-title">Point light</div>
+
+      <PositionRow obj={obj} />
 
       <div className="pct-field pct-field-col">
         <span className="pct-field-label">Colour</span>
@@ -384,14 +441,7 @@ function LightFields({
         />
       </label>
 
-      <label className="pct-lock">
-        <input
-          type="checkbox"
-          checked={flashing}
-          onChange={(e) => store().setFlashing(obj.id, e.target.checked ? [1, 0, 3, 0] : [0, 0, 0, 0])}
-        />
-        <span>Flashing (slow, ~6 s cycle)</span>
-      </label>
+      <FlashingField id={obj.id} value={obj.flashing} />
 
       <GroupIndexField id={obj.id} value={obj.groupIndex} />
 

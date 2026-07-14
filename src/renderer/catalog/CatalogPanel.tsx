@@ -119,21 +119,26 @@ export function CatalogPanel(): React.ReactElement {
         value={filter.query}
         onChange={(e) => editorStore.getState().setFilter({ query: e.target.value })}
       />
-      {tree && <CategoryTree tree={tree} active={filter.category} onSelect={onSelectCategory} />}
-      <div className="pct-catalog-list">
-        {objects.length === 0 ? (
-          <p className="pct-empty">{catalog ? "No matching objects" : "No catalog loaded"}</p>
-        ) : (
-          <List
-            className="pct-vlist"
-            rowComponent={Row}
-            rowCount={objects.length}
-            rowHeight={ROW_H}
-            rowProps={rowProps}
-            defaultHeight={400}
-          />
-        )}
-      </div>
+      {/* The XREF objects live in their own collapsible section so folding it lifts the Lights section
+          into view instead of leaving it pinned to the bottom (forum #86-1). Mirrors LightsSection. */}
+      <details className="pct-objects" open>
+        <summary className="pct-section-summary">Objects ({browsable.length})</summary>
+        {tree && <CategoryTree tree={tree} active={filter.category} onSelect={onSelectCategory} />}
+        <div className="pct-catalog-list">
+          {objects.length === 0 ? (
+            <p className="pct-empty">{catalog ? "No matching objects" : "No catalog loaded"}</p>
+          ) : (
+            <List
+              className="pct-vlist"
+              rowComponent={Row}
+              rowCount={objects.length}
+              rowHeight={ROW_H}
+              rowProps={rowProps}
+              defaultHeight={400}
+            />
+          )}
+        </div>
+      </details>
       <LightsSection />
     </section>
   );

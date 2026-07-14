@@ -1062,11 +1062,41 @@ body {
   border-color: #f59e0b;
   box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.45);
 }
+/* Collapsible catalog sections (forum #86-1): Objects (the virtualized gallery) + Lights fold alike and
+   SHARE the panel's vertical space. NOTE: Chromium wraps a <details>'s content in a block
+   ::details-content pseudo-element, so display:flex on the <details> alone never reaches the inner
+   scroller — we must flex ::details-content too, or the gallery collapses to its content height and
+   won't scroll. When both are open Objects keeps ~2/3 (it's the 850-object primary list); collapsing one
+   lets the other fill the column. */
+.pct-objects,
+.pct-lights {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.pct-objects[open] {
+  flex: 2 1 0;
+}
+.pct-lights[open] {
+  flex: 1 1 0;
+}
+.pct-objects:not([open]),
+.pct-lights:not([open]) {
+  flex: 0 0 auto;
+}
+.pct-objects::details-content,
+.pct-lights::details-content {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1 1 0;
+}
 .pct-lights {
   border-top: 1px solid #e2e8f0;
   padding-top: 4px;
 }
-.pct-lights-summary {
+.pct-lights-summary,
+.pct-section-summary {
   font-size: 13px;
   font-weight: 600;
   color: #334155;
@@ -1078,7 +1108,8 @@ body {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  max-height: 220px;
+  flex: 1 1 0;
+  min-height: 0;
   overflow-y: auto;
   padding: 4px 2px 2px;
 }

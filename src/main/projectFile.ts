@@ -69,6 +69,16 @@ export async function saveProjectAs(
   return { path: file };
 }
 
+/** Drop a copy of the project JSON INTO an exported POI folder (forum #89-3), beside its
+ *  poi.toc/poi.tsl/README, so a shared POI can be re-opened and revised in PCT. Same serialization as
+ *  Save; named by the POI slug (already filesystem-safe), falling back to "project". Does NOT touch
+ *  currentPath — the sidecar is a companion copy, not "the open file". */
+export function writeProjectSidecar(destDir: string, project: Project): string {
+  const name = `${project.poiName || "project"}.json`;
+  writeFileSync(path.join(destDir, name), JSON.stringify(project, null, 2), "utf8");
+  return name;
+}
+
 // ── Crash-recovery shadow (design §3.6 autosave) ──────────────────────────────
 // A debounced copy the renderer pushes to userData; on next launch the shell offers to restore it.
 // No dialog, no currentPath change — it is a side copy, not "the file".

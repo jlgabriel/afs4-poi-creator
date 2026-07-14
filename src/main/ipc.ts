@@ -38,6 +38,7 @@ import {
   openProject,
   saveProject,
   saveProjectAs,
+  writeProjectSidecar,
 } from "./projectFile";
 import { NoXrefError, readCatalogCache, scanXref, writeCatalogCache } from "./scan";
 import { readSettings, writeSettings } from "./settings";
@@ -100,8 +101,22 @@ async function showSaveFile(opts: SaveDialogOptions): Promise<string | null> {
   win?.webContents.focus();
   return r.canceled || !r.filePath ? null : r.filePath;
 }
+/** Default the Open dialog to the AFS4 `scenery/poi/` folder (forum #89-4) — where most users keep
+ *  their POIs. Best-effort: returns undefined (→ OS default / last-used dir) when the user folder isn't
+ *  set/detected or scenery/poi doesn't exist yet. */
+function poiOpenDir(): string | undefined {
+  const dir = currentSettings().afs4UserDir ?? detectUserDir(documents());
+  if (!dir) return undefined;
+  const root = poiRoot(dir);
+  return existsSync(root) ? root : undefined;
+}
 const pickOpenProject = (): Promise<string | null> =>
-  showOpenFile({ title: "Open PCT project", properties: ["openFile"], filters: PROJECT_FILTER });
+  showOpenFile({
+    title: "Open PCT project",
+    properties: ["openFile"],
+    filters: PROJECT_FILTER,
+    defaultPath: poiOpenDir(),
+  });
 const pickSaveProject = (project: Project): Promise<string | null> =>
   showSaveFile({
     title: "Save PCT project",
@@ -128,11 +143,13 @@ async function runExport(project: Project, opts: ExportOptions): Promise<Install
 
   if (opts.target === "install") {
     const w = writePoi(plan, poiRoot(afs4UserDirOrThrow()), { overwrite: opts.overwrite });
+    writeProjectSidecar(w.path, project); // #89-3: re-openable copy beside the POI
     return { folderName: w.folderName, path: w.path, installed: true, warnings: plan.warnings };
   }
   const chosen = await pickExportFolder();
   if (!chosen) return null;
   const w = writePoi(plan, chosen, { overwrite: opts.overwrite });
+  writeProjectSidecar(w.path, project); // #89-3: re-openable copy beside the POI
   return { folderName: w.folderName, path: w.path, installed: false, warnings: plan.warnings };
 }
 

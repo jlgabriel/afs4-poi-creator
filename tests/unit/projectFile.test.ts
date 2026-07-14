@@ -13,6 +13,7 @@ import {
   saveProject,
   saveProjectAs,
   setCurrentProjectPath,
+  writeProjectSidecar,
   type PickPath,
 } from "../../src/main/projectFile";
 
@@ -128,5 +129,25 @@ describe("autosaveShadow / loadShadow", () => {
   });
   it("clearShadow with no shadow present is a no-op (never throws)", () => {
     expect(() => clearShadow(tmp)).not.toThrow();
+  });
+});
+
+describe("writeProjectSidecar (forum #89-3)", () => {
+  it("writes <poiName>.json into the folder and round-trips through openProject", async () => {
+    const name = writeProjectSidecar(tmp, proj({ name: "Shared", poiName: "obbi_rw30r" }));
+    expect(name).toBe("obbi_rw30r.json");
+    const res = await openProject(pick(path.join(tmp, name)));
+    expect(res?.project.poiName).toBe("obbi_rw30r");
+    expect(res?.project.name).toBe("Shared");
+  });
+
+  it("falls back to project.json when poiName is empty", () => {
+    expect(writeProjectSidecar(tmp, proj({ poiName: "" }))).toBe("project.json");
+  });
+
+  it("is a companion copy — never touches the current project path", () => {
+    setCurrentProjectPath(null);
+    writeProjectSidecar(tmp, proj({ poiName: "x" }));
+    expect(getCurrentProjectPath()).toBeNull();
   });
 });
