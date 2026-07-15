@@ -4,6 +4,7 @@
 
 import { parseTmi } from "./tmiParser";
 import { categorize, displayName } from "./categorize";
+import { lookupXref, type XrefTable } from "./xrefTable";
 import type { Catalog, CatalogAirportLight, CatalogObject, BundleInfo } from "../project/types";
 
 export interface TmiSource {
@@ -23,10 +24,16 @@ export function buildCatalog(
   sources: TmiSource[],
   meta: { installDir: string; userXrefDir: string | null; scannedAt: string },
   airportLights: CatalogAirportLight[] = [],
+  // Optional official-table overlay (build-but-disabled until forum #114 — see xrefTable.ts /
+  // docs/XREF_TABLE_CSV_DECISION.md). null = the shipping default: pure heuristic, output byte-identical
+  // to before. The overlay is STRICTLY ADDITIVE and consulted only per scanned install-source entry —
+  // it never iterates the table, so it can't add objects the scan didn't find.
+  table: XrefTable | null = null,
 ): BuildResult {
   const warnings: string[] = [];
   const bundles: BundleInfo[] = [];
   const xref: CatalogObject[] = [];
+  let matched = 0; // scanned names that hit an official row (for the catalog's overlay stamp)
 
   for (const src of sources) {
     const { bundle, entries, warnings: w } = parseTmi(src.text);
@@ -35,7 +42,10 @@ export function buildCatalog(
 
     for (const e of entries) {
       const { category, act } = categorize(e.name, bundle);
-      xref.push({
+      // Overlay only install-source objects: a user `.tmb` sharing a built-in's name must not inherit
+      // that built-in's official metadata (the names collide but the geometry is the user's own).
+      const official = src.source === "install" ? lookupXref(table, e.name) : null;
+      const obj: CatalogObject = {
         name: e.name,
         bundle,
         source: src.source,
@@ -47,10 +57,19 @@ export function buildCatalog(
           y: round2(e.bbMax[1] - e.bbMin[1]),
           z: round2(e.bbMax[2] - e.bbMin[2]),
         },
-        category,
-        displayName: displayName(e.name),
+        category, // NOT replaced this phase: the curated 29-category tree stays the source of the browse
+        //           tree/icons; the official taxonomy rides along as metadata (obj.taxonomy) so wiring
+        //           it into categories is a later UI call, not baked in here.
+        displayName: official ? official.displayName : displayName(e.name),
         act,
-      });
+      };
+      if (official) {
+        matched++;
+        obj.official = true;
+        obj.taxonomy = official.taxonomy;
+        if (official.footprint) obj.footprint = official.footprint;
+      }
+      xref.push(obj);
     }
   }
 
@@ -65,5 +84,6 @@ export function buildCatalog(
     airportLights,
     animated: [],
   };
+  if (table) catalog.xrefTable = { rows: table.rows, matched };
   return { catalog, warnings };
 }
