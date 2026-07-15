@@ -29,6 +29,7 @@ export interface UserTmbGeometry {
 
 export interface UserTmbResult {
   geometries: UserTmbGeometry[]; // registerable geometries; [] ⇒ caller degrades to the opaque tier
+  textures: string[]; // texture names from material_list/texture_list (append ".ttx" for the file to copy)
   warnings: string[];
 }
 
@@ -77,7 +78,7 @@ export function parseUserTmb(text: string): UserTmbResult {
     root = parseTm(clean);
   } catch (err) {
     warnings.push(`.tmb parse failed: ${(err as Error).message}`);
-    return { geometries: [], warnings };
+    return { geometries: [], textures: [], warnings };
   }
 
   // Exact type match: reference/virtual geometry lists are `list_tmxglgeometry_reference`/`_virtual`,
@@ -85,7 +86,7 @@ export function parseUserTmb(text: string): UserTmbResult {
   const geomNodes = findAll(root, "tmxglgeometry");
   if (geomNodes.length === 0) {
     warnings.push("no tmxglgeometry — not a renderable .tmb");
-    return { geometries: [], warnings };
+    return { geometries: [], textures: [], warnings };
   }
 
   const geometries: UserTmbGeometry[] = [];
@@ -119,5 +120,16 @@ export function parseUserTmb(text: string): UserTmbResult {
     geometries.push({ name, ...bboxOf(points) });
   }
 
-  return { geometries, warnings };
+  // Texture references (material_list → texture_list → tm_tmtexture_index_pair.name), e.g. "pylon" →
+  // pylon.ttx. Used by the registrar to copy the object's textures and warn about missing ones. Unique,
+  // non-empty; empty when the object is untextured.
+  const textures = [
+    ...new Set(
+      findAll(root, "tm_tmtexture_index_pair")
+        .map((p) => child(p, "name")?.value ?? "")
+        .filter((n) => n !== ""),
+    ),
+  ];
+
+  return { geometries, textures, warnings };
 }

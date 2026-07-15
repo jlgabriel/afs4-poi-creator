@@ -86,6 +86,33 @@ describe("parseUserTmb — plain-text .tmb → geometries", () => {
     expect(entries[0].bbMin).toEqual([-2, -2, 0]);
     expect(entries[0].bbMax).toEqual([2, 2, 10]);
   });
+
+  it("extracts referenced texture names from material_list/texture_list (→ <name>.ttx to copy)", () => {
+    const withTex = `<[file][][]
+    <[tmxglscene][][]
+        <[list_tmxglmaterial][material_list][]
+            <[tmxglmaterial][element][0]
+                <[list_tm_tmtexture_index_pair][texture_list][]
+                    <[tm_tmtexture_index_pair][element][0]
+                        <[string8u][channel][diffuse]>
+                        <[string8][name][pct_tex]>
+                    >
+                >
+            >
+        >
+        <[pointer_list_tmxglgeometry][geometry_list][]
+${meshGeom("pct_obj", "(0 0 0) (1 1 1)")}
+        >
+    >
+>`;
+    const { geometries, textures } = parseUserTmb(withTex);
+    expect(geometries.map((g) => g.name)).toEqual(["pct_obj"]);
+    expect(textures).toEqual(["pct_tex"]);
+  });
+
+  it("reports an empty texture list for an untextured .tmb", () => {
+    expect(parseUserTmb(tmb(meshGeom("plain", "(0 0 0) (1 1 1)"))).textures).toEqual([]);
+  });
 });
 
 describe("isTextTmb — first-byte discriminator", () => {
