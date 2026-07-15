@@ -3,16 +3,20 @@
 // checks (911 objects, ACT cross-check, geo parity, ≥95% categorized).
 //
 //   npm run scan -- --install "<AFS4 install dir>" [--user "<user dir>"] [--out catalog.json]
+//                    [--xref-table "<xref_table.csv>"]   (optional official-CSV overlay — see
+//                    docs/XREF_TABLE_CSV_DECISION.md; lets you verify the overlay without the app)
 
 import { readFileSync, writeFileSync, readdirSync, statSync, existsSync, mkdirSync } from "node:fs";
 import path from "node:path";
 import { buildCatalog, type TmiSource } from "../core/catalog/buildCatalog";
+import { loadXrefTable } from "../main/xrefTableSource";
 import { encodeLonLat } from "../core/geo/poiName";
 
 interface Args {
   install?: string;
   user?: string;
   out: string;
+  xrefTable?: string;
 }
 
 function parseArgs(argv: string[]): Args {
@@ -22,6 +26,7 @@ function parseArgs(argv: string[]): Args {
     if (a === "--install") args.install = argv[++i];
     else if (a === "--user") args.user = argv[++i];
     else if (a === "--out") args.out = argv[++i];
+    else if (a === "--xref-table") args.xrefTable = argv[++i];
   }
   return args;
 }
@@ -81,11 +86,21 @@ function main(): number {
     }
   }
 
-  const { catalog, warnings } = buildCatalog(sources, {
-    installDir: args.install,
-    userXrefDir: args.user ?? null,
-    scannedAt: new Date().toISOString(),
-  });
+  // Optional official-CSV overlay. Only loaded when --xref-table is given (the CLI never auto-discovers
+  // it) so the M0 acceptance run below stays on the pure-heuristic path by default.
+  const load = args.xrefTable ? loadXrefTable([args.xrefTable]) : { table: null, path: null, warnings: [] };
+  for (const w of load.warnings) console.warn(`  WARN ${w}`);
+
+  const { catalog, warnings } = buildCatalog(
+    sources,
+    {
+      installDir: args.install,
+      userXrefDir: args.user ?? null,
+      scannedAt: new Date().toISOString(),
+    },
+    [],
+    load.table,
+  );
 
   mkdirSync(path.dirname(path.resolve(args.out)), { recursive: true });
   writeFileSync(args.out, JSON.stringify(catalog, null, 2));
@@ -97,6 +112,12 @@ function main(): number {
     console.log(`  ${b.bundle.padEnd(18)} ${b.count}`);
   }
   console.log(`  ${"TOTAL".padEnd(18)} ${catalog.xref.length}\n`);
+
+  if (catalog.xrefTable) {
+    const { matched, rows } = catalog.xrefTable;
+    const pct = catalog.xref.length ? ((matched / catalog.xref.length) * 100).toFixed(1) : "0.0";
+    console.log(`Official overlay: ${matched}/${catalog.xref.length} scanned objects matched (${pct}%), ${rows} rows in table.\n`);
+  }
 
   const byName = new Map(catalog.xref.map((o) => [o.name, o]));
   const fallbacks = catalog.xref.filter((o) => o.category.startsWith("other/"));

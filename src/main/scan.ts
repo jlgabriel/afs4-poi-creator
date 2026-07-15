@@ -6,6 +6,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { buildCatalog, type BuildResult, type TmiSource } from "../core/catalog/buildCatalog";
 import { buildAirportLights, type AirportLightFile } from "../core/catalog/airportLights";
+import type { XrefTable } from "../core/catalog/xrefTable";
 import type { Catalog } from "../core/project/types";
 import { findTmb, findTmi, resolveAirportLightsDir, resolveXrefDir } from "./afs4Paths";
 
@@ -18,11 +19,14 @@ export class NoXrefError extends Error {
 }
 
 /** Read + parse an install's (and optional user's) XREF into a Catalog. `scannedAt` is injectable
- *  for deterministic tests. Throws NoXrefError if the install has no scenery/xref. */
+ *  for deterministic tests. `table` is the optional official-CSV overlay (null = disabled, the shipping
+ *  default; ipc.ts loads it from the injected candidates). Throws NoXrefError if the install has no
+ *  scenery/xref. */
 export function scanXref(
   installDir: string,
   userDir: string | null,
   scannedAt: string = new Date().toISOString(),
+  table: XrefTable | null = null,
 ): BuildResult {
   const xrefDir = resolveXrefDir(installDir);
   if (!xrefDir) throw new NoXrefError(installDir);
@@ -53,7 +57,7 @@ export function scanXref(
   }
   const { lights, warnings: lightWarnings } = buildAirportLights(airportLightFiles);
 
-  const result = buildCatalog(sources, { installDir, userXrefDir: userDir, scannedAt }, lights);
+  const result = buildCatalog(sources, { installDir, userXrefDir: userDir, scannedAt }, lights, table);
   result.warnings.push(...lightWarnings);
   return result;
 }

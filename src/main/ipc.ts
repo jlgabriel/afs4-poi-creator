@@ -42,6 +42,7 @@ import {
   writeProjectSidecar,
 } from "./projectFile";
 import { NoXrefError, readCatalogCache, scanXref, writeCatalogCache } from "./scan";
+import { defaultXrefTableCandidates, loadXrefTable } from "./xrefTableSource";
 import { normalizeUserDir, readSettings, writeSettings } from "./settings";
 
 const PROJECT_FILTER = [{ name: "PCT project", extensions: ["json"] }];
@@ -163,13 +164,16 @@ export function registerIpc(): void {
 
   ipcMain.handle("pct:scan", (_e, installDir: string, userXrefDir: string | null) =>
     guarded((): ScanResult => {
-      const { catalog, warnings } = scanXref(installDir, userXrefDir);
+      // Optional official-CSV overlay (build-but-disabled): resolves to nothing unless PCT_XREF_TABLE is
+      // set or a packaged xref_table.csv exists (forum #114). Absent → load.table is null → heuristic.
+      const load = loadXrefTable(defaultXrefTableCandidates(process.env, process.resourcesPath));
+      const { catalog, warnings } = scanXref(installDir, userXrefDir, undefined, load.table);
       writeCatalogCache(userData(), catalog);
       writeSettings(userData(), { lastScanAt: catalog.scannedAt }, documents());
       // The scan's warnings (a corrupt .tmi, an entry with no bounding box) used to be dropped on the
       // floor: the catalog simply came out smaller and nothing said why, so a missing object read as a
-      // PCT bug. Hand them back — the wizard's result step shows them.
-      return { catalog, warnings };
+      // PCT bug. Hand them back (plus any overlay-load warnings) — the wizard's result step shows them.
+      return { catalog, warnings: [...load.warnings, ...warnings] };
     }),
   );
 
