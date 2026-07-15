@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { tag, block, sanitizeValue, fmtLonLat, fmtMeters, fmtNum } from "../../src/core/tm/tmEmit";
+import { tag, block, sanitizeValue, fmtLonLat, fmtMeters, fmtNum, fmtF6 } from "../../src/core/tm/tmEmit";
 
 describe("tag", () => {
   it("emits a leaf tag on one line", () => {
@@ -60,5 +60,14 @@ describe("number formatting", () => {
   });
   it("fmtNum is float-safe (no 0.30000000000000004)", () => {
     expect(fmtNum(0.1 + 0.2, 3)).toBe("0.3");
+  });
+  it("fmtF6 → fixed 6 decimals, trailing zeros KEPT, -0 normalised", () => {
+    expect(fmtF6(1.5)).toBe("1.500000");
+    expect(fmtF6(3)).toBe("3.000000");
+    expect(fmtF6(0)).toBe("0.000000");
+    expect(fmtF6(-2.25)).toBe("-2.250000");
+    expect(fmtF6(-0)).toBe("0.000000");
+    expect(fmtF6(-1e-9)).toBe("0.000000"); // tiny negative would round to "-0.000000" — normalised
+    expect(fmtF6(-1e-6)).toBe("-0.000001"); // a genuine ±1 µm keeps its sign
   });
 });

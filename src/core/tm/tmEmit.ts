@@ -55,3 +55,15 @@ export function fmtNum(v: number, maxDecimals = 6): string {
   const s = v.toFixed(maxDecimals);
   return s.includes(".") ? s.replace(/0+$/, "").replace(/\.$/, "") : s;
 }
+
+/** Fixed 6-decimal float for `.tmi` geometry fields (bb_min/bb_max/bs_center/bs_radius). Unlike
+ *  `fmtNum`, trailing zeros are KEPT — fixed width keeps the byte-goldens stable and matches the
+ *  precision flown and accepted in-sim (~1 µm). The one wrinkle: a tiny negative that rounds to zero
+ *  yields `"-0.000000"`, which would make an otherwise-symmetric bbox emit a stray minus and destabilise
+ *  goldens, so it is normalised to `"0.000000"` (the only value that ever needs normalising — a genuine
+ *  ±1 µm keeps its sign). Real files vary radius/precision and all render, so this is a wide-tolerance
+ *  field: determinism matters more than matching any one producer. */
+export function fmtF6(v: number): string {
+  const s = v.toFixed(6);
+  return s === "-0.000000" ? "0.000000" : s;
+}
