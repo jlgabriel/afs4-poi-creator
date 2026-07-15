@@ -5,7 +5,7 @@
 // the inline base-elevation field (offline fallback); a folder-exists refusal offers overwrite. Below
 // the form, a list of PCT-installed POIs with per-row Uninstall (M2g). The chrome is previewable
 // without the bridge — only the write actions need it.
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ExportOptions, InstallResult, InstalledPoi, PctError } from "../../shared/pctApi";
 import type { LonLat } from "../../core/project/types";
 import { shiftEastNorth } from "../../core/geo/geo";
@@ -13,6 +13,7 @@ import { centroid, poiFolderName } from "../../core/geo/poiName";
 import { firstProjectError, isExportablePoiName } from "../../core/project/schemas";
 import { editorStore, useEditor } from "../state/editorStore";
 import { getPct } from "../app/pct";
+import { unregisteredPlacedNames } from "../catalog/registration";
 import { NumberInput } from "../inspector/NumberInput";
 
 function sameRef(a: LonLat | null, b: LonLat | null): boolean {
@@ -90,6 +91,7 @@ function messageFor(error: PctError): string {
 export function ExportDialog({ onClose }: { onClose: () => void }): React.ReactElement {
   const pct = getPct();
   const objects = useEditor((s) => s.project.objects);
+  const catalogIndex = useEditor((s) => s.catalogIndex);
   const storePoiName = useEditor((s) => s.project.poiName);
   const storeRef = useEditor((s) => s.project.reference);
   const storeShift = useEditor((s) => s.project.shift);
@@ -115,6 +117,13 @@ export function ExportDialog({ onClose }: { onClose: () => void }): React.ReactE
       ? { lon: mapView.lon, lat: mapView.lat }
       : centroid(objects.map((o) => shiftEastNorth(o.position, shiftEast, shiftNorth)));
   const folderName = validSlug ? poiFolderName(previewRef, slug) : null;
+
+  // Warn (don't block) if the scene places a user model that isn't registered — it won't render in the
+  // sim. Unreachable by placing (unregistered cards are disabled); reachable via an opened project.json.
+  const unregisteredPlaced = useMemo(
+    () => unregisteredPlacedNames(objects, catalogIndex),
+    [objects, catalogIndex],
+  );
 
   // One install attempt. On a folder-exists refusal, offer to replace and retry with overwrite — the
   // installer's overwrite path is already safe, so this is dialog-side only (Fable P1-5 / A#5).
@@ -303,6 +312,14 @@ export function ExportDialog({ onClose }: { onClose: () => void }): React.ReactE
 
             {error !== null && <p className="pct-warn">{error}</p>}
             {objects.length === 0 && <p className="pct-empty">No objects placed — the POI would be empty.</p>}
+            {unregisteredPlaced.length > 0 && (
+              <p className="pct-warn">
+                {unregisteredPlaced.length} placed object{unregisteredPlaced.length === 1 ? "" : "s"} use an
+                unregistered user model ({unregisteredPlaced.join(", ")}) — register{" "}
+                {unregisteredPlaced.length === 1 ? "it" : "them"} in the Catalog panel, or{" "}
+                {unregisteredPlaced.length === 1 ? "it won't" : "they won't"} render in the sim.
+              </p>
+            )}
 
             <div className="pct-modal-actions">
               <button onClick={onClose} disabled={busy}>
