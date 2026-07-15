@@ -42,6 +42,27 @@ export interface InstallResult {
   warnings: string[];
 }
 
+/** One loose user `.tmb` PCT can register, previewed in the register dialog (main-produced, display-only). */
+export interface RegistrablePreview {
+  base: string; // the bundle/subfolder name it will get
+  geometries: number; // geometries that will be indexed (usually 1)
+  ttx: number; // textures that will be copied into the bundle
+  missingTextures: string[]; // referenced `.ttx` not found beside the `.tmb` → the object may render untextured
+}
+
+/** Read-only preview of what registerXref would do (drives the banner → confirm dialog). */
+export interface XrefRegistrationPlan {
+  registerable: RegistrablePreview[];
+  skipped: { name: string; reason: string }[]; // name = the loose `.tmb` filename, for display
+}
+
+/** Outcome of a registration: how many landed, the fresh catalog (the renderer just reloads it), warnings. */
+export interface XrefRegistrationResult {
+  registered: number;
+  scan: ScanResult;
+  warnings: string[];
+}
+
 export interface InstalledPoi {
   folderName: string;
   byPct: boolean; // carries PCT's README marker → safe to offer Uninstall
@@ -78,6 +99,12 @@ export interface PctApi {
   autosaveShadow(project: Project): Promise<void>;
   loadShadow(): Promise<Project | null>;
   clearShadow(): Promise<void>; // drop the shadow after a save or a declined recovery
+
+  // User-XREF registration (design B2): turn loose scenery/xref/*.tmb into resolvable subfolder bundles.
+  // No args — main uses its known user dir (P0-2). planXrefRegistration is read-only (the dialog preview);
+  // registerXref writes, then rescans, so the renderer just reloads `result.scan.catalog`.
+  planXrefRegistration(): Promise<PctResult<XrefRegistrationPlan>>;
+  registerXref(): Promise<PctResult<XrefRegistrationResult>>;
 
   resolveHeights(objects: PlacedObject[]): Promise<PctResult<ResolvedObject[]>>;
   // `null` value = the user cancelled the choose-folder dialog (target "install" never cancels).

@@ -69,6 +69,35 @@ function buildBigCatalog(): Catalog {
       });
     }
   }
+  // Two loose user `.tmb` (design B2) so the register banner/dialog is exercisable in the preview: one
+  // plain-text (registerable) + one opaque (sizeUnknown, skipped).
+  xref.push({
+    name: "my_pylon",
+    bundle: "my_pylon",
+    source: "user",
+    bbMin: [-1, -1, 0],
+    bbMax: [1, 1, 15],
+    bsRadius: Math.hypot(2, 2, 15) / 2,
+    size: { x: 2, y: 2, z: 15 },
+    category: "user/my_pylon",
+    displayName: "My Pylon",
+    act: false,
+    unregistered: true,
+  });
+  xref.push({
+    name: "opaque_widget",
+    bundle: "opaque_widget",
+    source: "user",
+    bbMin: [0, 0, 0],
+    bbMax: [0, 0, 0],
+    bsRadius: 0,
+    size: { x: 0, y: 0, z: 0 },
+    category: "user/opaque_widget",
+    displayName: "Opaque Widget",
+    act: false,
+    unregistered: true,
+    sizeUnknown: true,
+  });
   return {
     schemaVersion: 1,
     scannedAt: "2026-07-09T00:00:00Z",
@@ -128,7 +157,7 @@ export function installMockBridge(): void {
   // alone — window.pct there is a read-only contextBridge binding and assigning over it throws.
   if ((window as unknown as { pct?: PctApi }).pct) return;
 
-  const catalog = buildBigCatalog();
+  let catalog = buildBigCatalog();
   // `?mockpct&recover` simulates a returning user whose last session crashed: a cached catalog +
   // known install dir (→ editor, not wizard) AND a shadow to recover, so the RecoveryBanner shows.
   const wantRecover = location.search.includes("recover");
@@ -160,6 +189,26 @@ export function installMockBridge(): void {
       return settings;
     },
     chooseDirectory: async () => "C:/Mock/Aerofly FS 4",
+    planXrefRegistration: async () => ({
+      ok: true,
+      value: {
+        registerable: catalog.xref
+          .filter((o) => o.unregistered && !o.sizeUnknown)
+          .map((o) => ({ base: o.name, geometries: 1, ttx: 1, missingTextures: [] })),
+        skipped: catalog.xref
+          .filter((o) => o.sizeUnknown)
+          .map((o) => ({ name: `${o.name}.tmb`, reason: "opaque (compiled) .tmb — register it manually" })),
+      },
+    }),
+    registerXref: async () => {
+      const registered = catalog.xref.filter((o) => o.unregistered && !o.sizeUnknown).length;
+      // "register" the plain-text ones: they now resolve → drop the unregistered flag.
+      catalog = {
+        ...catalog,
+        xref: catalog.xref.map((o) => (o.unregistered && !o.sizeUnknown ? { ...o, unregistered: undefined } : o)),
+      };
+      return { ok: true, value: { registered, scan: { catalog, warnings: [] }, warnings: [] } };
+    },
     openProject: async () => ({ ok: true, value: null }),
     saveProject: async () => ({ ok: true, value: { path: "C:/Mock/project.json" } }),
     saveProjectAs: async () => ({ ok: true, value: { path: "C:/Mock/project.json" } }),

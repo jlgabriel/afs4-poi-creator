@@ -7,6 +7,7 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
 import type { OpenDialogOptions, SaveDialogOptions } from "electron";
 import { existsSync } from "node:fs";
+import path from "node:path";
 import { ZodError } from "zod";
 import type { Catalog, PlacedObject, Project, ResolvedObject, Settings } from "../core/project/types";
 import type {
@@ -17,6 +18,8 @@ import type {
   PctError,
   PctResult,
   ScanResult,
+  XrefRegistrationPlan,
+  XrefRegistrationResult,
 } from "../shared/pctApi";
 import { NeedsElevationError, resolveHeightsFlat } from "../core/export/heights";
 import { planExport } from "../core/export/planExport";
@@ -42,6 +45,7 @@ import {
   writeProjectSidecar,
 } from "./projectFile";
 import { NoXrefError, readCatalogCache, scanXref, writeCatalogCache } from "./scan";
+import { planXrefRegistration, registerXref } from "./xrefRegistrar";
 import { defaultXrefTableCandidates, loadXrefTable } from "./xrefTableSource";
 import { normalizeUserDir, readSettings, writeSettings } from "./settings";
 
@@ -155,6 +159,18 @@ async function runExport(project: Project, opts: ExportOptions): Promise<Install
   return { folderName: w.folderName, path: w.path, installed: false, warnings: plan.warnings };
 }
 
+/** Load the optional official overlay, scan, cache the catalog, and record lastScanAt. Shared by
+ *  pct:scan and the post-registration rescan so a freshly registered bundle appears with zero new read
+ *  code. Scan warnings (a corrupt .tmi, an entry with no bbox) + any overlay-load warning are handed
+ *  back — the wizard/result surface shows them, instead of an object silently missing looking like a bug. */
+function scanAndCache(installDir: string, userXrefDir: string | null): ScanResult {
+  const load = loadXrefTable(defaultXrefTableCandidates(process.env, process.resourcesPath));
+  const { catalog, warnings } = scanXref(installDir, userXrefDir, undefined, load.table);
+  writeCatalogCache(userData(), catalog);
+  writeSettings(userData(), { lastScanAt: catalog.scannedAt }, documents());
+  return { catalog, warnings: [...load.warnings, ...warnings] };
+}
+
 export function registerIpc(): void {
   // ── Detect / scan / settings (M1e-2a) ──
   ipcMain.handle(
@@ -163,17 +179,34 @@ export function registerIpc(): void {
   );
 
   ipcMain.handle("pct:scan", (_e, installDir: string, userXrefDir: string | null) =>
-    guarded((): ScanResult => {
-      // Optional official-CSV overlay (build-but-disabled): resolves to nothing unless PCT_XREF_TABLE is
-      // set or a packaged xref_table.csv exists (forum #114). Absent → load.table is null → heuristic.
-      const load = loadXrefTable(defaultXrefTableCandidates(process.env, process.resourcesPath));
-      const { catalog, warnings } = scanXref(installDir, userXrefDir, undefined, load.table);
-      writeCatalogCache(userData(), catalog);
-      writeSettings(userData(), { lastScanAt: catalog.scannedAt }, documents());
-      // The scan's warnings (a corrupt .tmi, an entry with no bounding box) used to be dropped on the
-      // floor: the catalog simply came out smaller and nothing said why, so a missing object read as a
-      // PCT bug. Hand them back (plus any overlay-load warnings) — the wizard's result step shows them.
-      return { catalog, warnings: [...load.warnings, ...warnings] };
+    guarded((): ScanResult => scanAndCache(installDir, userXrefDir)),
+  );
+
+  // ── User-XREF registration (design B2) — main owns the user dir + the rescan (P0-2: no paths in) ──
+  ipcMain.handle("pct:planXrefRegistration", () =>
+    guarded((): XrefRegistrationPlan => {
+      const plan = planXrefRegistration(afs4UserDirOrThrow());
+      return {
+        registerable: plan.registerable.map((b) => ({
+          base: b.base,
+          geometries: b.geometries.length,
+          ttx: b.ttx.length,
+          missingTextures: b.missingTextures,
+        })),
+        skipped: plan.skipped.map((s) => ({ name: path.basename(s.path), reason: s.reason })),
+      };
+    }),
+  );
+  ipcMain.handle("pct:registerXref", () =>
+    guarded((): XrefRegistrationResult => {
+      const userDir = afs4UserDirOrThrow();
+      const result = registerXref(userDir, userData());
+      // Rescan so the renderer just reloads the fresh catalog: a registered bundle now resolves via its
+      // generated .tmi and the loose original is gone. Needs the install dir the user already scanned with.
+      const installDir = currentSettings().installDir;
+      if (!installDir) throw new Error("Scan your Aerofly install first, then register.");
+      const scan = scanAndCache(installDir, userDir);
+      return { registered: result.registered.length, scan, warnings: result.warnings };
     }),
   );
 
