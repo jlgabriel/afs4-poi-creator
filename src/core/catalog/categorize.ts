@@ -50,13 +50,18 @@ export function categorize(name: string, bundle: string): CategoryResult {
   return { category: `other/${bundle}`, act: false };
 }
 
-/** Derived pretty label. Strips trailing decoration runs (_ds_.., _sh_.., size codes),
- *  splits camelCase / underscores, title-cases. The raw name is what the UI copies into a
- *  `.toc`, so it's always shown alongside — this is a display nicety only.
+/** Derived pretty label — the fallback for objects NOT covered by an authoritative table.
+ *  Strips only the IPACS decoration runs (_ds_.., _sh_.., _mw_.., _lod_..), splits
+ *  camelCase / underscores, title-cases. Trailing numeric tokens are KEPT on purpose:
+ *   - for community objects they're the meaningful discriminator — pylon_air_race_18_4 vs
+ *     _25_5 collapsed to the same label (forum #110), making variants indistinguishable;
+ *   - no built-in needs them gone — every IPACS size code sits behind a _ds/_sh/_mw/_lod
+ *     marker (stripped above), and IPACS's own curated names keep the number as often as not
+ *     (car_00 → "Car 00", glider_02 → "Glider 02"), so keeping is the closer default.
+ *  The raw name is always shown alongside, so this is a display nicety only.
  *  e.g. "tower00_small_plates_ds_00_08_08" → "Tower00 Small Plates". */
 export function displayName(name: string): string {
   let s = name.replace(/_(ds|sh|mw|lod)(_[0-9a-z]+)*$/i, ""); // drop _ds_00_08_08 style runs
-  s = s.replace(/(_[0-9]+)+$/, ""); // drop trailing numeric size codes like _16_13
   s = s.replace(/([a-z0-9])([A-Z])/g, "$1 $2"); // split camelCase
   s = s.replace(/_+/g, " ").trim();
   s = s.replace(/\b\w/g, (c) => c.toUpperCase()); // title-case

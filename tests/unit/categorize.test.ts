@@ -34,4 +34,24 @@ describe("displayName", () => {
     expect(displayName("BarrelBlueNew")).toBe("Barrel Blue New");
     expect(displayName("terminal00_ds_16_13")).toBe("Terminal00");
   });
+
+  // forum #110 — the old trailing-number strip collapsed distinct community pylons to the
+  // same label. Keep the number so variants stay distinguishable (name is the only discriminator).
+  it("keeps meaningful trailing numbers so variants stay distinct (#110)", () => {
+    expect(displayName("pylon_15m")).toBe("Pylon 15m");
+    expect(displayName("pylon_30m")).toBe("Pylon 30m");
+    expect(displayName("pylon_air_race_18_4")).toBe("Pylon Air Race 18 4");
+    expect(displayName("pylon_air_race_25_5")).toBe("Pylon Air Race 25 5");
+    expect(displayName("pylon_reno_3")).toBe("Pylon Reno 3");
+    // the two air-race variants must NOT render identically
+    expect(displayName("pylon_air_race_18_4")).not.toBe(displayName("pylon_air_race_25_5"));
+  });
+
+  // keeping trailing numbers also brings built-ins closer to IPACS's own curated labels,
+  // where numbered variants keep their index (verified against the official xref table).
+  it("keeps built-in numeric indices (matches IPACS labels)", () => {
+    expect(displayName("car_00")).toBe("Car 00");
+    expect(displayName("glider_02")).toBe("Glider 02");
+    expect(displayName("mast_03")).toBe("Mast 03");
+  });
 });
