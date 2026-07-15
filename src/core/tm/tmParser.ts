@@ -109,3 +109,29 @@ export function vec3(node: TmNode): Vec3 {
   }
   return [x, y, z];
 }
+
+/** A `point_list`-style value "(x y z) (x y z) …" → Vec3[]: parentheses delimit each triple, the
+ *  three components inside are whitespace-separated. Throws TmParseError on a group that isn't three
+ *  finite numbers. Returns [] when there are no parenthesised groups — callers wanting tolerance
+ *  (userTmb) treat that as "no geometry" and degrade. Distinct from `vec3`, which reads ONE bare
+ *  whitespace-separated triple (the sim writes bounding boxes that way, but vertex lists in parens). */
+export function vec3List(node: TmNode): Vec3[] {
+  const out: Vec3[] = [];
+  const re = /\(([^)]*)\)/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(node.value)) !== null) {
+    const parts = m[1].trim().split(/\s+/);
+    if (parts.length !== 3) {
+      throw new TmParseError(
+        `vec3List '${node.name}': expected 3 numbers per triple, got ${parts.length} ('${m[1]}')`,
+        -1,
+      );
+    }
+    const [x, y, z] = parts.map(Number);
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) {
+      throw new TmParseError(`vec3List '${node.name}': non-numeric triple ('${m[1]}')`, -1);
+    }
+    out.push([x, y, z]);
+  }
+  return out;
+}

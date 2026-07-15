@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseTm, findAll, child, vec3, TmParseError } from "../../src/core/tm/tmParser";
+import { parseTm, findAll, child, vec3, vec3List, TmParseError } from "../../src/core/tm/tmParser";
 
 // All fixtures are synthetic — invented tag names, no IPACS content.
 const SAMPLE = `<[file][][]
@@ -50,5 +50,36 @@ describe("parseTm", () => {
     expect(() => parseTm("<[a][b][c]")).toThrow(TmParseError); // unclosed block
     expect(() => vec3(parseTm("<[v][p][1 2]>"))).toThrow(TmParseError); // too few numbers
     expect(() => vec3(parseTm("<[v][p][a b c]>"))).toThrow(TmParseError); // non-numeric
+  });
+});
+
+describe("vec3List — parenthesised triple list (point_list)", () => {
+  const list = (value: string) => parseTm(`<[list_vector3_float32][point_list][${value}]>`);
+
+  it("parses '(x y z) (x y z) …' with or without spaces between triples", () => {
+    expect(vec3List(list("(1 2 3) (4 5 6)"))).toEqual([
+      [1, 2, 3],
+      [4, 5, 6],
+    ]);
+    expect(vec3List(list("(1 2 3)(-4 -5 -6)"))).toEqual([
+      [1, 2, 3],
+      [-4, -5, -6],
+    ]);
+  });
+
+  it("tolerates whitespace inside a triple and scientific notation", () => {
+    expect(vec3List(list("(  1   2  3 )"))).toEqual([[1, 2, 3]]);
+    expect(vec3List(list("(0 8.34465026855469e-07 11.37)"))).toEqual([[0, 8.34465026855469e-7, 11.37]]);
+  });
+
+  it("returns [] when there are no parenthesised groups (caller degrades)", () => {
+    expect(vec3List(list(""))).toEqual([]);
+    expect(vec3List(list("1 2 3"))).toEqual([]); // bare triple, no parens
+  });
+
+  it("throws TmParseError on a malformed triple", () => {
+    expect(() => vec3List(list("(1 2)"))).toThrow(TmParseError); // too few
+    expect(() => vec3List(list("(1 2 3 4)"))).toThrow(TmParseError); // too many
+    expect(() => vec3List(list("(a b c)"))).toThrow(TmParseError); // non-numeric
   });
 });
