@@ -22,6 +22,13 @@ export interface CatalogObject {
   category: string; // display taxonomy path, e.g. "buildings/tower"
   displayName: string; // derived pretty label, e.g. "Tower00 Small Plates"
   act: boolean; // true = present in the curated category table
+  // ── Optional overlay from the official IPACS `xref_table.csv` (build-but-disabled until forum #114;
+  //    see docs/XREF_TABLE_CSV_DECISION.md). Present ONLY on an install-source object whose name matched
+  //    a table row. All optional → the cache stays schemaVersion 1 and a scan with no table (the shipping
+  //    default) is byte-identical to before. `displayName` above is the OFFICIAL label on a match. ──
+  official?: true; // provenance: displayName + taxonomy are the official table's, not the heuristic
+  taxonomy?: { main: string; sub: string; type: string }; // IPACS 3-level taxonomy, e.g. Aircraft/Airliner/A320
+  footprint?: [number, number][]; // real footprint polygon, model-local metres (x, y) — glyphs (#86-2)
 }
 
 /** One scanned `.tmi` bundle. */
@@ -53,6 +60,7 @@ export interface Catalog {
   userXrefDir: string | null;
   bundles: BundleInfo[];
   xref: CatalogObject[];
+  xrefTable?: { rows: number; matched: number }; // present only when an xref_table overlay was applied
   plants: []; // reserved (M4+)
   airportLights: CatalogAirportLight[]; // v0.2 — scanned from airport_lights/ (empty on a pre-v0.2 cache)
   animated: []; // reserved
