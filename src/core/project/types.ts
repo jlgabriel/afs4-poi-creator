@@ -29,6 +29,11 @@ export interface CatalogObject {
   official?: true; // provenance: displayName + taxonomy are the official table's, not the heuristic
   taxonomy?: { main: string; sub: string; type: string }; // IPACS 3-level taxonomy, e.g. Aircraft/Airliner/A320
   footprint?: [number, number][]; // real footprint polygon, model-local metres (x, y) — glyphs (#86-2)
+  // ── Optional user-XREF registration state (design B2). Set on objects derived from a LOOSE user `.tmb`
+  //    (one dropped in scenery/xref that isn't yet resolvable from a POI — it needs a generated `.tmi` in
+  //    its own subfolder). Absent on every built-in and every already-bundled object. ──
+  unregistered?: true; // from a loose user `.tmb` not yet registered → surfaced for registration, not placement
+  sizeUnknown?: true; // an OPAQUE (IPACS-compiled) `.tmb`: filename only, no derivable bbox/footprint
 }
 
 /** One scanned `.tmi` bundle. */

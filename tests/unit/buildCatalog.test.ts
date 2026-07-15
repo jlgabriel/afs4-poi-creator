@@ -142,3 +142,89 @@ describe("buildCatalog — official xref_table overlay", () => {
     }
   });
 });
+
+// Loose user `.tmb` → `unregistered` catalog objects (design B2). Synthetic `.tmb` fixtures — invented
+// names, the real plain-text grammar (scene → geometry_list → tmxglgeometry(name, matrix, mesh_collision)).
+describe("buildCatalog — loose user .tmb (unregistered)", () => {
+  const meta = { installDir: "X", userXrefDir: "U", scannedAt: "t" };
+  const IDENTITY = "1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1";
+  const meshGeom = (name: string, points: string): string =>
+    `            <[tmxglgeometry][element][0]
+                <[string8u][name][${name}]>
+                <[matrix4_float64][matrix][${IDENTITY}]>
+                <[tmxglmesh][mesh_collision][]
+                    <[list_vector3_float32][point_list][${points}]>
+                >
+            >`;
+  const userTmb = (...g: string[]): string =>
+    `<[file][][]
+    <[tmxglscene][][]
+        <[pointer_list_tmxglgeometry][geometry_list][]
+${g.join("\n")}
+        >
+    >
+>`;
+
+  it("makes one unregistered object per geometry of a plain-text .tmb, with real bbox", () => {
+    const { catalog, warnings } = buildCatalog([], meta, [], null, [
+      { base: "pct_userbundle", text: userTmb(meshGeom("pct_userobj", "(-1 -2 0) (1 2 3)")) },
+    ]);
+    expect(warnings).toEqual([]);
+    expect(catalog.xref).toHaveLength(1);
+    const o = catalog.xref[0];
+    expect(o).toMatchObject({
+      name: "pct_userobj",
+      bundle: "pct_userbundle",
+      source: "user",
+      category: "user/pct_userbundle",
+      displayName: "Pct Userobj",
+      unregistered: true,
+    });
+    expect(o.bbMin).toEqual([-1, -2, 0]);
+    expect(o.bbMax).toEqual([1, 2, 3]);
+    expect(o.size).toEqual({ x: 2, y: 4, z: 3 });
+    expect(o.sizeUnknown).toBeUndefined();
+    expect(o.official).toBeUndefined(); // user source is never overlaid (Q5)
+  });
+
+  it("makes a single sizeUnknown placeholder for an opaque .tmb (text:null)", () => {
+    const { catalog } = buildCatalog([], meta, [], null, [{ base: "opaque_obj", text: null }]);
+    expect(catalog.xref).toHaveLength(1);
+    expect(catalog.xref[0]).toMatchObject({
+      name: "opaque_obj",
+      source: "user",
+      unregistered: true,
+      sizeUnknown: true,
+    });
+    expect(catalog.xref[0].bbMax).toEqual([0, 0, 0]);
+    expect(catalog.xref[0].size).toEqual({ x: 0, y: 0, z: 0 });
+  });
+
+  it("degrades a text .tmb with no derivable geometry to a sizeUnknown placeholder + warning", () => {
+    const { catalog, warnings } = buildCatalog([], meta, [], null, [
+      { base: "empty_obj", text: "<[file][][]\n    <[tmxglscene][][]>\n>" }, // valid tree, no tmxglgeometry
+    ]);
+    expect(catalog.xref).toHaveLength(1);
+    expect(catalog.xref[0].sizeUnknown).toBe(true);
+    expect(warnings.join(" ")).toContain("tmxglgeometry");
+  });
+
+  it("warns when a loose .tmb geometry collides with a built-in name (both kept, no dedupe)", () => {
+    const install: TmiSource[] = [
+      { path: "i.tmi", source: "install", text: tmi("xref_i", entry("shared_name", "0 0 0", "1 1 1")) },
+    ];
+    const { catalog, warnings } = buildCatalog(install, meta, [], null, [
+      { base: "user_pack", text: userTmb(meshGeom("shared_name", "(0 0 0) (2 2 2)")) },
+    ]);
+    expect(catalog.xref).toHaveLength(2);
+    expect(warnings.join(" ")).toContain("shares a built-in's name");
+  });
+
+  it("no loose .tmb → catalog identical to the call without userTmbs (no-regression)", () => {
+    const install: TmiSource[] = [
+      { path: "i.tmi", source: "install", text: tmi("xref_i", entry("plain_obj", "0 0 0", "1 1 1")) },
+    ];
+    expect(buildCatalog(install, meta, [], null, [])).toEqual(buildCatalog(install, meta, [], null));
+    expect(buildCatalog(install, meta, [], null).catalog.xref.every((o) => !o.unregistered)).toBe(true);
+  });
+});
