@@ -18,7 +18,8 @@ POI-folder conventions.
 > desktop editor (first-run wizard, satellite/streets map, object catalog, inspector, airport
 > search, per-object height, export / install / uninstall) are built and tested — unit + golden
 > tests, typecheck, and an Electron smoke test, all green in [CI](.github/workflows/ci.yml). **v0.2
-> added lights.** The export format is **confirmed working in the sim**. Builds are currently
+> added lights, and v0.3 lets you place your own custom XREF objects.** The export format is
+> **confirmed working in the sim**. Builds are currently
 > **unsigned**, so your OS will warn you once on first launch — see
 > [Installing PCT](#installing-pct). Grab the newest build from
 > [Releases](https://github.com/jlgabriel/afs4-poi-creator/releases).
@@ -33,6 +34,12 @@ model or a config file — you click on a map, and PCT writes the folder.
 approach, taxiway, helipad…) and fully parametric **point lights**, where you pick the colour, the
 brightness and the flash pattern. Stagger the flash across a row of them and you get a running-light
 sweep. Lights only show at night in the sim — that's Aerofly's behaviour, not a bug.
+
+**Your own objects, too.** Since **v0.3**, PCT can also place the custom **XREF objects you've added
+to your sim** — the model files you (or a scenery add-on) dropped into Aerofly's `scenery/xref`
+folder. PCT reads each model's name and footprint, registers it so the sim can resolve it, then
+treats it like any built-in: place it, rotate it, set its height, export. See
+[Placing your own XREF objects](#placing-your-own-xref-objects).
 
 **It ships no Aerofly content.** PCT reads the object catalog from *your* installed copy of the sim,
 so you only ever place objects you already own. Nothing from the sim is copied into this project or
@@ -57,17 +64,40 @@ into your finished POIs — just the *names* of the objects you chose.
 **The POIs you create are yours.** They're the program's output and are **not** covered by PCT's
 license — share them, post them, or sell them however you like.
 
+### Placing your own XREF objects
+
+Beyond the sim's built-in catalog, PCT can place the **custom objects you've added to Aerofly
+yourself** — model files (`.tmb`) that you, or a scenery add-on, put in your Aerofly FS 4
+`scenery/xref/` folder.
+
+A loose `.tmb` won't render in the sim on its own: Aerofly needs a small scene-index (`.tmi`)
+generated for it, in its **own subfolder**. PCT does that for you:
+
+1. **Drop your model** into `…/Aerofly FS 4/scenery/xref/` — the `.tmb`, plus its `.ttx` textures if
+   it has any.
+2. **Rescan** in PCT (re-run the wizard, or use *Rescan* in the catalog). Your objects show up with an
+   **"unregistered"** badge, and a banner offers to register them.
+3. **Click Register.** PCT reads each model's name and size, generates its `.tmi`, and moves it into
+   its own subfolder next to its textures. Your objects become normal, **placeable** catalog entries.
+4. **Place, rotate, set the height and export** — exactly like a built-in object.
+
+**What's supported:** text-format `.tmb` — the kind Aerofly's SDK and the AC3D exporter produce — are
+read fully (name, footprint, textures). IPACS's **pre-compiled binary** `.tmb` can't be read
+automatically and appear greyed out. As everywhere else, PCT ships and copies **no model bytes**: it
+only re-lays *your* files and writes the small `.tmi` index next to them.
+
 ### Good to know
 
-Two things about the editor that trip people up (both are correct — just not obvious):
+A couple of things worth knowing about the editor:
 
-- **"Direction °"** is the raw rotation stored in the object's `.toc`, **not** a compass heading. `0`
-  is the object's built-in pose, and that pose **varies per object** (many face east at `0`), so there
-  is no single "north = 0" rule to apply. The value increases clockwise and is normalised to 0–360°.
-  The tick on the map marks the model's own axis so you can watch it turn — to line an object up, match
-  its **footprint rectangle** to the imagery, which is always correct regardless of the authored front.
-  (An airport light's **"Orientation °"** is the same kind of raw value. Both can be dragged with the
-  **cyan handle** on the map — hold **Shift** to snap to 5°.)
+- **"Heading °"** on an XREF object is a real **compass heading** — `0` = north, `90` = east,
+  clockwise — not a raw rotation. PCT applies the object-facing convention it **calibrated in the
+  sim**, so the value matches what you'd fly, and the map's **cyan handle** points the way the object
+  faces. It's a best-effort convention that holds for the large majority of objects; if one comes out
+  turned the wrong way, line its **footprint rectangle** up with the imagery — that reads true no
+  matter which way the model was authored. (An **airport light** still shows a raw **"Orientation °"**,
+  since lights weren't part of the heading calibration. Either can be dragged with the **cyan handle**
+  on the map — hold **Shift** to snap to 5°.)
 - **Height modes** — Aerofly's built-in library objects have no auto-height, so PCT always writes an
   **absolute** elevation (metres ASL). *Terrain* looks up the ground height and bakes it in; *Terrain +
   offset* adds metres on top (rooftop items); *ASL* is a value you type. So "Terrain" does **not** mean
