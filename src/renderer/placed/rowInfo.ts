@@ -2,7 +2,13 @@
 // PlacedList.tsx so it carries no React/store import and unit-tests under the node config. Same
 // node-testable-boundary idiom as map/syncDiff.ts and map/rotate.ts.
 
-import type { CatalogAirportLight, CatalogObject, PlacedObject } from "../../core/project/types";
+import type {
+  CatalogAirportLight,
+  CatalogObject,
+  CatalogPlant,
+  PlacedObject,
+} from "../../core/project/types";
+import { plantKey } from "../../core/catalog/plants";
 import { isMissing } from "../map/syncDiff";
 
 export interface RowInfo {
@@ -17,8 +23,9 @@ export function rowInfo(
   o: PlacedObject,
   catalogIndex: Map<string, CatalogObject>,
   airportLightIndex: Map<string, CatalogAirportLight>,
+  plantIndex: Map<string, CatalogPlant>,
 ): RowInfo {
-  const missing = isMissing(o, catalogIndex, airportLightIndex);
+  const missing = isMissing(o, catalogIndex, airportLightIndex, plantIndex);
   if (o.kind === "xref") {
     const cat = catalogIndex.get(o.name);
     return { category: cat?.category ?? "various", name: o.label || cat?.displayName || o.name, missing };
@@ -28,6 +35,16 @@ export function rowInfo(
     return {
       category: meta?.category ?? "lights/other",
       name: o.label || meta?.displayName || o.typeName,
+      missing,
+    };
+  }
+  if (o.kind === "plant") {
+    const meta = plantIndex.get(plantKey(o));
+    // The fallback label is the raw pair, not a prettified guess: if the catalog lacks it, the row is
+    // already flagged missing, and the exact `group/species` is what the user needs in order to see WHY.
+    return {
+      category: meta?.category ?? "plants/other",
+      name: o.label || meta?.displayName || plantKey(o),
       missing,
     };
   }

@@ -6,8 +6,10 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-/** Recursively collect every .tmi file under `root` (unreadable dirs are skipped, not fatal). */
-export function findTmi(root: string, out: string[] = []): string[] {
+/** Recursively collect every file under `root` with the given lowercase extension (unreadable dirs are
+ *  skipped, not fatal). Recursion is load-bearing for `.tmi`/`.tmb`, where an add-on ships as a
+ *  ZIP-of-a-folder and a root-only walk saw nothing (forum #122). */
+function findByExt(root: string, ext: string, out: string[] = []): string[] {
   let entries;
   try {
     entries = readdirSync(root, { withFileTypes: true });
@@ -16,38 +18,45 @@ export function findTmi(root: string, out: string[] = []): string[] {
   }
   for (const e of entries) {
     const full = path.join(root, e.name);
-    if (e.isDirectory()) findTmi(full, out);
-    else if (e.isFile() && e.name.toLowerCase().endsWith(".tmi")) out.push(full);
+    if (e.isDirectory()) findByExt(full, ext, out);
+    else if (e.isFile() && e.name.toLowerCase().endsWith(ext)) out.push(full);
   }
   return out;
 }
 
-/** Recursively collect every .tmb file under `root` (unreadable dirs skipped). Mirrors findTmi — used
- *  for the v0.2 airport-light library, where fixtures are `.tmb` (not `.tmi`) and carry no bounding box. */
-export function findTmb(root: string, out: string[] = []): string[] {
-  let entries;
-  try {
-    entries = readdirSync(root, { withFileTypes: true });
-  } catch {
-    return out;
+/** Every .tmi under `root` — the xref catalog index. */
+export const findTmi = (root: string): string[] => findByExt(root, ".tmi");
+
+/** Every .tmb under `root` — the v0.2 airport-light fixtures (no `.tmi`, no bounding box). */
+export const findTmb = (root: string): string[] => findByExt(root, ".tmb");
+
+/** Every .ttx under `root` — the v0.4 plant library. `.ttx` is a TEXTURE, and for plants that is the
+ *  whole asset: `scenery/plants` ships 41 textures and no geometry at all, so the filename is the
+ *  entire record (see core/catalog/plants.ts). */
+export const findTtx = (root: string): string[] => findByExt(root, ".ttx");
+
+/** Resolve a library dir under an install root: try each `candidates` relative path in turn, and also
+ *  tolerate being handed the leaf directory itself (the CLI accepts either). */
+function resolveLibraryDir(installArg: string, leaf: string, candidates: string[]): string | null {
+  const paths = candidates.map((c) => path.join(installArg, c));
+  if (path.basename(installArg).toLowerCase() === leaf) paths.unshift(installArg);
+  for (const c of paths) {
+    if (existsSync(c) && statSync(c).isDirectory()) return c;
   }
-  for (const e of entries) {
-    const full = path.join(root, e.name);
-    if (e.isDirectory()) findTmb(full, out);
-    else if (e.isFile() && e.name.toLowerCase().endsWith(".tmb")) out.push(full);
-  }
-  return out;
+  return null;
 }
 
 /** The airport-light library dir (`<install>/airport_lights`), or null if absent. Install-only —
  *  there is no known user-dir airport-light concept. */
 export function resolveAirportLightsDir(installArg: string): string | null {
-  const candidates = [path.join(installArg, "airport_lights")];
-  if (path.basename(installArg).toLowerCase() === "airport_lights") candidates.unshift(installArg);
-  for (const c of candidates) {
-    if (existsSync(c) && statSync(c).isDirectory()) return c;
-  }
-  return null;
+  return resolveLibraryDir(installArg, "airport_lights", ["airport_lights"]);
+}
+
+/** The plant library dir (`<install>/scenery/plants`), or null if absent (v0.4). Install-only: a plant
+ *  is drawn from a built-in texture referenced by group + species, so there is no user-supplied
+ *  equivalent to scan the way `scenery/xref` has one. */
+export function resolvePlantsDir(installArg: string): string | null {
+  return resolveLibraryDir(installArg, "plants", [path.join("scenery", "plants"), "plants"]);
 }
 
 /** Resolve an install root (or a scenery/xref dir) to the directory that holds the .tmi files. */

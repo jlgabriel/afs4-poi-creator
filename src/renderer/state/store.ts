@@ -23,6 +23,7 @@ import type {
   Catalog,
   CatalogAirportLight,
   CatalogObject,
+  CatalogPlant,
   HeightSpec,
   LonLat,
   PoiShift,
@@ -31,6 +32,7 @@ import type {
   Vec3,
 } from "../../core/project/types";
 import type { Airport } from "../../core/airports/types";
+import { plantKey } from "../../core/catalog/plants";
 import { destination } from "../../core/geo/geo";
 import * as mutate from "../../core/project/mutate";
 
@@ -45,11 +47,16 @@ export interface Filter {
 }
 
 /** What click-to-place is armed for. `name` is the xref catalog name or the airport-light typeName;
- *  a point light is parametric (no name). null = nothing armed. */
+ *  a point light is parametric (no name); a plant needs BOTH halves of its identity, so it carries the
+ *  pair rather than a name (see plants.plantKey). null = nothing armed. */
 export type PlacingSpec =
   | { kind: "xref"; name: string }
   | { kind: "airport_light"; name: string }
-  | { kind: "light" };
+  | { kind: "light" }
+  // `naturalHeight` rides along rather than being looked up at place time. The palette has the
+  // CatalogPlant in hand when it arms, so carrying it removes the only path where a plant could be
+  // created with height 0 — the one value that may mean "invisible" (see mutate.createPlant).
+  | { kind: "plant"; group: string; species: string; naturalHeight: number };
 
 const UNDO_CAP = 50; // design §3.6: snapshot stacks capped at 50
 /** The blank-project world view (new project before the user navigates). Exported for the shell's
@@ -92,6 +99,7 @@ export interface EditorState {
   catalog: Catalog | null;
   catalogIndex: Map<string, CatalogObject>; // xref, by exact name
   airportLightIndex: Map<string, CatalogAirportLight>; // v0.2 airport lights, by typeName
+  plantIndex: Map<string, CatalogPlant>; // v0.4 plants, by plantKey() — "group/species", not one name
   airports: Airport[]; // sim airport list (bundled), for the TopBar search → flyTo; never saved
   tiles: TilesConfig; // map tile provider (from Settings); MapView subscribes → live tile swap
 
@@ -148,6 +156,7 @@ export interface EditorState {
   setLightColor: (id: string, color: Vec3) => void;
   setIntensity: (id: string, intensity: number) => void;
   setFlashing: (id: string, flashing: [number, number, number, number]) => void;
+  setPlantHeightRange: (id: string, heightRange: [number, number]) => void;
   setGroupIndex: (id: string, groupIndex: number) => void;
   setReference: (ref: LonLat | null) => void;
   renameProject: (name: string) => void;
@@ -282,6 +291,7 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
         catalog: null,
         catalogIndex: new Map(),
         airportLightIndex: new Map(),
+        plantIndex: new Map(),
         airports: [],
         tiles: DEFAULT_TILES,
         project: deps.initialProject,
@@ -312,6 +322,11 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
             catalog: { ...catalog, xref },
             catalogIndex: new Map(xref.map((o) => [o.name, o])),
             airportLightIndex: new Map(catalog.airportLights.map((l) => [l.typeName, l])),
+            // A catalog.json cached by v0.3 DOES have a `plants` key — it has been `plants: []` in the
+            // type since M0 — so this can't crash on upgrade. It resolves to an EMPTY palette instead,
+            // which is the same first-launch-after-update state v0.2's lights had, and it is handled the
+            // same way: PlantsSection shows a Rescan hint rather than an unexplained empty list.
+            plantIndex: new Map((catalog.plants ?? []).map((p) => [plantKey(p), p])),
           });
         },
         loadAirports: (airports) => set({ airports }),
@@ -339,7 +354,9 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
               ? mutate.createXref(spec.name, p, { id })
               : spec.kind === "airport_light"
                 ? mutate.createAirportLight(spec.name, p, { id })
-                : mutate.createLight(p, { id });
+                : spec.kind === "plant"
+                  ? mutate.createPlant(spec.group, spec.species, spec.naturalHeight, p, { id })
+                  : mutate.createLight(p, { id });
           commit((proj) => mutate.addObject(proj, obj));
           set({ selection: [id] }); // select the fresh object; placement stays armed (multi-drop)
         },
@@ -398,6 +415,8 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
         setLightColor: (id, color) => commit((proj) => mutate.setLightColor(proj, id, color)),
         setIntensity: (id, intensity) => commit((proj) => mutate.setIntensity(proj, id, intensity)),
         setFlashing: (id, flashing) => commit((proj) => mutate.setFlashing(proj, id, flashing)),
+        setPlantHeightRange: (id, heightRange) =>
+          commit((proj) => mutate.setPlantHeightRange(proj, id, heightRange)),
         setGroupIndex: (id, groupIndex) => commit((proj) => mutate.setGroupIndex(proj, id, groupIndex)),
         setReference: (ref) => commit((proj) => mutate.setReference(proj, ref)),
         renameProject: (name) => commit((proj) => mutate.renameProject(proj, name)),

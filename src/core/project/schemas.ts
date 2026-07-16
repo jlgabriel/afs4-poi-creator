@@ -121,6 +121,25 @@ export const zPlacedLight = z.looseObject({
   locked: z.boolean().optional(),
 });
 
+// v0.4 plants. `group`/`species` are catalog-derived slugs, so they get the same XREF_NAME_RE gate as
+// an xref name and for the same reason: a forum-shared project.json must not smuggle a `]` into a
+// value the TM grammar cannot escape (tocWriter's sanitizeValue is the second line of defence).
+// `heightRange` is validated as a plain non-negative pair, NOT as min ≤ max — what the sim does with
+// an inverted range is unknown until the in-sim gate reports, and rejecting a file on an unverified
+// rule would lock people out of their own projects over a guess. The editor constrains; the loader
+// stays permissive (the same split as `color` above).
+export const zPlacedPlant = z.looseObject({
+  id: z.string().min(1),
+  kind: z.literal("plant"),
+  group: z.string().min(1).regex(XREF_NAME_RE, "must be a plant group name"),
+  species: z.string().min(1).regex(XREF_NAME_RE, "must be a plant species index"),
+  position: zLonLat,
+  height: zHeightSpec,
+  heightRange: z.tuple([zNonNeg, zNonNeg]),
+  label: z.string().optional(),
+  locked: z.boolean().optional(),
+});
+
 // loose (like the document top level) so a project written by a newer PCT that adds camera fields
 // round-trips without loss — zod v4 z.object would strip them (Fable review nit).
 export const zCamera = z.looseObject({
@@ -139,10 +158,14 @@ export const zProject = z.looseObject({
   reference: zLonLat.nullable(),
   camera: zCamera,
   // Discriminated on `kind` — an xref-only project (pre-v0.2) still validates, and a `kind` outside
-  // the three arms is a precise error rather than a silent drop. schemaVersion stays 1 (the seam was
+  // the four arms is a precise error rather than a silent drop. schemaVersion stays 1 (the seam was
   // designed for this): bumping it would lock older builds out of every v0.2-saved project, including
-  // pure-xref ones people share on the forum.
-  objects: z.array(z.discriminatedUnion("kind", [zPlacedXref, zPlacedAirportLight, zPlacedLight])),
+  // pure-xref ones people share on the forum. The cost of staying at 1 is the mirror case — a v0.3
+  // build opening a project with plants reports an unknown `kind` rather than dropping them silently,
+  // which is the failure we want.
+  objects: z.array(
+    z.discriminatedUnion("kind", [zPlacedXref, zPlacedAirportLight, zPlacedLight, zPlacedPlant]),
+  ),
   shift: zShift.optional(),
 });
 

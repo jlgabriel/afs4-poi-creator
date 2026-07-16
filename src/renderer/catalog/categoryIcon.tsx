@@ -23,6 +23,7 @@ type IconKey =
   | "person"
   | "jetway"
   | "light"
+  | "tree"
   | "box"
   | "generic";
 
@@ -32,6 +33,7 @@ function iconKey(category: string): IconKey {
   const c = category.toLowerCase();
   if (c === "aircraft") return "plane";
   if (c.startsWith("lights/")) return "light"; // v0.2 airport lights
+  if (c.startsWith("plants/")) return "tree"; // v0.4 plants — every group shares the one glyph
 
   if (c.startsWith("vehicles/")) {
     if (c.includes("truck") || c.includes("airport") || c.includes("caravan")) return "truck";
@@ -163,6 +165,15 @@ const ICONS: Record<IconKey, React.ReactElement> = {
       <line x1="12" y1="21" x2="12" y2="11" />
       <path d="M8 11a4 4 0 0 1 8 0z" />
       <line x1="9" y1="21" x2="15" y2="21" />
+    </>
+  ),
+  // A broadleaf silhouette: the one glyph stands for all 6 groups (palm and shrub included) — the
+  // group name is right next to it in every surface that draws this, so the icon only has to say
+  // "plant", not which.
+  tree: (
+    <>
+      <line x1="12" y1="21" x2="12" y2="14" />
+      <path d="M12 3a5.5 5.5 0 0 1 4.3 8.9A4.2 4.2 0 0 1 12 17a4.2 4.2 0 0 1-4.3-5.1A5.5 5.5 0 0 1 12 3Z" />
     </>
   ),
   box: (

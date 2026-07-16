@@ -57,6 +57,20 @@ export interface CatalogAirportLight {
   displayName: string; // derived pretty label, e.g. "Runway Edge Light"
 }
 
+/** One plant texture, enumerated from the install's `scenery/plants` folder (v0.4). Like
+ *  CatalogAirportLight there is NO `.tmi` and NO bounding box — but here there is no MESH either:
+ *  all 41 install files are `.ttx` textures, so the sim draws a plant from its texture alone and the
+ *  "scan" is pure name derivation (`broadleaf__i00__h1750_color.ttx`). `group` + `species` are the
+ *  exact strings a POI `.toc` writes; see core/catalog/plants.ts. */
+export interface CatalogPlant {
+  group: string; // the .toc `group`, e.g. "conifer_forest" — verbatim from the filename
+  species: string; // the .toc `species`, e.g. "00" — 2 zero-padded digits, verbatim
+  naturalHeight: number; // metres, decoded from the filename's h#### (h1750 → 17.5)
+  source: "install";
+  category: string; // display taxonomy path, e.g. "plants/broadleaf"
+  displayName: string; // derived pretty label, e.g. "Broadleaf 00"
+}
+
 /** The scanned catalog cache. Written to Electron userData at runtime; never committed. */
 export interface Catalog {
   schemaVersion: 1;
@@ -66,7 +80,7 @@ export interface Catalog {
   bundles: BundleInfo[];
   xref: CatalogObject[];
   xrefTable?: { rows: number; matched: number }; // present only when an xref_table overlay was applied
-  plants: []; // reserved (M4+)
+  plants: CatalogPlant[]; // v0.4 — scanned from scenery/plants/ (empty on a pre-v0.4 cache)
   airportLights: CatalogAirportLight[]; // v0.2 — scanned from airport_lights/ (empty on a pre-v0.2 cache)
   animated: []; // reserved
 }
@@ -120,9 +134,30 @@ export interface PlacedLight extends PlacedBase {
   groupIndex: number; // night-visibility group
 }
 
+/** One placed plant (v0.4). Placed BY NAME like an xref, but the name is a `group` + `species` PAIR
+ *  rather than one id. Emitted into the POI `.toc` `list_plant`.
+ *
+ *  Two fields the other kinds have are deliberately ABSENT, because the bible's plant element has
+ *  neither: no `direction` (a plant is a billboard — it turns to face the camera, so a heading has
+ *  nothing to act on) and no `scale` (`heightRange` is the size control).
+ *
+ *  ⚠️ `height` (→ the `.toc` `altitude`) is the one UNRESOLVED semantic in v0.4. Every other kind's
+ *  height is metres ASL, but a plant is the only element whose altitude is a field of its OWN
+ *  (float32, beside a 2-value lon/lat `position`) instead of the third slot of `position`, and the
+ *  bible annotates ASL on the xref/light positions while saying nothing here. So ASL is the working
+ *  assumption (consistency + it makes the existing HeightSpec pipeline fit unchanged), NOT a finding.
+ *  The in-sim gate decides; if it lands AGL the change is confined to how heights resolve, not to
+ *  this model. Do not repeat it as fact until the gate says so. */
+export interface PlacedPlant extends PlacedBase {
+  kind: "plant"; // discriminator; mirrors the .toc element tag
+  group: string; // CatalogPlant.group — the .toc `group`, e.g. "broadleaf"
+  species: string; // CatalogPlant.species — the .toc `species`, e.g. "00"
+  heightRange: [number, number]; // metres, [MIN MAX] "growth height"; [0, 0] = the texture's own height
+}
+
 /** Any placed object, discriminated on `kind`. (Project.objects widens to this when the v0.2 lights
  *  UI lands; the format/scanner plumbing below is built and golden-tested first.) */
-export type PlacedObject = PlacedXref | PlacedAirportLight | PlacedLight;
+export type PlacedObject = PlacedXref | PlacedAirportLight | PlacedLight | PlacedPlant;
 
 /** Global horizontal shift applied to EVERY object at export time: nudge each position `east`
  *  metres east and `north` metres north (either can be negative). Corrects a systematic offset
@@ -160,7 +195,10 @@ export interface ResolvedAirportLight extends Omit<PlacedAirportLight, "height">
 export interface ResolvedLight extends Omit<PlacedLight, "height"> {
   heightAsl: number;
 }
-export type ResolvedObject = ResolvedXref | ResolvedAirportLight | ResolvedLight;
+export interface ResolvedPlant extends Omit<PlacedPlant, "height"> {
+  heightAsl: number; // → the `.toc` `altitude` (ASL pending the gate — see PlacedPlant)
+}
+export type ResolvedObject = ResolvedXref | ResolvedAirportLight | ResolvedLight | ResolvedPlant;
 
 /** One file to write into the POI folder. */
 export interface PoiFile {

@@ -1,18 +1,22 @@
 // Inspector.tsx — the right panel: numeric editor for the single selected object (design §5). Reads
 // selection[0] → the object reference (Object.is-stable across unrelated store changes, so panning the
 // map never re-renders this) → its catalog metadata. Edits route through the store mutations so the
-// map's O(changed) footprint diff stays intact. v0.2 dispatches the body by `kind`: xref (footprint) |
-// airport_light | light (the two point kinds), sharing the position row + height/label/lock tail.
+// map's O(changed) footprint diff stays intact. The body dispatches by `kind`: xref (footprint) |
+// airport_light | light (the two point kinds) | plant (v0.4), sharing the position row + the
+// height/label/lock tail.
 import { useState } from "react";
 import type {
   CatalogAirportLight,
   CatalogObject,
+  CatalogPlant,
   PlacedAirportLight,
   PlacedLight,
   PlacedObject,
+  PlacedPlant,
   PlacedXref,
   Vec3,
 } from "../../core/project/types";
+import { plantKey } from "../../core/catalog/plants";
 import { clampLonLat } from "../../core/project/schemas";
 import { directionToHeading, headingToDirection } from "../../core/geo/orientation";
 import { editorStore, useEditor } from "../state/editorStore";
@@ -474,21 +478,76 @@ function LightFields({
   );
 }
 
+function PlantFields({
+  obj,
+  meta,
+  resolvedAsl,
+}: {
+  obj: PlacedPlant;
+  meta: CatalogPlant | undefined;
+  resolvedAsl: number | undefined;
+}): React.ReactElement {
+  const store = editorStore.getState;
+  // v0.4 always keeps MIN = MAX (see mutate.setPlantHeightRange), so one number drives the pair.
+  const height = obj.heightRange[0];
+  const natural = meta?.naturalHeight;
+  return (
+    <div className="pct-inspector-body">
+      <div className="pct-field-title">{meta?.displayName ?? plantKey(obj)}</div>
+
+      <PositionRow obj={obj} />
+
+      {/* ⚠️ "Plant height" ≠ the "Height" control in SharedTail below. That one is WHERE THE BASE
+          SITS (terrain / ASL, shared by every kind); this one is HOW TALL THE PLANT GROWS — a plant
+          is the only kind that has both, because it's the only element whose size is a field rather
+          than a property of a fixed mesh. Naming them both "Height" would be the whole bug. */}
+      <label className="pct-field pct-field-col">
+        <span
+          className="pct-field-label"
+          title={
+            natural !== undefined
+              ? `How tall this plant grows. Its texture is naturally ${natural} m.`
+              : "How tall this plant grows."
+          }
+        >
+          Plant height (m)
+        </span>
+        <NumberInput
+          value={height}
+          format={(n) => n.toFixed(2)}
+          onCommit={(v) => {
+            // A plant 0 m tall is, at best, invisible — and it's the value the format bible's template
+            // shows, so it's exactly the one a curious user would try. Refuse it rather than let the
+            // editor write an object that silently renders as nothing.
+            if (v > 0) store().setPlantHeightRange(obj.id, [v, v]);
+          }}
+          ariaLabel="Plant height in metres"
+        />
+      </label>
+
+      <SharedTail obj={obj} resolvedAsl={resolvedAsl} />
+    </div>
+  );
+}
+
 /** Dispatch the editor body by object kind. */
 function ObjectFields({
   obj,
   xrefMeta,
   airportLightMeta,
+  plantMeta,
   resolvedAsl,
 }: {
   obj: PlacedObject;
   xrefMeta: CatalogObject | undefined;
   airportLightMeta: CatalogAirportLight | undefined;
+  plantMeta: CatalogPlant | undefined;
   resolvedAsl: number | undefined;
 }): React.ReactElement {
   if (obj.kind === "xref") return <XrefFields obj={obj} meta={xrefMeta} resolvedAsl={resolvedAsl} />;
   if (obj.kind === "airport_light")
     return <AirportLightFields obj={obj} meta={airportLightMeta} resolvedAsl={resolvedAsl} />;
+  if (obj.kind === "plant") return <PlantFields obj={obj} meta={plantMeta} resolvedAsl={resolvedAsl} />;
   return <LightFields obj={obj} resolvedAsl={resolvedAsl} />;
 }
 
@@ -504,6 +563,7 @@ export function Inspector(): React.ReactElement {
   const airportLightMeta = useEditor((s) =>
     obj?.kind === "airport_light" ? s.airportLightIndex.get(obj.typeName) : undefined,
   );
+  const plantMeta = useEditor((s) => (obj?.kind === "plant" ? s.plantIndex.get(plantKey(obj)) : undefined));
   const resolvedAsl = useEditor((s) => (obj ? s.resolvedElev.get(obj.id) : undefined));
 
   return (
@@ -517,6 +577,7 @@ export function Inspector(): React.ReactElement {
           obj={obj}
           xrefMeta={xrefMeta}
           airportLightMeta={airportLightMeta}
+          plantMeta={plantMeta}
           resolvedAsl={resolvedAsl}
         />
       ) : (

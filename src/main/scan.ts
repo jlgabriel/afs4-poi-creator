@@ -6,10 +6,18 @@ import { closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, 
 import path from "node:path";
 import { buildCatalog, type BuildResult, type TmiSource, type UserTmbInput } from "../core/catalog/buildCatalog";
 import { buildAirportLights, type AirportLightFile } from "../core/catalog/airportLights";
+import { buildPlants, type PlantFile } from "../core/catalog/plants";
 import { isTextTmb } from "../core/catalog/userTmb";
 import type { XrefTable } from "../core/catalog/xrefTable";
 import type { Catalog } from "../core/project/types";
-import { findTmb, findTmi, resolveAirportLightsDir, resolveXrefDir } from "./afs4Paths";
+import {
+  findTmb,
+  findTmi,
+  findTtx,
+  resolveAirportLightsDir,
+  resolvePlantsDir,
+  resolveXrefDir,
+} from "./afs4Paths";
 
 /** Thrown when the given install dir has no scenery/xref with .tmi files. */
 export class NoXrefError extends Error {
@@ -116,8 +124,25 @@ export function scanXref(
   }
   const { lights, warnings: lightWarnings } = buildAirportLights(airportLightFiles);
 
-  const result = buildCatalog(sources, { installDir, userXrefDir: userDir, scannedAt }, lights, table, userTmbs);
-  result.warnings.push(...lightWarnings);
+  // v0.4 plants: enumerate scenery/plants/*.ttx from the INSTALL — filenames only, and here that is
+  // not a self-imposed limit but the whole library: those 41 textures ARE the plants, there is no
+  // geometry file to read. group/species/height all decode from the name; see core/catalog/plants.
+  const plantFiles: PlantFile[] = [];
+  const plantsDir = resolvePlantsDir(installDir);
+  if (plantsDir) {
+    for (const p of findTtx(plantsDir)) plantFiles.push({ base: path.basename(p, ".ttx") });
+  }
+  const { plants, warnings: plantWarnings } = buildPlants(plantFiles);
+
+  const result = buildCatalog(
+    sources,
+    { installDir, userXrefDir: userDir, scannedAt },
+    lights,
+    table,
+    userTmbs,
+    plants,
+  );
+  result.warnings.push(...lightWarnings, ...plantWarnings);
   return result;
 }
 

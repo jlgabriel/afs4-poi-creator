@@ -59,13 +59,20 @@ export function MapView(): React.ReactElement {
     // React so drag and undo never wait on a render.
     const paint = (): void => {
       const s = editorStore.getState();
-      layer.sync(s.project.objects, s.catalogIndex, s.airportLightIndex, new Set(s.selection));
+      layer.sync(
+        s.project.objects,
+        s.catalogIndex,
+        s.airportLightIndex,
+        s.plantIndex,
+        new Set(s.selection),
+      );
     };
     paint();
     const unsub = editorStore.subscribe(
-      // airportLightIndex too: it decides an airport light's missing (red) state, and a Rescan swaps it in
-      // alongside catalogIndex — without watching it, a light whose fixture appeared/vanished never repaints.
-      (s) => [s.project.objects, s.catalogIndex, s.airportLightIndex, s.selection] as const,
+      // Every catalog index is watched, not just catalogIndex: each one decides some object's missing
+      // (red) state, and a Rescan swaps them all in together — without watching one, an object whose
+      // catalog entry appeared/vanished never repaints.
+      (s) => [s.project.objects, s.catalogIndex, s.airportLightIndex, s.plantIndex, s.selection] as const,
       paint,
       { equalityFn: shallow },
     );

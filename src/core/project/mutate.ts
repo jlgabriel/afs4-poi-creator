@@ -14,6 +14,7 @@ import type {
   PlacedAirportLight,
   PlacedLight,
   PlacedObject,
+  PlacedPlant,
   PlacedXref,
   PoiShift,
   Project,
@@ -89,6 +90,42 @@ export function createLight(
     intensity: overrides.intensity ?? 1000,
     flashing: overrides.flashing ?? [0, 0, 0, 0],
     groupIndex: overrides.groupIndex ?? 0,
+  };
+  if (overrides.label !== undefined && overrides.label !== "") base.label = overrides.label;
+  if (overrides.locked) base.locked = true;
+  return base;
+}
+
+/** A fresh placed plant (v0.4). `naturalHeight` is the height decoded from the texture's own filename
+ *  (CatalogPlant.naturalHeight) — the caller has it in hand from the catalog.
+ *
+ *  Two defaults worth their reasoning:
+ *
+ *  • `height: { mode: "terrain" }` — a tree stands ON the ground. (Contrast createLight, which floats
+ *    its default 3 m up.) This is the mode the whole app already resolves to ASL at export.
+ *
+ *  • `heightRange: [naturalHeight, naturalHeight]` — NOT the bible's `[0, 0]`. The bible shows `[0 0]`
+ *    as the plant element's default, but that same template shows `position [0.000000 0.000000]`, which
+ *    is plainly a placeholder rather than a working value — so `[0 0]` may well mean "a plant 0 metres
+ *    tall", i.e. invisible. We never have to find out: the natural height is right there in the
+ *    filename, so writing it explicitly is correct under every reading of the field. If height_range
+ *    scales, this reproduces the texture's own size; if it's ignored, so is this. The in-sim gate (P2)
+ *    settles what `[0 0]` means, but nothing PCT emits depends on the answer. */
+export function createPlant(
+  group: string,
+  species: string,
+  naturalHeight: number,
+  position: LonLat,
+  overrides: Partial<PlacedPlant> = {},
+): PlacedPlant {
+  const base: PlacedPlant = {
+    id: overrides.id ?? randomId(),
+    kind: "plant",
+    group: overrides.group ?? group,
+    species: overrides.species ?? species,
+    position: overrides.position ?? position,
+    height: overrides.height ?? { mode: "terrain" },
+    heightRange: overrides.heightRange ?? [naturalHeight, naturalHeight],
   };
   if (overrides.label !== undefined && overrides.label !== "") base.label = overrides.label;
   if (overrides.locked) base.locked = true;
@@ -240,6 +277,22 @@ export function setGroupIndex(project: Project, id: string, groupIndex: number, 
     (o) => (o.kind === "airport_light" || o.kind === "light" ? { ...o, groupIndex } : o),
     now,
   );
+}
+
+// ── Plant field setters (v0.4; kind-guarded → no-op on the wrong kind) ─────────────────────────────
+
+/** The plant's `height_range` — how TALL it grows, which is a different axis from `height` (where its
+ *  base sits). v0.4 places one plant at a time, so the editor always sends MIN = MAX: a range would
+ *  randomise, and a precision tool wants the number the user typed. The pair is kept in the model
+ *  because it IS the field's shape, and a future scatter/forest brush is exactly where MIN ≠ MAX earns
+ *  its keep. */
+export function setPlantHeightRange(
+  project: Project,
+  id: string,
+  heightRange: [number, number],
+  now = nowIso(),
+): Project {
+  return updateOne(project, id, (o) => (o.kind === "plant" ? { ...o, heightRange } : o), now);
 }
 
 /** Set or clear the optional note. An empty/undefined label removes the field. */

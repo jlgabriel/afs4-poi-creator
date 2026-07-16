@@ -29,10 +29,12 @@ import * as L from "leaflet";
 import type {
   CatalogAirportLight,
   CatalogObject,
+  CatalogPlant,
   LonLat,
   PlacedAirportLight,
   PlacedLight,
   PlacedObject,
+  PlacedPlant,
   PlacedXref,
   Vec3,
 } from "../../core/project/types";
@@ -81,16 +83,24 @@ const hex2 = (v: number): string =>
     .toString(16)
     .padStart(2, "0");
 
-/** The map fill colour for a light: its configuration letter (airport_light) or its RGB (point light). */
-function lightColor(obj: PlacedAirportLight | PlacedLight): string {
+/** Green, for a plant's map dot. Not a light colour — a plant emits nothing; this is just the one
+ *  colour that reads as "vegetation" at a glance against both satellite imagery and street tiles. */
+const PLANT_FILL = "#3faa4a";
+
+/** The map fill colour for a point object: a light's configuration letter (airport_light) or RGB
+ *  (point light), or plain green for a plant. */
+function pointColor(obj: PlacedAirportLight | PlacedLight | PlacedPlant): string {
   if (obj.kind === "airport_light") return LIGHT_LETTER[obj.configuration[0]] ?? "#ffffff";
+  if (obj.kind === "plant") return PLANT_FILL;
   const [r, g, b] = obj.color;
   return `#${hex2(r)}${hex2(g)}${hex2(b)}`;
 }
 
 /** The orientation a rotate-grip edits, or null for a kind that has none. A parametric point light has no
  *  orientation at all (mutate.rotateObject is a deliberate no-op for it), so it gets no grip: an
- *  interactive control that commits nothing is a lie. */
+ *  interactive control that commits nothing is a lie. A plant is the same case for a different reason —
+ *  it is a billboard that turns to face the camera, so there is no heading for a grip to act on, and the
+ *  `.toc` plant element has no direction field to write one into. */
 function orientationOf(obj: PlacedObject): number | null {
   if (obj.kind === "xref") return obj.direction;
   if (obj.kind === "airport_light") return obj.orientation;
@@ -109,9 +119,9 @@ interface FootprintEntry {
 }
 interface PointEntry {
   shape: "point";
-  obj: PlacedAirportLight | PlacedLight;
+  obj: PlacedAirportLight | PlacedLight | PlacedPlant;
   selected: boolean;
-  missing: boolean; // airport_light whose fixture isn't in the scanned install (a point light never is)
+  missing: boolean; // an airport_light or plant naming something the install lacks (a point light never is)
   body: L.CircleMarker;
   halo?: L.CircleMarker; // amber selection ring, present only while selected
   tick?: L.Polyline; // orientation tick body→grip (airport_light, while selected & unlocked)
@@ -139,6 +149,7 @@ export class FootprintLayer {
   private readonly entries = new Map<string, Entry>();
   private index: Map<string, CatalogObject> = new Map();
   private lightIndex: Map<string, CatalogAirportLight> = new Map();
+  private plantIndex: Map<string, CatalogPlant> = new Map();
   private drag: Drag | null = null;
 
   constructor(
@@ -167,14 +178,18 @@ export class FootprintLayer {
     objects: PlacedObject[],
     index: Map<string, CatalogObject>,
     lightIndex: Map<string, CatalogAirportLight>,
+    plantIndex: Map<string, CatalogPlant>,
     selection: Set<string>,
   ): void {
-    // A Rescan swaps in fresh catalog Maps (loadCatalog replaces BOTH in one set()), so every footprint's
-    // bbox and every entry's missing state may differ even though the object references are untouched —
-    // force a rebuild of existing entries (I3). Watching both indexes keeps lights covered too.
-    const indexChanged = this.index !== index || this.lightIndex !== lightIndex;
+    // A Rescan swaps in fresh catalog Maps (loadCatalog replaces ALL THREE in one set()), so every
+    // footprint's bbox and every entry's missing state may differ even though the object references are
+    // untouched — force a rebuild of existing entries (I3). Every index that feeds a missing state has to
+    // be watched here, or an object whose catalog entry appeared/vanished never repaints.
+    const indexChanged =
+      this.index !== index || this.lightIndex !== lightIndex || this.plantIndex !== plantIndex;
     this.index = index;
     this.lightIndex = lightIndex;
+    this.plantIndex = plantIndex;
     const seen = new Set<string>();
     for (const obj of objects) {
       seen.add(obj.id);
@@ -243,6 +258,8 @@ export class FootprintLayer {
   }
 
   private add(obj: PlacedObject, selected: boolean): void {
+    // xref is the only kind with a footprint: it's the only one with a bounding box. Lights are point
+    // fixtures and a plant is a billboard, so both draw as a dot.
     if (obj.kind === "xref") this.addFootprint(obj, selected);
     else this.addPoint(obj, selected);
   }
@@ -283,17 +300,17 @@ export class FootprintLayer {
     this.syncHandle(entry, selected); // draw the grip if this object came in selected
   }
 
-  private addPoint(obj: PlacedAirportLight | PlacedLight, selected: boolean): void {
-    // A fixture the install doesn't have renders as NOTHING in the sim, so it must not be drawn as a
-    // happy light: it takes the xref's red-dashed idiom. There is no "its own colour" to show — the
-    // fixture that would define it doesn't exist here.
-    const missing = isMissing(obj, this.index, this.lightIndex);
+  private addPoint(obj: PlacedAirportLight | PlacedLight | PlacedPlant, selected: boolean): void {
+    // A fixture (or plant) the install doesn't have renders as NOTHING in the sim, so it must not be
+    // drawn as a happy light: it takes the xref's red-dashed idiom. There is no "its own colour" to
+    // show — the thing that would define it doesn't exist here.
+    const missing = isMissing(obj, this.index, this.lightIndex, this.plantIndex);
     const body = L.circleMarker(toLatLng(obj.position), {
       radius: LIGHT_RADIUS,
       color: missing ? COLOR_MISSING : LIGHT_OUTLINE, // dark ring so a white/pale fill reads on imagery
       weight: missing ? 2 : 1.5,
       dashArray: missing ? "3,3" : undefined,
-      fillColor: missing ? COLOR_MISSING : lightColor(obj),
+      fillColor: missing ? COLOR_MISSING : pointColor(obj),
       fillOpacity: missing ? 0.35 : 0.95,
       bubblingMouseEvents: false,
     });

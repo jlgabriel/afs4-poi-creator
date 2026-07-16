@@ -18,8 +18,8 @@ POI-folder conventions.
 > desktop editor (first-run wizard, satellite/streets map, object catalog, inspector, airport
 > search, per-object height, export / install / uninstall) are built and tested — unit + golden
 > tests, typecheck, and an Electron smoke test, all green in [CI](.github/workflows/ci.yml). **v0.2
-> added lights, and v0.3 lets you place your own custom XREF objects.** The export format is
-> **confirmed working in the sim**. Builds are currently
+> added lights, v0.3 lets you place your own custom XREF objects, and v0.4 adds plants.** The export
+> format is **confirmed working in the sim**. Builds are currently
 > **unsigned**, so your OS will warn you once on first launch — see
 > [Installing PCT](#installing-pct). Grab the newest build from
 > [Releases](https://github.com/jlgabriel/afs4-poi-creator/releases).
@@ -34,6 +34,11 @@ model or a config file — you click on a map, and PCT writes the folder.
 approach, taxiway, helipad…) and fully parametric **point lights**, where you pick the colour, the
 brightness and the flash pattern. Stagger the flash across a row of them and you get a running-light
 sweep. Lights only show at night in the sim — that's Aerofly's behaviour, not a bug.
+
+**Plants, too.** Since **v0.4** you can plant the sim's own **trees and shrubs** — broadleaf, conifer,
+conifer forest, palm, shrub and alley, 41 of them, each with its own natural height from 0.8 m of scrub
+to a 28 m forest conifer. Pick one from the **Plants** section, click the map, and set how tall it
+grows. They're billboards, so there's no rotation to worry about — a tree always faces you.
 
 **Your own objects, too.** Since **v0.3**, PCT can also place the custom **XREF objects you've added
 to your sim** — the model files you (or a scenery add-on) dropped into Aerofly's `scenery/xref`
@@ -53,10 +58,10 @@ into your finished POIs — just the *names* of the objects you chose.
    [Installing PCT](#installing-pct).
 2. **Point PCT at your sim** — on first run, a short wizard auto-detects where Aerofly FS 4 is
    installed and where your user folder lives, then scans your object catalog.
-3. **Place objects and lights** — search the catalog, click on the map to drop an object, then drag,
-   rotate, scale and fine-tune its height. Every object's footprint is drawn at its true size, so you
-   can line things up precisely. The **Lights** section below the catalog holds the airport-light
-   fixtures and the custom point light.
+3. **Place objects, lights and plants** — search the catalog, click on the map to drop an object, then
+   drag, rotate, scale and fine-tune its height. Every object's footprint is drawn at its true size, so
+   you can line things up precisely. Below the catalog, the **Lights** section holds the airport-light
+   fixtures and the custom point light, and **Plants** holds the trees and shrubs.
 4. **Export & install** — *Export POI → Install into Aerofly FS 4* writes the folder into your
    `scenery/poi/`. Restart Aerofly and fly to the spot. The same dialog can **uninstall** POIs that
    PCT made, so nothing is permanent.

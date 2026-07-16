@@ -16,6 +16,7 @@ export function PlacedList(): React.ReactElement {
   const selection = useEditor((s) => s.selection);
   const catalogIndex = useEditor((s) => s.catalogIndex);
   const airportLightIndex = useEditor((s) => s.airportLightIndex);
+  const plantIndex = useEditor((s) => s.plantIndex);
   const selSet = useMemo(() => new Set(selection), [selection]);
   const hasSelection = selection.length > 0;
 
@@ -48,7 +49,7 @@ export function PlacedList(): React.ReactElement {
           <p className="pct-empty">No objects yet — click the map to place one.</p>
         ) : (
           objects.map((o) => {
-            const info = rowInfo(o, catalogIndex, airportLightIndex);
+            const info = rowInfo(o, catalogIndex, airportLightIndex, plantIndex);
             const selected = selSet.has(o.id);
             return (
               <button

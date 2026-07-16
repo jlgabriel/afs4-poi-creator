@@ -18,12 +18,20 @@ import type {
   ResolvedAirportLight,
   ResolvedLight,
   ResolvedObject,
+  ResolvedPlant,
   ResolvedXref,
 } from "../project/types";
 import { tag, block, sanitizeValue, fmtLonLat, fmtMeters, fmtNum } from "../tm/tmEmit";
 
 function fmtPosition(o: { position: { lon: number; lat: number }; heightAsl: number }): string {
   return `${fmtLonLat(o.position.lon)} ${fmtLonLat(o.position.lat)} ${fmtMeters(o.heightAsl)}`;
+}
+
+/** A plant's `position` carries only [LONGITUDE LATITUDE] — its height lives in the sibling
+ *  `altitude` field, so this is deliberately NOT fmtPosition. (Both fields are still declared
+ *  `vector3_*` in the bible while carrying two values; the type tag is a loose hint — see below.) */
+function fmtLonLatOnly(o: { position: { lon: number; lat: number } }): string {
+  return `${fmtLonLat(o.position.lon)} ${fmtLonLat(o.position.lat)}`;
 }
 
 function xrefElement(o: ResolvedXref, index: number): string[] {
@@ -66,24 +74,61 @@ function lightElement(o: ResolvedLight, index: number): string[] {
   ]);
 }
 
+// v0.4 plants. UNLIKE every element above, this one has NO ground truth behind it: the install's own
+// `list_plant`s all live in the 38k binary-packed cultivation `.toc` we cannot read, so the bible is
+// the only spec and the in-sim gate is the validator. Emitted in the bible's declared order and types
+// verbatim — which is a weaker claim than it sounds, because three properties of the parser make the
+// shape below low-risk, each one already paid for:
+//   • ORDER doesn't matter — the sim resolves a property by HASH OF ITS NAME (tm.log: "property
+//     'model_center' is not a member of type 'cultivation' hash=…"). `list_light` shipped in pure
+//     bible order with no canonical example and rendered (gate 2026-07-12).
+//   • The TYPE TAG is loose — our own in-sim-proven `.toc` writes `float32 direction` where the bible
+//     says float64, and `string8u coordinate_system` where it says string8. Both load.
+//   • A wrong property NAME is therefore the real risk, and it is the one thing tm.log names out loud
+//     WITHOUT flying. It settles the bible's own contradiction here: this element calls the field
+//     `group` while the bible's plant list header calls the same thing `type`. We emit `group` (the
+//     element is the more specific statement) and read the log.
+// What stays for the flight: whether `altitude` is ASL or AGL, and what `height_range` does.
+function plantElement(o: ResolvedPlant, index: number): string[] {
+  return block("plant", "element", String(index), [
+    tag("vector3_float64", "position", fmtLonLatOnly(o)),
+    tag("float32", "altitude", fmtMeters(o.heightAsl)),
+    tag("vector3_float32", "height_range", o.heightRange.map((h) => fmtMeters(h)).join(" ")),
+    tag("string8", "group", sanitizeValue(o.group)),
+    tag("string8", "species", sanitizeValue(o.species)),
+  ]);
+}
+
 /** Build the `poi.toc` text for a set of height-resolved objects.
- *  A POI's `cultivation` carries sibling lists in the canonical order `list_light` →
- *  `list_airport_light` → `list_xref`. The two light lists are OMITTED when empty (never emitted
- *  empty), so an xref-only POI is byte-identical to before v0.2; `list_xref` is always emitted (even
- *  empty), which every in-sim gate has proven renders. Height is absolute ASL for all kinds (gate
- *  2026-07-12). Accepts any ResolvedObject[]; an all-xref array (the live path today) hits only the
- *  xref branch. */
+ *  A POI's `cultivation` carries sibling lists in the bible's order `list_plant` → `list_light` →
+ *  `list_airport_light` → `list_xref`. Every optional list is OMITTED when empty (never emitted
+ *  empty), so an xref-only POI stays byte-identical to before v0.2/v0.4; `list_xref` is always
+ *  emitted (even empty), which every in-sim gate has proven renders. Height is absolute ASL for
+ *  xref and both light kinds (gate 2026-07-12) — for plants it is the working assumption the v0.4
+ *  gate tests, not a finding. Accepts any ResolvedObject[]; an all-xref array hits only that branch. */
 export function buildToc(objects: ResolvedObject[]): string {
   const xrefs: ResolvedXref[] = [];
   const airportLights: ResolvedAirportLight[] = [];
   const lights: ResolvedLight[] = [];
+  const plants: ResolvedPlant[] = [];
   for (const o of objects) {
+    // One arm per kind, no catch-all `else`: a trailing else silently swept any unrecognised kind into
+    // the last bucket, so adding plants would have emitted them as lights. `never` makes the next kind
+    // a compile error here instead.
     if (o.kind === "xref") xrefs.push(o);
     else if (o.kind === "airport_light") airportLights.push(o);
-    else lights.push(o);
+    else if (o.kind === "light") lights.push(o);
+    else if (o.kind === "plant") plants.push(o);
+    else {
+      const unreachable: never = o;
+      throw new Error(`buildToc: unhandled object kind ${JSON.stringify(unreachable)}`);
+    }
   }
 
   const children: string[] = [tag("string8u", "coordinate_system", "lonlat")];
+  if (plants.length > 0) {
+    children.push(...block("list_plant", "plant_list", "", plants.flatMap((o, i) => plantElement(o, i))));
+  }
   if (lights.length > 0) {
     children.push(...block("list_light", "light_list", "", lights.flatMap((o, i) => lightElement(o, i))));
   }

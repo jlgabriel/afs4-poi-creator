@@ -6,7 +6,14 @@ import { parseTmi } from "./tmiParser";
 import { categorize, displayName } from "./categorize";
 import { lookupXref, type XrefTable } from "./xrefTable";
 import { parseUserTmb } from "./userTmb";
-import type { Catalog, CatalogAirportLight, CatalogObject, BundleInfo, Vec3 } from "../project/types";
+import type {
+  Catalog,
+  CatalogAirportLight,
+  CatalogObject,
+  CatalogPlant,
+  BundleInfo,
+  Vec3,
+} from "../project/types";
 
 export interface TmiSource {
   path: string;
@@ -69,6 +76,9 @@ export function buildCatalog(
   // a POI (they need a generated `.tmi` in their own subfolder). The scan shell enumerates + classifies
   // them; here they become `unregistered` catalog objects the UI can offer to register.
   userTmbs: UserTmbInput[] = [],
+  // v0.4 plants, already derived from filenames by core/catalog/plants.ts — passed through for the same
+  // reason as airportLights: this function's job is the `.tmi` text, and a plant has no text to parse.
+  plants: CatalogPlant[] = [],
 ): BuildResult {
   const warnings: string[] = [];
   const bundles: BundleInfo[] = [];
@@ -158,7 +168,7 @@ export function buildCatalog(
     userXrefDir: meta.userXrefDir,
     bundles,
     xref,
-    plants: [],
+    plants,
     airportLights,
     animated: [],
   };

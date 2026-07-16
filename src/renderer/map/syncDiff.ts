@@ -3,23 +3,34 @@
 // `window` at module load). mutate.ts keeps untouched objects at the same reference, so the layer can
 // skip them and only rebuild what actually changed, keeping sync O(changed).
 
-import type { CatalogAirportLight, CatalogObject, PlacedObject } from "../../core/project/types";
+import { plantKey } from "../../core/catalog/plants";
+import type {
+  CatalogAirportLight,
+  CatalogObject,
+  CatalogPlant,
+  PlacedObject,
+} from "../../core/project/types";
 
-/** Does this object name something the scanned install doesn't have? An xref names a catalog object and
- *  an airport_light names a scanned fixture, so either can dangle — a project shared on the forum may
- *  reference a fixture the opener doesn't own. A parametric point light names nothing (its parameters ARE
- *  the light), so it can never be missing.
+/** Does this object name something the scanned install doesn't have? An xref names a catalog object, an
+ *  airport_light names a scanned fixture and a plant names a group+species pair, so any of the three can
+ *  dangle — a project shared on the forum may reference something the opener doesn't own. A parametric
+ *  point light names nothing (its parameters ARE the light), so it can never be missing.
  *
  *  Missing is not fatal: the in-sim gate (V6) proved AFS4 silently SKIPS an unknown name and keeps parsing
  *  the rest of the file. But it renders as NOTHING, so the editor has to say so — before this, a placed
- *  fixture the user didn't have simply vanished at export with no warning anywhere in the UI. */
+ *  fixture the user didn't have simply vanished at export with no warning anywhere in the UI. That silence
+ *  is exactly why a plant is checked here too: every install ships the same 41 today, so this looks
+ *  redundant — but a plant name is assembled from two fields, which is one more chance to dangle than an
+ *  xref has, and the failure mode is an invisible object with no error anywhere. */
 export function isMissing(
   obj: PlacedObject,
   xrefIndex: Map<string, CatalogObject>,
   lightIndex: Map<string, CatalogAirportLight>,
+  plantIndex: Map<string, CatalogPlant>,
 ): boolean {
   if (obj.kind === "xref") return !xrefIndex.has(obj.name);
   if (obj.kind === "airport_light") return !lightIndex.has(obj.typeName);
+  if (obj.kind === "plant") return !plantIndex.has(plantKey(obj));
   return false;
 }
 

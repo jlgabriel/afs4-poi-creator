@@ -9,7 +9,9 @@
 import { readFileSync, writeFileSync, readdirSync, statSync, existsSync, mkdirSync } from "node:fs";
 import path from "node:path";
 import { buildCatalog, type TmiSource } from "../core/catalog/buildCatalog";
+import { buildPlants } from "../core/catalog/plants";
 import { loadXrefTable } from "../main/xrefTableSource";
+import { findTtx, resolvePlantsDir } from "../main/afs4Paths";
 import { encodeLonLat } from "../core/geo/poiName";
 
 interface Args {
@@ -91,6 +93,12 @@ function main(): number {
   const load = args.xrefTable ? loadXrefTable([args.xrefTable]) : { table: null, path: null, warnings: [] };
   for (const w of load.warnings) console.warn(`  WARN ${w}`);
 
+  // v0.4 plants: filenames only — `scenery/plants` holds 41 `.ttx` textures and no geometry.
+  const plantsDir = resolvePlantsDir(args.install);
+  const { plants, warnings: plantWarnings } = buildPlants(
+    plantsDir ? findTtx(plantsDir).map((p) => ({ base: path.basename(p, ".ttx") })) : [],
+  );
+
   const { catalog, warnings } = buildCatalog(
     sources,
     {
@@ -100,7 +108,10 @@ function main(): number {
     },
     [],
     load.table,
+    [],
+    plants,
   );
+  warnings.push(...plantWarnings);
 
   mkdirSync(path.dirname(path.resolve(args.out)), { recursive: true });
   writeFileSync(args.out, JSON.stringify(catalog, null, 2));
@@ -125,9 +136,18 @@ function main(): number {
     ? (1 - fallbacks.length / catalog.xref.length) * 100
     : 0;
 
+  // v0.4 acceptance: the install ships 41 plant textures and the format bible's plant list has the
+  // same 41 group/species pairs. Asserting the count here catches BOTH a scanner regression and an
+  // install whose library moved — and it is the only automated check that the two sources still agree.
+  const plantGroups = [...new Set(catalog.plants.map((p) => p.group))].sort();
   const tower = byName.get("tower00_small_plates_ds_00_08_08");
   const checks: Array<[string, boolean, string]> = [
     ["exactly 911 objects", catalog.xref.length === 911, `got ${catalog.xref.length}`],
+    [
+      "exactly 41 plants in 6 groups (matches the bible's list)",
+      catalog.plants.length === 41 && plantGroups.length === 6,
+      `got ${catalog.plants.length} in ${plantGroups.length}: ${plantGroups.join(", ")}`,
+    ],
     [
       "ACT tower cross-check 8.19 x 25.90 m",
       !!tower && Math.abs(tower.size.x - 8.19) < 0.01 && Math.abs(tower.size.z - 25.9) < 0.01,

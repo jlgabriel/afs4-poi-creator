@@ -21,6 +21,7 @@ import { buildCatalogTree, hasCategory } from "./catalogTree";
 import { CategoryTree } from "./CategoryTree";
 import { CategoryIcon } from "./categoryIcon";
 import { LightsSection } from "./LightsSection";
+import { PlantsSection } from "./PlantsSection";
 
 const ROW_H = 64; // must match .pct-row height budget in styles.css (card + row padding)
 
@@ -198,6 +199,7 @@ export function CatalogPanel(): React.ReactElement {
         </div>
       </details>
       <LightsSection />
+      <PlantsSection />
     </section>
   );
 }
