@@ -160,6 +160,20 @@ export const zSettings = z.looseObject({
   elevation: z.looseObject({ provider: z.enum(["open-meteo", "none"]) }),
   recentProjects: z.array(z.string()),
   lastScanAt: z.string().nullable(),
+  // Saved window placement. `.catch(undefined)` is load-bearing, not decoration: readSettings falls back
+  // to DEFAULTS on any parse throw, so without it a single bad rect (a hand-edited file, a NaN) would
+  // silently reset the user's install dir and tile provider too. A cosmetic field must never be able to
+  // cost them their real settings — a bad rect degrades to "no saved placement" and nothing else.
+  window: z
+    .looseObject({
+      x: z.number().finite(),
+      y: z.number().finite(),
+      width: z.number().finite().positive(),
+      height: z.number().finite().positive(),
+      maximized: z.boolean(),
+    })
+    .optional()
+    .catch(undefined),
 });
 
 // ── Migration + parse entry points ───────────────────────────────────────────

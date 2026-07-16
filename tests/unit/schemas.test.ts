@@ -114,6 +114,33 @@ describe("parseSettings", () => {
   it("rejects an unknown tile provider", () => {
     expect(() => parseSettings({ ...validSettings(), tiles: { provider: "bing" } })).toThrow();
   });
+
+  // The saved window placement (forum #125) is cosmetic, and readSettings falls back to DEFAULTS on any
+  // throw — so a schema that rejected a bad rect would quietly reset the user's install dir and tile
+  // provider along with it. It degrades to "no saved placement" instead, and nothing else moves.
+  const win = { x: 100, y: 80, width: 1280, height: 820, maximized: false };
+
+  it("round-trips a window placement", () => {
+    expect(parseSettings({ ...validSettings(), window: win })).toMatchObject({ window: win });
+  });
+  it("treats settings without a window as valid (every file written before v0.3.4)", () => {
+    expect(parseSettings(validSettings())).not.toHaveProperty("window");
+  });
+  it("drops a corrupt window rect WITHOUT losing the rest of the settings", () => {
+    for (const bad of [
+      { ...win, width: Number.NaN },
+      { ...win, height: 0 },
+      { ...win, x: "left" },
+      { maximized: true },
+      "somewhere",
+      null,
+    ]) {
+      const got = parseSettings({ ...validSettings(), window: bad });
+      expect(got.window).toBeUndefined();
+      expect(got.installDir).toBe(validSettings().installDir); // the real settings survived
+      expect(got.tiles).toEqual(validSettings().tiles);
+    }
+  });
 });
 
 describe("clampLonLat — keep a coordinate in the range the loader enforces (Fable C1)", () => {

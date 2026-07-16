@@ -3,11 +3,18 @@
 // applied to the packaged renderer. All real I/O lives in the main modules reached through
 // main/ipc.ts; the renderer stays sandboxed and talks only to the preload bridge.
 import { join } from "node:path";
-import { app, BrowserWindow, session, shell } from "electron";
+import { app, BrowserWindow, screen, session, shell } from "electron";
 import { registerIpc } from "./ipc";
+import { readSettings, writeSettings } from "./settings";
+import { restoreBounds } from "./windowBounds";
 
 // electron-vite injects this env var in dev (the Vite renderer dev-server URL); undefined in prod.
 const RENDERER_URL = process.env["ELECTRON_RENDERER_URL"];
+
+/** Frozen in at build time from package.json by electron.vite.config (`define`). See the note there for
+ *  why this is NOT app.getVersion(): that returns Electron's own version when the main script is launched
+ *  by path, so the title read "PCT 43.0.0" under the e2e while being correct in a packaged build. */
+declare const __APP_VERSION__: string;
 
 // Packaged-renderer CSP. NOT applied in dev: Vite HMR injects an inline react-refresh preamble + a
 // ws: connection that a strict policy would block. The dev renderer is a local-only page; the
@@ -23,12 +30,21 @@ const CSP =
   "connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'";
 
 function createWindow(): void {
+  const userData = app.getPath("userData");
+  const documents = app.getPath("documents");
+
+  // Reopen where the user left it (forum #125). `screen` is only legal after app.whenReady(), which both
+  // call sites satisfy. windowBounds decides — including refusing a position whose display is gone.
+  const workAreas = screen.getAllDisplays().map((d) => d.workArea);
+  const { maximized, ...frame } = restoreBounds(readSettings(userData, documents).window, workAreas);
+
   const win = new BrowserWindow({
-    width: 1280,
-    height: 820,
+    ...frame, // width/height always; x/y only when they still land on a screen
     show: false,
     autoHideMenuBar: true,
-    title: "PCT — POI Creation Tool",
+    // The version is here because Michael was asked to test v0.3.3 and had no way to tell what he was
+    // running (forum #131). Build-time constant → the same string in dev, e2e and the installer.
+    title: `PCT ${__APP_VERSION__} — POI Creation Tool`,
     webPreferences: {
       preload: join(import.meta.dirname, "../preload/index.cjs"),
       contextIsolation: true,
@@ -37,7 +53,30 @@ function createWindow(): void {
     },
   });
 
-  win.once("ready-to-show", () => win.show());
+  // index.html carries its own <title> (it is also the dev-preview tab label), and in Electron a page
+  // title WINS over the `title` option the moment the document loads — so the option alone would show the
+  // version for one frame and then lose it. Main owns the title; the renderer never sets one dynamically.
+  // Verified by deleting this line: the e2e goes red with "PCT — POI Creation Tool", no version.
+  win.on("page-title-updated", (event) => event.preventDefault());
+
+  // "…reappears at the same place and in the size as when closing" — so close is exactly when to record
+  // it. getNormalBounds(), NOT getBounds(): while maximized the latter returns the maximized rectangle,
+  // which would come back as the restored size and un-maximizing would give the wrong window. One
+  // synchronous write, no resize/move listeners to debounce; a kill -9 costs a placement and nothing else.
+  win.on("close", () => {
+    try {
+      const b = win.getNormalBounds();
+      const window = { x: b.x, y: b.y, width: b.width, height: b.height, maximized: win.isMaximized() };
+      writeSettings(userData, { window }, documents);
+    } catch {
+      /* a window placement is never worth blocking a quit over */
+    }
+  });
+
+  win.once("ready-to-show", () => {
+    if (maximized) win.maximize(); // after the frame exists, before the first paint → no restore flash
+    win.show();
+  });
 
   // Navigation hardening: external links (e.g. map attribution) open in the OS browser; the window
   // itself never navigates away from the app (in-app same-origin reloads — Vite dev — are allowed).

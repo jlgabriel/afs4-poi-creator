@@ -177,6 +177,17 @@ export interface ExportPlan {
 
 // ── App settings (design §2.3) ──────────────────────────────────────────────
 
+/** Where the window was when it was last closed, so it reopens there (forum #125). Always the NORMAL
+ *  bounds — the maximized rectangle is not worth storing, `maximized` restores that separately and the
+ *  normal size is what un-maximizing must give back. Optional: absent until the first clean close. */
+export interface WindowBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  maximized: boolean;
+}
+
 export interface Settings {
   schemaVersion: 1;
   installDir: string | null; // AFS4 install (read: scenery/xref)
@@ -189,4 +200,5 @@ export interface Settings {
   elevation: { provider: "open-meteo" | "none" };
   recentProjects: string[]; // absolute paths, max 10
   lastScanAt: string | null;
+  window?: WindowBounds; // last placement — restored on launch (see main/windowBounds.ts)
 }

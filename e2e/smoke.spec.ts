@@ -13,7 +13,7 @@ import {
   type ElectronApplication,
   type Page,
 } from "@playwright/test";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -21,6 +21,10 @@ import type { Catalog, Settings } from "../src/core/project/types";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const MAIN = path.join(ROOT, "out", "main", "index.js");
+
+/** Read from package.json, NOT app.getVersion() — asserting getVersion() against getVersion() would pass
+ *  no matter what the title said. */
+const VERSION: string = JSON.parse(readFileSync(path.join(ROOT, "package.json"), "utf8")).version;
 
 const tempUserData = (tag: string): string => mkdtempSync(path.join(tmpdir(), `pct-e2e-${tag}-`));
 
@@ -142,5 +146,60 @@ test("the Inspector's Copy button really reaches the clipboard (deny-all permiss
     expect(seen.errors.map(String), seen.errors.join("\n")).toEqual([]);
   } finally {
     await app.close();
+  }
+});
+
+// Forum #131: "please show the version number somewhere in the app (or I'm too stupid to find it)" — asked
+// right after being handed a build to test and having no way to tell which one he was running.
+//
+// This asserts the NATIVE window title, which is the only thing that can catch the actual trap: the
+// renderer's index.html carries its own <title>, and in Electron a page title overrides the
+// BrowserWindow `title` option the moment the document loads. Setting `title` alone LOOKS right in the
+// source and ships a titlebar with no version in it. page.title() would read the document title and
+// happily agree with the bug, so it is deliberately not used here.
+test("the window title carries the version (a page <title> must not win)", async () => {
+  const app = await launch(seedEditor("title"));
+  try {
+    const page = await app.firstWindow();
+    await expect(page.locator(".leaflet-container")).toBeVisible(); // the document (and its <title>) has loaded
+
+    const nativeTitle = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getTitle());
+    expect(nativeTitle).toBe(`PCT ${VERSION} — POI Creation Tool`);
+    expect(nativeTitle).toContain(VERSION); // the point of the exercise, said out loud
+  } finally {
+    await app.close();
+  }
+});
+
+// Forum #125: "Can the PCT app also be coded in such a way that it reappears at the same place and in the
+// size as when closing?" Both halves are asserted against a REAL relaunch sharing one userData dir —
+// the save happens in a `close` handler, which no unit test can reach.
+test("the window reopens at the size and place it was closed at", async () => {
+  const userData = seedEditor("bounds");
+  const want = { x: 100, y: 80, width: 900, height: 640 }; // comfortably inside any CI/xvfb display
+
+  const first = await launch(userData);
+  try {
+    await first.firstWindow();
+    await first.evaluate(({ BrowserWindow }, b) => BrowserWindow.getAllWindows()[0].setBounds(b), want);
+    // Let the window manager actually apply it before we trust what gets saved.
+    await expect
+      .poll(() => first.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getNormalBounds()))
+      .toMatchObject({ width: want.width, height: want.height });
+  } finally {
+    await first.close(); // fires the window's `close` → settings.json is written
+  }
+
+  const saved = JSON.parse(readFileSync(path.join(userData, "settings.json"), "utf8")) as Settings;
+  expect(saved.window, "close should have recorded the placement").toMatchObject({ ...want, maximized: false });
+  expect(saved.installDir).toBe(userData); // and must not have trampled the rest of the settings
+
+  const second = await launch(userData);
+  try {
+    await second.firstWindow();
+    const reopened = await second.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getBounds());
+    expect(reopened).toMatchObject(want);
+  } finally {
+    await second.close();
   }
 });
