@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { XREF_BASE_HEADING, directionToHeading, headingToDirection } from "../../src/core/geo/orientation";
+import {
+  XREF_BASE_HEADING,
+  directionToHeading,
+  headingToDirection,
+  rotateAzimuth,
+} from "../../src/core/geo/orientation";
 
 // The mapping was measured in-sim (2026-07-15 KDAG gate): heading = (90 − direction) mod 360.
 // These cases are exactly the gate readings Juan confirmed by flying them.
@@ -33,5 +38,27 @@ describe("XREF orientation conversion (heading = 90 − direction)", () => {
   it("honours a per-object base override (the planned exception layer)", () => {
     expect(directionToHeading(0, 270)).toBe(270); // an object whose front is West at direction 0
     expect(headingToDirection(0, 270)).toBe(270);
+  });
+});
+
+// The rotation SENSE lives in rotateAzimuth alone — footprint corners come through it too. v0.3.0's
+// #120 was exactly two copies of this fact drifting apart, so it gets pinned on its own.
+describe("rotateAzimuth — the one home of the rotation sense", () => {
+  it("turns a direction-0 azimuth AGAINST the compass", () => {
+    expect(rotateAzimuth(0, 30)).toBe(330); // North turned by direction 30 → 330, NOT 30
+    expect(rotateAzimuth(90, 90)).toBe(0); // East → North
+    expect(rotateAzimuth(10, 20)).toBe(350); // wraps below zero
+  });
+
+  it("direction 0 is the identity, and it normalizes", () => {
+    expect(rotateAzimuth(20.5, 0)).toBe(20.5);
+    expect(rotateAzimuth(0, -90)).toBe(90); // negative direction normalized
+    expect(rotateAzimuth(0, 450)).toBe(270); // >360 normalized (450 ≡ dir 90)
+  });
+
+  it("is what directionToHeading is made of (the base facing, rotated)", () => {
+    for (const d of [0, 37, 90, 250, 359]) {
+      expect(directionToHeading(d)).toBe(rotateAzimuth(XREF_BASE_HEADING, d));
+    }
   });
 });

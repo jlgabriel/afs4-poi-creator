@@ -22,9 +22,23 @@ export const XREF_BASE_HEADING = 90;
 
 const norm360 = (deg: number): number => ((deg % 360) + 360) % 360;
 
+/** Rotate a compass azimuth measured at `direction 0` by an object's raw `.toc` `direction`.
+ *
+ *  THE single home of the rotation SENSE — every consumer comes through here. `direction` is a
+ *  right-handed yaw about +z (up) in a model frame of +X = East / +Y = North, so it turns compass
+ *  azimuths NEGATIVE; that is the same fact that makes `heading = 90 − direction`.
+ *
+ *  It exists because v0.3.0 spelled that sense out in two places — the facing (below, calibrated) and
+ *  the map footprint's corners, which still ADDED `direction` from the pre-calibration guess. They
+ *  rotated opposite ways and the polygon visibly fought its own heading tick (forum #120). Anything
+ *  that turns with an object — a facing, a bbox corner, a tick — is one rotation and shares one line. */
+export function rotateAzimuth(azimuthAtDir0: number, direction: number): number {
+  return norm360(azimuthAtDir0 - direction);
+}
+
 /** Raw `.toc` `direction` → the compass heading the object's front points in-sim. */
 export function directionToHeading(direction: number, base: number = XREF_BASE_HEADING): number {
-  return norm360(base - direction);
+  return rotateAzimuth(base, direction);
 }
 
 /** Desired compass heading → the raw `.toc` `direction` to write. Inverse of directionToHeading (an

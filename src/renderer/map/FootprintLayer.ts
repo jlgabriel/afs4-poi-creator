@@ -209,8 +209,11 @@ export class FootprintLayer {
 
   // The orientation tick points where the object FACES in-sim (heading = 90 − direction, calibrated
   // 2026-07-15) — not along the model +Y axis. It reaches the box's extent in that compass bearing, and
-  // the grip (handleAt, same bearing) sits just past it. `footprintCorners` stays as-is: the rectangle is
-  // 180°-symmetric, so its rotation sense is invisible — only this facing tick makes the sense visible.
+  // the grip (handleAt, same bearing) sits just past it. footprintCorners turns the polygon through the
+  // same orientation.rotateAzimuth, so the box and this tick can never disagree. v0.3.0 shipped them
+  // disagreeing: the polygon kept the old clockwise guess on the theory that a 180°-symmetric rectangle
+  // hides its rotation sense. It does not — ±d are mirror images, and an off-centre bbox lands on the
+  // wrong side of the anchor outright — so users watched the box turn against its own tick (forum #120).
   private headingAt(
     anchor: LonLat,
     obj: PlacedXref,
