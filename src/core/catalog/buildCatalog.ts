@@ -14,12 +14,18 @@ export interface TmiSource {
   text: string;
 }
 
-/** One loose user `.tmb` the scan shell hands to buildCatalog (design B2). `text` is the full plain-text
- *  body for an AC3D-exported `.tmb`; null for an OPAQUE (IPACS-compiled) one the scan classified by its
- *  first byte and deliberately did NOT read in full. Passed as data (not a filesystem read here) so
- *  buildCatalog stays pure. */
+/** One unregistered user `.tmb` the scan shell hands to buildCatalog (design B2). `text` is the full
+ *  plain-text body for an AC3D-exported `.tmb`; null for an OPAQUE (IPACS-compiled) one the scan
+ *  classified by its first byte and deliberately did NOT read in full. Passed as data (not a filesystem
+ *  read here) so buildCatalog stays pure.
+ *
+ *  `bundle` and `base` differ, and must: the unit of registration is the FOLDER (one `.tmi` per folder,
+ *  named after it — see scan.listUserTmb), so N `.tmb` in one folder share a bundle while each keeps its
+ *  own basename. v0.3.0 had a single `base` for both, which only held because it looked at the xref root
+ *  alone, where every `.tmb` is its own bundle (forum #122). */
 export interface UserTmbInput {
-  base: string; // `.tmb` basename → the bundle folder + `.tmi` name once registered
+  base: string; // the `.tmb`'s own basename — the object NAME fallback when the file is opaque
+  bundle: string; // the bundle it belongs to: its folder, or its own base when loose at the xref root
   text: string | null; // full text for a plain-text `.tmb`; null = opaque (not read)
 }
 
@@ -30,18 +36,18 @@ export interface BuildResult {
 
 const round2 = (v: number): number => Math.round(v * 100) / 100;
 
-/** One `unregistered` catalog object for a loose user `.tmb`. Opaque `.tmb` (sizeUnknown) carry a zero
+/** One `unregistered` catalog object for a user `.tmb`. Opaque `.tmb` (sizeUnknown) carry a zero
  *  bbox — the filename is all PCT can read. Never overlaid (source:"user"; see the buildCatalog merge). */
-function userXrefObject(name: string, base: string, bbMin: Vec3, bbMax: Vec3, opaque: boolean): CatalogObject {
+function userXrefObject(name: string, bundle: string, bbMin: Vec3, bbMax: Vec3, opaque: boolean): CatalogObject {
   const obj: CatalogObject = {
     name,
-    bundle: base,
+    bundle,
     source: "user",
     bbMin,
     bbMax,
     bsRadius: opaque ? 0 : Math.hypot(bbMax[0] - bbMin[0], bbMax[1] - bbMin[1], bbMax[2] - bbMin[2]) / 2,
     size: { x: round2(bbMax[0] - bbMin[0]), y: round2(bbMax[1] - bbMin[1]), z: round2(bbMax[2] - bbMin[2]) },
-    category: `user/${base}`,
+    category: `user/${bundle}`,
     displayName: displayName(name),
     act: false,
     unregistered: true,
@@ -109,8 +115,9 @@ export function buildCatalog(
     }
   }
 
-  // Loose user `.tmb` → `unregistered` objects. A plain-text `.tmb` yields one object per geometry (real
-  // bbox); an opaque one — or a text one with no derivable bbox — becomes a single sizeUnknown placeholder.
+  // Unregistered user `.tmb` → `unregistered` objects. A plain-text `.tmb` yields one object per geometry
+  // (real bbox); an opaque one — or a text one with no derivable bbox — becomes a single sizeUnknown
+  // placeholder named after the FILE (its geometry name is exactly what PCT could not read).
   for (const u of userTmbs) {
     if (u.text !== null) {
       const { geometries, warnings: uw } = parseUserTmb(u.text);
@@ -122,13 +129,13 @@ export function buildCatalog(
               `[user:${u.base}.tmb] geometry '${g.name}' shares a built-in's name — the user object wins in the browse list`,
             );
           }
-          xref.push(userXrefObject(g.name, u.base, g.bbMin, g.bbMax, false));
+          xref.push(userXrefObject(g.name, u.bundle, g.bbMin, g.bbMax, false));
         }
         continue;
       }
       // text-class but nothing derivable → fall through to the opaque placeholder
     }
-    xref.push(userXrefObject(u.base, u.base, [0, 0, 0], [0, 0, 0], true));
+    xref.push(userXrefObject(u.base, u.bundle, [0, 0, 0], [0, 0, 0], true));
   }
 
   const catalog: Catalog = {

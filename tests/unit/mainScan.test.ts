@@ -66,6 +66,67 @@ describe("scanXref", () => {
     expect(opaque?.sizeUnknown).toBe(true);
     expect(opaque?.bbMax).toEqual([0, 0, 0]);
   });
+
+  // ── #122: the layout a real add-on ZIP extracts to. v0.3.0 walked the xref ROOT only, so a normally
+  //    installed object was invisible and the whole register flow could never fire. ──
+  const userTmbText = (name: string, points: string): string => `<[file][][]
+    <[tmxglscene][][]
+        <[pointer_list_tmxglgeometry][geometry_list][]
+            <[tmxglgeometry][element][0]
+                <[string8u][name][${name}]>
+                <[matrix4_float64][matrix][1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1]>
+                <[tmxglmesh][mesh_collision][]
+                    <[list_vector3_float32][point_list][${points}]>
+                >
+            >
+        >
+    >
+>`;
+
+  it("#122: surfaces .tmb from a SUBFOLDER with no .tmi, bundled under the folder name", () => {
+    writeTmi("scenery/xref/xref_install.tmi", "");
+    const userXref = path.join(tmp, "user", "scenery", "xref");
+    const pack = path.join(userXref, "xref_air_race_pylons");
+    mkdirSync(pack, { recursive: true });
+    writeFileSync(path.join(pack, "pylon_15m.tmb"), userTmbText("pylon_15m", "(0 0 0) (2 2 15)"));
+    writeFileSync(path.join(pack, "pylon_30m.tmb"), userTmbText("pylon_30m", "(0 0 0) (3 3 30)"));
+
+    const { catalog } = scanXref(tmp, path.join(tmp, "user"), "t");
+    expect(catalog.xref.map((o) => o.name).sort()).toEqual(["pylon_15m", "pylon_30m"]);
+    expect(catalog.xref.every((o) => o.unregistered && o.bundle === "xref_air_race_pylons")).toBe(true);
+    expect(catalog.xref.find((o) => o.name === "pylon_30m")?.size).toEqual({ x: 3, y: 3, z: 30 });
+  });
+
+  it("#122: a subfolder WITH a .tmi is read through the .tmi, never doubled as unregistered", () => {
+    writeTmi("scenery/xref/xref_install.tmi", "");
+    const userXref = path.join(tmp, "user", "scenery", "xref");
+    const pack = path.join(userXref, "xref_air_race");
+    mkdirSync(pack, { recursive: true });
+    writeFileSync(path.join(pack, "pylon_15m.tmb"), userTmbText("pylon_15m", "(0 0 0) (2 2 15)"));
+    // its real index — the bundle is already resolvable, so the .tmb must NOT surface again
+    writeFileSync(
+      path.join(pack, "xref_air_race.tmi"),
+      `<[file][][]
+    <[tmxglscene_info][][]
+        <[string8][filename][xref_air_race]>
+        <[list_tmxglscene_info_entry][geometries][]
+            <[tmxglscene_info_entry][element][0]
+                <[string8u][name][pylon_15m]>
+                <[vector3_float64][bb_min][0.0 0.0 0.0]>
+                <[vector3_float64][bb_max][2.0 2.0 15.0]>
+                <[vector3_float64][bs_center][1.0 1.0 7.5]>
+                <[float64][bs_radius][7.6]>
+            >
+        >
+    >
+>`,
+    );
+
+    const { catalog } = scanXref(tmp, path.join(tmp, "user"), "t");
+    expect(catalog.xref).toHaveLength(1); // exactly one — not one from the .tmi plus one from the .tmb
+    expect(catalog.xref[0].name).toBe("pylon_15m");
+    expect(catalog.xref[0].unregistered).toBeUndefined();
+  });
 });
 
 describe("catalog cache", () => {

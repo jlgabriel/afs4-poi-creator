@@ -52,6 +52,11 @@ afterEach(() => {
   rmSync(userData, { recursive: true, force: true });
 });
 const writeLoose = (file: string, content: string | Buffer): void => writeFileSync(path.join(root, file), content);
+/** Write into `<xref>/<folder>/` — the shape a real add-on ZIP extracts to (#122). */
+const writeIn = (folder: string, file: string, content: string | Buffer): void => {
+  mkdirSync(path.join(root, folder), { recursive: true });
+  writeFileSync(path.join(root, folder, file), content);
+};
 
 describe("isSafeBundleName", () => {
   it("accepts slugs and rejects traversal / separators / spaces", () => {
@@ -99,6 +104,47 @@ describe("planXrefRegistration", () => {
       skipped: [],
     });
   });
+
+  // ── #122: the layout real add-ons actually ship (a ZIP of a FOLDER). v0.3.0 walked the root only and
+  //    found NOTHING here, so the feature could not fire for a normally-installed object. ──
+  it("#122: a folder of .tmb with no .tmi is ONE registerable bundle named after the folder", () => {
+    writeIn("xref_air_race_pylons", "pylon_15m.tmb", tmbText("pylon_15m", "(-1 -1 0) (1 1 15)", "pylon"));
+    writeIn("xref_air_race_pylons", "pylon_30m.tmb", tmbText("pylon_30m", "(-1 -1 0) (1 1 30)", "pylon"));
+    writeIn("xref_air_race_pylons", "pylon.ttx", "fake-texture-bytes");
+
+    const plan = planXrefRegistration(tmp);
+    expect(plan.skipped).toEqual([]);
+    expect(plan.registerable).toHaveLength(1); // ONE bundle, not one per file
+    const b = plan.registerable[0];
+    expect(b.base).toBe("xref_air_race_pylons"); // the FOLDER names the bundle + its .tmi
+    expect(b.inPlace).toBe(true);
+    expect(b.dir).toBe(path.join(root, "xref_air_race_pylons"));
+    expect(b.geometries.map((g) => g.name)).toEqual(["pylon_15m", "pylon_30m"]);
+    expect(b.ttx).toEqual([]); // the user's texture is already beside its .tmb — never copy it
+    expect(b.missingTextures).toEqual([]);
+  });
+
+  it("#122: a folder that already has a .tmi is left completely alone", () => {
+    writeIn("xref_air_race", "pylon_15m.tmb", tmbText("pylon_15m", "(-1 -1 0) (1 1 15)"));
+    writeIn("xref_air_race", "xref_air_race.tmi", "<[file][][]>"); // already resolvable → findTmi's job
+    expect(planXrefRegistration(tmp).registerable).toEqual([]);
+  });
+
+  it("#122: an unreadable .tmb doesn't sink its readable siblings (partial index still helps)", () => {
+    writeIn("pack", "good.tmb", tmbText("good", "(0 0 0) (1 1 1)"));
+    writeIn("pack", "opaque.tmb", Buffer.from([0xb5, 0xfe, 0x24, 0xc7]));
+    const plan = planXrefRegistration(tmp);
+    expect(plan.registerable).toHaveLength(1);
+    expect(plan.registerable[0].geometries.map((g) => g.name)).toEqual(["good"]);
+    expect(plan.skipped.map((s) => s.reason).join(" ")).toContain("opaque");
+  });
+
+  it("#122: nested folders are walked too (symmetric with findTmi)", () => {
+    writeIn(path.join("vendor", "deep_pack"), "thing.tmb", tmbText("thing", "(0 0 0) (1 1 1)"));
+    const plan = planXrefRegistration(tmp);
+    expect(plan.registerable).toHaveLength(1);
+    expect(plan.registerable[0].base).toBe("deep_pack");
+  });
 });
 
 describe("registerXref", () => {
@@ -141,6 +187,41 @@ describe("registerXref", () => {
     writeLoose("pct_widget.tmb", tmbText("pct_widget", "(0 0 0) (1 1 1)"));
     expect(registerXref(tmp, userData, "t").registered).toHaveLength(1);
     expect(registerXref(tmp, userData, "t").registered).toHaveLength(0);
+  });
+
+  // ── #122: registering a real add-on folder. This is the whole point of the fix — and note how much
+  //    LESS it does than the loose path: one file appears, nothing of the user's is touched. ──
+  it("#122: registering a folder bundle only ADDS the .tmi — every user file is untouched", () => {
+    writeIn("pylons", "pylon_15m.tmb", tmbText("pylon_15m", "(-1 -1 0) (1 1 15)", "pylon"));
+    writeIn("pylons", "pylon_30m.tmb", tmbText("pylon_30m", "(-2 -2 0) (2 2 30)", "pylon"));
+    writeIn("pylons", "pylon.ttx", "fake");
+    writeIn("pylons", "__readme.txt", "michael's notes");
+    const dir = path.join(root, "pylons");
+    const before = readdirSync(dir).sort();
+
+    const res = registerXref(tmp, userData, "2026-07-16T00:00:00Z");
+    expect(res.warnings).toEqual([]);
+    expect(res.registered).toEqual([{ base: "pylons", path: dir, geometries: 2, ttx: 0 }]);
+
+    // exactly ONE new file — the index; nothing moved, nothing deleted, no folder created
+    expect(readdirSync(dir).sort()).toEqual([...before, "pylons.tmi"].sort());
+    expect(readFileSync(path.join(dir, "pylons.tmi"), "utf8")).toBe(
+      buildTmi("pylons", [
+        { name: "pylon_15m", bbMin: [-1, -1, 0], bbMax: [1, 1, 15] },
+        { name: "pylon_30m", bbMin: [-2, -2, 0], bbMax: [2, 2, 30] },
+      ]),
+    );
+    // the journal claims ONLY the .tmi — a future unregister must never delete the user's own files
+    const journal = JSON.parse(readFileSync(path.join(userData, "xref-registry.json"), "utf8"));
+    expect(journal.pylons.files).toEqual(["pylons.tmi"]);
+    expect(journal.pylons.inPlace).toBe(true);
+    expect(journal.pylons.sourceTmbPath).toBeUndefined();
+  });
+
+  it("#122: registering a folder bundle is idempotent (its .tmi now makes it resolvable)", () => {
+    writeIn("pylons", "pylon_15m.tmb", tmbText("pylon_15m", "(0 0 0) (1 1 15)"));
+    expect(registerXref(tmp, userData, "t").registered).toHaveLength(1);
+    expect(registerXref(tmp, userData, "t").registered).toHaveLength(0); // the .tmi is there → left alone
   });
 
   it("registers the good bundle even when another is skipped", () => {

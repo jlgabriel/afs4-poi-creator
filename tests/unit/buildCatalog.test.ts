@@ -167,7 +167,7 @@ ${g.join("\n")}
 
   it("makes one unregistered object per geometry of a plain-text .tmb, with real bbox", () => {
     const { catalog, warnings } = buildCatalog([], meta, [], null, [
-      { base: "pct_userbundle", text: userTmb(meshGeom("pct_userobj", "(-1 -2 0) (1 2 3)")) },
+      { base: "pct_userbundle", bundle: "pct_userbundle", text: userTmb(meshGeom("pct_userobj", "(-1 -2 0) (1 2 3)")) },
     ]);
     expect(warnings).toEqual([]);
     expect(catalog.xref).toHaveLength(1);
@@ -188,7 +188,9 @@ ${g.join("\n")}
   });
 
   it("makes a single sizeUnknown placeholder for an opaque .tmb (text:null)", () => {
-    const { catalog } = buildCatalog([], meta, [], null, [{ base: "opaque_obj", text: null }]);
+    const { catalog } = buildCatalog([], meta, [], null, [
+      { base: "opaque_obj", bundle: "opaque_obj", text: null },
+    ]);
     expect(catalog.xref).toHaveLength(1);
     expect(catalog.xref[0]).toMatchObject({
       name: "opaque_obj",
@@ -202,7 +204,7 @@ ${g.join("\n")}
 
   it("degrades a text .tmb with no derivable geometry to a sizeUnknown placeholder + warning", () => {
     const { catalog, warnings } = buildCatalog([], meta, [], null, [
-      { base: "empty_obj", text: "<[file][][]\n    <[tmxglscene][][]>\n>" }, // valid tree, no tmxglgeometry
+      { base: "empty_obj", bundle: "empty_obj", text: "<[file][][]\n    <[tmxglscene][][]>\n>" }, // valid tree, no tmxglgeometry
     ]);
     expect(catalog.xref).toHaveLength(1);
     expect(catalog.xref[0].sizeUnknown).toBe(true);
@@ -214,10 +216,37 @@ ${g.join("\n")}
       { path: "i.tmi", source: "install", text: tmi("xref_i", entry("shared_name", "0 0 0", "1 1 1")) },
     ];
     const { catalog, warnings } = buildCatalog(install, meta, [], null, [
-      { base: "user_pack", text: userTmb(meshGeom("shared_name", "(0 0 0) (2 2 2)")) },
+      { base: "user_pack", bundle: "user_pack", text: userTmb(meshGeom("shared_name", "(0 0 0) (2 2 2)")) },
     ]);
     expect(catalog.xref).toHaveLength(2);
     expect(warnings.join(" ")).toContain("shares a built-in's name");
+  });
+
+  // #122: the real shape — N `.tmb` in ONE folder share that folder's bundle, and each keeps its own
+  // basename. v0.3.0 had a single `base` doing both jobs, which only survived because it looked at the
+  // xref root alone (where every `.tmb` IS its own bundle).
+  it("several .tmb in one folder share the folder's bundle, each keeping its own name", () => {
+    const { catalog } = buildCatalog([], meta, [], null, [
+      { base: "pylon_15m", bundle: "xref_air_race_pylons", text: userTmb(meshGeom("pylon_15m", "(-1 -1 0) (1 1 15)")) },
+      { base: "pylon_30m", bundle: "xref_air_race_pylons", text: userTmb(meshGeom("pylon_30m", "(-1 -1 0) (1 1 30)")) },
+    ]);
+    expect(catalog.xref).toHaveLength(2);
+    expect(catalog.xref.map((o) => o.name)).toEqual(["pylon_15m", "pylon_30m"]);
+    expect(catalog.xref.every((o) => o.bundle === "xref_air_race_pylons")).toBe(true);
+    expect(catalog.xref.every((o) => o.category === "user/xref_air_race_pylons")).toBe(true);
+    expect(catalog.xref.every((o) => o.unregistered)).toBe(true);
+    expect(catalog.xref[1].size).toEqual({ x: 2, y: 2, z: 30 });
+  });
+
+  // Two opaque `.tmb` in one folder must stay two DISTINCT objects. They fall back to a name, and the
+  // only name PCT has for an unreadable file is its own basename — the bundle would collide.
+  it("opaque .tmb in a shared folder keep distinct names (basename, not bundle)", () => {
+    const { catalog } = buildCatalog([], meta, [], null, [
+      { base: "box_a", bundle: "ipacs_pack", text: null },
+      { base: "box_b", bundle: "ipacs_pack", text: null },
+    ]);
+    expect(catalog.xref.map((o) => o.name)).toEqual(["box_a", "box_b"]);
+    expect(catalog.xref.every((o) => o.bundle === "ipacs_pack" && o.sizeUnknown)).toBe(true);
   });
 
   it("no loose .tmb → catalog identical to the call without userTmbs (no-regression)", () => {

@@ -32,24 +32,46 @@ function readHead(file: string, n = 512): string {
   }
 }
 
-/** Enumerate ROOT-level `.tmb` in the user's scenery/xref (NON-recursive, by design): a `.tmb` sitting
- *  inside a subfolder alongside a `.tmi` is a registered bundle already read via the `.tmi` path, so we
- *  only surface the loose ones at the root. Classify each by its first byte — read a plain-text `.tmb`
- *  in full (buildCatalog derives its geometry), leave an opaque one unread (text:null → sizeUnknown). */
-function listLooseTmb(xrefRoot: string): UserTmbInput[] {
-  let entries;
-  try {
-    entries = readdirSync(xrefRoot, { withFileTypes: true });
-  } catch {
-    return [];
-  }
+/** Enumerate the user's UNREGISTERED `.tmb` under scenery/xref — RECURSIVELY, mirroring findTmi.
+ *
+ *  The unit of registration is a BUNDLE = the folder the `.tmb` sits in, indexed by one `.tmi` named after
+ *  that folder. So a directory is unregistered exactly when it holds `.tmb` but NO `.tmi`, at any depth.
+ *  A `.tmb` loose at the xref ROOT is its own bundle-to-be (registration gives it a folder of its own).
+ *
+ *  v0.3.0 walked the root ONLY, reasoning that a `.tmb` in a subfolder "is a registered bundle already
+ *  read via the `.tmi` path". That conflates *in a subfolder* with *next to a `.tmi`* — and real add-ons
+ *  ship as a ZIP OF A FOLDER, so extracting one puts every `.tmb` one level down with no `.tmi` anywhere,
+ *  and PCT saw nothing at all (forum #122). findTmi has always recursed; this walk has to agree with it,
+ *  or the two disagree about what exists — which is precisely the bug the user hit.
+ *
+ *  Classify each by its first byte — read a plain-text `.tmb` in full (buildCatalog derives its geometry),
+ *  leave an opaque one unread (text:null → sizeUnknown). */
+function listUserTmb(xrefRoot: string): UserTmbInput[] {
   const out: UserTmbInput[] = [];
-  for (const e of entries) {
-    if (!e.isFile() || !e.name.toLowerCase().endsWith(".tmb")) continue;
-    const full = path.join(xrefRoot, e.name);
-    const base = path.basename(e.name, path.extname(e.name));
-    out.push({ base, text: isTextTmb(readHead(full)) ? readFileSync(full, "utf8") : null });
-  }
+  const walk = (dir: string, isRoot: boolean): void => {
+    let entries;
+    try {
+      entries = readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return; // unreadable dir — skip, never fatal (mirrors findTmi)
+    }
+    const files = entries.filter((e) => e.isFile());
+    // A `.tmi` here means this folder is already a resolvable bundle: its `.tmb` come in via findTmi.
+    if (!files.some((e) => e.name.toLowerCase().endsWith(".tmi"))) {
+      for (const e of files) {
+        if (!e.name.toLowerCase().endsWith(".tmb")) continue;
+        const full = path.join(dir, e.name);
+        const base = path.basename(e.name, path.extname(e.name));
+        out.push({
+          base,
+          bundle: isRoot ? base : path.basename(dir),
+          text: isTextTmb(readHead(full)) ? readFileSync(full, "utf8") : null,
+        });
+      }
+    }
+    for (const e of entries) if (e.isDirectory()) walk(path.join(dir, e.name), false);
+  };
+  walk(xrefRoot, true);
   return out;
 }
 
@@ -79,7 +101,7 @@ export function scanXref(
       for (const p of findTmi(userXref)) {
         sources.push({ path: p, source: "user", text: readFileSync(p, "utf8") });
       }
-      userTmbs.push(...listLooseTmb(userXref)); // loose (unregistered) user `.tmb` at the xref root
+      userTmbs.push(...listUserTmb(userXref)); // every user `.tmb` no `.tmi` indexes yet (any depth)
     }
   }
 

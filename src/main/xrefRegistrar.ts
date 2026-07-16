@@ -79,16 +79,23 @@ function readHead(file: string, n = 512): string {
 const sha256 = (s: string): string => createHash("sha256").update(s).digest("hex");
 const sha256File = (p: string): string => createHash("sha256").update(readFileSync(p)).digest("hex");
 
-/** One loose `.tmb` that CAN be registered, with everything the write step needs. */
+/** A bundle PCT can register, with everything the write step needs. Two shapes, one type:
+ *
+ *  • `inPlace` — a FOLDER the user already has (`xref/foo/` holding `.tmb` + textures but no `.tmi`).
+ *    This is what a real add-on looks like once extracted, and registering it means writing ONE file:
+ *    `foo/foo.tmi`. Nothing moves, nothing is deleted.
+ *  • loose — a bare `.tmb` at the xref ROOT. PCT builds `xref/<base>/` around it (the v0.3.0 flow). */
 export interface RegisterableBundle {
-  base: string; // `.tmb` basename → subfolder + `.tmi` name
-  tmbPath: string; // absolute source path of the loose `.tmb`
-  geometries: UserTmbGeometry[]; // fed straight to buildTmi
-  ttx: string[]; // sibling `.ttx` filenames present at the xref root, copied into the bundle (copy-all, Q2)
-  missingTextures: string[]; // `<name>.ttx` the `.tmb` references but that isn't a sibling → renders untextured
+  base: string; // bundle name → the folder AND its `.tmi` basename (the sim keys off `filename`)
+  dir: string; // absolute bundle folder: already on disk when inPlace, created by us when loose
+  inPlace: boolean;
+  tmbPaths: string[]; // the `.tmb` this bundle indexes (exactly one when loose)
+  geometries: UserTmbGeometry[]; // union across tmbPaths, fed straight to buildTmi
+  ttx: string[]; // `.ttx` filenames at the xref root to copy IN (loose only — an inPlace bundle's are already beside their `.tmb`)
+  missingTextures: string[]; // `<name>.ttx` a `.tmb` references but that isn't beside it → renders untextured
 }
 
-/** A loose `.tmb` that was NOT registered, with a human reason (shown in the register dialog). */
+/** A `.tmb` (or folder) that was NOT registered, with a human reason (shown in the register dialog). */
 export interface SkippedTmb {
   path: string;
   reason: string;
@@ -100,56 +107,119 @@ export interface RegistrationPlan {
   skipped: SkippedTmb[];
 }
 
-/** Dry-run (READ-ONLY): classify every loose root-level `.tmb` in the user's scenery/xref. Non-recursive
- *  by design — a `.tmb` already inside a subfolder is a bundle, not loose. Never throws. */
-export function planXrefRegistration(afs4UserDir: string): RegistrationPlan {
-  const root = xrefRoot(afs4UserDir);
-  let entries;
-  try {
-    entries = readdirSync(root, { withFileTypes: true });
-  } catch {
-    return { xrefDir: null, registerable: [], skipped: [] };
+/** Classify one bare `.tmb` at the xref ROOT — PCT will build a folder around it. */
+function planLooseTmb(
+  root: string,
+  name: string,
+  siblingTtx: string[],
+  registerable: RegisterableBundle[],
+  skipped: SkippedTmb[],
+): void {
+  const tmbPath = path.join(root, name);
+  const base = path.basename(name, path.extname(name));
+  if (!isSafeBundleName(base)) return void skipped.push({ path: tmbPath, reason: "unsafe bundle name" });
+  if (!isTextTmb(readHead(tmbPath))) {
+    return void skipped.push({
+      path: tmbPath,
+      reason: "opaque (compiled) .tmb — name/bbox not readable; register it manually",
+    });
   }
+  const { geometries, textures } = parseUserTmb(readFileSync(tmbPath, "utf8"));
+  if (geometries.length === 0) {
+    return void skipped.push({ path: tmbPath, reason: "no derivable geometry (empty or invalid .tmb)" });
+  }
+  const dest = path.join(root, base);
+  if (existsSync(dest)) {
+    return void skipped.push({ path: tmbPath, reason: `a "${base}" folder already exists at the xref root` });
+  }
+  const referenced = textures.map((n) => `${n}.ttx`);
+  registerable.push({
+    base,
+    dir: dest,
+    inPlace: false,
+    tmbPaths: [tmbPath],
+    geometries,
+    ttx: siblingTtx,
+    missingTextures: referenced.filter((t) => !siblingTtx.some((s) => s.toLowerCase() === t.toLowerCase())),
+  });
+}
 
-  // All `.ttx` at the root — copied wholesale into each bundle (copy-all is safe: over-copy is inert,
-  // under-copy renders untextured; Q2). texture_list is used only to WARN about missing ones, not filter.
-  const siblingTtx = entries
-    .filter((e) => e.isFile() && e.name.toLowerCase().endsWith(".ttx"))
-    .map((e) => e.name);
+/** Classify a FOLDER that holds `.tmb` but no `.tmi` — the shape a real add-on ZIP extracts to. Every
+ *  readable `.tmb` in it joins ONE bundle named after the folder; an unreadable one is skipped with its
+ *  own reason but does not sink its readable siblings (a partial index still makes those objects work). */
+function planFolderBundle(
+  dir: string,
+  tmbNames: string[],
+  ttxNames: string[],
+  registerable: RegisterableBundle[],
+  skipped: SkippedTmb[],
+): void {
+  const base = path.basename(dir);
+  if (!isSafeBundleName(base)) return void skipped.push({ path: dir, reason: "unsafe folder name" });
 
-  const registerable: RegisterableBundle[] = [];
-  const skipped: SkippedTmb[] = [];
-
-  for (const e of entries) {
-    if (!e.isFile() || !e.name.toLowerCase().endsWith(".tmb")) continue;
-    const tmbPath = path.join(root, e.name);
-    const base = path.basename(e.name, path.extname(e.name));
-
-    if (!isSafeBundleName(base)) {
-      skipped.push({ path: tmbPath, reason: "unsafe bundle name" });
-      continue;
-    }
+  const geometries: UserTmbGeometry[] = [];
+  const tmbPaths: string[] = [];
+  const referenced = new Set<string>();
+  for (const name of tmbNames) {
+    const tmbPath = path.join(dir, name);
     if (!isTextTmb(readHead(tmbPath))) {
       skipped.push({ path: tmbPath, reason: "opaque (compiled) .tmb — name/bbox not readable; register it manually" });
       continue;
     }
-    const { geometries, textures } = parseUserTmb(readFileSync(tmbPath, "utf8"));
-    if (geometries.length === 0) {
+    const { geometries: g, textures } = parseUserTmb(readFileSync(tmbPath, "utf8"));
+    if (g.length === 0) {
       skipped.push({ path: tmbPath, reason: "no derivable geometry (empty or invalid .tmb)" });
       continue;
     }
-    const dest = path.join(root, base);
-    if (existsSync(dest)) {
-      skipped.push({ path: tmbPath, reason: `a "${base}" folder already exists at the xref root` });
-      continue;
-    }
-
-    const referenced = textures.map((n) => `${n}.ttx`);
-    const missingTextures = referenced.filter(
-      (t) => !siblingTtx.some((s) => s.toLowerCase() === t.toLowerCase()),
-    );
-    registerable.push({ base, tmbPath, geometries, ttx: siblingTtx, missingTextures });
+    geometries.push(...g);
+    for (const t of textures) referenced.add(`${t}.ttx`);
+    tmbPaths.push(tmbPath);
   }
+  if (geometries.length === 0) return; // nothing readable here — each `.tmb` already carries its own reason
+
+  registerable.push({
+    base,
+    dir,
+    inPlace: true,
+    tmbPaths,
+    geometries,
+    ttx: [], // the user's textures already sit beside their `.tmb` — copying would only duplicate them
+    missingTextures: [...referenced].filter((t) => !ttxNames.some((s) => s.toLowerCase() === t.toLowerCase())),
+  });
+}
+
+/** Dry-run (READ-ONLY): find everything in the user's scenery/xref that a `.tmi` doesn't index yet.
+ *  RECURSIVE, mirroring findTmi / scan.listUserTmb — see the note there: v0.3.0 looked at the root alone
+ *  and therefore never saw a normally-installed add-on, which ships as a ZIP of a folder (#122). A folder
+ *  holding a `.tmi` is already resolvable and is left completely alone. Never throws. */
+export function planXrefRegistration(afs4UserDir: string): RegistrationPlan {
+  const root = xrefRoot(afs4UserDir);
+  if (!existsSync(root)) return { xrefDir: null, registerable: [], skipped: [] };
+
+  const registerable: RegisterableBundle[] = [];
+  const skipped: SkippedTmb[] = [];
+
+  const walk = (dir: string, isRoot: boolean): void => {
+    let entries;
+    try {
+      entries = readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    const files = entries.filter((e) => e.isFile());
+    const named = (ext: string) => files.filter((e) => e.name.toLowerCase().endsWith(ext)).map((e) => e.name);
+    const tmb = named(".tmb");
+    // `.ttx` beside the `.tmb`: copied wholesale into a loose bundle (copy-all is safe — over-copy is
+    // inert, under-copy renders untextured; Q2). texture_list only WARNS about missing ones, never filters.
+    const ttx = named(".ttx");
+
+    if (named(".tmi").length === 0 && tmb.length > 0) {
+      if (isRoot) for (const name of tmb) planLooseTmb(root, name, ttx, registerable, skipped);
+      else planFolderBundle(dir, tmb, ttx, registerable, skipped);
+    }
+    for (const e of entries) if (e.isDirectory()) walk(path.join(dir, e.name), false);
+  };
+  walk(root, true);
 
   return { xrefDir: root, registerable, skipped };
 }
@@ -167,15 +237,31 @@ export interface RegistrationResult {
   warnings: string[]; // missing-texture notes + any per-bundle failure, for the result surface
 }
 
+/** Provenance for a future "unregister". `files` lists ONLY what PCT itself wrote into the bundle — for
+ *  an inPlace folder that is the `.tmi` and nothing else, so an unregister can never reach for the user's
+ *  own `.tmb`/`.ttx` that were already sitting there. */
 interface JournalEntry {
   base: string;
-  sourceTmbPath: string;
-  tmbSha256: string;
+  dir: string;
+  inPlace: boolean;
+  sourceTmbPath?: string; // loose only: where the original `.tmb` was moved from
+  tmbSha256?: string; // loose only
   tmiSha256: string;
-  files: string[]; // relative filenames written into the bundle (provenance for a future unregister)
+  files: string[]; // relative filenames PCT WROTE into the bundle
   registeredAt: string;
 }
 type Journal = Record<string, JournalEntry>;
+
+/** Assert a discovered bundle dir resolves strictly inside the xref root. Our own walk produced it (and
+ *  never follows symlinks — a symlinked dir fails isDirectory()), so this is belt-and-braces at the write
+ *  boundary, the same rationale as resolveBundlePath for the loose shape. */
+function assertInsideRoot(root: string, dir: string): void {
+  const rootAbs = path.resolve(root);
+  const dirAbs = path.resolve(dir);
+  if (!dirAbs.startsWith(rootAbs + path.sep)) {
+    throw new Error(`Bundle escapes the xref root: ${JSON.stringify(dir)}`);
+  }
+}
 
 function readJournal(userDataDir: string): Journal {
   try {
@@ -222,36 +308,60 @@ export function registerXref(
   const warnings: string[] = [];
 
   for (const b of plan.registerable) {
-    const dest = resolveBundlePath(root, b.base); // re-validate at the write boundary
-    const staging = dest + STAGING_SUFFIX;
-    rmSync(staging, { recursive: true, force: true });
     try {
-      mkdirSync(staging, { recursive: true });
       const tmiText = buildTmi(b.base, b.geometries);
-      copyFileSync(b.tmbPath, path.join(staging, `${b.base}.tmb`)); // COPY — don't move yet
-      const files = [`${b.base}.tmb`, `${b.base}.tmi`];
-      for (const ttx of b.ttx) {
-        copyFileSync(path.join(root, ttx), path.join(staging, ttx)); // copy (leave the original — shared)
-        files.push(ttx);
-      }
-      writeFileSync(path.join(staging, `${b.base}.tmi`), tmiText, "utf8");
-      renameSync(staging, dest); // atomic swap-in of the complete bundle
-      rmSync(b.tmbPath, { force: true }); // NOW delete the original loose `.tmb` — bundle is safely in place
+      if (b.inPlace) {
+        // The folder already IS the bundle — the user's `.tmb` and textures are where the sim wants them
+        // (this is byte-for-byte the shape of a working community bundle). Registering is ONE atomic file
+        // write: no staging, no move, no delete, nothing to roll back and nothing of the user's to lose.
+        assertInsideRoot(root, b.dir);
+        writeFileAtomic(path.join(b.dir, `${b.base}.tmi`), tmiText);
+        journal[b.base] = {
+          base: b.base,
+          dir: b.dir,
+          inPlace: true,
+          tmiSha256: sha256(tmiText),
+          files: [`${b.base}.tmi`], // the ONLY byte PCT authored here
+          registeredAt: now,
+        };
+        registered.push({ base: b.base, path: b.dir, geometries: b.geometries.length, ttx: 0 });
+      } else {
+        const dest = resolveBundlePath(root, b.base); // re-validate at the write boundary
+        const staging = dest + STAGING_SUFFIX;
+        rmSync(staging, { recursive: true, force: true });
+        try {
+          mkdirSync(staging, { recursive: true });
+          const [tmbPath] = b.tmbPaths; // loose = exactly one
+          copyFileSync(tmbPath, path.join(staging, `${b.base}.tmb`)); // COPY — don't move yet
+          const files = [`${b.base}.tmb`, `${b.base}.tmi`];
+          for (const ttx of b.ttx) {
+            copyFileSync(path.join(root, ttx), path.join(staging, ttx)); // copy (leave the original — shared)
+            files.push(ttx);
+          }
+          writeFileSync(path.join(staging, `${b.base}.tmi`), tmiText, "utf8");
+          renameSync(staging, dest); // atomic swap-in of the complete bundle
+          rmSync(tmbPath, { force: true }); // NOW delete the original — the bundle is safely in place
 
-      journal[b.base] = {
-        base: b.base,
-        sourceTmbPath: b.tmbPath,
-        tmbSha256: sha256File(path.join(dest, `${b.base}.tmb`)),
-        tmiSha256: sha256(tmiText),
-        files,
-        registeredAt: now,
-      };
-      registered.push({ base: b.base, path: dest, geometries: b.geometries.length, ttx: b.ttx.length });
+          journal[b.base] = {
+            base: b.base,
+            dir: dest,
+            inPlace: false,
+            sourceTmbPath: tmbPath,
+            tmbSha256: sha256File(path.join(dest, `${b.base}.tmb`)),
+            tmiSha256: sha256(tmiText),
+            files,
+            registeredAt: now,
+          };
+          registered.push({ base: b.base, path: dest, geometries: b.geometries.length, ttx: b.ttx.length });
+        } catch (e) {
+          rmSync(staging, { recursive: true, force: true }); // leave no half-built bundle behind
+          throw e;
+        }
+      }
       for (const m of b.missingTextures) {
         warnings.push(`${b.base}: referenced texture ${m} not found — the object may render untextured`);
       }
     } catch (e) {
-      rmSync(staging, { recursive: true, force: true }); // leave no half-built bundle behind
       warnings.push(`${b.base}: registration failed (${(e as Error).message})`);
     }
   }
