@@ -16,7 +16,7 @@ import type { PlacingSpec } from "../state/store";
 import { getPct } from "../app/pct";
 import { matchesFilter } from "./catalogFilter";
 import { isBrowsable } from "./browseVisibility";
-import { buildCatalogTree } from "./catalogTree";
+import { buildCatalogTree, hasCategory } from "./catalogTree";
 import { CategoryTree } from "./CategoryTree";
 import { CategoryIcon } from "./categoryIcon";
 import { LightsSection } from "./LightsSection";
@@ -157,12 +157,20 @@ export function CatalogPanel(): React.ReactElement {
 
   const tree = useMemo(() => (catalog ? buildCatalogTree(browsable) : null), [catalog, browsable]);
 
+  // A category the current catalog no longer has is no filter at all — see hasCategory. DERIVED, not
+  // synced back into the store: the user's choice is still their choice, so a rescan that brings the
+  // node back re-applies it, and we never write to the store from a render.
+  const category = useMemo(
+    () => (tree !== null && filter.category !== null && !hasCategory(tree, filter.category) ? null : filter.category),
+    [tree, filter.category],
+  );
+
   // The input reflects filter.query immediately; the list filters on the DEFERRED query so typing is
   // never blocked by the row re-render (see the perf note above).
   const deferredQuery = useDeferredValue(filter.query);
   const objects = useMemo(
-    () => browsable.filter((o) => matchesFilter(o, { category: filter.category, query: deferredQuery })),
-    [browsable, filter.category, deferredQuery],
+    () => browsable.filter((o) => matchesFilter(o, { category, query: deferredQuery })),
+    [browsable, category, deferredQuery],
   );
 
   // Stable across renders: reads the live `placing` at click time rather than closing over this
@@ -195,7 +203,7 @@ export function CatalogPanel(): React.ReactElement {
           into view instead of leaving it pinned to the bottom (forum #86-1). Mirrors LightsSection. */}
       <details className="pct-objects" open>
         <summary className="pct-section-summary">Objects ({browsable.length})</summary>
-        {tree && <CategoryTree tree={tree} active={filter.category} onSelect={onSelectCategory} />}
+        {tree && <CategoryTree tree={tree} active={category} onSelect={onSelectCategory} />}
         <div className="pct-catalog-list">
           {objects.length === 0 ? (
             <p className="pct-empty">{catalog ? "No matching objects" : "No catalog loaded"}</p>

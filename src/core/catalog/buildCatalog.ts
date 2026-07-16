@@ -83,7 +83,20 @@ export function buildCatalog(
 
     for (const e of entries) {
       if (src.source === "install") installNames.add(e.name);
-      const { category, act } = categorize(e.name, bundle);
+      // A user's own object browses under `user/<bundle>` whether or not it is registered yet —
+      // the same category `userXrefObject` (below) gives it while it is still a loose `.tmb`. So
+      // registering only clears the `unregistered` badge; the object never MOVES in the tree, and a
+      // category selected before hitting Register still exists after it.
+      //
+      // `categorize` only describes IPACS's built-ins, so it can't say anything true about a user
+      // object: it either buries it in `other/<bundle>`, or — on a name collision — files it under
+      // the built-in's category, scattering the user's library through 855 objects that aren't
+      // theirs. Same reasoning as the overlay guard below: the names may collide, the geometry is
+      // the user's own. `act` (present in the curated table) is false for the same reason.
+      const isUser = src.source === "user";
+      const builtin = categorize(e.name, bundle);
+      const category = isUser ? `user/${bundle}` : builtin.category;
+      const act = isUser ? false : builtin.act;
       // Overlay only install-source objects: a user `.tmb` sharing a built-in's name must not inherit
       // that built-in's official metadata (the names collide but the geometry is the user's own).
       const official = src.source === "install" ? lookupXref(table, e.name) : null;

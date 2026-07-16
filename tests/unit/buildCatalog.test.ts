@@ -256,4 +256,49 @@ ${g.join("\n")}
     expect(buildCatalog(install, meta, [], null, [])).toEqual(buildCatalog(install, meta, [], null));
     expect(buildCatalog(install, meta, [], null).catalog.xref.every((o) => !o.unregistered)).toBe(true);
   });
+
+  // Registering must not MOVE a user's object in the browse tree. Found by using the tool: the natural
+  // flow is to click the `user` category to see your loose `.tmb`, then hit Register — and the rescan
+  // filed them under `other/<bundle>` instead, so the node the user was standing in ceased to exist and
+  // the gallery went blank for EVERY search (catalogTree.hasCategory covers that second half).
+  // Pins the contract the way a user states it: Register clears the badge and changes nothing else.
+  it("registering a folder does not move its objects — same category before and after", () => {
+    const loose = buildCatalog([], meta, [], null, [
+      { base: "pylon_15m", bundle: "xref_air_race_pylons", text: userTmb(meshGeom("pylon_15m", "(-1 -1 0) (1 1 15)")) },
+    ]).catalog.xref[0];
+
+    // the very same folder, rescanned once PCT has written its `.tmi` in place (filename = the folder)
+    const registered = buildCatalog(
+      [
+        {
+          path: "U/xref_air_race_pylons/xref_air_race_pylons.tmi",
+          source: "user",
+          text: tmi("xref_air_race_pylons", entry("pylon_15m", "-1 -1 0", "1 1 15")),
+        },
+      ],
+      meta,
+    ).catalog.xref[0];
+
+    expect(registered.category).toBe(loose.category); // the bug: "other/…" after vs "user/…" before
+    expect(registered.category).toBe("user/xref_air_race_pylons");
+    expect(loose.unregistered).toBe(true);
+    expect(registered.unregistered).toBeUndefined(); // the ONLY difference the user should see
+  });
+
+  // `categorize` speaks only for IPACS's built-ins, so a user object whose name happens to hit a curated
+  // rule must not be filed under it: that scatters someone's own library through 855 objects that aren't
+  // theirs, and `act` would claim it came from the curated table when it didn't.
+  it("a user-source .tmi never scatters into a built-in category on a name match", () => {
+    const { catalog } = buildCatalog(
+      [{ path: "U/mine/mine.tmi", source: "user", text: tmi("mine", entry("hangar_demo_ds_01", "0 0 0", "1 1 1")) }],
+      meta,
+    );
+    expect(catalog.xref[0]).toMatchObject({ category: "user/mine", act: false });
+    // …while the identical name from the INSTALL still categorizes as before
+    const builtin = buildCatalog(
+      [{ path: "i.tmi", source: "install", text: tmi("xref_i", entry("hangar_demo_ds_01", "0 0 0", "1 1 1")) }],
+      meta,
+    ).catalog.xref[0];
+    expect(builtin.category).toBe("buildings/hangar");
+  });
 });

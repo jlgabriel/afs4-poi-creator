@@ -57,3 +57,13 @@ export function buildCatalogTree(objects: readonly CatalogObject[]): CatalogTree
   nodes.sort(byLabel);
   return { total: objects.length, nodes };
 }
+
+/** Is `path` still a live node in this tree? A category selection outlives the catalog it was made
+ *  against (`filter.category` is only ever written by a click), so a rescan can leave it pointing at
+ *  a node that no longer exists — the user deletes a bundle from scenery/xref, or repoints PCT at
+ *  another install. matchesFilter's category gate then rejects EVERY object and the panel reads
+ *  "No matching objects" for any search, with no visible cause and no way out but clicking another
+ *  node. The panel calls this to treat a vanished category as no filter at all. */
+export function hasCategory(tree: CatalogTree, path: string): boolean {
+  return tree.nodes.some((top) => top.path === path || top.children.some((c) => c.path === path));
+}
