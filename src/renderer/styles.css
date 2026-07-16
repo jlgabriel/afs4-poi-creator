@@ -530,6 +530,47 @@ body {
   flex: 0 0 auto;
 }
 
+/* Register dialog lists (forum #125). Each list scrolls at its own cap, INSIDE .pct-modal-card's 90vh —
+   two independent bounds, so neither a 35-line skipped list nor both lists together can run off-screen.
+   That is the entire bug: a native alert has no such bound and simply grew past the bottom of the screen. */
+.pct-reg-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+.pct-reg-head .pct-field-label {
+  flex: 1 1 auto;
+}
+.pct-reg-list {
+  /* flex: 0 0 auto is NOT decoration. .pct-modal-card is a flex column, so these lists are flex items and
+     shrink below their content by default — in a short window the one-row "will be registered" list
+     collapsed to a ~14px sliver with its own scrollbar. Refuse to shrink: each list keeps its cap, and if
+     the total still doesn't fit, the card's own overflow scrolls (same as ExportDialog). Only reproducible
+     in a SHORT window — which is the one Michael has. */
+  flex: 0 0 auto;
+  max-height: 180px;
+  overflow-y: auto;
+  margin: 4px 0 0;
+  padding: 6px 8px;
+  list-style: none;
+  font-size: 12px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+}
+.pct-reg-row {
+  padding: 3px 0;
+}
+.pct-reg-row + .pct-reg-row {
+  border-top: 1px solid #f1f5f9;
+}
+.pct-copy-list {
+  flex: 0 0 auto;
+  font-size: 11px;
+  padding: 2px 8px;
+}
+
 /* Inspector fields. */
 .pct-inspector-body {
   flex: 1 1 auto;

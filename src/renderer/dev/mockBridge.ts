@@ -43,6 +43,11 @@ const STEMS = [
   "powerline_pylon",
 ];
 
+/** Verbatim from xrefRegistrar.planLooseTmb — the mock's job is to look like main, and the old copy here
+ *  had drifted (it dropped "name/bbox not readable"), which is exactly the kind of gap that makes a
+ *  preview agree with a bug. */
+const OPAQUE_REASON = "opaque (compiled) .tmb — name/bbox not readable; register it manually";
+
 function buildBigCatalog(): Catalog {
   const xref: CatalogObject[] = [];
   const bundle = "xref_mock";
@@ -69,8 +74,11 @@ function buildBigCatalog(): Catalog {
       });
     }
   }
-  // Two loose user `.tmb` (design B2) so the register banner/dialog is exercisable in the preview: one
-  // plain-text (registerable) + one opaque (sizeUnknown, skipped).
+  // Loose user `.tmb` (design B2), in the proportion the register dialog actually has to survive: ONE
+  // readable + THIRTY opaque. The COUNT is the point, not the coverage. Michael scanned ~2000 objects
+  // with exactly one readable, and at roughly this length the old alert-driven flow ran off the bottom
+  // of his screen (#125) — a 1+1 mock renders both lists beautifully and could never have shown that.
+  // Same trap as the register bug itself: ask what the harness is incapable of reproducing.
   xref.push({
     name: "my_pylon",
     bundle: "my_pylon",
@@ -84,20 +92,23 @@ function buildBigCatalog(): Catalog {
     act: false,
     unregistered: true,
   });
-  xref.push({
-    name: "opaque_widget",
-    bundle: "opaque_widget",
-    source: "user",
-    bbMin: [0, 0, 0],
-    bbMax: [0, 0, 0],
-    bsRadius: 0,
-    size: { x: 0, y: 0, z: 0 },
-    category: "user/opaque_widget",
-    displayName: "Opaque Widget",
-    act: false,
-    unregistered: true,
-    sizeUnknown: true,
-  });
+  for (let i = 0; i < 30; i++) {
+    const name = `opaque_widget_${String(i).padStart(2, "0")}`;
+    xref.push({
+      name,
+      bundle: name,
+      source: "user",
+      bbMin: [0, 0, 0],
+      bbMax: [0, 0, 0],
+      bsRadius: 0,
+      size: { x: 0, y: 0, z: 0 },
+      category: `user/${name}`,
+      displayName: `Opaque Widget ${String(i).padStart(2, "0")}`,
+      act: false,
+      unregistered: true,
+      sizeUnknown: true,
+    });
+  }
   return {
     schemaVersion: 1,
     scannedAt: "2026-07-09T00:00:00Z",
@@ -195,19 +206,28 @@ export function installMockBridge(): void {
         registerable: catalog.xref
           .filter((o) => o.unregistered && !o.sizeUnknown)
           .map((o) => ({ base: o.name, geometries: 1, ttx: 1, missingTextures: [] })),
-        skipped: catalog.xref
-          .filter((o) => o.sizeUnknown)
-          .map((o) => ({ name: `${o.name}.tmb`, reason: "opaque (compiled) .tmb — register it manually" })),
+        skipped: catalog.xref.filter((o) => o.sizeUnknown).map((o) => ({ name: `${o.name}.tmb`, reason: OPAQUE_REASON })),
       },
     }),
     registerXref: async () => {
       const registered = catalog.xref.filter((o) => o.unregistered && !o.sizeUnknown).length;
+      const skipped = catalog.xref.filter((o) => o.sizeUnknown);
       // "register" the plain-text ones: they now resolve → drop the unregistered flag.
       catalog = {
         ...catalog,
         xref: catalog.xref.map((o) => (o.unregistered && !o.sizeUnknown ? { ...o, unregistered: undefined } : o)),
       };
-      return { ok: true, value: { registered, scan: { catalog, warnings: [] }, warnings: [] } };
+      // The real registerXref appends one "Skipped …" warning PER skipped file (xrefRegistrar.ts), so the
+      // RESULT screen gets the same wall the plan did — which is the half of #125 that bit Michael twice.
+      // `warnings: []` here meant the preview could never render that list at all.
+      return {
+        ok: true,
+        value: {
+          registered,
+          scan: { catalog, warnings: [] },
+          warnings: skipped.map((o) => `Skipped ${o.name}.tmb: ${OPAQUE_REASON}`),
+        },
+      };
     },
     openProject: async () => ({ ok: true, value: null }),
     saveProject: async () => ({ ok: true, value: { path: "C:/Mock/project.json" } }),

@@ -14,6 +14,7 @@ import type { CatalogObject } from "../../core/project/types";
 import { editorStore, useEditor } from "../state/editorStore";
 import type { PlacingSpec } from "../state/store";
 import { getPct } from "../app/pct";
+import { RegisterDialog } from "../dialogs/RegisterDialog";
 import { matchesFilter } from "./catalogFilter";
 import { isBrowsable } from "./browseVisibility";
 import { buildCatalogTree, hasCategory } from "./catalogTree";
@@ -59,58 +60,35 @@ const ObjectCard = memo(function ObjectCard({ o, armed, onArm }: ObjectCardProps
   );
 });
 
-/** A banner shown when the catalog holds loose user `.tmb` (design B2): it previews what can be
- *  registered (main re-plans authoritatively), confirms, registers, and reloads the fresh catalog so the
- *  now-resolvable objects become placeable. Q4: a simple banner + confirm/alert, not a bespoke modal. */
+/** A banner shown when the catalog holds user `.tmb` that no `.tmi` indexes yet (design B2). It counts
+ *  and opens; the plan, the confirmation and the result all live in RegisterDialog.
+ *
+ *  Q4 chose "a simple banner + confirm/alert, not a bespoke modal", and that held right up until a user
+ *  arrived with ~2000 objects: a native alert doesn't scroll, so his skipped list ran off the bottom of
+ *  the screen (#125). The banner itself stayed simple — only the surface behind it grew. */
 function RegisterBanner({ count }: { count: number }): React.ReactElement | null {
   const pct = getPct();
-  const [busy, setBusy] = useState(false);
+  const [open, setOpen] = useState(false);
   if (count === 0) return null;
 
-  const run = async (): Promise<void> => {
-    if (!pct) return;
-    setBusy(true);
-    try {
-      const planRes = await pct.planXrefRegistration();
-      if (!planRes.ok) return void window.alert(planRes.error.message);
-      const { registerable, skipped } = planRes.value;
-      const skipText = skipped.length
-        ? `\n\nCan't auto-register:\n${skipped.map((s) => `• ${s.name} — ${s.reason}`).join("\n")}`
-        : "";
-      if (registerable.length === 0) return void window.alert(`Nothing can be registered.${skipText}`);
-      const list = registerable
-        .map((b) => `• ${b.base}${b.missingTextures.length ? ` (missing texture: ${b.missingTextures.join(", ")})` : ""}`)
-        .join("\n");
-      const ok = window.confirm(
-        `Register ${registerable.length} object${registerable.length === 1 ? "" : "s"} into scenery/xref? ` +
-          `Each moves into its own subfolder with a generated .tmi so the sim can resolve it.\n\n${list}${skipText}`,
-      );
-      if (!ok) return;
-      const res = await pct.registerXref();
-      if (!res.ok) return void window.alert(res.error.message);
-      editorStore.getState().loadCatalog(res.value.scan.catalog); // now-resolvable objects become placeable
-      const warnText = res.value.warnings.length ? `\n\n${res.value.warnings.join("\n")}` : "";
-      window.alert(`Registered ${res.value.registered} object${res.value.registered === 1 ? "" : "s"}.${warnText}`);
-    } finally {
-      setBusy(false);
-    }
-  };
-
   return (
-    <div className="pct-register-banner">
-      <span>
-        {count} user object{count === 1 ? "" : "s"} need{count === 1 ? "s" : ""} registering before you can place{" "}
-        {count === 1 ? "it" : "them"}.
-      </span>
-      <button
-        type="button"
-        disabled={busy || !pct}
-        title={pct ? undefined : "Registration runs in the desktop app"}
-        onClick={() => void run()}
-      >
-        {busy ? "Registering…" : "Register"}
-      </button>
-    </div>
+    <>
+      <div className="pct-register-banner">
+        <span>
+          {count} user object{count === 1 ? "" : "s"} need{count === 1 ? "s" : ""} registering before you can place{" "}
+          {count === 1 ? "it" : "them"}.
+        </span>
+        <button
+          type="button"
+          disabled={!pct}
+          title={pct ? undefined : "Registration runs in the desktop app"}
+          onClick={() => setOpen(true)}
+        >
+          Register…
+        </button>
+      </div>
+      {open && <RegisterDialog onClose={() => setOpen(false)} />}
+    </>
   );
 }
 
