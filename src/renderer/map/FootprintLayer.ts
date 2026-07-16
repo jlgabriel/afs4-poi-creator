@@ -36,8 +36,9 @@ import type {
   PlacedXref,
   Vec3,
 } from "../../core/project/types";
-import { footprintCorners, headingMarker } from "../../core/geo/footprint";
+import { footprintCorners } from "../../core/geo/footprint";
 import { destination, initialBearing, wrapLon } from "../../core/geo/geo";
+import { directionToHeading, headingToDirection } from "../../core/geo/orientation";
 import { diffEntry, isMissing } from "./syncDiff";
 import { snapAngle } from "./rotate";
 
@@ -206,13 +207,19 @@ export class FootprintLayer {
     return footprintCorners(anchor, min, max, direction, obj.scale);
   }
 
+  // The orientation tick points where the object FACES in-sim (heading = 90 − direction, calibrated
+  // 2026-07-15) — not along the model +Y axis. It reaches the box's extent in that compass bearing, and
+  // the grip (handleAt, same bearing) sits just past it. `footprintCorners` stays as-is: the rectangle is
+  // 180°-symmetric, so its rotation sense is invisible — only this facing tick makes the sense visible.
   private headingAt(
     anchor: LonLat,
     obj: PlacedXref,
     cat: CatalogObject | undefined,
     direction = obj.direction,
   ): LonLat {
-    return headingMarker(anchor, cat ? cat.bbMax : PH_MAX, direction, obj.scale);
+    const [min, max] = cat ? [cat.bbMin, cat.bbMax] : [PH_MIN, PH_MAX];
+    const ext = Math.max(Math.abs(min[0]), Math.abs(max[0]), Math.abs(min[1]), Math.abs(max[1]));
+    return destination(anchor, ext * obj.scale, directionToHeading(direction));
   }
 
   /** Distance from the anchor to the rotate handle: past the farthest bbox corner so the grip always
@@ -229,7 +236,7 @@ export class FootprintLayer {
     cat: CatalogObject | undefined,
     direction = obj.direction,
   ): LonLat {
-    return destination(anchor, this.handleDist(obj, cat), direction);
+    return destination(anchor, this.handleDist(obj, cat), directionToHeading(direction));
   }
 
   private add(obj: PlacedObject, selected: boolean): void {
@@ -443,9 +450,11 @@ export class FootprintLayer {
     this.map.dragging.disable();
     this.drag = { mode: "rotate", id, anchor: entry.obj.position, startDir: dir, bearing: dir, moved: false };
     // The store isn't touched until release (the gesture-end contract), so without this the angle you are
-    // dragging to is invisible. A live tooltip on the grip is the cheapest honest readout.
+    // dragging to is invisible. A live tooltip on the grip is the cheapest honest readout. For an xref it
+    // shows the compass HEADING the object faces (90 − direction); a light shows its raw orientation.
+    const shown = entry.obj.kind === "xref" ? directionToHeading(dir) : dir;
     entry.handle
-      ?.bindTooltip(`${Math.round(dir)}°`, {
+      ?.bindTooltip(`${Math.round(shown)}°`, {
         permanent: true,
         direction: "top",
         offset: [0, -8],
@@ -487,23 +496,27 @@ export class FootprintLayer {
       d.anchor = anchor; // remember it so a release outside the map commits this spot (I2)
       this.previewMove(entry, anchor);
     } else {
-      let bearing = initialBearing(d.anchor, { lon: e.latlng.lng, lat: e.latlng.lat });
-      if (e.originalEvent.shiftKey) bearing = snapAngle(bearing, SNAP_DEG);
-      d.bearing = bearing;
+      // The cursor's bearing from the anchor is the compass direction the grip is dragged TOWARD. For an
+      // xref that IS the facing the user wants, so the raw direction to store = headingToDirection(facing);
+      // a light's orientation is the raw bearing itself. The tooltip shows that same compass value.
+      let facing = initialBearing(d.anchor, { lon: e.latlng.lng, lat: e.latlng.lat });
+      if (e.originalEvent.shiftKey) facing = snapAngle(facing, SNAP_DEG);
+      const dir = entry.shape === "footprint" ? headingToDirection(facing) : facing;
+      d.bearing = dir; // the RAW direction/orientation committed on release
       if (entry.shape === "footprint") {
         const cat = this.index.get(entry.obj.name);
-        entry.poly.setLatLngs(this.cornersAt(d.anchor, entry.obj, cat, bearing).map(toLatLng));
+        entry.poly.setLatLngs(this.cornersAt(d.anchor, entry.obj, cat, dir).map(toLatLng));
         entry.heading.setLatLngs([
           toLatLng(d.anchor),
-          toLatLng(this.headingAt(d.anchor, entry.obj, cat, bearing)),
+          toLatLng(this.headingAt(d.anchor, entry.obj, cat, dir)),
         ]);
-        entry.handle?.setLatLng(toLatLng(this.handleAt(d.anchor, entry.obj, cat, bearing)));
+        entry.handle?.setLatLng(toLatLng(this.handleAt(d.anchor, entry.obj, cat, dir)));
       } else if (entry.obj.kind === "airport_light") {
-        const tip = this.lightHandleAt(entry.obj, d.anchor, bearing);
+        const tip = this.lightHandleAt(entry.obj, d.anchor, dir);
         entry.tick?.setLatLngs([toLatLng(d.anchor), toLatLng(tip)]);
         entry.handle?.setLatLng(toLatLng(tip));
       }
-      entry.handle?.setTooltipContent(`${Math.round(bearing)}°`);
+      entry.handle?.setTooltipContent(`${Math.round(facing)}°`);
     }
   };
 

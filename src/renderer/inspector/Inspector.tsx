@@ -14,6 +14,7 @@ import type {
   Vec3,
 } from "../../core/project/types";
 import { clampLonLat } from "../../core/project/schemas";
+import { directionToHeading, headingToDirection } from "../../core/geo/orientation";
 import { editorStore, useEditor } from "../state/editorStore";
 import { HeightControl } from "./HeightControl";
 import { NumberInput } from "./NumberInput";
@@ -172,16 +173,16 @@ function XrefFields({
         <label className="pct-field-col">
           <span
             className="pct-field-label"
-            title="Raw rotation stored in the .toc — not a compass heading. 0 = the object's built-in pose (varies per object); increases clockwise, normalized to 0–360°. Drag the cyan handle on the map (hold Shift to snap to 5°) or type it here; to align, match the footprint rectangle to the imagery."
+            title="Compass heading the object faces in-sim: 0 = North, 90 = East, clockwise, normalized to 0–360°. Calibrated in-sim (heading = 90 − the raw .toc direction). Drag the cyan handle on the map (hold Shift to snap to 5°) or type it here."
           >
-            Direction °
+            Heading °
           </span>
           <NumberInput
             id="pct-inspector-direction"
-            value={obj.direction}
+            value={directionToHeading(obj.direction)}
             format={(n) => n.toFixed(1)}
-            onCommit={(d) => store().rotateObject(obj.id, d)}
-            ariaLabel="Direction in degrees"
+            onCommit={(h) => store().rotateObject(obj.id, headingToDirection(h))}
+            ariaLabel="Heading in degrees"
           />
         </label>
         <label className="pct-field-col">
