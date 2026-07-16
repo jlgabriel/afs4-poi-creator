@@ -7,9 +7,12 @@
 // that. It is PURE (specs in, string out — no filesystem), so the registrar (main-side) owns the write
 // surface and this stays golden-testable, mirroring `tocWriter.ts`.
 //
-// Format proven three ways: it matches AFS4's built-in `.tmi` grammar [FILES], Michael's working
-// community bundle (`xref_air_race.tmi`, 5 entries) [FILES], and the PCT artifact flown in-sim — a
-// `pylon_15m` that rendered only once resolved through a PCT-generated `.tmi` [SIM].
+// Format proven four ways: it matches AFS4's built-in `.tmi` grammar [FILES], Michael's working
+// community bundle (`xref_air_race.tmi`, 5 entries) [FILES], a `pylon_15m` that rendered only once
+// resolved through a PCT-generated `.tmi` [SIM], and — gate N2, 2026-07-16 — a whole FOLDER of five
+// separate `.tmb` registered in place by PCT and indexed by one multi-entry `.tmi`: all five rendered,
+// textured, standing [SIM]. That last one is the layout `registerXref` actually produces; until it was
+// flown, the only evidence for it was that a third party ships `xref_air_race` and flies it.
 //
 // Per entry, bs_center/bs_radius are DERIVED from the bbox alone:
 //   bs_center = bbox midpoint
@@ -48,10 +51,22 @@ function entryElement(e: TmiEntrySpec, index: number): string[] {
   ]);
 }
 
-/** Build the byte-exact `.tmi` text indexing `entries` under bundle `bundleBase` (= the bundle folder
- *  and `.tmb` basename; the sim keys the bundle off `filename`). `bundleBase` is emitted verbatim — the
- *  registrar guards it as a safe slug upstream (same rationale as the entry name). Layout-agnostic:
- *  emits one element per entry, so a single- or multi-geometry `.tmb` both work with no special case. */
+/** Build the byte-exact `.tmi` text indexing `entries` under bundle `bundleBase` — **the bundle FOLDER's
+ *  name**, which is not necessarily any `.tmb`'s basename. Both shipping layouts prove that:
+ *
+ *    IPACS      xref_buildings/  ONE multi-geometry xref_buildings.tmb + a 250-entry .tmi   [FILES]
+ *    community  xref_air_race/   FIVE single-geometry .tmb (pylon_15m.tmb, …) + a 5-entry .tmi,
+ *                                filename = xref_air_race, and NO xref_air_race.tmb exists    [FILES]
+ *
+ *  The second renders in-sim (Michael flies it; gate N2 flew PCT's own), so the sim does NOT locate a
+ *  geometry through `filename` — it resolves each entry by its `name`. What `filename` is FOR is still
+ *  unknown; we write the folder because that is what both working layouts write. (An earlier version of
+ *  this note called `bundleBase` "the .tmb basename", which is true only of IPACS's layout — the one PCT
+ *  does not produce.)
+ *
+ *  `bundleBase` is emitted verbatim — the registrar guards it as a safe slug upstream (same rationale as
+ *  the entry name). Layout-agnostic: one element per entry, so single- or multi-geometry `.tmb` both work
+ *  with no special case. */
 export function buildTmi(bundleBase: string, entries: TmiEntrySpec[]): string {
   const info = block("tmxglscene_info", "", "", [
     tag("string8", "filename", bundleBase),
