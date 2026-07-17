@@ -56,7 +56,7 @@ export function planExport(project: Project, resolved: ResolvedObject[]): Export
   const tocFileName = objects.length > 0 ? POI_BASENAME : null;
 
   const files: PoiFile[] = [
-    { relPath: `${POI_BASENAME}.tsl`, content: buildTsl({ name: project.name, tocFileName }) },
+    { relPath: `${POI_BASENAME}.tsl`, content: buildTsl({ tocFileName }) },
     { relPath: `${POI_BASENAME}.toc`, content: buildToc(objects) },
     { relPath: "README.txt", content: buildReadme(project, objects) },
   ];

@@ -3,10 +3,13 @@ import type { ResolvedObject, ResolvedPlant, ResolvedXref } from "../../src/core
 import { buildToc } from "../../src/core/export/tocWriter";
 import { parseTm, child, findAll } from "../../src/core/tm/tmParser";
 
-// v0.4 plants. ⚠️ Read this before regenerating anything below: unlike the xref and light goldens,
-// this one is NOT a record of bytes proven in-sim. There is no canonical `list_plant` to copy — every
-// real one is inside a binary-packed cultivation `.toc` — so this golden pins the format bible's
-// declared shape, and the in-sim gate is what promotes it from "the only spec we have" to "proven".
+// v0.4 plants. This golden is now a transcription of a REAL, in-sim-proven `list_plant`: the format's
+// author built one at Heligoland, flew it, and sent the file (2026-07-17, kept out of the repo in
+// _local_reference). Its element is byte-for-byte the shape below.
+//
+// ★ It corrects the format bible on all three types — `vector2_float64` not vector3, `vector2_float32`
+// not vector3, `stringt8c` not string8 — which is why the bible's own template printed two values into
+// a "vector3": the type is a vector2. Regenerate deliberately only against a newer proven file.
 const PLANT: ResolvedPlant = {
   id: "p1",
   kind: "plant",
@@ -31,11 +34,11 @@ const GOLDEN_PLANTS_TOC = `<[file][][]
         <[string8u][coordinate_system][lonlat]>
         <[list_plant][plant_list][]
             <[plant][element][0]
-                <[vector3_float64][position][-116.7878783 34.8554000]>
+                <[vector2_float64][position][-116.7878783 34.8554000]>
                 <[float32][altitude][584.00]>
-                <[vector3_float32][height_range][0.00 0.00]>
-                <[string8][group][broadleaf]>
-                <[string8][species][00]>
+                <[vector2_float32][height_range][0.00 0.00]>
+                <[stringt8c][group][broadleaf]>
+                <[stringt8c][species][00]>
             >
         >
         <[list_xref][xref_list][]
@@ -57,9 +60,22 @@ describe("buildToc — list_plant (v0.4)", () => {
     expect(child(el, "altitude")!.value).toBe("584.00");
   });
 
-  it("keeps `species` as the string \"00\" — never a number", () => {
-    // "0" would not resolve, and an unresolvable plant name fails SILENTLY in-sim: no object, no error.
-    expect(buildToc([PLANT])).toContain("<[string8][species][00]>");
+  it("keeps `species` as the filename's padded digits — never a 0-based ordinal", () => {
+    // The reference file places `palm`/`11`, and palm's textures are i08…i14 — an ordinal would top
+    // out at 6. An unresolvable plant fails SILENTLY in-sim (no object, no error), so this is exactly
+    // the kind of value that must come from the scan verbatim.
+    expect(buildToc([PLANT])).toContain("<[stringt8c][species][00]>");
+    const palm: ResolvedPlant = { ...PLANT, group: "palm", species: "11" };
+    expect(buildToc([palm])).toContain("<[stringt8c][species][11]>");
+  });
+
+  it("declares position and height_range as vector2, not vector3 (the bible's error)", () => {
+    // The bible says vector3 for both while printing two values into them; the author's working file
+    // says vector2. This is the one thing PCT emitted that the reference file contradicts outright.
+    const toc = buildToc([PLANT]);
+    expect(toc).toContain("<[vector2_float64][position]");
+    expect(toc).toContain("<[vector2_float32][height_range]");
+    expect(toc).not.toContain("vector3_float64][position][-116.7878783 34.8554000]>"); // the old 2-in-a-vector3
   });
 
   it("omits list_plant entirely when there are no plants (an xref-only POI is unchanged)", () => {
@@ -93,8 +109,10 @@ describe("buildToc — list_plant (v0.4)", () => {
     expect(toc).toContain("<[plant][element][1]");
   });
 
-  it("emits a non-zero height_range as metres", () => {
+  it("emits a non-zero height_range as metres — it is how tall the plant grows", () => {
+    // Confirmed by the reference file, which drives real size through this field alone: a 20 m
+    // broadleaf and a 5 m shrub, each `[h h]`, all sharing one altitude.
     const grown: ResolvedPlant = { ...PLANT, heightRange: [12, 18.5] };
-    expect(buildToc([grown])).toContain("<[vector3_float32][height_range][12.00 18.50]>");
+    expect(buildToc([grown])).toContain("<[vector2_float32][height_range][12.00 18.50]>");
   });
 });

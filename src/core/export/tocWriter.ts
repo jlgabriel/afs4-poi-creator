@@ -28,8 +28,8 @@ function fmtPosition(o: { position: { lon: number; lat: number }; heightAsl: num
 }
 
 /** A plant's `position` carries only [LONGITUDE LATITUDE] — its height lives in the sibling
- *  `altitude` field, so this is deliberately NOT fmtPosition. (Both fields are still declared
- *  `vector3_*` in the bible while carrying two values; the type tag is a loose hint — see below.) */
+ *  `altitude` field, so this is deliberately NOT fmtPosition. Two values because the type is a
+ *  `vector2_float64` (the bible's `vector3` was the error — see plantElement). */
 function fmtLonLatOnly(o: { position: { lon: number; lat: number } }): string {
   return `${fmtLonLat(o.position.lon)} ${fmtLonLat(o.position.lat)}`;
 }
@@ -74,28 +74,38 @@ function lightElement(o: ResolvedLight, index: number): string[] {
   ]);
 }
 
-// v0.4 plants. UNLIKE every element above, this one has NO ground truth behind it: the install's own
-// `list_plant`s all live in the 38k binary-packed cultivation `.toc` we cannot read, so the bible is
-// the only spec and the in-sim gate is the validator. Emitted in the bible's declared order and types
-// verbatim — which is a weaker claim than it sounds, because three properties of the parser make the
-// shape below low-risk, each one already paid for:
-//   • ORDER doesn't matter — the sim resolves a property by HASH OF ITS NAME (tm.log: "property
-//     'model_center' is not a member of type 'cultivation' hash=…"). `list_light` shipped in pure
-//     bible order with no canonical example and rendered (gate 2026-07-12).
-//   • The TYPE TAG is loose — our own in-sim-proven `.toc` writes `float32 direction` where the bible
-//     says float64, and `string8u coordinate_system` where it says string8. Both load.
-//   • A wrong property NAME is therefore the real risk, and it is the one thing tm.log names out loud
-//     WITHOUT flying. It settles the bible's own contradiction here: this element calls the field
-//     `group` while the bible's plant list header calls the same thing `type`. We emit `group` (the
-//     element is the more specific statement) and read the log.
-// What stays for the flight: whether `altitude` is ASL or AGL, and what `height_range` does.
+// v0.4 plants. This element now mirrors a REAL, in-sim-proven `list_plant` — the format's author
+// (ApfelFlieger) built and flew one at Heligoland and sent the file (2026-07-17). Until then this was
+// the only element with no ground truth anywhere: every `list_plant` in the install sits inside the
+// 38k binary-packed cultivation `.toc` we cannot read, so the format bible was the sole spec.
+//
+// ★ The bible is WRONG about all three types here, and the errors were self-concealing:
+//
+//     bible                  real (proven)          why the bible looked plausible
+//     vector3_float64 position   vector2_float64    it prints TWO values into a "vector3"
+//     vector3_float32 height_range vector2_float32  same — two values in a "vector3"
+//     string8 group/species      stringt8c          string8 is what the doc uses everywhere
+//
+// The two-values-in-a-vector3 oddity was the tell, and it now resolves: the type IS a vector2. The
+// earlier read — "the type tag is loose, our proven .toc writes float32 where the bible says float64"
+// — was true but did not generalise: float32↔float64 is a scalar the parser can coerce, while
+// vector3↔vector2 is an ARITY, and `string8`↔`stringt8c` is a different type entirely.
+//
+// Order is genuinely free (the sim resolves properties by hash of the NAME — tm.log says so), and the
+// five NAMES are proven correct by a deliberate bogus-property control that made the log complain
+// while ours never did. `group` (not the `type` the bible's list header shows) is confirmed the same
+// way: "property 'type' is not a member of type 'plant'".
+//
+// ⚠️ None of this is why plants failed to render for five flights — see buildTsl: `autoheight true`
+// forces every plant to height 0. This element was already close enough that the author's verdict on
+// our code was "Claude did not make a mistake".
 function plantElement(o: ResolvedPlant, index: number): string[] {
   return block("plant", "element", String(index), [
-    tag("vector3_float64", "position", fmtLonLatOnly(o)),
+    tag("vector2_float64", "position", fmtLonLatOnly(o)),
     tag("float32", "altitude", fmtMeters(o.heightAsl)),
-    tag("vector3_float32", "height_range", o.heightRange.map((h) => fmtMeters(h)).join(" ")),
-    tag("string8", "group", sanitizeValue(o.group)),
-    tag("string8", "species", sanitizeValue(o.species)),
+    tag("vector2_float32", "height_range", o.heightRange.map((h) => fmtMeters(h)).join(" ")),
+    tag("stringt8c", "group", sanitizeValue(o.group)),
+    tag("stringt8c", "species", sanitizeValue(o.species)),
   ]);
 }
 

@@ -13,27 +13,19 @@
 //               field separator is the DOUBLE underscore, not a single one). CONFIRMED in-sim: the
 //               log rejects `type` ("property 'type' is not a member of type 'plant'") and never
 //               objects to `group`.
-//   • species → the 2 zero-padded digits, verbatim from the filename ("00", not "0").
-//               ⚠️ WHETHER THIS IS WHAT THE `.toc` `species` WANTS IS UNVERIFIED. The sim's own
-//               startup log (`tmterrain_trees`) enumerates each group's variations from 0 with NO
-//               gaps — palm gets 7 (0..6) even though its files are i08…i14 — so the sim's internal
-//               index is an ORDINAL, not this number. Both readings were flown and neither renders
-//               (see below), so the mapping is still open; this keeps the filename's own digits
-//               because that is the one thing the disk actually says.
+//   • species → the `.toc` `species` value: the filename's own 2 zero-padded digits ("08", not "0").
+//               ✅ CONFIRMED by the format author's proven file: it places `palm`/`08` and `palm`/`11`.
+//               ⚠️ Do NOT "fix" this to a 0-based ordinal. The sim's startup log (`tmterrain_trees`)
+//               enumerates palm as 7 variations with `fi=23`, which reads exactly like a 0..6 ordinal
+//               and is tempting — but `fi` is an index into the renderer's flat 41-texture array, NOT
+//               this field. `palm/11` in a working file settles it: the gaps (i04–i07) are real and
+//               `species` carries the filename's number.
 //   • h####   → the texture's natural height in CENTIMETRES (h1750 = 17.50 m). Range across the real
 //               41: 0.80 m (shrub__i11) … 28.20 m (conifer_forest__i01). CONFIRMED: `tmterrain_trees`
 //               lists exactly these 41 heights, in this order.
 //
-// ⚠️ STATUS (2026-07-17): a POI's `list_plant` DOES NOT RENDER, and this scanner is not the reason.
-// Four in-sim gates eliminated every field-level explanation — the property names are PROVEN right
-// (a deliberate bogus property made the log complain, so its silence about ours is evidence), and
-// species/position-arity/height_range-arity/zero-padding/altitude(ASL,AGL,0)/buildings_texture_folder
-// were each ruled out, including a probe using `alley`, whose single variation makes a wrong index
-// impossible. The surviving explanation is structural and untestable from outside: the tree renderer
-// builds its tile system at ~4 s of startup while a POI is only read at ~13 s, so a POI's plants may
-// simply never reach it. Question is with Michael (docs/MICHAEL_PLANTS_QUESTION.md). Nothing here is
-// wasted either way: `list_plant` is only emitted when plants are placed, so a POI without them is
-// byte-identical to v0.3.
+// Nothing in this file was ever the reason plants didn't render — that was `autoheight` in the `.tsl`
+// (see tslWriter). The author's verdict on the scan + emit was "Claude did not make a mistake".
 //
 // Cross-validated: the format bible's plant list (group → species indices) matches these filenames
 // EXACTLY, 41 = 41, down to the i04–i07 gaps absent from every group in both sources. Two

@@ -82,13 +82,12 @@ describe("buildPlants — enumerate the plant library", () => {
     expect(plants.find((p) => p.group === "conifer_forest")!.displayName).toBe("Conifer Forest 00");
   });
 
-  it("keeps `species` verbatim as the filename's 2 zero-padded digits", () => {
-    // Pins WHAT THE DISK SAYS, which is all this function claims. It deliberately does NOT claim to
-    // be the `.toc` `species` value: the sim's own log enumerates each group's variations from 0 with
-    // no gaps (palm gets 0..6 from files i08…i14), and neither reading renders in-sim yet — see the
-    // status note in plants.ts. If Michael's answer settles the mapping, the ordinal is derivable
-    // from this array's index within its group; nothing here has to change to get it.
+  it("keeps `species` as the filename's 2 zero-padded digits — NOT a 0-based ordinal", () => {
+    // Confirmed against the format author's proven-in-sim file, which places `palm`/`08` and
+    // `palm`/`11`. Palm's textures are i08…i14, so an ordinal would top out at 6 and `11` could not
+    // exist — the gaps are real and this field carries the filename's number.
     expect(speciesOf("alley")).toEqual(["00"]);
+    expect(speciesOf("palm")).toContain("11"); // the exact value in the working reference file
     expect(plants.every((p) => /^\d\d$/.test(p.species))).toBe(true);
   });
 

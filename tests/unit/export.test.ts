@@ -50,11 +50,13 @@ const GOLDEN_TOC = `<[file][][]
 >
 `;
 
+// Byte-identical to the format author's own working `.tsl` (2026-07-17): no `name`, autoheight FALSE.
+// See tslWriter for why each of those two is load-bearing — the `autoheight` flag is what kept every
+// plant 584 m underground at KDAG for five flights.
 const GOLDEN_TSL = `<[file][][]
     <[tmsimulator_scenery_place_simple][][]
-        <[string8][name][Munich test]>
         <[string8u][coordinate_system][lonlat]>
-        <[bool][autoheight][true]>
+        <[bool][autoheight][false]>
         <[string8u][cultivation][poi]>
     >
 >
@@ -85,21 +87,30 @@ describe("buildToc — cultivation list_xref", () => {
 
 describe("buildTsl — place_simple wrapper", () => {
   it("references the toc via cultivation", () => {
-    expect(buildTsl({ name: "Munich test", tocFileName: "poi" })).toBe(GOLDEN_TSL);
+    expect(buildTsl({ tocFileName: "poi" })).toBe(GOLDEN_TSL);
   });
   it("omits the cultivation line when there is no toc", () => {
-    const tsl = buildTsl({ name: "Empty", tocFileName: null });
+    const tsl = buildTsl({ tocFileName: null });
     expect(tsl).not.toContain("cultivation");
-    expect(tsl).toContain("<[bool][autoheight][true]>");
   });
-  it("sanitises brackets in the project name so the .tsl stays parseable (Fable C2)", () => {
-    // Pre-fix, `Munich [WIP]` emitted <…[name][Munich [WIP]]…>, which parseTm truncates at the first
-    // `]` → the file is corrupt. The sanitised form round-trips, and the tag AFTER name survives.
-    const tsl = buildTsl({ name: "Munich [WIP]", tocFileName: "poi" });
-    expect(tsl).toContain("<[string8][name][Munich (WIP)]>");
+  it("always writes autoheight FALSE — true forces every plant to height 0", () => {
+    // The v0.4 root cause, and it cost five in-sim flights. `true` made the sim ignore each plant's
+    // `altitude` and pin it to 0, i.e. 584 m underground at KDAG — so ~20 format variants all failed
+    // identically while tm.log stayed silent, because nothing was wrong with the file.
+    // Safe for the other kinds: PCT has always written explicit absolute ASL for every object, and
+    // repeated gates established autoheight never reached xref cultivation at all.
+    expect(buildTsl({ tocFileName: "poi" })).toContain("<[bool][autoheight][false]>");
+    expect(buildTsl({ tocFileName: null })).toContain("<[bool][autoheight][false]>");
+  });
+  it("carries no `name` tag — so the export has no user-typed value at all (retires Fable C2)", () => {
+    // The format's author: the line "doesn't make any sense at all, I suggest deleting it without
+    // replacement". Dropping it removes the only free-text value the .tsl ever had, which is what
+    // the `]`-truncation guard existed for. The .toc's own sanitizeValue still covers object names.
+    const tsl = buildTsl({ tocFileName: "poi" });
+    expect(tsl).not.toContain("[name]");
     const place = parseTm(tsl).children[0]; // <file> → <tmsimulator_scenery_place_simple>
-    expect(child(place, "name")?.value).toBe("Munich (WIP)");
-    expect(child(place, "cultivation")?.value).toBe("poi");
+    expect(child(place, "name")).toBeUndefined();
+    expect(child(place, "cultivation")?.value).toBe("poi"); // and the file still parses
   });
 });
 
