@@ -10,6 +10,7 @@
 // only ever create or delete folders it could have produced (design §3.4 safety note).
 
 import {
+  copyFileSync,
   cpSync,
   existsSync,
   mkdirSync,
@@ -46,6 +47,24 @@ export class FolderExistsError extends Error {
   }
 }
 
+/** A plan asset name isn't a plain basename (contains a path separator or `..`) — refuse it at the write
+ *  boundary. Asset names are internal constants (ANCHOR_ASSETS), so this only ever fires on a bug, but a
+ *  POI folder must gain files only at its top level. */
+export class UnsafeAssetNameError extends Error {
+  constructor(readonly assetName: string) {
+    super(`Unsafe asset name: ${JSON.stringify(assetName)}`);
+    this.name = "UnsafeAssetNameError";
+  }
+}
+
+/** No `assetsDir` was provided but the plan requires a bundled asset. A wiring bug, not a user error. */
+export class MissingAssetsDirError extends Error {
+  constructor(readonly assetName: string) {
+    super(`Plan requires bundled asset "${assetName}" but no assetsDir was provided.`);
+    this.name = "MissingAssetsDirError";
+  }
+}
+
 export interface WriteResult {
   folderName: string;
   path: string; // absolute destination (main-produced → safe to reveal)
@@ -70,8 +89,14 @@ export function resolvePoiPath(root: string, folderName: string): string {
 }
 
 /** Write a planned POI into `<root>/<plan.folderName>/`. `root` is poiRoot(userDir) for an install
- *  or a user-chosen dir for export-to-folder. Refuses to clobber unless `overwrite`. */
-export function writePoi(plan: ExportPlan, root: string, opts: { overwrite: boolean }): WriteResult {
+ *  or a user-chosen dir for export-to-folder. Refuses to clobber unless `overwrite`. `opts.assetsDir` is
+ *  the directory holding PCT's bundled binary assets (anchorAsset.ts) — required only when the plan ships
+ *  any (a POI with plants); an xref/light-only plan has `assets: []` and never reads it. */
+export function writePoi(
+  plan: ExportPlan,
+  root: string,
+  opts: { overwrite: boolean; assetsDir?: string },
+): WriteResult {
   const dest = resolvePoiPath(root, plan.folderName);
   const overwrote = existsSync(dest);
   if (overwrote && !opts.overwrite) throw new FolderExistsError(plan.folderName);
@@ -89,6 +114,14 @@ export function writePoi(plan: ExportPlan, root: string, opts: { overwrite: bool
       const p = path.join(staging, f.relPath);
       mkdirSync(path.dirname(p), { recursive: true });
       writeFileSync(p, f.content, "utf8"); // keep \n endings — AFS4 text files use LF
+    }
+    // Bundled binary assets (v0.4 plant anchor mesh+texture). Copied AFTER the text files, into the same
+    // staged folder, so the stage-and-swap atomicity covers them too. Names are internal constants, but
+    // this is the write boundary: refuse anything that isn't a top-level basename before touching disk.
+    for (const name of plan.assets) {
+      if (name !== path.basename(name)) throw new UnsafeAssetNameError(name);
+      if (opts.assetsDir === undefined) throw new MissingAssetsDirError(name);
+      copyFileSync(path.join(opts.assetsDir, name), path.join(staging, name));
     }
     if (overwrote) rmSync(dest, { recursive: true, force: true });
     renameSync(staging, dest);

@@ -18,6 +18,14 @@ files:
   - THIRD_PARTY_NOTICES.md
   - "!**/*.map"
 
+# Bundled binary assets copied to <resourcesPath>/assets, read at export time by anchorAsset.ts: the
+# v0.4 plant anchor mesh (pct_anchor.tmb) + its texture (pct_anchor.ttx). OUR content run through IPACS's
+# official converter — see assets/ and forum #136. (The files are gitignored until the licence is
+# confirmed; they must be present on disk to package a v0.4 release.)
+extraResources:
+  - from: assets
+    to: assets
+
 asar: true
 # No native modules → nothing to rebuild against Electron's ABI.
 npmRebuild: false

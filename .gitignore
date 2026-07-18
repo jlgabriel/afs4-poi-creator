@@ -39,3 +39,10 @@ docs/
 # Local reference material — never published. Kept on disk, root-anchored
 # so nothing here is ever `git add`-ed.
 /_local_reference/
+
+# v0.4 plant anchor asset — OUR Blender mesh + OUR texture run through IPACS's official content
+# converter, carrying zero IPACS bytes (grep-verified). Kept on disk so dev/CLI/export use it, but NOT
+# committed until ApfelFlieger/IPACS confirm the converter's output is redistributable (forum #136).
+# Then un-ignore and `git add -f assets/pct_anchor.*`, before the v0.4.0 release.
+/assets/pct_anchor.tmb
+/assets/pct_anchor.ttx

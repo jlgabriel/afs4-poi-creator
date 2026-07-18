@@ -9,6 +9,7 @@ import { centroid, poiFolderName } from "../geo/poiName";
 import { shiftEastNorth } from "../geo/geo";
 import { buildToc } from "./tocWriter";
 import { buildTsl } from "./tslWriter";
+import { computeAnchor, ANCHOR_ASSETS } from "./plantAnchor";
 
 // A POI's two payload files are named `poi.tsl` / `poi.toc` (format bible), and the .tsl
 // references the .toc by this basename.
@@ -54,12 +55,16 @@ export function planExport(project: Project, resolved: ResolvedObject[]): Export
   const ref = project.reference ?? centroid(objects.map((o) => o.position));
   const folderName = poiFolderName(ref, project.poiName);
   const tocFileName = objects.length > 0 ? POI_BASENAME : null;
+  // A POI with plants also gets the reference-POI anchor (plantAnchor.ts): the anchor object emitted in
+  // the .tsl plus its bundled mesh/texture assets. Computed from the SHIFTED objects so it lines up with
+  // them; null (no anchor, no assets) for any POI without plants.
+  const anchor = computeAnchor(objects);
 
   const files: PoiFile[] = [
-    { relPath: `${POI_BASENAME}.tsl`, content: buildTsl({ tocFileName }) },
+    { relPath: `${POI_BASENAME}.tsl`, content: buildTsl({ tocFileName, anchor }) },
     { relPath: `${POI_BASENAME}.toc`, content: buildToc(objects) },
     { relPath: "README.txt", content: buildReadme(project, objects) },
   ];
 
-  return { folderName, files, warnings };
+  return { folderName, files, assets: anchor ? [...ANCHOR_ASSETS] : [], warnings };
 }

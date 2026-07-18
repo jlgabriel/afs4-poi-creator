@@ -210,6 +210,7 @@ export interface PoiFile {
 export interface ExportPlan {
   folderName: string; // "e01187n4838_munich_test"
   files: PoiFile[]; // poi.tsl, poi.toc, README.txt
+  assets: string[]; // bundled binary asset basenames to copy verbatim into the folder (v0.4 plant anchor mesh+texture); [] for xref/light-only POIs — the installer resolves each name in the app's assets dir
   warnings: string[];
 }
 

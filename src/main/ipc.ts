@@ -35,6 +35,7 @@ import {
   uninstallPoi,
   writePoi,
 } from "./installer";
+import { anchorAssetsDir } from "./anchorAsset";
 import {
   autosaveShadow,
   clearShadow,
@@ -146,15 +147,23 @@ async function runExport(project: Project, opts: ExportOptions): Promise<Install
           version: app.getVersion(),
         });
   const plan = planExport(project, resolved);
+  // Where the bundled anchor mesh+texture live (anchorAsset.ts). writePoi copies them into any POI that
+  // has plants; an xref/light-only POI ships none and never reads this.
+  const assetsDir = anchorAssetsDir({
+    env: process.env,
+    packaged: app.isPackaged,
+    resourcesPath: process.resourcesPath,
+    appPath: app.getAppPath(),
+  });
 
   if (opts.target === "install") {
-    const w = writePoi(plan, poiRoot(afs4UserDirOrThrow()), { overwrite: opts.overwrite });
+    const w = writePoi(plan, poiRoot(afs4UserDirOrThrow()), { overwrite: opts.overwrite, assetsDir });
     writeProjectSidecar(w.path, project); // #89-3: re-openable copy beside the POI
     return { folderName: w.folderName, path: w.path, installed: true, warnings: plan.warnings };
   }
   const chosen = await pickExportFolder();
   if (!chosen) return null;
-  const w = writePoi(plan, chosen, { overwrite: opts.overwrite });
+  const w = writePoi(plan, chosen, { overwrite: opts.overwrite, assetsDir });
   writeProjectSidecar(w.path, project); // #89-3: re-openable copy beside the POI
   return { folderName: w.folderName, path: w.path, installed: false, warnings: plan.warnings };
 }

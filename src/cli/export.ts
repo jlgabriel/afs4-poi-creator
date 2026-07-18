@@ -11,13 +11,14 @@
 // "terrain-offset" need a ground elevation — pass --base-elevation (one value for the whole
 // POI, the offline/manual path). The networked elevation lookup arrives with the Electron shell.
 
-import { readFileSync, writeFileSync, mkdirSync, existsSync, rmSync, cpSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, existsSync, rmSync, cpSync, copyFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import type { ExportPlan, Project } from "../core/project/types";
 import { planExport } from "../core/export/planExport";
 import { NeedsElevationError, resolveHeightsFlat } from "../core/export/heights";
 import { isSafePoiFolderName } from "../core/geo/poiName";
+import { anchorAssetsDir } from "../main/anchorAsset";
 
 interface Args {
   project?: string;
@@ -65,12 +66,17 @@ function loadProject(file: string): Project {
   return raw as Project;
 }
 
-function writePlan(plan: ExportPlan, outDir: string): void {
+function writePlan(plan: ExportPlan, outDir: string, assetsDir: string): void {
   mkdirSync(outDir, { recursive: true });
   for (const f of plan.files) {
     const p = path.join(outDir, f.relPath);
     mkdirSync(path.dirname(p), { recursive: true });
     writeFileSync(p, f.content, "utf8"); // keep \n line endings — AFS4 text files use LF
+  }
+  // Bundled binary assets (v0.4 plant anchor mesh+texture). ANCHOR_ASSETS are plain basenames — copy
+  // each verbatim beside the text files. Empty for an xref/light-only POI.
+  for (const name of plan.assets) {
+    copyFileSync(path.join(assetsDir, name), path.join(outDir, name));
   }
 }
 
@@ -123,11 +129,20 @@ function main(): number {
     return 1;
   }
 
+  // Dev resolution: assets/ at the repo root (cwd of `npm run export`), or PCT_ASSETS_DIR to point
+  // elsewhere (e.g. build/_poc/ before the asset ships). Only read when the POI has plants.
+  const assetsDir = anchorAssetsDir({
+    env: process.env,
+    packaged: false,
+    resourcesPath: undefined,
+    appPath: process.cwd(),
+  });
   const outDir = path.resolve(args.out, plan.folderName);
-  writePlan(plan, outDir);
+  writePlan(plan, outDir, assetsDir);
   console.log(`Built POI: ${outDir}`);
   console.log(`  ${resolved.length} object(s) → folder ${plan.folderName}`);
   for (const f of plan.files) console.log(`    ${f.relPath}`);
+  for (const name of plan.assets) console.log(`    ${name} (bundled asset)`);
 
   if (args.install) {
     const userDir = args.afs4Dir ? path.resolve(args.afs4Dir) : afs4UserDir();

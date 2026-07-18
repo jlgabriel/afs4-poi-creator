@@ -14,6 +14,8 @@ import type { ExportPlan } from "../../src/core/project/types";
 import { POI_README_MARKER } from "../../src/core/export/planExport";
 import {
   FolderExistsError,
+  MissingAssetsDirError,
+  UnsafeAssetNameError,
   UnsafeFolderNameError,
   listInstalledPois,
   poiRoot,
@@ -38,6 +40,7 @@ const plan = (folderName: string, tocContent = "TOC\n"): ExportPlan => ({
     { relPath: "poi.toc", content: tocContent },
     { relPath: "README.txt", content: `Munich test\n${POI_README_MARKER}\n` },
   ],
+  assets: [],
   warnings: [],
 });
 
@@ -89,6 +92,7 @@ describe("writePoi", () => {
       { relPath: "poi.tsl", content: "TSL\n" },
       { relPath: "poi.tsl/nope.txt", content: "boom" }, // parent is a file → mkdir throws
     ],
+    assets: [],
     warnings: [],
   });
 
@@ -106,6 +110,42 @@ describe("writePoi", () => {
     expect(() => writePoi(brokenPlan(SAFE), root, { overwrite: false })).toThrow();
     expect(existsSync(path.join(root, SAFE))).toBe(false); // no half-written POI in scenery/poi/
     expect(readdirSync(root)).toEqual([]); // and no staging scratch left lying around either
+  });
+});
+
+describe("writePoi — bundled assets (v0.4 plant anchor)", () => {
+  const withAssets = (folderName: string, assets: string[]): ExportPlan => ({ ...plan(folderName), assets });
+
+  it("copies each plan asset from assetsDir into the POI folder", () => {
+    const root = poiRoot(tmp);
+    const assetsDir = mkdtempSync(path.join(os.tmpdir(), "pct-assets-"));
+    writeFileSync(path.join(assetsDir, "pct_anchor.tmb"), "MESH", "utf8");
+    writeFileSync(path.join(assetsDir, "pct_anchor.ttx"), "TEX", "utf8");
+    try {
+      writePoi(withAssets(SAFE, ["pct_anchor.tmb", "pct_anchor.ttx"]), root, { overwrite: false, assetsDir });
+      expect(readFileSync(path.join(root, SAFE, "pct_anchor.tmb"), "utf8")).toBe("MESH");
+      expect(readFileSync(path.join(root, SAFE, "pct_anchor.ttx"), "utf8")).toBe("TEX");
+    } finally {
+      rmSync(assetsDir, { recursive: true, force: true });
+    }
+  });
+
+  it("throws MissingAssetsDirError — and stages nothing — when an asset is required but no assetsDir given", () => {
+    const root = poiRoot(tmp);
+    expect(() => writePoi(withAssets(SAFE, ["pct_anchor.tmb"]), root, { overwrite: false })).toThrow(
+      MissingAssetsDirError,
+    );
+    expect(existsSync(path.join(root, SAFE))).toBe(false); // no half-built POI left behind
+  });
+
+  it("rejects an asset name that isn't a plain basename at the write boundary", () => {
+    expect(() =>
+      writePoi(withAssets(SAFE, ["../evil.tmb"]), poiRoot(tmp), { overwrite: false, assetsDir: tmp }),
+    ).toThrow(UnsafeAssetNameError);
+  });
+
+  it("an asset-free plan (the common xref/light-only POI) needs no assetsDir", () => {
+    expect(writePoi(plan(SAFE), poiRoot(tmp), { overwrite: false }).overwrote).toBe(false);
   });
 });
 
