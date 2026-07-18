@@ -192,6 +192,11 @@ installed copy of the sim at runtime; nothing IPACS-derived (scanned object dime
 `.tmb` bytes) is ever committed to this repo. Only object *names* — public facts — ship, in a curated
 category table. Test fixtures use invented names.
 
+The one binary PCT does ship is **its own**: `assets/pct_anchor.tmb` + `.ttx`, a tiny anchor mesh a POI
+needs when it holds plants (without it the sim culls them at altitude — v0.4). Its mesh and texture are
+ours, made for PCT and compiled with IPACS's official content converter; it carries zero IPACS bytes.
+See the [License](#license) note.
+
 ### Build it yourself
 
 Requires **Node.js ≥ 20** (developed on 24 LTS). An Aerofly FS 4 install is only needed to *scan* a
@@ -224,4 +229,12 @@ covered by the GPL — do with them whatever you like.
 
 PCT bundles third-party components (Leaflet, React, Zustand, Zod, Electron, and others) under their
 own permissive licenses, and reuses Frank Boës's MIT airport data; their notices are preserved in
+[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+
+**Bundled anchor mesh.** PCT ships one binary asset, `assets/pct_anchor.tmb` + `.ttx`, used to anchor a
+POI's plants so Aerofly doesn't cull them at altitude (v0.4). Its geometry and texture are **our own
+work** — © 2026 Juan Luis Gabriel, **GPL-3.0-or-later**, same as PCT — compiled into Aerofly's binary
+format with IPACS's official **Aerofly FS 4 Content Converter**. That converter is IPACS's software and
+is **not** redistributed here; only its output, built entirely from our own source mesh and texture,
+ships in this repo (confirmed OK with IPACS via ApfelFlieger). See
 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).

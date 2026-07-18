@@ -109,6 +109,24 @@ OurAirports, released into the Public Domain. Bundling was OK'd by the author. S
 
 ---
 
+## Bundled anchor mesh
+
+**`assets/pct_anchor.tmb` + `assets/pct_anchor.ttx`** — a small anchor mesh PCT places in any POI that
+holds plants, so Aerofly FS 4 does not cull them at altitude (v0.4). This is **PCT's own content**, not a
+third-party component:
+
+> Anchor mesh and texture © 2026 Juan Luis Gabriel, GPL-3.0-or-later (same as PCT).
+
+The mesh (a small disc) and its texture were created for PCT and compiled into Aerofly's binary
+`.tmb` / `.ttx` format with IPACS's official **Aerofly FS 4 Content Converter**. The converter itself is
+IPACS's software and is **not** bundled or redistributed by PCT — only its *output*, built entirely from
+our own source geometry and texture, ships here. It contains no IPACS content. IPACS confirmed (via
+ApfelFlieger on the Aerofly forum) that distributing the converter's output of our own source assets is
+fine, provided the rights and licenses of the resulting object are documented — which is the purpose of
+this note.
+
+---
+
 *Map tiles are fetched at runtime from Esri World Imagery and OpenStreetMap (or a user-configured
 XYZ source); they are services, not bundled code, and their required attribution is shown on the
 map.*
