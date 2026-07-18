@@ -145,10 +145,10 @@ As it took shape, more of the community pitched in:
 
 - **Frank Boës (@Armitage on the forum, `fboes` on GitHub)** let PCT bundle a snapshot of his open **aerofly-data** airport list, which
   powers the in-app airport search that recenters the map on any core Aerofly airport.
-- **Christophe (@chrispriv)** and **@Rodeo** untangled the trickiest question — how Aerofly
+- **Christophe (@chrispriv)** and **Rodeo** untangled the trickiest question — how Aerofly
   decides an object's height. Christophe pinned down the exact behaviour for library objects (they need an
   explicit height written in, there's no auto-height to lean on), which set PCT on the correct path;
-  and @Rodeo's hands-on method for reading real terrain elevation inside the sim is how those heights
+  and Rodeo's hands-on method for reading real terrain elevation inside the sim is how those heights
   were validated on the ground.
 
 The code itself was built by two of Anthropic's **Claude** models working in tandem: **Fable 5**
@@ -162,7 +162,7 @@ all under the direction of **Juan Luis Gabriel (@Jugac64)**, who created and ste
 - **Frank Boës — @Armitage (forum), `fboes` (GitHub)** — the [aerofly-data](https://github.com/fboes/aerofly-data) airport
   dataset (MIT), reused with permission.
 - **Christophe — @chrispriv** — the object-height mechanics for library objects ([GitHub](https://chrispriv.github.io/aeroscenery-afs_addons/)).
-- **@Rodeo** — the in-sim ground-truth method for validating terrain elevation.
+- **Rodeo (forum)** — the in-sim ground-truth method for validating terrain elevation.
 - **Fable 5** & **Claude Opus 4.8** (Anthropic) — architecture/reviews and implementation.
 
 …and the wider Aerofly FS 4 forum community, who tested ideas and kept the thread alive.
