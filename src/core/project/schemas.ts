@@ -167,6 +167,11 @@ export const zProject = z.looseObject({
     z.discriminatedUnion("kind", [zPlacedXref, zPlacedAirportLight, zPlacedLight, zPlacedPlant]),
   ),
   shift: zShift.optional(),
+  // Optional export height mode (types.ts HeightMode). Absent ≡ "baked-asl", so schemaVersion stays 1 and
+  // a pre-autoheight project round-trips byte-identical; an older PCT opening an "autoheight" project just
+  // ignores the field and exports the same scene via baked ASL (a correct, lossless degradation — the
+  // objects' HeightSpecs are unchanged, only the compile strategy differs).
+  heightMode: z.enum(["baked-asl", "autoheight"]).optional(),
 });
 
 // ── Settings ─────────────────────────────────────────────────────────────────

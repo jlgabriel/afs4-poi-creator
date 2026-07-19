@@ -9,6 +9,7 @@
 // accepts an override so tests stay deterministic.
 
 import type {
+  HeightMode,
   HeightSpec,
   LonLat,
   PlacedAirportLight,
@@ -343,6 +344,18 @@ export function setPoiName(project: Project, poiName: string, now = nowIso()): P
  *  (planExport); stored on the document so a Save/reopen remembers it. */
 export function setShift(project: Project, shift: PoiShift, now = nowIso()): Project {
   return { ...project, shift, modifiedAt: now };
+}
+
+/** Set the export height mode (types.ts HeightMode). The default "baked-asl" is stored as ABSENT — same
+ *  rule as setShift's zero — so a project that never touched the toggle stays byte-identical on save and
+ *  the existing goldens don't move. A no-op (setting the mode it already has) returns the same reference. */
+export function setHeightMode(project: Project, mode: HeightMode, now = nowIso()): Project {
+  const current = project.heightMode ?? "baked-asl";
+  if (current === mode) return project;
+  const next = { ...project, modifiedAt: now };
+  if (mode === "autoheight") next.heightMode = "autoheight";
+  else delete next.heightMode;
+  return next;
 }
 
 /** Persist the last map view. View state, but it lives in the document, so it bumps modifiedAt;

@@ -70,6 +70,18 @@ describe("parseProject — accepts valid input and round-trips", () => {
   it("accepts a catalog-style object name with . and - (the headroom charset, Fable A)", () => {
     expect(() => parseProject(withFirstObject({ name: "obj-name.v2_00" }))).not.toThrow();
   });
+  it("accepts and round-trips an autoheight heightMode (v0.5)", () => {
+    const p = { ...validProject(), heightMode: "autoheight" as const };
+    expect(parseProject(JSON.parse(JSON.stringify(p)))).toEqual(p);
+  });
+  it("treats a project with no heightMode as valid (absent ≡ baked-asl; every pre-v0.5 file)", () => {
+    expect("heightMode" in validProject()).toBe(false);
+    expect(() => parseProject(validProject())).not.toThrow();
+  });
+  it("rejects an unknown heightMode value", () => {
+    // A forum-shared file must not smuggle a mode the exporter can't compile.
+    expect(() => parseProject({ ...validProject(), heightMode: "agl" })).toThrow();
+  });
 });
 
 describe("parseProject — rejects malformed input (untrusted forum files)", () => {

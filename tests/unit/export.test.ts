@@ -92,6 +92,27 @@ const GOLDEN_TSL_ANCHORED = `<[file][][]
 >
 `;
 
+// GOLDEN — the .tsl an AUTOHEIGHT POI carries (v0.5, forum #142): autoheight=TRUE and the anchor is written
+// AGL — position z = 0.1 (just above ground) + autoheight_override=-1 (inherit the place's true), which is
+// what makes autoheight reach the cultivation. Byte-exact against the shape the 2026-07-19 gate flew firm.
+// Regenerate deliberately if the anchor format changes; never let it drift silently.
+const GOLDEN_TSL_AUTOHEIGHT = `<[file][][]
+    <[tmsimulator_scenery_place_simple][][]
+        <[string8u][coordinate_system][lonlat]>
+        <[bool][autoheight][true]>
+        <[string8u][cultivation][poi]>
+        <[list_tmsimulator_scenery_object][objects][]
+            <[tmsimulator_scenery_object][element][0]
+                <[string8u][type][object]>
+                <[string8u][geometry][pct_anchor]>
+                <[vector3_float64][position][11.8500000 48.3760000 0.1]>
+                <[int32][autoheight_override][-1]>
+            >
+        >
+    >
+>
+`;
+
 describe("buildToc — cultivation list_xref", () => {
   it("emits a byte-exact poi.toc for placed xrefs", () => {
     expect(buildToc([TOWER, BARREL])).toBe(GOLDEN_TOC);
@@ -163,6 +184,22 @@ describe("buildTsl — place_simple wrapper", () => {
     expect(tsl).toContain(`<[string8u][geometry][${ANCHOR_GEOMETRY}]>`);
     const place = parseTm(tsl).children[0]; // still a well-formed place with exactly one scenery object
     expect(findAll(place, "tmsimulator_scenery_object").length).toBe(1);
+  });
+
+  it("autoheight=true → place autoheight=true + the anchor AGL (z=0.1, override=-1), byte-exact (v0.5)", () => {
+    // The shape the 2026-07-19 gate flew firm: the override is what makes autoheight reach the cultivation,
+    // and heightAsl on the anchor is ignored (the AGL z is a fixed literal), so it can be 0.
+    const anchor = { position: { lon: 11.85, lat: 48.376 }, heightAsl: 0 };
+    expect(buildTsl({ tocFileName: "poi", anchor, autoheight: true })).toBe(GOLDEN_TSL_AUTOHEIGHT);
+  });
+
+  it("autoheight is opt-in per call — default (absent) stays FALSE, so baked-asl output never moves", () => {
+    // The regression lock: every existing caller omits `autoheight`, so it must default false and leave
+    // both the plain and anchored goldens byte-identical.
+    expect(buildTsl({ tocFileName: "poi" })).toBe(GOLDEN_TSL);
+    const anchor = { position: { lon: 11.85, lat: 48.376 }, heightAsl: 520 };
+    expect(buildTsl({ tocFileName: "poi", anchor })).toBe(GOLDEN_TSL_ANCHORED);
+    expect(buildTsl({ tocFileName: "poi", anchor, autoheight: false })).toBe(GOLDEN_TSL_ANCHORED);
   });
 });
 
@@ -245,5 +282,41 @@ describe("planExport", () => {
     const s2 = shiftEastNorth(p2.position, shift.east, shift.north);
     const c = { lon: (s1.lon + s2.lon) / 2, lat: (s1.lat + s2.lat) / 2 };
     expect(tsl).toContain(`<[vector3_float64][position][${fmtLonLat(c.lon)} ${fmtLonLat(c.lat)} ${fmtMeters(521)}]>`);
+  });
+
+  // ── Autoheight mode (v0.5) — the caller resolves heights via resolveHeightsAgl (heightAsl = the AGL z),
+  //    then planExport reads project.heightMode to emit autoheight=true + the always-present anchor. ──
+  const ahProject: Project = { ...project, heightMode: "autoheight" };
+  const AGL_TOWER: ResolvedXref = { ...TOWER, heightAsl: 0 }; // terrain → 0
+  const AGL_BARREL: ResolvedXref = { ...BARREL, heightAsl: 25 }; // terrain-offset 25 → floats 25 m
+
+  it("autoheight mode: place is autoheight=true, anchor is present, assets ship — even for an xref-only POI", () => {
+    const plan = planExport(ahProject, [AGL_TOWER, AGL_BARREL]);
+    const tsl = plan.files.find((f) => f.relPath === "poi.tsl")!.content;
+    expect(tsl).toContain("<[bool][autoheight][true]>");
+    expect(tsl).toContain("<[int32][autoheight_override][-1]>");
+    expect(tsl).toContain(`<[string8u][geometry][${ANCHOR_GEOMETRY}]>`);
+    expect(plan.assets).toEqual([...ANCHOR_ASSETS]); // the anchor ALWAYS ships in autoheight (unlike baked-asl)
+  });
+
+  it("autoheight anchor sits at the centroid of ALL objects, not just plants", () => {
+    const tsl = planExport(ahProject, [AGL_TOWER, AGL_BARREL]).files.find((f) => f.relPath === "poi.tsl")!.content;
+    const c = {
+      lon: (TOWER.position.lon + BARREL.position.lon) / 2,
+      lat: (TOWER.position.lat + BARREL.position.lat) / 2,
+    };
+    expect(tsl).toContain(`<[vector3_float64][position][${fmtLonLat(c.lon)} ${fmtLonLat(c.lat)} 0.1]>`);
+  });
+
+  it("autoheight .toc writes each object at its AGL z (terrain→0, offset→the offset)", () => {
+    const toc = planExport(ahProject, [AGL_TOWER, AGL_BARREL]).files.find((f) => f.relPath === "poi.toc")!.content;
+    expect(toc).toContain(`${fmtLonLat(TOWER.position.lon)} ${fmtLonLat(TOWER.position.lat)} 0.00]>`);
+    expect(toc).toContain(`${fmtLonLat(BARREL.position.lon)} ${fmtLonLat(BARREL.position.lat)} 25.00]>`);
+  });
+
+  it("an empty autoheight POI emits no anchor and no assets (nothing to ground)", () => {
+    const plan = planExport(ahProject, []);
+    expect(plan.files.find((f) => f.relPath === "poi.tsl")!.content).not.toContain("tmsimulator_scenery_object");
+    expect(plan.assets).toEqual([]);
   });
 });

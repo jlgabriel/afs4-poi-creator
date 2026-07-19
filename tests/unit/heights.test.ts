@@ -1,6 +1,13 @@
 import { describe, it, expect } from "vitest";
-import type { HeightSpec, PlacedXref } from "../../src/core/project/types";
-import { NeedsElevationError, resolveHeight, resolveHeightsFlat } from "../../src/core/export/heights";
+import type { HeightSpec, PlacedLight, PlacedXref } from "../../src/core/project/types";
+import {
+  NeedsElevationError,
+  UnsupportedInAutoheightError,
+  resolveHeight,
+  resolveHeightsFlat,
+  resolveHeightsAgl,
+  unsupportedInAutoheight,
+} from "../../src/core/export/heights";
 
 const obj = (height: HeightSpec): PlacedXref => ({
   id: "x",
@@ -10,6 +17,17 @@ const obj = (height: HeightSpec): PlacedXref => ({
   height,
   direction: 0,
   scale: 1,
+});
+
+const light = (): PlacedLight => ({
+  id: "l",
+  kind: "light",
+  position: { lon: 0, lat: 0 },
+  height: { mode: "terrain" },
+  color: [1, 1, 1],
+  intensity: 1000,
+  flashing: [0, 0, 0, 0],
+  groupIndex: 0,
 });
 
 describe("resolveHeight", () => {
@@ -47,5 +65,60 @@ describe("resolveHeightsFlat", () => {
     } catch (e) {
       expect((e as NeedsElevationError).points).toHaveLength(1);
     }
+  });
+});
+
+describe("resolveHeightsAgl (autoheight mode)", () => {
+  it("terrain → 0 and terrain-offset → the offset (the AGL z the sim grounds)", () => {
+    const out = resolveHeightsAgl([obj({ mode: "terrain" }), obj({ mode: "terrain-offset", offset: 25 })]);
+    expect(out.map((o) => o.heightAsl)).toEqual([0, 25]);
+    expect("height" in out[0]).toBe(false); // HeightSpec dropped, like resolveHeightsFlat
+  });
+
+  it("is fully offline — needs no terrain elevation at all (that is the point of the mode)", () => {
+    // No base-elevation argument exists to pass: terrain resolves to 0 by definition here.
+    expect(() => resolveHeightsAgl([obj({ mode: "terrain" })])).not.toThrow();
+  });
+
+  it("throws UnsupportedInAutoheightError(reason=asl) listing the absolute-ASL objects", () => {
+    const run = () => resolveHeightsAgl([obj({ mode: "terrain" }), obj({ mode: "asl", value: 500 })]);
+    expect(run).toThrow(UnsupportedInAutoheightError);
+    try {
+      run();
+    } catch (e) {
+      expect((e as UnsupportedInAutoheightError).reason).toBe("asl");
+      expect((e as UnsupportedInAutoheightError).points).toHaveLength(1);
+    }
+  });
+
+  it("throws UnsupportedInAutoheightError(reason=lights) — lights aren't verified in autoheight yet", () => {
+    const run = () => resolveHeightsAgl([obj({ mode: "terrain" }), light()]);
+    expect(run).toThrow(UnsupportedInAutoheightError);
+    try {
+      run();
+    } catch (e) {
+      expect((e as UnsupportedInAutoheightError).reason).toBe("lights");
+    }
+  });
+});
+
+describe("unsupportedInAutoheight", () => {
+  it("null when every object is terrain / terrain-offset (exports cleanly)", () => {
+    expect(
+      unsupportedInAutoheight([obj({ mode: "terrain" }), obj({ mode: "terrain-offset", offset: 3 })]),
+    ).toBeNull();
+  });
+
+  it("reports lights BEFORE asl — a light is a kind the mode can't handle at all", () => {
+    const lightObj = light();
+    const blocked = unsupportedInAutoheight([obj({ mode: "asl", value: 1 }), lightObj]);
+    expect(blocked?.reason).toBe("lights");
+    expect(blocked?.points).toEqual([lightObj]);
+  });
+
+  it("reports asl when there are no lights", () => {
+    const blocked = unsupportedInAutoheight([obj({ mode: "terrain" }), obj({ mode: "asl", value: 7 })]);
+    expect(blocked?.reason).toBe("asl");
+    expect(blocked?.points).toHaveLength(1);
   });
 });

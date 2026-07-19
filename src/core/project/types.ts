@@ -168,6 +168,19 @@ export interface PoiShift {
   north: number; // metres, + = north
 }
 
+/** How a project's heights are turned into the export (a per-PROJECT property, not a fourth HeightSpec —
+ *  the flag flips the z-semantics of the WHOLE cultivation, so a mixed POI can't exist; design §2 of the
+ *  autoheight plan). `absent ≡ "baked-asl"`.
+ *
+ *  • "baked-asl"  — the shipping default: each object's HeightSpec resolves to an absolute ASL number
+ *    (Open-Meteo for terrain modes), written verbatim into the `.toc`; the place stays autoheight=false.
+ *  • "autoheight" — opt-in (forum #142 chrispriv / #143 ApfelFlieger; in-sim gate 2026-07-19): the place
+ *    is autoheight=true and carries the `pct_anchor` reference object, so the SIM resolves the terrain and
+ *    each object's z is written AGL (`terrain → 0`, `terrain-offset → offset`). Fully OFFLINE — no
+ *    Open-Meteo — and immune to the Open-Meteo-vs-mesh error that leaves ASL objects floating/buried. An
+ *    `asl` height has no AGL meaning here, so the export guards against it (see resolveHeightsAgl). */
+export type HeightMode = "baked-asl" | "autoheight";
+
 /** The editable working file (`project.json`). */
 export interface Project {
   schemaVersion: 1;
@@ -180,6 +193,7 @@ export interface Project {
   camera: { lon: number; lat: number; zoom: number }; // last map view
   objects: PlacedObject[]; // xref + v0.2 airport_light / light, discriminated on `kind`
   shift?: PoiShift; // optional global export shift (forum #12); absent = none
+  heightMode?: HeightMode; // how heights export (see HeightMode); absent ≡ "baked-asl"
 }
 
 // ── Export (design §3.4) ────────────────────────────────────────────────────

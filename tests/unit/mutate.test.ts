@@ -18,6 +18,7 @@ import {
   setFlashing,
   setGroupIndex,
   setHeight,
+  setHeightMode,
   setIntensity,
   setLabel,
   setLightColor,
@@ -231,5 +232,24 @@ describe("project-level mutations", () => {
     });
     expect(p.createdAt).toBe(NOW);
     expect(p.modifiedAt).toBe(NOW);
+  });
+
+  it("setHeightMode stores autoheight, normalises the default to ABSENT, and no-ops on the current mode", () => {
+    const p0 = baseProject();
+    expect(p0.heightMode).toBeUndefined();
+
+    const ah = setHeightMode(p0, "autoheight", LATER);
+    expect(ah.heightMode).toBe("autoheight");
+    expect(ah.modifiedAt).toBe(LATER);
+
+    // Back to the default REMOVES the field — a project that ends on baked-asl is byte-identical to one
+    // that never touched the toggle (same rule as setShift's zero), so the goldens don't move.
+    const back = setHeightMode(ah, "baked-asl", LATER);
+    expect("heightMode" in back).toBe(false);
+
+    // No-op: setting the mode it already has returns the SAME reference, keeping the undo stack clean.
+    expect(setHeightMode(p0, "baked-asl")).toBe(p0);
+    expect(setHeightMode(ah, "autoheight")).toBe(ah);
+    expect(p0.heightMode).toBeUndefined(); // input untouched
   });
 });

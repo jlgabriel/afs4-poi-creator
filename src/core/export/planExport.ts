@@ -9,7 +9,7 @@ import { centroid, poiFolderName } from "../geo/poiName";
 import { shiftEastNorth } from "../geo/geo";
 import { buildToc } from "./tocWriter";
 import { buildTsl } from "./tslWriter";
-import { computeAnchor, ANCHOR_ASSETS } from "./plantAnchor";
+import { computeAnchor, computeAutoheightAnchor, ANCHOR_ASSETS } from "./plantAnchor";
 
 // A POI's two payload files are named `poi.tsl` / `poi.toc` (format bible), and the .tsl
 // references the .toc by this basename.
@@ -51,17 +51,19 @@ export function planExport(project: Project, resolved: ResolvedObject[]): Export
     warnings.push("The POI has no objects — nothing will appear in the sim.");
   }
 
+  const autoheight = project.heightMode === "autoheight";
   const objects = applyShift(resolved, project.shift);
   const ref = project.reference ?? centroid(objects.map((o) => o.position));
   const folderName = poiFolderName(ref, project.poiName);
   const tocFileName = objects.length > 0 ? POI_BASENAME : null;
-  // A POI with plants also gets the reference-POI anchor (plantAnchor.ts): the anchor object emitted in
-  // the .tsl plus its bundled mesh/texture assets. Computed from the SHIFTED objects so it lines up with
-  // them; null (no anchor, no assets) for any POI without plants.
-  const anchor = computeAnchor(objects);
+  // The reference-POI anchor (plantAnchor.ts): the anchor object emitted in the .tsl plus its bundled
+  // mesh/texture assets. In AUTOHEIGHT mode every non-empty POI carries it (computed from ALL objects — it
+  // is what makes autoheight reach the cultivation); in BAKED-ASL only a POI with plants does (to stop them
+  // blinking). Computed from the SHIFTED objects so it lines up with them; null ⇒ no anchor and no assets.
+  const anchor = autoheight ? computeAutoheightAnchor(objects) : computeAnchor(objects);
 
   const files: PoiFile[] = [
-    { relPath: `${POI_BASENAME}.tsl`, content: buildTsl({ tocFileName, anchor }) },
+    { relPath: `${POI_BASENAME}.tsl`, content: buildTsl({ tocFileName, anchor, autoheight }) },
     { relPath: `${POI_BASENAME}.toc`, content: buildToc(objects) },
     { relPath: "README.txt", content: buildReadme(project, objects) },
   ];

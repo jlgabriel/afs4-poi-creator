@@ -48,3 +48,57 @@ export function resolveHeightsFlat(
   if (missing.length > 0) throw new NeedsElevationError(missing);
   return resolved;
 }
+
+// ── Autoheight (AGL) mode — forum #142 / in-sim gate 2026-07-19 ─────────────────────────────────────
+
+/** Objects that an AUTOHEIGHT export cannot represent (types.ts HeightMode). Two reasons:
+ *  • "asl"    — an absolute-ASL height: the place is autoheight=true, so the sim would read the number as
+ *               metres-ABOVE-GROUND, not ASL. The fix is the user's — switch those to Terrain / Terrain+offset,
+ *               or export in Baked ASL. (Deliberately NOT NeedsElevationError, whose "enter a base elevation"
+ *               recovery is the wrong advice here.)
+ *  • "lights" — a `light` / `airport_light`: whether autoheight reaches the cultivation light lists was never
+ *               flown (the gate covered xref + plants), so the beta refuses them rather than ship an unverified
+ *               placement. Lift this once an in-sim gate confirms it. */
+export class UnsupportedInAutoheightError extends Error {
+  readonly points: PlacedObject[];
+  readonly reason: "asl" | "lights";
+  constructor(points: PlacedObject[], reason: "asl" | "lights") {
+    super(
+      reason === "lights"
+        ? `${points.length} light(s): autoheight mode doesn't support lights yet — export in Baked ASL, or remove them`
+        : `${points.length} object(s) use an absolute ASL height, which autoheight can't represent — switch them to Terrain / Terrain + offset, or export in Baked ASL`,
+    );
+    this.name = "UnsupportedInAutoheightError";
+    this.points = points;
+    this.reason = reason;
+  }
+}
+
+/** What (if anything) blocks an autoheight export, for the ExportDialog to warn about BEFORE trying (same
+ *  role as the registration guard). Lights are checked first — a kind the mode doesn't handle at all —
+ *  then `asl`. Returns null when the project exports cleanly in autoheight. PURE, no I/O. */
+export function unsupportedInAutoheight(
+  objects: PlacedObject[],
+): { reason: "asl" | "lights"; points: PlacedObject[] } | null {
+  const lights = objects.filter((o) => o.kind === "airport_light" || o.kind === "light");
+  if (lights.length > 0) return { reason: "lights", points: lights };
+  const asl = objects.filter((o) => o.height.mode === "asl");
+  if (asl.length > 0) return { reason: "asl", points: asl };
+  return null;
+}
+
+/** Resolve every object for an AUTOHEIGHT export: the SIM resolves the terrain, so a terrain-relative
+ *  height becomes the AGL value written into the `.toc` — `terrain → 0`, `terrain-offset → offset`. PURE
+ *  and OFFLINE (no terrain lookup — that is the whole point of the mode). Throws UnsupportedInAutoheightError
+ *  if any object can't be represented (lights, or an absolute `asl` height); check unsupportedInAutoheight
+ *  first to warn without throwing. The resolved `heightAsl` field carries the AGL z here (its name is kept
+ *  to avoid renaming ~15 files; under autoheight the sim reads it as metres-above-ground). */
+export function resolveHeightsAgl(objects: PlacedObject[]): ResolvedObject[] {
+  const blocked = unsupportedInAutoheight(objects);
+  if (blocked) throw new UnsupportedInAutoheightError(blocked.points, blocked.reason);
+  return objects.map((o): ResolvedObject => {
+    const { height, ...rest } = o;
+    const z = height.mode === "terrain-offset" ? height.offset : 0; // terrain → 0; asl already rejected above
+    return { ...rest, heightAsl: z } as ResolvedObject;
+  });
+}
