@@ -18,8 +18,8 @@ POI-folder conventions.
 > desktop editor (first-run wizard, satellite/streets map, object catalog, inspector, airport
 > search, per-object height, export / install / uninstall) are built and tested — unit + golden
 > tests, typecheck, and an Electron smoke test, all green in [CI](.github/workflows/ci.yml). **v0.2
-> added lights, v0.3 lets you place your own custom XREF objects, and v0.4 adds plants.** The export
-> format is **confirmed working in the sim**. Builds are currently
+> added lights, v0.3 lets you place your own custom XREF objects, v0.4 adds plants, and v0.5 adds an
+> optional "Sim autoheight" export mode.** The export format is **confirmed working in the sim**. Builds are currently
 > **unsigned**, so your OS will warn you once on first launch — see
 > [Installing PCT](#installing-pct). Grab the newest build from
 > [Releases](https://github.com/jlgabriel/afs4-poi-creator/releases).
@@ -103,10 +103,17 @@ A couple of things worth knowing about the editor:
   matter which way the model was authored. (An **airport light** still shows a raw **"Orientation °"**,
   since lights weren't part of the heading calibration. Either can be dragged with the **cyan handle**
   on the map — hold **Shift** to snap to 5°.)
-- **Height modes** — Aerofly's built-in library objects have no auto-height, so PCT always writes an
-  **absolute** elevation (metres ASL). *Terrain* looks up the ground height and bakes it in; *Terrain +
-  offset* adds metres on top (rooftop items); *ASL* is a value you type. So "Terrain" does **not** mean
-  `0` — it means the resolved ground elevation.
+- **Height modes** — how an object's height reaches the sim, chosen **per project** from the top bar (and
+  echoed in the Export dialog):
+  - **Baked ASL** (default) — PCT writes each object an **absolute** elevation (metres ASL). *Terrain*
+    looks up the ground height and bakes it in; *Terrain + offset* adds metres on top (rooftop items);
+    *ASL* is a value you type. So "Terrain" does **not** mean `0` — it means the resolved ground elevation.
+  - **Sim autoheight (beta)** — lets **Aerofly itself** set the ground under each object at load time, so
+    *Terrain* means "on the ground" and *Terrain + offset* floats N metres above it. The export is then
+    **fully offline** (no elevation lookup) and objects follow the terrain even if the sim re-levels it —
+    so heights come out more reliable than a baked value, at the cost of leaning on undocumented sim
+    behaviour (hence *opt-in*, and it may change with a sim update). *ASL* has no meaning in this mode.
+    Suggested and worked out on the forum by **@chrispriv**, with **@ApfelFlieger**.
 
 ### Installing PCT
 
@@ -149,7 +156,8 @@ As it took shape, more of the community pitched in:
   decides an object's height. Christophe pinned down the exact behaviour for library objects (they need an
   explicit height written in, there's no auto-height to lean on), which set PCT on the correct path;
   and Rodeo's hands-on method for reading real terrain elevation inside the sim is how those heights
-  were validated on the ground.
+  were validated on the ground. Christophe went on to design the **Sim-autoheight** mode added in v0.5 —
+  the project-level approach and the exact `.tsl` / `.toc` behaviour behind it — with **@ApfelFlieger**.
 
 The code itself was built by two of Anthropic's **Claude** models working in tandem: **Fable 5**
 designed the architecture and reviewed every milestone, and **Opus 4.8** wrote the implementation —
@@ -161,7 +169,8 @@ all under the direction of **Juan Luis Gabriel (@Jugac64)**, who created and ste
   made a first release realistic.
 - **Frank Boës — @Armitage (forum), `fboes` (GitHub)** — the [aerofly-data](https://github.com/fboes/aerofly-data) airport
   dataset (MIT), reused with permission.
-- **Christophe — @chrispriv** — the object-height mechanics for library objects ([GitHub](https://chrispriv.github.io/aeroscenery-afs_addons/)).
+- **Christophe — @chrispriv** — the object-height mechanics for library objects, and the design of the
+  **Sim-autoheight** mode (v0.5) ([GitHub](https://chrispriv.github.io/aeroscenery-afs_addons/)).
 - **Rodeo (forum)** — the in-sim ground-truth method for validating terrain elevation.
 - **Fable 5** & **Claude Opus 4.8** (Anthropic) — architecture/reviews and implementation.
 
