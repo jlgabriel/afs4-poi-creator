@@ -10,6 +10,7 @@ import type { ExportOptions, InstallResult, InstalledPoi, PctError } from "../..
 import type { LonLat } from "../../core/project/types";
 import { shiftEastNorth } from "../../core/geo/geo";
 import { centroid, poiFolderName } from "../../core/geo/poiName";
+import { unsupportedInAutoheight } from "../../core/export/heights";
 import { firstProjectError, isExportablePoiName } from "../../core/project/schemas";
 import { editorStore, useEditor } from "../state/editorStore";
 import { getPct } from "../app/pct";
@@ -73,6 +74,14 @@ function InstalledPois(): React.ReactElement | null {
   );
 }
 
+/** The fix-it text for an autoheight blocker, shared by the pre-export warning and the error envelope. */
+function autoheightBlockText(reason: "asl" | "lights", n: number): string {
+  const these = n === 1 ? "it" : "them";
+  return reason === "lights"
+    ? `${n} placed light${n === 1 ? "" : "s"} can't use Sim autoheight yet — switch to Baked ASL, or remove ${these}.`
+    : `${n} object${n === 1 ? "" : "s"} use an absolute ASL height that Sim autoheight can't place — switch ${these} to Terrain / Terrain + offset, or use Baked ASL.`;
+}
+
 function messageFor(error: PctError): string {
   switch (error.code) {
     case "needs-elevation": {
@@ -81,6 +90,8 @@ function messageFor(error: PctError): string {
       const n = error.points.length;
       return `Couldn't get the terrain elevation for ${n} object${n === 1 ? "" : "s"} — enter a base elevation (m ASL) below and export again.`;
     }
+    case "unsupported-in-autoheight":
+      return autoheightBlockText(error.reason, error.points.length);
     case "folder-exists":
       return `A POI folder "${error.folderName}" already exists.`;
     default:
@@ -95,12 +106,17 @@ export function ExportDialog({ onClose }: { onClose: () => void }): React.ReactE
   const storePoiName = useEditor((s) => s.project.poiName);
   const storeRef = useEditor((s) => s.project.reference);
   const storeShift = useEditor((s) => s.project.shift);
+  // Height mode lives on the document (one source of truth, shared with the TopBar's HeightModeSwitch) —
+  // read it live and change it via setHeightMode, so the switch and these radios always agree and the
+  // inspector reacts immediately. (Unlike slug/shift, which stay local drafts until export.)
+  const heightMode = useEditor((s) => s.project.heightMode) ?? "baked-asl";
   const mapView = useEditor((s) => s.mapView);
 
   const [slug, setSlug] = useState(storePoiName);
   const [refMode, setRefMode] = useState<"auto" | "map">(storeRef !== null ? "map" : "auto");
   const [target, setTarget] = useState<ExportOptions["target"]>("install");
   const [baseElev, setBaseElev] = useState("");
+  const autoheight = heightMode === "autoheight";
   const [shiftEast, setShiftEast] = useState(storeShift?.east ?? 0);
   const [shiftNorth, setShiftNorth] = useState(storeShift?.north ?? 0);
   const [busy, setBusy] = useState(false);
@@ -123,6 +139,14 @@ export function ExportDialog({ onClose }: { onClose: () => void }): React.ReactE
   const unregisteredPlaced = useMemo(
     () => unregisteredPlacedNames(objects, catalogIndex),
     [objects, catalogIndex],
+  );
+
+  // In Sim-autoheight mode, warn (and block) BEFORE trying if the scene has something the mode can't
+  // represent — a light (not verified in autoheight yet) or an absolute-ASL height (no AGL meaning). Same
+  // pure guard the exporter throws on, surfaced early so the user fixes it here instead of hitting an error.
+  const blockedByAutoheight = useMemo(
+    () => (autoheight ? unsupportedInAutoheight(objects) : null),
+    [autoheight, objects],
   );
 
   // One install attempt. On a folder-exists refusal, offer to replace and retry with overwrite — the
@@ -169,6 +193,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }): React.ReactE
     if (shiftEast !== curShift.east || shiftNorth !== curShift.north) {
       store.setShift({ east: shiftEast, north: shiftNorth });
     }
+    // heightMode is already persisted the moment it's toggled (store-backed) — nothing to sync here.
 
     // Export-time twin of the C1 save-net (commands.ts): never write a POI the loader would reject.
     // The export path bypasses doSave, so without this an out-of-range coordinate that Save refuses could
@@ -182,7 +207,9 @@ export function ExportDialog({ onClose }: { onClose: () => void }): React.ReactE
     }
 
     const opts: ExportOptions = { target, overwrite: false };
-    if (baseElevation !== undefined) opts.baseElevation = baseElevation;
+    // Autoheight is fully offline: the sim resolves the terrain, so a base elevation has no meaning (main
+    // ignores it too). Baked-asl passes it through as the offline/manual fallback.
+    if (!autoheight && baseElevation !== undefined) opts.baseElevation = baseElevation;
 
     await install(opts);
   };
@@ -263,16 +290,41 @@ export function ExportDialog({ onClose }: { onClose: () => void }): React.ReactE
               </label>
             </div>
 
-            <label className="pct-field pct-field-col">
-              <span className="pct-field-label">Base elevation — m ASL (optional)</span>
-              <input
-                className="pct-num"
-                value={baseElev}
-                placeholder="blank = use the elevation service"
-                aria-label="Base elevation"
-                onChange={(e) => setBaseElev(e.target.value)}
-              />
-            </label>
+            <div className="pct-field pct-field-col">
+              <span className="pct-field-label">Heights</span>
+              <label className="pct-radio">
+                <input
+                  type="radio"
+                  name="heightmode"
+                  checked={!autoheight}
+                  onChange={() => editorStore.getState().setHeightMode("baked-asl")}
+                />
+                Baked ASL (default) — looks up terrain elevation (may go online)
+              </label>
+              <label className="pct-radio">
+                <input
+                  type="radio"
+                  name="heightmode"
+                  checked={autoheight}
+                  onChange={() => editorStore.getState().setHeightMode("autoheight")}
+                />
+                Sim autoheight (beta) — objects follow the terrain; fully offline
+              </label>
+            </div>
+
+            {/* Base elevation is the Baked-ASL offline fallback only — autoheight needs no elevation at all. */}
+            {!autoheight && (
+              <label className="pct-field pct-field-col">
+                <span className="pct-field-label">Base elevation — m ASL (optional)</span>
+                <input
+                  className="pct-num"
+                  value={baseElev}
+                  placeholder="blank = use the elevation service"
+                  aria-label="Base elevation"
+                  onChange={(e) => setBaseElev(e.target.value)}
+                />
+              </label>
+            )}
 
             <div className="pct-field pct-field-col">
               <span className="pct-field-label">Shift — metres (line objects up with FS4's tiles)</span>
@@ -320,6 +372,11 @@ export function ExportDialog({ onClose }: { onClose: () => void }): React.ReactE
                 {unregisteredPlaced.length === 1 ? "it won't" : "they won't"} render in the sim.
               </p>
             )}
+            {blockedByAutoheight !== null && (
+              <p className="pct-warn">
+                {autoheightBlockText(blockedByAutoheight.reason, blockedByAutoheight.points.length)}
+              </p>
+            )}
 
             <div className="pct-modal-actions">
               <button onClick={onClose} disabled={busy}>
@@ -328,7 +385,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }): React.ReactE
               <span className="pct-spacer" />
               <button
                 className="pct-primary"
-                disabled={!validSlug || busy || !pct || objects.length === 0}
+                disabled={!validSlug || busy || !pct || objects.length === 0 || blockedByAutoheight !== null}
                 title={pct ? undefined : "Export runs in the desktop app"}
                 onClick={() => void doExport()}
               >

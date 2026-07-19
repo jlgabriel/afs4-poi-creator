@@ -5,7 +5,7 @@
 // the terrain elevation under the object once fetched — the lazy network lookup (M2d) is the "Fetch
 // elevation" button, which populates the store's ephemeral resolvedElev cache via app/commands.
 import { useState } from "react";
-import { editorStore } from "../state/editorStore";
+import { editorStore, useEditor } from "../state/editorStore";
 import type { HeightSpec } from "../../core/project/types";
 import { fetchElevation } from "../app/commands";
 import { hasPct } from "../app/pct";
@@ -27,6 +27,9 @@ interface HeightControlProps {
 
 export function HeightControl({ id, height, resolvedAsl }: HeightControlProps): React.ReactElement {
   const store = editorStore.getState;
+  // The export height mode (set in the Export dialog) changes what these modes MEAN at export, so the copy
+  // reflects it: baked-asl bakes an absolute ASL number, autoheight lets the sim ground each object.
+  const autoheight = useEditor((s) => s.project.heightMode) === "autoheight";
 
   // Local fetch state. ObjectFields is keyed by object id, so this component remounts on selection
   // change → fetching/fetchErr reset per object automatically (no stale spinner from a prior object).
@@ -88,22 +91,38 @@ export function HeightControl({ id, height, resolvedAsl }: HeightControlProps): 
     <div className="pct-height">
       <div
         className="pct-field-label"
-        title="Library objects have no auto-height, so PCT always writes an absolute elevation (m ASL). Terrain = look up and bake the ground height; Terrain + offset = ground + metres (rooftops); ASL = a value you type. Terrain does not mean 0."
+        title="How this object's height resolves at export. Terrain = the ground under it; Terrain + offset = ground + metres (rooftops); ASL = a fixed value you type. Baked-ASL export bakes an absolute elevation (m ASL); Sim-autoheight export lets the sim place it on the terrain. Terrain does not mean 0."
       >
         Height
       </div>
       <div className="pct-radio-row">
-        {MODES.map((m) => (
-          <label key={m.mode} className="pct-radio">
-            <input
-              type="radio"
-              name={`h-${id}`}
-              checked={height.mode === m.mode}
-              onChange={() => selectMode(m.mode)}
-            />
-            {m.label}
-          </label>
-        ))}
+        {MODES.map((m) => {
+          // ASL has no meaning under Sim autoheight: the place is autoheight=true, so the sim reads an
+          // absolute number as metres-above-ground (forum #148, chrispriv). Disable the radio there so a
+          // user can't build an unexportable project; the export guard still catches an ASL height already
+          // set on an object (e.g. from an opened project), which the ExportDialog warning explains.
+          const disabled = autoheight && m.mode === "asl";
+          return (
+            <label
+              key={m.mode}
+              className="pct-radio"
+              title={
+                disabled
+                  ? "ASL has no meaning in Sim autoheight — the sim sets the ground. Use Terrain or Terrain + offset."
+                  : undefined
+              }
+            >
+              <input
+                type="radio"
+                name={`h-${id}`}
+                checked={height.mode === m.mode}
+                disabled={disabled}
+                onChange={() => selectMode(m.mode)}
+              />
+              {m.label}
+            </label>
+          );
+        })}
       </div>
       <div className="pct-nudge-row">
         <button type="button" onClick={() => store().nudgeHeight(id, -5)} title="−5 m">
@@ -129,9 +148,13 @@ export function HeightControl({ id, height, resolvedAsl }: HeightControlProps): 
         <span>
           {resolvedAsl !== undefined
             ? `terrain ≈ ${resolvedAsl.toFixed(1)} m ASL`
-            : height.mode === "asl"
-              ? "absolute metres ASL"
-              : "resolved to absolute ASL at export"}
+            : autoheight
+              ? height.mode === "asl"
+                ? "ASL — switch to Terrain for autoheight"
+                : "placed on the terrain (autoheight)"
+              : height.mode === "asl"
+                ? "absolute metres ASL"
+                : "resolved to absolute ASL at export"}
         </span>
         <button
           type="button"

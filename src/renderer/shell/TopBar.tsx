@@ -5,6 +5,7 @@
 // lands. IPC-backed buttons disable in the browser preview (no bridge).
 import { useState } from "react";
 import { editorStore, useEditor } from "../state/editorStore";
+import type { HeightMode } from "../../core/project/types";
 import { hasPct } from "../app/pct";
 import { doNew, doOpen, doSave, doSaveAs, setTileProvider } from "../app/commands";
 import { PROVIDER_LABEL, type TileProvider } from "../map/tileProviders";
@@ -40,6 +41,40 @@ function MapStyleSwitch(): React.ReactElement {
           </button>
         );
       })}
+    </div>
+  );
+}
+
+/** Height-mode switch (forum #142/#148, chrispriv): the PROJECT-level choice of how object heights export —
+ *  Baked ASL (default: absolute elevations, may look up terrain online) or Sim autoheight (beta: the sim
+ *  grounds each object, fully offline). Kept in the bar, not just the Export dialog, so the choice is
+ *  visible at all times and the inspector's Height control reflects it from the first object placed
+ *  ("display it in the GUI for informational purposes", chrispriv #148). One source of truth: the document
+ *  (setHeightMode), so the Export dialog's radios and this switch always agree. */
+function HeightModeSwitch(): React.ReactElement {
+  const mode: HeightMode = useEditor((s) => s.project.heightMode) ?? "baked-asl";
+  const set = (m: HeightMode): void => editorStore.getState().setHeightMode(m);
+  const modes: { m: HeightMode; label: string; title: string }[] = [
+    { m: "baked-asl", label: "Baked ASL", title: "Absolute elevations — looks up terrain (may go online). The default." },
+    { m: "autoheight", label: "Autoheight", title: "Sim autoheight (beta) — objects follow the terrain; fully offline export." },
+  ];
+  return (
+    <div className="pct-tileswitch" role="group" aria-label="Height mode">
+      <span className="pct-readout" title="How object heights export — applies to the whole project">
+        Heights
+      </span>
+      {modes.map(({ m, label, title }) => (
+        <button
+          key={m}
+          type="button"
+          className={mode === m ? "on" : undefined}
+          aria-pressed={mode === m}
+          title={title}
+          onClick={() => set(m)}
+        >
+          {label}
+        </button>
+      ))}
     </div>
   );
 }
@@ -131,6 +166,7 @@ export function TopBar({ onExport, onRescan, onSettings }: TopBarProps): React.R
 
       <span className="pct-spacer" />
       <AirportSearch />
+      <HeightModeSwitch />
       <MapStyleSwitch />
       <span className="pct-readout">
         {objCount} {objCount === 1 ? "object" : "objects"}

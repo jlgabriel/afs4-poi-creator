@@ -24,6 +24,7 @@ import type {
   CatalogAirportLight,
   CatalogObject,
   CatalogPlant,
+  HeightMode,
   HeightSpec,
   LonLat,
   PoiShift,
@@ -162,6 +163,7 @@ export interface EditorState {
   renameProject: (name: string) => void;
   setPoiName: (poiName: string) => void;
   setShift: (shift: PoiShift) => void;
+  setHeightMode: (mode: HeightMode) => void;
   duplicateSelection: (offsetM?: number) => void;
   deleteSelection: () => void;
 
@@ -422,6 +424,7 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
         renameProject: (name) => commit((proj) => mutate.renameProject(proj, name)),
         setPoiName: (poiName) => commit((proj) => mutate.setPoiName(proj, poiName)),
         setShift: (shift) => commit((proj) => mutate.setShift(proj, shift)),
+        setHeightMode: (mode) => commit((proj) => mutate.setHeightMode(proj, mode)),
 
         duplicateSelection: (offsetM = 5) => {
           const { selection } = get();
