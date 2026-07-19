@@ -224,6 +224,7 @@ body {
 /* Map-style quick switch — a segmented control in the dark top bar (overrides .pct-topbar button). */
 .pct-tileswitch {
   display: flex;
+  align-items: center;
   border: 1px solid #4b5563;
   border-radius: 4px;
   overflow: hidden;
