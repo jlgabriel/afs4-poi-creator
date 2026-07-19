@@ -21,7 +21,12 @@ import type {
   XrefRegistrationPlan,
   XrefRegistrationResult,
 } from "../shared/pctApi";
-import { NeedsElevationError, resolveHeightsFlat } from "../core/export/heights";
+import {
+  NeedsElevationError,
+  UnsupportedInAutoheightError,
+  resolveHeightsAgl,
+  resolveHeightsFlat,
+} from "../core/export/heights";
 import { planExport } from "../core/export/planExport";
 import { UnsupportedSchemaVersionError } from "../core/project/schemas";
 import { detectInstallDirs, detectUserDir } from "./afs4Paths";
@@ -69,6 +74,9 @@ function toPctError(e: unknown): PctError {
   if (e instanceof NoXrefError) return { code: "no-xref", message: e.message, installDir: e.installDir };
   if (e instanceof NeedsElevationError) {
     return { code: "needs-elevation", message: e.message, points: e.points };
+  }
+  if (e instanceof UnsupportedInAutoheightError) {
+    return { code: "unsupported-in-autoheight", message: e.message, points: e.points, reason: e.reason };
   }
   if (e instanceof UnsupportedSchemaVersionError) {
     return { code: "unsupported-schema", message: e.message, found: e.found };
@@ -139,16 +147,21 @@ const pickDirectory = (title: string): Promise<string | null> =>
  *  into scenery/poi/ (install) or a chosen folder. Returns null only when choose-folder is cancelled. */
 async function runExport(project: Project, opts: ExportOptions): Promise<InstallResult | null> {
   const settings = currentSettings();
+  // Autoheight mode is fully OFFLINE — the sim resolves the terrain, so there is no elevation lookup and
+  // baseElevation is ignored (resolveHeightsAgl throws UnsupportedInAutoheightError on an asl height / a
+  // light, which toPctError surfaces). Baked-asl keeps the manual-base / provider path unchanged.
   const resolved =
-    opts.baseElevation != null
-      ? resolveHeightsFlat(project.objects, opts.baseElevation)
-      : await resolveHeights(project.objects, settings.elevation.provider, {
-          cacheDir: userData(),
-          version: app.getVersion(),
-        });
+    project.heightMode === "autoheight"
+      ? resolveHeightsAgl(project.objects)
+      : opts.baseElevation != null
+        ? resolveHeightsFlat(project.objects, opts.baseElevation)
+        : await resolveHeights(project.objects, settings.elevation.provider, {
+            cacheDir: userData(),
+            version: app.getVersion(),
+          });
   const plan = planExport(project, resolved);
   // Where the bundled anchor mesh+texture live (anchorAsset.ts). writePoi copies them into any POI that
-  // has plants; an xref/light-only POI ships none and never reads this.
+  // carries the anchor — plants (baked-asl) or every non-empty autoheight POI; others ship none.
   const assetsDir = anchorAssetsDir({
     env: process.env,
     packaged: app.isPackaged,

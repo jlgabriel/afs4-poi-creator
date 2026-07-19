@@ -19,6 +19,9 @@ export interface DetectResult {
 /** Discriminated, serialization-safe error surface — plain data, survives IPC intact. */
 export type PctError =
   | { code: "needs-elevation"; message: string; points: PlacedObject[] }
+  // Autoheight export can't represent these objects (heights.ts): "asl" = an absolute height (switch it to
+  // Terrain / Terrain+offset, or export in Baked ASL); "lights" = a light kind not yet verified in autoheight.
+  | { code: "unsupported-in-autoheight"; message: string; points: PlacedObject[]; reason: "asl" | "lights" }
   | { code: "no-xref"; message: string; installDir: string }
   | { code: "unsupported-schema"; message: string; found: unknown }
   | { code: "invalid-project"; message: string }

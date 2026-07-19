@@ -16,7 +16,12 @@ import os from "node:os";
 import path from "node:path";
 import type { ExportPlan, Project } from "../core/project/types";
 import { planExport } from "../core/export/planExport";
-import { NeedsElevationError, resolveHeightsFlat } from "../core/export/heights";
+import {
+  NeedsElevationError,
+  UnsupportedInAutoheightError,
+  resolveHeightsAgl,
+  resolveHeightsFlat,
+} from "../core/export/heights";
 import { isSafePoiFolderName } from "../core/geo/poiName";
 import { anchorAssetsDir } from "../main/anchorAsset";
 
@@ -108,12 +113,24 @@ function main(): number {
 
   let resolved;
   try {
-    resolved = resolveHeightsFlat(project.objects, args.baseElevation);
+    if (project.heightMode === "autoheight") {
+      // Fully offline: the sim resolves the terrain, so heights are AGL and --base-elevation has no meaning.
+      if (args.baseElevation !== null) {
+        console.warn("WARNING: --base-elevation is ignored in autoheight mode (heights are AGL, resolved by the sim).");
+      }
+      resolved = resolveHeightsAgl(project.objects);
+    } else {
+      resolved = resolveHeightsFlat(project.objects, args.baseElevation);
+    }
   } catch (e) {
     if (e instanceof NeedsElevationError) {
       console.error(`ERROR: ${e.points.length} object(s) use a terrain-relative height but no elevation was given.`);
       console.error(`       Pass --base-elevation <metres ASL> (ground height at the POI), or set those`);
       console.error(`       objects to { "mode": "asl", "value": <m> } in the project.`);
+      return 1;
+    }
+    if (e instanceof UnsupportedInAutoheightError) {
+      console.error(`ERROR: ${e.message}`);
       return 1;
     }
     throw e;
