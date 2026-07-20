@@ -59,22 +59,24 @@ function HeightModeSwitch(): React.ReactElement {
     { m: "autoheight", label: "Autoheight", title: "Sim autoheight (beta) — objects follow the terrain; fully offline export." },
   ];
   return (
-    <div className="pct-tileswitch" role="group" aria-label="Height mode">
-      <span className="pct-readout" title="How object heights export — applies to the whole project">
-        Heights
+    <div className="pct-barfield">
+      <span className="pct-barfield-label" title="How object heights export — applies to the whole project">
+        Heights:
       </span>
-      {modes.map(({ m, label, title }) => (
-        <button
-          key={m}
-          type="button"
-          className={mode === m ? "on" : undefined}
-          aria-pressed={mode === m}
-          title={title}
-          onClick={() => set(m)}
-        >
-          {label}
-        </button>
-      ))}
+      <div className="pct-tileswitch" role="group" aria-label="Height mode">
+        {modes.map(({ m, label, title }) => (
+          <button
+            key={m}
+            type="button"
+            className={mode === m ? "on" : undefined}
+            aria-pressed={mode === m}
+            title={title}
+            onClick={() => set(m)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

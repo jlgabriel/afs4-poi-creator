@@ -159,6 +159,10 @@ body {
 .pct-topbar {
   display: flex;
   align-items: center;
+  /* Wrap to a second row rather than overflow: the bar's natural width already exceeds a ~1240 px window,
+     and the alternative is losing whatever sits at the right edge (the object count) off-screen with no
+     scrollbar. The shell's grid row is `auto`, so a taller bar just takes the height from the map. */
+  flex-wrap: wrap;
   gap: 8px;
   padding: 6px 12px;
   background: #1f2937;
@@ -228,6 +232,9 @@ body {
   border: 1px solid #4b5563;
   border-radius: 4px;
   overflow: hidden;
+  /* Never squeeze a segmented control: with `overflow: hidden` a shrunk switch CLIPS its own buttons and
+     silently loses them. The bar wraps to a second row instead (see .pct-topbar). */
+  flex-shrink: 0;
 }
 .pct-tileswitch button {
   font: inherit;
@@ -239,6 +246,11 @@ body {
   background: #1f2937;
   color: #cbd5e1;
   cursor: pointer;
+  /* A crowded bar was breaking "Baked ASL" over two lines, so that one button stood 40 px tall beside a
+     24 px "Autoheight" — the uneven box in chrispriv's #151 screenshot. The labels are two words at most.
+     (Pin the shrink on the SWITCH, not here: buttons that refuse to shrink let the flex parent collapse
+     instead, and `overflow: hidden` then clips them — that briefly ate the whole map-style switch.) */
+  white-space: nowrap;
 }
 .pct-tileswitch button:first-child {
   border-left: none;
@@ -253,13 +265,18 @@ body {
 }
 
 /* Airport search — "Airport:" label + typeahead in the dark top bar; the dropdown overflows down over
-   the map (see the .pct-topbar stacking-context note above). Recenters the map only; draws nothing. */
-.pct-airport {
+   the map (see the .pct-topbar stacking-context note above). Recenters the map only; draws nothing.
+   `.pct-barfield` is the same label-then-control pairing for any other top-bar control (the Heights
+   switch): grouped here ON PURPOSE so every bar label is one rule — chrispriv (#151) read a label
+   styled unlike "Airport:" as a different KIND of thing, so they must not be able to drift apart. */
+.pct-airport,
+.pct-barfield {
   display: flex;
   align-items: center;
   gap: 6px;
 }
-.pct-airport-label {
+.pct-airport-label,
+.pct-barfield-label {
   font-size: 12px;
   color: #cbd5e1;
   white-space: nowrap;
