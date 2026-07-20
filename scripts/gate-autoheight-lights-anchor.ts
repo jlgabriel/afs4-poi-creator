@@ -82,11 +82,27 @@ const RUNWAY_CENTRE: LonLat = { lon: -116.7871683, lat: 34.8514739 };
 const PROBE_EAST = { A: -440, B: 0, C: 440, D: -880 };
 
 /** Ground elevation at KDAG, metres ASL — needed only by the baked-asl control, whose heights are
- *  absolute rather than AGL. Not a guess: the 2026-07-12 lights gate flew a height-614 probe here and
- *  it floated +30 m over 584 m terrain, which is the same fixture-at-+30 m reading this probe repeats.
- *  If D comes out buried or floating as a whole, this number moved — that is a finding about the
- *  terrain, not about lights. */
-const TERRAIN_ASL = 584;
+ *  absolute rather than AGL.
+ *
+ *  MEASURED, from run 2's HUD: ALT 2000 ft with GND 70 ft ⇒ terrain 1930 ft = 588 m. (KDAG's published
+ *  field elevation, 1927 ft, agrees.) Run 2 flew 584 — inherited from a note about the 2026-07-12 gate
+ *  and flagged "assumed, not verified" in the sheet, then never checked. Four metres was enough to bury
+ *  the control's container and its low light completely, leaving a lone pylon and one floating light,
+ *  which is exactly what came back. A premise you label as unverified and fly anyway is just a premise. */
+const TERRAIN_ASL = 588;
+
+/** Metres the WHOLE baked-asl control is lifted above the terrain.
+ *
+ *  Deliberately airborne, and this is the real fix — correcting 584→588 alone would leave the control
+ *  hostage to the same class of error. The control's ONLY job is to prove these fixtures draw at all,
+ *  and a light hanging in mid-air does that whether the ground beneath is 584 m or 592 m. Lifting every
+ *  object (not just the lights) also keeps the control's shape identical to the autoheight probes, so
+ *  "the group with nothing on the ground" is the control, at a glance. Nothing in it can be swallowed
+ *  by the terrain, so it can no longer fail for a reason unrelated to the question.
+ *
+ *  The autoheight probes need no such margin: their z IS AGL — the sim resolves the ground, which is
+ *  the whole point of the mode under test. */
+const CONTROL_FLOAT = 10;
 
 /** Metres between objects within a probe, laid out ACROSS the runway (north–south).
  *
@@ -342,7 +358,7 @@ const PROBES: Probe[] = [
   // not visible" look identical. D flies the SAME two fixtures at the SAME heights down the baked-asl
   // path — the one already proven to place lights (gate 2026-07-12) — so it produces the signal the
   // autoheight probes are being read for the absence of. No anchor: baked-asl only ships one for plants.
-  { key: "D", poiName: "gate_d_bakedasl_control", title: "Gate D — CONTROL: same lights, baked ASL", anchorZ: null, withLights: true, heightMode: "baked-asl", base: TERRAIN_ASL, isolates: "whether these fixtures are visible AT ALL" },
+  { key: "D", poiName: "gate_d_bakedasl_control", title: "Gate D — CONTROL: same lights, baked ASL, floating", anchorZ: null, withLights: true, heightMode: "baked-asl", base: TERRAIN_ASL + CONTROL_FLOAT, isolates: "whether these fixtures are visible AT ALL" },
 ];
 
 function main(): number {
@@ -426,7 +442,12 @@ function main(): number {
 
     console.log(`${probe.title}`);
     console.log(`  isolates : ${probe.isolates}`);
-    console.log(`  mode     : ${probe.heightMode}${probe.base ? ` (z absolute, ground ${probe.base} m ASL)` : " (z is AGL)"}`);
+    console.log(
+      `  mode     : ${probe.heightMode}` +
+        (probe.base
+          ? ` (z absolute; ${probe.base} m ASL = ${probe.base - TERRAIN_ASL} m above ${TERRAIN_ASL} m terrain)`
+          : " (z is AGL — the sim resolves the ground)"),
+    );
     console.log(`  folder   : ${plan.folderName}`);
     console.log(`  objects  : ${resolved.length} (${probe.withLights ? "2 xref + 2 lights" : "2 xref, no lights"})`);
     console.log(`  anchor   : ${anchorLine}`);
