@@ -74,30 +74,46 @@ const RUNWAY_CENTRE: LonLat = { lon: -116.7871683, lat: 34.8514739 };
  *  runway's ±968 m, so every probe sits on asphalt and no two can be mistaken for each other. */
 const PROBE_EAST = { A: -440, B: 0, C: 440 };
 
-/** Metres between objects within a probe. Close enough to compare heights at a glance, far enough
- *  that the four are separate. */
-const SPACING = 25;
+/** Metres between objects within a probe, laid out ACROSS the runway (north–south).
+ *
+ *  ACROSS, not along: the KDAG spawn is the 08/26 threshold, so the flight path runs down the runway
+ *  and a line of probes ALONG it foreshortens into one another — the same way that nearly cost the N2
+ *  plant gate its reading. Perpendicular, all four are separate in one pass and none hides another.
+ *  15 m puts the outermost pair at ±22.5 m, inside the runway's 46 m width, so every probe stays on
+ *  asphalt while still being close enough to compare heights without parallax. */
+const SPACING = 15;
 
 /** The AGL height of the raised light — the probe's positive signal. Read against TALL_XREF's tip. */
 const LIGHT_AGL = 30;
 
 // ── Probe construction ────────────────────────────────────────────────────────────────────────────
 
-const at = (east: number): LonLat => shiftEastNorth(RUNWAY_CENTRE, east, 0);
+const at = (east: number, north: number): LonLat => shiftEastNorth(RUNWAY_CENTRE, east, north);
+
+/** Lane 0..3 → metres north of the runway centreline: -22.5, -7.5, +7.5, +22.5. */
+const lane = (i: number): number => (i - 1.5) * SPACING;
 
 let uid = 0;
 const id = (): string => `gate-${String(++uid).padStart(4, "0")}`;
 
-function xref(name: string, east: number, aglZ: number): ResolvedXref {
-  return { id: id(), kind: "xref", name, position: at(east), heightAsl: aglZ, direction: 0, scale: 1 };
+function xref(name: string, east: number, laneIdx: number, aglZ: number): ResolvedXref {
+  return {
+    id: id(),
+    kind: "xref",
+    name,
+    position: at(east, lane(laneIdx)),
+    heightAsl: aglZ,
+    direction: 0,
+    scale: 1,
+  };
 }
 
-function light(east: number, aglZ: number): ResolvedAirportLight {
+function light(east: number, laneIdx: number, aglZ: number): ResolvedAirportLight {
   return {
     id: id(),
     kind: "airport_light",
     typeName: LIGHT_TYPE,
-    position: at(east),
+    position: at(east, lane(laneIdx)),
     heightAsl: aglZ,
     orientation: 0,
     configuration: LIGHT_CONFIG,
@@ -108,11 +124,13 @@ function light(east: number, aglZ: number): ResolvedAirportLight {
 /** The four-object line: tall xref at ground, a light beside it at +30 m, a low xref at ground, a light
  *  beside THAT at ground. Every reading is a comparison with an adjacent object, never a judgement of
  *  absolute height. `withLights: false` drops the two lights (probe B). */
-function probeObjects(east0: number, withLights: boolean): ResolvedObject[] {
-  const objects: ResolvedObject[] = [xref(TALL_XREF, east0, 0)];
-  if (withLights) objects.push(light(east0 + SPACING, LIGHT_AGL));
-  objects.push(xref(LOW_XREF, east0 + SPACING * 2, 0));
-  if (withLights) objects.push(light(east0 + SPACING * 3, 0));
+function probeObjects(east: number, withLights: boolean): ResolvedObject[] {
+  // Lanes across the runway, south to north. The xrefs keep lanes 0 and 2 whether or not the lights
+  // are present, so probe B (no lights) frames identically to A and C.
+  const objects: ResolvedObject[] = [xref(TALL_XREF, east, 0, 0)];
+  if (withLights) objects.push(light(east, 1, LIGHT_AGL));
+  objects.push(xref(LOW_XREF, east, 2, 0));
+  if (withLights) objects.push(light(east, 3, 0));
   return objects;
 }
 
