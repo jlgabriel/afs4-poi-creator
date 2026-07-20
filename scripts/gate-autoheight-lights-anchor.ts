@@ -35,13 +35,16 @@ import type {
 // the case is real (`mobile_LightTower`). These are checked against the scanned catalog before anything
 // is written, and the failure prints candidates; never "fix" a mismatch by editing from memory.
 
-/** Tall and thin: the vertical ruler the +30 m light is read against. Its top is at bbMax.z = 29.64 m
- *  above the placement point (bbMin.z = -0.43), so a light at +30 m AGL lands ~0.4 m above the tip —
- *  the sharpest possible reading, a level match instead of an estimated proportion. */
+/** Tall and thin: the vertical ruler the +30 m light is read against. Chosen because its top sits
+ *  almost exactly at LIGHT_AGL, so the light reads as a LEVEL MATCH with the tip rather than an
+ *  estimated proportion. The actual height is read from the scanned catalog at build time and
+ *  printed — never hardcoded here, both because scanned dimensions are IPACS-derived data that
+ *  stays out of the repo, and because a number baked into a comment silently goes stale. */
 const TALL_XREF = "powerline_30m";
-/** Low and compact, unmistakable beside the tall one: a 40 ft box, 3.00 m tall, base at the origin.
- *  ⚠️ LOWERCASE. `Container_Blue` / `_Red` / `_Yellow` / `_White` are DIFFERENT objects, half the
- *  height (1.24 m). The case is the object here — see validateNames, which catches exactly this. */
+/** Low and compact, unmistakable beside the tall one: a shipping container, base at the origin. A
+ *  horizontal box next to a vertical needle — no chance of mistaking one for the other at a glance.
+ *  ⚠️ LOWERCASE. `Container_Blue` / `_Red` / `_Yellow` / `_White` are DIFFERENT objects, roughly half
+ *  the height. The case IS the object here — see validateNames, which catches exactly this. */
 const LOW_XREF = "container";
 /** The airport-light fixture (CatalogAirportLight.typeName, no "al_" prefix).
  *
@@ -75,6 +78,9 @@ const PROBE_EAST = { A: -440, B: 0, C: 440 };
  *  that the four are separate. */
 const SPACING = 25;
 
+/** The AGL height of the raised light — the probe's positive signal. Read against TALL_XREF's tip. */
+const LIGHT_AGL = 30;
+
 // ── Probe construction ────────────────────────────────────────────────────────────────────────────
 
 const at = (east: number): LonLat => shiftEastNorth(RUNWAY_CENTRE, east, 0);
@@ -104,10 +110,27 @@ function light(east: number, aglZ: number): ResolvedAirportLight {
  *  absolute height. `withLights: false` drops the two lights (probe B). */
 function probeObjects(east0: number, withLights: boolean): ResolvedObject[] {
   const objects: ResolvedObject[] = [xref(TALL_XREF, east0, 0)];
-  if (withLights) objects.push(light(east0 + SPACING, 30));
+  if (withLights) objects.push(light(east0 + SPACING, LIGHT_AGL));
   objects.push(xref(LOW_XREF, east0 + SPACING * 2, 0));
   if (withLights) objects.push(light(east0 + SPACING * 3, 0));
   return objects;
+}
+
+/** What the raised light should look like against the ruler, computed from the scan rather than
+ *  asserted. `bbMax[2]` is metres ABOVE the placement point — the visible top — which is not `size.z`
+ *  whenever a model extends below its origin. Warns if the two are far enough apart that "level with
+ *  the tip" stops being the right thing to look for. */
+function rulerReading(cat: Catalog): string {
+  const ruler = cat.xref.find((o) => o.name === TALL_XREF);
+  if (!ruler) return `${TALL_XREF}: not in the catalog (validated separately)`;
+  const top = ruler.bbMax[2];
+  const delta = LIGHT_AGL - top;
+  const how =
+    Math.abs(delta) <= 1
+      ? `level with its tip (${delta >= 0 ? "+" : ""}${delta.toFixed(2)} m) — read it as a match`
+      : `${Math.abs(delta).toFixed(2)} m ${delta > 0 ? "ABOVE" : "BELOW"} its tip — NOT a level match, ` +
+        `read the gap instead, or pick a ruler nearer ${LIGHT_AGL} m`;
+  return `${TALL_XREF} top ${top.toFixed(2)} m AGL; the +${LIGHT_AGL} m light should sit ${how}`;
 }
 
 function project(poiName: string, name: string): Project {
@@ -303,7 +326,8 @@ function main(): number {
   console.log(`  ${fixtures.fixtureCount} airport-light fixtures, from the ${fixtures.fixtureSource}`);
   console.log(`  all three probe names verified present, case-exact\n`);
   console.log(`Site: KDAG runway 08/26 centre ${RUNWAY_CENTRE.lat}, ${RUNWAY_CENTRE.lon} (on asphalt)`);
-  console.log(`Probe objects: ${TALL_XREF} / ${LOW_XREF} / light ${LIGHT_TYPE} (group ${LIGHT_GROUP}, 24 h)\n`);
+  console.log(`Probe objects: ${TALL_XREF} / ${LOW_XREF} / light ${LIGHT_TYPE} (group ${LIGHT_GROUP}, 24 h)`);
+  console.log(`What to look for: ${rulerReading(cat)}\n`);
 
   const assetsDir = anchorAssetsDir({
     env: process.env,
