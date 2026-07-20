@@ -1,28 +1,34 @@
-// gate-autoheight-lights-anchor.ts — v2: does autoheight place airport lights, read in the DARK DESERT.
+// gate-autoheight-lights-anchor.ts — v3: does autoheight place airport lights, read with a FAN of the
+// runway fixtures Juan can actually see at night.
 //
 //   npx tsx scripts/gate-autoheight-lights-anchor.ts [--install] [--catalog <catalog.json>] [--out <dir>]
 //
 // The buried-anchor half of chrispriv #151 is CLOSED (runs 1–3, 2026-07-20: xrefs land on the runway with
 // the anchor at -1.0). What remains is #151.2: does `autoheight=true` reach the cultivation's LIGHT lists,
-// or does it swallow them the way it swallowed plants? This is the instrument to read that, rebuilt after
-// three unreadable flights — each of which failed on the INSTRUMENT, never the question:
+// or does it swallow them the way it swallowed plants? Five flights failed to read that, EVERY ONE on the
+// instrument, never the question:
 //
-//   run 1 (day, helipad_beacon)  → nothing: airport lights don't show in daylight (emitters, not day geometry)
-//   run 3 (day, helipad_flood)   → nothing: same daylight problem, and I'd chased the fixture, not the hour
-//   run 4 (NIGHT, on the runway) → "solo las luces normales de la pista": our two lights drowned in KDAG's
-//                                   real edge/centreline lighting. Right hour, wrong SITE.
+//   run 1 (day,   helipad_beacon) → nothing: airport lights are invisible in daylight
+//   run 3 (day,   helipad_flood)  → nothing: same daylight problem, and I'd chased the fixture not the hour
+//   run 4 (NIGHT, on the runway)  → "solo las luces de la pista": ours drowned in KDAG's real lighting
+//   run 5 (NIGHT, dark desert)    → "ninguna luz aparte de las del aeropuerto": clean load, big circuits
+//                                    flown, still nothing — so the helipad fixture itself is MUTE.
 //
-// v2 fixes both remaining instrument faults:
-//   • SITE  → 150 m NORTH of the runway, in the open desert. At night the desert is BLACK and has no lights
-//             of its own, so anything that glows there is unambiguously ours (the v0.2 lights gate, the one
-//             that ever read lights, put them in this same desert and saw "una luz flotando como un ovni").
-//   • FIXTURE → back to `helipad_beacon`, a point beacon confirmed visible at night in that v0.2 gate.
-//             `helipad_flood_light` was a mistake: a floodlight lights a SURFACE, it is not a bright point.
+// The fix comes from what Juan reported at run 5: the runway's own lights "se ven tenues pero bien". Those
+// are RUNWAY fixtures from this same library — empirically visible. I avoided them for fear of confusing
+// them with the airport's lighting and picked a helipad beacon instead; but out in the desert there is no
+// runway to confuse them with, so that fear cost four flights. v3 uses a FAN of the runway fixtures Juan
+// sees, in the dark desert where nothing competes:
 //
-// Why a script and not `npm run export`: the CLI runs resolveHeightsAgl, which REFUSES lights in autoheight
-// — that refusal is the thing under test. planExport takes already-resolved objects and has no such guard,
-// so building the ResolvedObject[] here bypasses exactly one check. The bytes are what PCT would emit with
-// the guard lifted. ⚠️ FLY AT NIGHT/DUSK — airport lights are invisible by day at any group_index.
+//   CONTROL (baked-asl)  the fan floating +20 m  → the guarantee: these are known to draw, so if the
+//                        control is dark the site/night is wrong, not autoheight
+//   AUTOHEIGHT           the same fan at z=0 AGL, with the -1.0 anchor
+//     fan visible at ground  ⇒ autoheight places lights  → lift the guard
+//     nothing               ⇒ it buries them (the plant failure) → the finding for Michael
+//
+// Why a script and not `npm run export`: the CLI runs resolveHeightsAgl, which REFUSES lights in
+// autoheight — that refusal is the thing under test. planExport takes already-resolved objects and has no
+// such guard. ⚠️ FLY AT NIGHT/DUSK — airport lights are invisible by day at any group_index.
 
 import { copyFileSync, cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
@@ -33,79 +39,82 @@ import { isSafePoiFolderName } from "../src/core/geo/poiName";
 import { anchorAssetsDir } from "../src/main/anchorAsset";
 import type { Catalog, LonLat, Project, ResolvedAirportLight, ResolvedObject } from "../src/core/project/types";
 
-// ── The fixture ─────────────────────────────────────────────────────────────────────────────────────
+// ── The fixtures ────────────────────────────────────────────────────────────────────────────────────
 //
 // ⚠️ VERBATIM FROM THE SCAN. A name AFS4 can't resolve fails SILENTLY — nothing appears, no error — so a
-// typo reads exactly like a failed gate. validateNames checks this against the install before writing.
+// typo reads exactly like a failed gate. validateFixtures checks these against the install before writing.
 
-/** `helipad_beacon`: a POINT beacon, confirmed visible at NIGHT in the v0.2 lights gate (2026-07-12).
- *  No helipad exists near KDAG 08/26, so a helipad beacon out here is unmistakably ours — and unlike a
- *  runway light it can't be read against the airport's own lighting. Run 4's `helipad_flood_light` was
- *  wrong twice over: a floodlight illuminates a surface (no bright point to see), and it sat among the
- *  runway's real lights. If this beacon still doesn't read, `papi_2_light` is the next point source. */
-const LIGHT_TYPE = "helipad_beacon";
-
-/** Colour letters (schemas.ts CONFIGURATION_RE `^[bgrwy]{0,2}$`). A SECOND signal on top of position, in
- *  case the beacon honours configuration: control = red, autoheight = green. If the beacon ignores colour,
- *  the two groups are still told apart by where they are (see DESERT_* below), so this can't mislead. */
-const CONTROL_COLOUR = "r";
-const AUTOHEIGHT_COLOUR = "g";
+/** A FAN of RUNWAY fixtures — the ones Juan confirms he sees on KDAG's real runway at night ("las de la
+ *  pista se ven tenues pero bien"). That is the whole point after five blind flights: stop guessing a
+ *  fixture and use the ones EMPIRICALLY known to draw.
+ *
+ *  Runs 1/3/4/5 flew `helipad_beacon` / `helipad_flood_light` and saw NOTHING even at night on a clean
+ *  load — helipad fixtures are mute (a beacon needs its pad context; a floodlight lights a surface, it is
+ *  not a point). I avoided the runway fixtures for fear they'd be confused with the airport's own lighting
+ *  — but in the DESERT there is no runway to confuse them with, so that fear cost four flights. A fan, not
+ *  one: if any single type is mute, the others still answer. Empty configuration = each fixture's own
+ *  colour; never force a colour a runway light may reject. */
+const LIGHT_TYPES = ["runway_edge_light", "papi_3_light", "runway_end_light"] as const;
 
 /** 3 = visible 24 h, so the reading never hinges on the exact minute of dusk. (Still fly at night — even a
  *  24 h light is an emitter that washes out against a bright daytime sky; that is run 1/run 3.) */
 const LIGHT_GROUP = 3;
 
-// ── Where: the black desert north of the runway ───────────────────────────────────────────────────────
+// ── Where: the black desert beside the runway-26 threshold, where Juan spawns ──────────────────────────
 
-/** KDAG runway 08/26 centre (OSM way 24019997). The probes are placed relative to this, but NOT on it. */
-const RUNWAY_CENTRE: LonLat = { lon: -116.7871683, lat: 34.8514739 };
+/** KDAG runway 26 threshold — where the sim drops Juan in (tm.log menu_location, every run). Anchoring the
+ *  probes here, not at the distant runway centre, puts them in view the moment he looks around — run 2's
+ *  probes sat ~960 m away at mid-runway, a needless handicap even though run 5 proved distance wasn't the
+ *  failure. */
+const SPAWN_26: LonLat = { lon: -116.776615, lat: 34.851474 };
 
-/** Metres NORTH of the runway centreline for both probes. 150 m clears the runway's 46 m width and its
- *  edge lighting by a wide margin, out onto open desert that carries no lights of its own at night — the
- *  whole reason run 4 was unreadable is gone. Close enough to see from the runway; far enough to be black
- *  behind it. */
-const DESERT_NORTH = 150;
+/** Metres NORTH of the threshold for both groups: out onto open desert that carries no lights of its own
+ *  at night, clear of the runway's real edge/end/PAPI lights so nothing competes with or masks ours. */
+const DESERT_NORTH = 200;
 
-/** Metres EAST between the two probes' groups. 80 m keeps the control and the autoheight group clearly
- *  separate — the primary way to tell them apart if the beacon ignores colour. Control sits WEST (left as
- *  you look north), autoheight EAST (right). */
-const GROUP_EAST = 80;
+/** Metres EAST between the two groups. 120 m keeps the control and the autoheight fan clearly apart — the
+ *  way to tell them apart at a glance. Control sits WEST (left as you look north), autoheight EAST. */
+const GROUP_EAST = 120;
+
+/** Metres between fixtures within one fan (3 lights in a short row, so a mute type shows as one dark slot
+ *  between two lit ones rather than an ambiguous absence). */
+const FIXTURE_EAST = 20;
 
 /** Ground elevation, metres ASL — MEASURED from run 2's HUD (ALT 2000 ft, GND 70 ft ⇒ 1930 ft = 588 m;
  *  KDAG's published field elevation 1927 ft agrees). Used only by the baked-asl control, whose z is
- *  absolute. If the control comes out buried or sky-high as a whole, this number moved — a finding about
- *  the terrain, not about lights. */
+ *  absolute. */
 const TERRAIN_ASL = 588;
 
-/** Metres the control beacon floats above the terrain. Airborne ON PURPOSE: a light hanging over black
- *  desert is unmistakable, and it frees the control from depending on TERRAIN_ASL being exact — 20 m of
- *  float reads as "up there" whether the ground is 585 m or 591 m. */
+/** Metres the control fan floats above the terrain. Airborne ON PURPOSE: lights hanging over black desert
+ *  are unmistakably ours (the runway's real ones are on the ground), and 20 m of float frees the control
+ *  from TERRAIN_ASL being exact. The autoheight fan needs no margin — its z is AGL, the sim adds the
+ *  ground, which is the mode under test. */
 const CONTROL_FLOAT = 20;
-
-/** The two AGL heights the autoheight probe writes: one AT the ground, one well above it. If autoheight
- *  reaches the lights, the sim grounds z=0 onto the desert and lifts z=30 to 30 m — a low light and a high
- *  light, stacked. If it swallows them (the plant failure), z=0 lands at 0 m ASL = 588 m underground and
- *  BOTH vanish. So the autoheight group shows 2 lights or 0 — never a confusing in-between. */
-const AH_LOW = 0;
-const AH_HIGH = 30;
 
 // ── Probe construction ────────────────────────────────────────────────────────────────────────────────
 
 let uid = 0;
 const id = (): string => `gate-${String(++uid).padStart(4, "0")}`;
 
-/** One beacon `east` metres from the runway centre (always DESERT_NORTH north of it), at absolute/AGL z. */
-function beacon(east: number, z: number, colour: string): ResolvedAirportLight {
+/** One airport light `east` metres from the threshold (always DESERT_NORTH north of it), at absolute/AGL z.
+ *  Empty configuration ⇒ the fixture's own default colour. */
+function light(typeName: string, east: number, z: number): ResolvedAirportLight {
   return {
     id: id(),
     kind: "airport_light",
-    typeName: LIGHT_TYPE,
-    position: shiftEastNorth(RUNWAY_CENTRE, east, DESERT_NORTH),
+    typeName,
+    position: shiftEastNorth(SPAWN_26, east, DESERT_NORTH),
     heightAsl: z, // ASL for the baked-asl control; AGL for autoheight (the sim adds the terrain)
     orientation: 0,
-    configuration: colour,
+    configuration: "",
     groupIndex: LIGHT_GROUP,
   };
+}
+
+/** The fan: one of each LIGHT_TYPE in a short east–west row centred on `eastCentre`, all at height `z`. */
+function fan(eastCentre: number, z: number): ResolvedAirportLight[] {
+  const mid = (LIGHT_TYPES.length - 1) / 2;
+  return LIGHT_TYPES.map((t, i) => light(t, eastCentre + (i - mid) * FIXTURE_EAST, z));
 }
 
 function project(poiName: string, name: string, heightMode: Project["heightMode"]): Project {
@@ -118,7 +127,7 @@ function project(poiName: string, name: string, heightMode: Project["heightMode"
     createdAt: now,
     modifiedAt: now,
     reference: null, // centroid of the probe's own lights
-    camera: { lon: RUNWAY_CENTRE.lon, lat: RUNWAY_CENTRE.lat, zoom: 15 },
+    camera: { lon: SPAWN_26.lon, lat: SPAWN_26.lat, zoom: 15 },
     objects: [], // unused: planExport reads the RESOLVED array; carried only for the folder name
     heightMode,
   };
@@ -154,22 +163,19 @@ interface LightProbe {
 const PROBES: LightProbe[] = [
   {
     poiName: "gate_light_ctrl",
-    title: "CONTROL — baked-asl beacon, floating (the guarantee)",
+    title: "CONTROL — baked-asl, the runway fan floating +20 m (the guarantee)",
     heightMode: "baked-asl",
     anchorZ: null, // baked-asl ships an anchor only for plants; this has none
-    lights: [beacon(-GROUP_EAST / 2, TERRAIN_ASL + CONTROL_FLOAT, CONTROL_COLOUR)],
-    reads: `1 ${CONTROL_COLOUR === "r" ? "RED" : CONTROL_COLOUR} light, floating ~${CONTROL_FLOAT} m over the desert — the WEST group. Proves the beacon emits and you're looking at the right spot.`,
+    lights: fan(-GROUP_EAST / 2, TERRAIN_ASL + CONTROL_FLOAT),
+    reads: `${LIGHT_TYPES.length} lights floating ~${CONTROL_FLOAT} m over the desert — the WEST group. These are runway fixtures, known to draw; if this group is dark the night/site is wrong, not autoheight.`,
   },
   {
     poiName: "gate_light_ah",
-    title: "AUTOHEIGHT — two beacons, z=0 and z=30 AGL, with the anchor",
+    title: "AUTOHEIGHT — the same fan at z=0 AGL, with the anchor",
     heightMode: "autoheight",
     anchorZ: "-1.0", // the buried anchor confirmed in runs 1–3
-    lights: [
-      beacon(GROUP_EAST / 2, AH_LOW, AUTOHEIGHT_COLOUR),
-      beacon(GROUP_EAST / 2, AH_HIGH, AUTOHEIGHT_COLOUR),
-    ],
-    reads: `2 ${AUTOHEIGHT_COLOUR === "g" ? "GREEN" : AUTOHEIGHT_COLOUR} lights (one at ground, one ~${AH_HIGH} m up) if autoheight reaches the lights — the EAST group. NONE if it buries them (the plant failure).`,
+    lights: fan(GROUP_EAST / 2, 0),
+    reads: `${LIGHT_TYPES.length} lights AT GROUND — the EAST group. Same as the control ⇒ autoheight places lights; NOTHING ⇒ it buries them (the plant failure).`,
   },
 ];
 
@@ -207,26 +213,24 @@ function installFixtureNames(installDir: string): string[] {
   return names;
 }
 
-/** Verify LIGHT_TYPE resolves, case-exact, and print the fixture list if not. In the sim a bad name is
- *  SILENT, and a silent probe reads exactly like a failed gate — so this refuses to build on a mismatch. */
-function validateFixture(cat: Catalog): { count: number; source: string } {
+/** Verify every LIGHT_TYPE resolves, case-exact, and print the fixture list if any doesn't. In the sim a
+ *  bad name is SILENT, and a silent probe reads exactly like a failed gate — so refuse to build on a miss. */
+function validateFixtures(cat: Catalog): { count: number; source: string } {
   const fixtures =
     cat.airportLights.length > 0 ? cat.airportLights.map((l) => l.typeName) : installFixtureNames(cat.installDir);
 
-  if (fixtures.includes(LIGHT_TYPE)) {
+  const missing = LIGHT_TYPES.filter((t) => !fixtures.includes(t));
+  if (missing.length === 0) {
     return { count: fixtures.length, source: cat.airportLights.length > 0 ? "catalog" : "install (CLI scan omits lights)" };
   }
 
-  const near = fixtures.filter((f) => f.toLowerCase() === LIGHT_TYPE.toLowerCase());
-  const why =
-    fixtures.length === 0
-      ? `no airport-light fixtures found under ${cat.installDir}`
-      : near.length > 0
-        ? `LIGHT_TYPE = ${JSON.stringify(LIGHT_TYPE)} — WRONG CASE. The install has ${JSON.stringify(near[0])}.`
-        : `LIGHT_TYPE = ${JSON.stringify(LIGHT_TYPE)} is not in the install (${fixtures.length} fixtures).`;
+  const detail = missing.map((t) => {
+    const near = fixtures.filter((f) => f.toLowerCase() === t.toLowerCase());
+    return near.length > 0 ? `${JSON.stringify(t)} — WRONG CASE, install has ${JSON.stringify(near[0])}` : `${JSON.stringify(t)} not in the install`;
+  });
 
   throw new Error(
-    [`Fixture doesn't match the scan:`, `  • ${why}`, ``, `  Airport-light fixtures found:`, ...fixtures.map((f) => `    ${f}`)].join("\n"),
+    [`Fixture(s) don't match the scan:`, ...detail.map((d) => `  • ${d}`), ``, `  Airport-light fixtures found:`, ...fixtures.map((f) => `    ${f}`)].join("\n"),
   );
 }
 
@@ -253,23 +257,23 @@ function main(): number {
   let fixture: { count: number; source: string };
   try {
     cat = loadCatalog(catalogFile);
-    fixture = validateFixture(cat);
+    fixture = validateFixtures(cat);
   } catch (e) {
     console.error(`\nERROR: ${(e as Error).message}\n`);
     return 1;
   }
 
-  const site = shiftEastNorth(RUNWAY_CENTRE, 0, DESERT_NORTH);
+  const site = shiftEastNorth(SPAWN_26, 0, DESERT_NORTH);
   console.log(`Catalog: ${catalogFile}`);
-  console.log(`  ${fixture.count} airport-light fixtures, from the ${fixture.source}; ${LIGHT_TYPE} verified case-exact\n`);
-  console.log(`Site: KDAG desert, ${DESERT_NORTH} m NORTH of the runway centre → ${site.lat.toFixed(6)}, ${site.lon.toFixed(6)}`);
-  console.log(`⚠️  FLY AT NIGHT/DUSK. Look NORTH from the runway toward the black desert.\n`);
+  console.log(`  ${fixture.count} airport-light fixtures, from the ${fixture.source}`);
+  console.log(`  fan verified case-exact: ${LIGHT_TYPES.join(", ")}\n`);
+  console.log(`Site: KDAG desert, ${DESERT_NORTH} m NORTH of the runway-26 threshold → ${site.lat.toFixed(6)}, ${site.lon.toFixed(6)}`);
+  console.log(`⚠️  FLY AT NIGHT/DUSK. Look NORTH from the 26 threshold toward the black desert.\n`);
 
   const assetsDir = anchorAssetsDir({ env: process.env, packaged: false, resourcesPath: undefined, appPath: process.cwd() });
 
-  // Sweep EVERY previous probe folder first (runs 1–4 put `_gate_a..d_` on the runway; this run writes
-  // `_gate_light_*`). A folder name encodes its coordinates, so a moved probe is orphaned rather than
-  // replaced — fly two generations at once and the gate's whole point is gone. This already cost a flight.
+  // Sweep EVERY previous probe folder first. A folder name encodes its coordinates, so a moved probe is
+  // orphaned rather than replaced — fly two generations at once and the gate's whole point is gone.
   if (install) {
     const poiRoot = path.join(afs4UserDir(), "scenery", "poi");
     if (existsSync(poiRoot)) {
@@ -307,7 +311,7 @@ function main(): number {
     console.log(`${probe.title}`);
     console.log(`  mode   : ${probe.heightMode}`);
     console.log(`  folder : ${plan.folderName}`);
-    console.log(`  lights : ${probe.lights.length} × ${LIGHT_TYPE}`);
+    console.log(`  lights : ${probe.lights.map((l) => l.typeName).join(", ")}`);
     console.log(`  anchor : ${anchorLine}`);
     console.log(`  expect : ${probe.reads}`);
     for (const w of plan.warnings) console.log(`  WARNING: ${w}`);
@@ -329,9 +333,9 @@ function main(): number {
 
   console.log(
     install
-      ? `Restart Aerofly FS 4, start at KDAG (26 or 08), and look NORTH — AT NIGHT.\n` +
-          `  WEST group  = 1 light floating (the control). If you don't see even this, the fixture/site is still wrong.\n` +
-          `  EAST group  = 2 lights (low + high) ⇒ autoheight places lights; 0 lights ⇒ it buries them (finding).`
+      ? `Restart Aerofly FS 4, start at KDAG 26, and look NORTH — AT NIGHT.\n` +
+          `  WEST group = the fan floating ~${CONTROL_FLOAT} m (control). Dark here ⇒ site/night wrong, not autoheight.\n` +
+          `  EAST group = the same fan at ground ⇒ autoheight places lights; nothing ⇒ it buries them (finding).`
       : `Built in ${outRoot}. Re-run with --install to install into AFS4.`,
   );
   return 0;
