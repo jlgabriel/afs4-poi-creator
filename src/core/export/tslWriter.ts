@@ -14,9 +14,17 @@
 import { tag, block, fmtLonLat, fmtMeters } from "../tm/tmEmit";
 import { ANCHOR_GEOMETRY, type Anchor } from "./plantAnchor";
 
-/** The AGL z of the anchor object in autoheight mode: 0.1 m above the ground, paired with
- *  autoheight_override=-1. A literal string so the bytes match the value flown firm in the 2026-07-19 gate. */
-const ANCHOR_AGL_Z = "0.1";
+/** The AGL z of the anchor object in autoheight mode: 1 m BELOW ground, paired with autoheight_override=-1.
+ *  Buried so the invisible disc can't collide with anything on the surface — an aircraft taxiing over the
+ *  POI's centroid — which is where chrispriv asked for it (#151). The anchor only has to supply a terrain
+ *  reference; nothing about that job needs it above ground. A literal string, so the emitted bytes are
+ *  exactly what was flown.
+ *
+ *  ⚠️ The 2026-07-19 gate flew 0.1 (just ABOVE ground). This is a change to the ONE object that makes
+ *  autoheight reach the cultivation at all: if a buried anchor stops anchoring, autoheight breaks for
+ *  every POI — not just for this value. Re-gate before releasing (docs/GATE_AUTOHEIGHT_LIGHTS_ANCHOR.md,
+ *  probe B). */
+const ANCHOR_AGL_Z = "-1.0";
 
 /** Build the `poi.tsl` text.
  *  @param opts.tocFileName  cultivation reference (the .toc basename), or null for no toc.

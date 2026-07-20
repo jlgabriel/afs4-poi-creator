@@ -93,9 +93,10 @@ const GOLDEN_TSL_ANCHORED = `<[file][][]
 `;
 
 // GOLDEN — the .tsl an AUTOHEIGHT POI carries (v0.5, forum #142): autoheight=TRUE and the anchor is written
-// AGL — position z = 0.1 (just above ground) + autoheight_override=-1 (inherit the place's true), which is
-// what makes autoheight reach the cultivation. Byte-exact against the shape the 2026-07-19 gate flew firm.
-// Regenerate deliberately if the anchor format changes; never let it drift silently.
+// AGL — position z = -1.0 (buried, so it can't collide with anything on the surface — chrispriv #151) +
+// autoheight_override=-1 (inherit the place's true), which is what makes autoheight reach the cultivation.
+// Regenerated DELIBERATELY when the anchor was buried; the 2026-07-19 gate flew 0.1 and the buried value
+// awaits its own gate (docs/GATE_AUTOHEIGHT_LIGHTS_ANCHOR.md). Never let this drift silently.
 const GOLDEN_TSL_AUTOHEIGHT = `<[file][][]
     <[tmsimulator_scenery_place_simple][][]
         <[string8u][coordinate_system][lonlat]>
@@ -105,7 +106,7 @@ const GOLDEN_TSL_AUTOHEIGHT = `<[file][][]
             <[tmsimulator_scenery_object][element][0]
                 <[string8u][type][object]>
                 <[string8u][geometry][pct_anchor]>
-                <[vector3_float64][position][11.8500000 48.3760000 0.1]>
+                <[vector3_float64][position][11.8500000 48.3760000 -1.0]>
                 <[int32][autoheight_override][-1]>
             >
         >
@@ -186,9 +187,10 @@ describe("buildTsl — place_simple wrapper", () => {
     expect(findAll(place, "tmsimulator_scenery_object").length).toBe(1);
   });
 
-  it("autoheight=true → place autoheight=true + the anchor AGL (z=0.1, override=-1), byte-exact (v0.5)", () => {
-    // The shape the 2026-07-19 gate flew firm: the override is what makes autoheight reach the cultivation,
-    // and heightAsl on the anchor is ignored (the AGL z is a fixed literal), so it can be 0.
+  it("autoheight=true → place autoheight=true + the anchor AGL (z=-1.0, override=-1), byte-exact (v0.5)", () => {
+    // The override is what makes autoheight reach the cultivation (gate 2026-07-19), and heightAsl on the
+    // anchor is ignored (the AGL z is a fixed literal), so it can be 0. The z itself is BURIED (chrispriv
+    // #151) — the gate flew 0.1, so the buried value is pending its own (GATE_AUTOHEIGHT_LIGHTS_ANCHOR.md).
     const anchor = { position: { lon: 11.85, lat: 48.376 }, heightAsl: 0 };
     expect(buildTsl({ tocFileName: "poi", anchor, autoheight: true })).toBe(GOLDEN_TSL_AUTOHEIGHT);
   });
@@ -305,7 +307,7 @@ describe("planExport", () => {
       lon: (TOWER.position.lon + BARREL.position.lon) / 2,
       lat: (TOWER.position.lat + BARREL.position.lat) / 2,
     };
-    expect(tsl).toContain(`<[vector3_float64][position][${fmtLonLat(c.lon)} ${fmtLonLat(c.lat)} 0.1]>`);
+    expect(tsl).toContain(`<[vector3_float64][position][${fmtLonLat(c.lon)} ${fmtLonLat(c.lat)} -1.0]>`);
   });
 
   it("autoheight .toc writes each object at its AGL z (terrain→0, offset→the offset)", () => {
