@@ -1,17 +1,28 @@
-// gate-autoheight-lights-anchor.ts — build the three probe POIs for docs/GATE_AUTOHEIGHT_LIGHTS_ANCHOR.md.
+// gate-autoheight-lights-anchor.ts — v2: does autoheight place airport lights, read in the DARK DESERT.
 //
 //   npx tsx scripts/gate-autoheight-lights-anchor.ts [--install] [--catalog <catalog.json>] [--out <dir>]
 //
-// Two questions, three probes, one flight (see the sheet for the reasoning and how to read the result):
+// The buried-anchor half of chrispriv #151 is CLOSED (runs 1–3, 2026-07-20: xrefs land on the runway with
+// the anchor at -1.0). What remains is #151.2: does `autoheight=true` reach the cultivation's LIGHT lists,
+// or does it swallow them the way it swallowed plants? This is the instrument to read that, rebuilt after
+// three unreadable flights — each of which failed on the INSTRUMENT, never the question:
 //
-//   A — lights, anchor at 0.1 (the value flown 2026-07-19)   → isolates LIGHTS
-//   B — no lights, anchor buried at -1.0                     → isolates the BURIED ANCHOR
-//   C — lights + buried anchor                               → what production would ship
+//   run 1 (day, helipad_beacon)  → nothing: airport lights don't show in daylight (emitters, not day geometry)
+//   run 3 (day, helipad_flood)   → nothing: same daylight problem, and I'd chased the fixture, not the hour
+//   run 4 (NIGHT, on the runway) → "solo las luces normales de la pista": our two lights drowned in KDAG's
+//                                   real edge/centreline lighting. Right hour, wrong SITE.
 //
-// Why this script exists rather than `npm run export`: the CLI runs resolveHeightsAgl, which REFUSES
-// lights in autoheight — that refusal is the thing under test. planExport itself takes already-resolved
-// objects and has no such guard, so building the ResolvedObject[] here bypasses exactly one check and
-// nothing else. The emitted bytes are what PCT would emit with the guard lifted.
+// v2 fixes both remaining instrument faults:
+//   • SITE  → 150 m NORTH of the runway, in the open desert. At night the desert is BLACK and has no lights
+//             of its own, so anything that glows there is unambiguously ours (the v0.2 lights gate, the one
+//             that ever read lights, put them in this same desert and saw "una luz flotando como un ovni").
+//   • FIXTURE → back to `helipad_beacon`, a point beacon confirmed visible at night in that v0.2 gate.
+//             `helipad_flood_light` was a mistake: a floodlight lights a SURFACE, it is not a bright point.
+//
+// Why a script and not `npm run export`: the CLI runs resolveHeightsAgl, which REFUSES lights in autoheight
+// — that refusal is the thing under test. planExport takes already-resolved objects and has no such guard,
+// so building the ResolvedObject[] here bypasses exactly one check. The bytes are what PCT would emit with
+// the guard lifted. ⚠️ FLY AT NIGHT/DUSK — airport lights are invisible by day at any group_index.
 
 import { copyFileSync, cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
@@ -20,169 +31,81 @@ import { planExport } from "../src/core/export/planExport";
 import { shiftEastNorth } from "../src/core/geo/geo";
 import { isSafePoiFolderName } from "../src/core/geo/poiName";
 import { anchorAssetsDir } from "../src/main/anchorAsset";
-import type {
-  Catalog,
-  LonLat,
-  Project,
-  ResolvedAirportLight,
-  ResolvedObject,
-  ResolvedXref,
-} from "../src/core/project/types";
+import type { Catalog, LonLat, Project, ResolvedAirportLight, ResolvedObject } from "../src/core/project/types";
 
-// ── What the probes are made of ───────────────────────────────────────────────────────────────────
+// ── The fixture ─────────────────────────────────────────────────────────────────────────────────────
 //
-// ⚠️ VERBATIM FROM THE SCAN. A name AFS4 can't resolve fails SILENTLY — nothing appears, no error — and
-// the case is real (`mobile_LightTower`). These are checked against the scanned catalog before anything
-// is written, and the failure prints candidates; never "fix" a mismatch by editing from memory.
+// ⚠️ VERBATIM FROM THE SCAN. A name AFS4 can't resolve fails SILENTLY — nothing appears, no error — so a
+// typo reads exactly like a failed gate. validateNames checks this against the install before writing.
 
-/** Tall and thin: the vertical ruler the +30 m light is read against. Chosen because its top sits
- *  almost exactly at LIGHT_AGL, so the light reads as a LEVEL MATCH with the tip rather than an
- *  estimated proportion. The actual height is read from the scanned catalog at build time and
- *  printed — never hardcoded here, both because scanned dimensions are IPACS-derived data that
- *  stays out of the repo, and because a number baked into a comment silently goes stale. */
-const TALL_XREF = "powerline_30m";
-/** Low and compact, unmistakable beside the tall one: a shipping container, base at the origin. A
- *  horizontal box next to a vertical needle — no chance of mistaking one for the other at a glance.
- *  ⚠️ LOWERCASE. `Container_Blue` / `_Red` / `_Yellow` / `_White` are DIFFERENT objects, roughly half
- *  the height. The case IS the object here — see validateNames, which catches exactly this. */
-const LOW_XREF = "container";
-/** The airport-light fixture (CatalogAirportLight.typeName, no "al_" prefix).
- *
- *  NOT a runway light. The probes sit on runway 08/26, which HAS real edge and centreline lighting —
- *  a `runway_edge_light` of ours would be read against KDAG's own, and "is that mine or the airport's?"
- *  is not a question a gate should have to answer. No helipad on 08/26 ⇒ a helipad fixture there is ours.
- *
- *  ⚠️ Run 1 (2026-07-20) used `helipad_beacon` and saw NOTHING — an unreadable result, not a negative
- *  one. Its `.tmb` is 3304 B, among the smallest in the library: essentially a bare light point, and
- *  invisible in daylight. "No light" then means either "not placed" (the finding) or "placed but not
- *  drawable" (nothing at all), which is exactly the ambiguity PROBE D now removes. This fixture is
- *  ~2.2× the mesh and still cannot be confused with anything on a runway; `papi_3_light` (13072 B) is
- *  the next step up, at the cost of resembling real threshold PAPIs. */
-const LIGHT_TYPE = "helipad_flood_light";
-/** Colour letters, 0–2 of [bgrwy]; "" = the fixture's own default. Independent of type_name — any
- *  fixture takes any valid configuration (schemas.ts CONFIGURATION_RE). */
-const LIGHT_CONFIG = "w";
-/** Night-visibility group. 3 = visible 24 h — so "I see nothing" can't mean "wrong time of day".
- *  The default is 0 (night only), which would make the gate's central negative reading ambiguous. */
+/** `helipad_beacon`: a POINT beacon, confirmed visible at NIGHT in the v0.2 lights gate (2026-07-12).
+ *  No helipad exists near KDAG 08/26, so a helipad beacon out here is unmistakably ours — and unlike a
+ *  runway light it can't be read against the airport's own lighting. Run 4's `helipad_flood_light` was
+ *  wrong twice over: a floodlight illuminates a surface (no bright point to see), and it sat among the
+ *  runway's real lights. If this beacon still doesn't read, `papi_2_light` is the next point source. */
+const LIGHT_TYPE = "helipad_beacon";
+
+/** Colour letters (schemas.ts CONFIGURATION_RE `^[bgrwy]{0,2}$`). A SECOND signal on top of position, in
+ *  case the beacon honours configuration: control = red, autoheight = green. If the beacon ignores colour,
+ *  the two groups are still told apart by where they are (see DESERT_* below), so this can't mislead. */
+const CONTROL_COLOUR = "r";
+const AUTOHEIGHT_COLOUR = "g";
+
+/** 3 = visible 24 h, so the reading never hinges on the exact minute of dusk. (Still fly at night — even a
+ *  24 h light is an emitter that washes out against a bright daytime sky; that is run 1/run 3.) */
 const LIGHT_GROUP = 3;
 
-// ── Where ─────────────────────────────────────────────────────────────────────────────────────────
+// ── Where: the black desert north of the runway ───────────────────────────────────────────────────────
 
-/** KDAG runway 08/26 centre, ON the asphalt: OSM way 24019997 (surface=asphalt, 1951 × 46 m, 90° true).
- *  NOT the airport's dataset coordinate (34.85369873, -116.7870026) — that is the administrative
- *  reference point, 247 m NORTH of the runway on open dirt. Terrain here is ~584 m ASL, which is the
- *  point: at sea level AGL and ASL coincide and the gate would read the same either way. */
+/** KDAG runway 08/26 centre (OSM way 24019997). The probes are placed relative to this, but NOT on it. */
 const RUNWAY_CENTRE: LonLat = { lon: -116.7871683, lat: 34.8514739 };
 
-/** Metres east of the runway centre for each probe. ~440 m apart, all inside the runway's ±968 m, so
- *  every probe sits on asphalt and no two can be mistaken for each other. Taking off from 26 (east
- *  threshold, heading 270) they pass in the order C, B, A, D — so the baked-asl control D is seen LAST,
- *  furthest and highest. That is deliberate: the control flies at a visibility DISADVANTAGE, so if D
- *  shows its lights and C doesn't, the difference cannot be explained by viewing conditions. */
-const PROBE_EAST = { A: -440, B: 0, C: 440, D: -880 };
+/** Metres NORTH of the runway centreline for both probes. 150 m clears the runway's 46 m width and its
+ *  edge lighting by a wide margin, out onto open desert that carries no lights of its own at night — the
+ *  whole reason run 4 was unreadable is gone. Close enough to see from the runway; far enough to be black
+ *  behind it. */
+const DESERT_NORTH = 150;
 
-/** Ground elevation at KDAG, metres ASL — needed only by the baked-asl control, whose heights are
- *  absolute rather than AGL.
- *
- *  MEASURED, from run 2's HUD: ALT 2000 ft with GND 70 ft ⇒ terrain 1930 ft = 588 m. (KDAG's published
- *  field elevation, 1927 ft, agrees.) Run 2 flew 584 — inherited from a note about the 2026-07-12 gate
- *  and flagged "assumed, not verified" in the sheet, then never checked. Four metres was enough to bury
- *  the control's container and its low light completely, leaving a lone pylon and one floating light,
- *  which is exactly what came back. A premise you label as unverified and fly anyway is just a premise. */
+/** Metres EAST between the two probes' groups. 80 m keeps the control and the autoheight group clearly
+ *  separate — the primary way to tell them apart if the beacon ignores colour. Control sits WEST (left as
+ *  you look north), autoheight EAST (right). */
+const GROUP_EAST = 80;
+
+/** Ground elevation, metres ASL — MEASURED from run 2's HUD (ALT 2000 ft, GND 70 ft ⇒ 1930 ft = 588 m;
+ *  KDAG's published field elevation 1927 ft agrees). Used only by the baked-asl control, whose z is
+ *  absolute. If the control comes out buried or sky-high as a whole, this number moved — a finding about
+ *  the terrain, not about lights. */
 const TERRAIN_ASL = 588;
 
-/** Metres the WHOLE baked-asl control is lifted above the terrain.
- *
- *  Deliberately airborne, and this is the real fix — correcting 584→588 alone would leave the control
- *  hostage to the same class of error. The control's ONLY job is to prove these fixtures draw at all,
- *  and a light hanging in mid-air does that whether the ground beneath is 584 m or 592 m. Lifting every
- *  object (not just the lights) also keeps the control's shape identical to the autoheight probes, so
- *  "the group with nothing on the ground" is the control, at a glance. Nothing in it can be swallowed
- *  by the terrain, so it can no longer fail for a reason unrelated to the question.
- *
- *  The autoheight probes need no such margin: their z IS AGL — the sim resolves the ground, which is
- *  the whole point of the mode under test. */
-const CONTROL_FLOAT = 10;
+/** Metres the control beacon floats above the terrain. Airborne ON PURPOSE: a light hanging over black
+ *  desert is unmistakable, and it frees the control from depending on TERRAIN_ASL being exact — 20 m of
+ *  float reads as "up there" whether the ground is 585 m or 591 m. */
+const CONTROL_FLOAT = 20;
 
-/** Metres between objects within a probe, laid out ACROSS the runway (north–south).
- *
- *  ACROSS, not along: the KDAG spawn is the 08/26 threshold, so the flight path runs down the runway
- *  and a line of probes ALONG it foreshortens into one another — the same way that nearly cost the N2
- *  plant gate its reading. Perpendicular, all four are separate in one pass and none hides another.
- *  15 m puts the outermost pair at ±22.5 m, inside the runway's 46 m width, so every probe stays on
- *  asphalt while still being close enough to compare heights without parallax. */
-const SPACING = 15;
+/** The two AGL heights the autoheight probe writes: one AT the ground, one well above it. If autoheight
+ *  reaches the lights, the sim grounds z=0 onto the desert and lifts z=30 to 30 m — a low light and a high
+ *  light, stacked. If it swallows them (the plant failure), z=0 lands at 0 m ASL = 588 m underground and
+ *  BOTH vanish. So the autoheight group shows 2 lights or 0 — never a confusing in-between. */
+const AH_LOW = 0;
+const AH_HIGH = 30;
 
-/** The AGL height of the raised light — the probe's positive signal. Read against TALL_XREF's tip. */
-const LIGHT_AGL = 30;
-
-// ── Probe construction ────────────────────────────────────────────────────────────────────────────
-
-const at = (east: number, north: number): LonLat => shiftEastNorth(RUNWAY_CENTRE, east, north);
-
-/** Lane 0..3 → metres north of the runway centreline: -22.5, -7.5, +7.5, +22.5. */
-const lane = (i: number): number => (i - 1.5) * SPACING;
+// ── Probe construction ────────────────────────────────────────────────────────────────────────────────
 
 let uid = 0;
 const id = (): string => `gate-${String(++uid).padStart(4, "0")}`;
 
-function xref(name: string, east: number, laneIdx: number, aglZ: number): ResolvedXref {
-  return {
-    id: id(),
-    kind: "xref",
-    name,
-    position: at(east, lane(laneIdx)),
-    heightAsl: aglZ,
-    direction: 0,
-    scale: 1,
-  };
-}
-
-function light(east: number, laneIdx: number, aglZ: number): ResolvedAirportLight {
+/** One beacon `east` metres from the runway centre (always DESERT_NORTH north of it), at absolute/AGL z. */
+function beacon(east: number, z: number, colour: string): ResolvedAirportLight {
   return {
     id: id(),
     kind: "airport_light",
     typeName: LIGHT_TYPE,
-    position: at(east, lane(laneIdx)),
-    heightAsl: aglZ,
+    position: shiftEastNorth(RUNWAY_CENTRE, east, DESERT_NORTH),
+    heightAsl: z, // ASL for the baked-asl control; AGL for autoheight (the sim adds the terrain)
     orientation: 0,
-    configuration: LIGHT_CONFIG,
+    configuration: colour,
     groupIndex: LIGHT_GROUP,
   };
-}
-
-/** The four-object line: tall xref at ground, a light beside it at +30 m, a low xref at ground, a light
- *  beside THAT at ground. Every reading is a comparison with an adjacent object, never a judgement of
- *  absolute height. `withLights: false` drops the two lights (probe B). */
-function probeObjects(east: number, withLights: boolean, base = 0): ResolvedObject[] {
-  // Lanes across the runway, south to north. The xrefs keep lanes 0 and 2 whether or not the lights
-  // are present, so probe B (no lights) frames identically to A and C.
-  //
-  // `base` is what makes the same four objects serve both modes: 0 for autoheight (the z IS the AGL
-  // height, the sim adds the terrain) and TERRAIN_ASL for the baked-asl control (the z is absolute).
-  // Identical geometry either way, so D and C differ in ONE thing — the height mode.
-  const objects: ResolvedObject[] = [xref(TALL_XREF, east, 0, base)];
-  if (withLights) objects.push(light(east, 1, base + LIGHT_AGL));
-  objects.push(xref(LOW_XREF, east, 2, base));
-  if (withLights) objects.push(light(east, 3, base));
-  return objects;
-}
-
-/** What the raised light should look like against the ruler, computed from the scan rather than
- *  asserted. `bbMax[2]` is metres ABOVE the placement point — the visible top — which is not `size.z`
- *  whenever a model extends below its origin. Warns if the two are far enough apart that "level with
- *  the tip" stops being the right thing to look for. */
-function rulerReading(cat: Catalog): string {
-  const ruler = cat.xref.find((o) => o.name === TALL_XREF);
-  if (!ruler) return `${TALL_XREF}: not in the catalog (validated separately)`;
-  const top = ruler.bbMax[2];
-  const delta = LIGHT_AGL - top;
-  const how =
-    Math.abs(delta) <= 1
-      ? `level with its tip (${delta >= 0 ? "+" : ""}${delta.toFixed(2)} m) — read it as a match`
-      : `${Math.abs(delta).toFixed(2)} m ${delta > 0 ? "ABOVE" : "BELOW"} its tip — NOT a level match, ` +
-        `read the gap instead, or pick a ruler nearer ${LIGHT_AGL} m`;
-  return `${TALL_XREF} top ${top.toFixed(2)} m AGL; the +${LIGHT_AGL} m light should sit ${how}`;
 }
 
 function project(poiName: string, name: string, heightMode: Project["heightMode"]): Project {
@@ -194,17 +117,16 @@ function project(poiName: string, name: string, heightMode: Project["heightMode"
     poiName,
     createdAt: now,
     modifiedAt: now,
-    reference: null, // centroid of the probe's own objects
+    reference: null, // centroid of the probe's own lights
     camera: { lon: RUNWAY_CENTRE.lon, lat: RUNWAY_CENTRE.lat, zoom: 15 },
-    objects: [], // unused: planExport reads the RESOLVED array, this is only carried for the folder name
+    objects: [], // unused: planExport reads the RESOLVED array; carried only for the folder name
     heightMode,
   };
 }
 
-/** Rewrite the anchor's AGL z in a generated `.tsl`. Probe A must fly the anchor at the value the
- *  2026-07-19 gate proved (0.1) so that probe changes exactly ONE thing from that gate: the lights.
- *  Throws unless it matched exactly once — the .tsl carries the anchor and nothing else, so a second
- *  match (or none) means the format moved and this rewrite is no longer safe to trust. */
+/** Force the anchor's AGL z in a generated autoheight `.tsl` to the production value. Throws unless it
+ *  matched exactly once — the .tsl carries the anchor and nothing else, so a different count means the
+ *  format moved and this rewrite is no longer safe. */
 function setAnchorZ(tsl: string, z: string): string {
   const re = /(<\[vector3_float64\]\[position\]\[-?[\d.]+ -?[\d.]+ )(-?[\d.]+)(\]>)/g;
   const hits = [...tsl.matchAll(re)];
@@ -217,22 +139,55 @@ function setAnchorZ(tsl: string, z: string): string {
   return tsl.replace(re, `$1${z}$3`);
 }
 
-// ── Catalog validation ────────────────────────────────────────────────────────────────────────────
+// ── The two probes ──────────────────────────────────────────────────────────────────────────────────
+
+interface LightProbe {
+  poiName: string;
+  title: string;
+  heightMode: Project["heightMode"];
+  /** AGL z forced into the .tsl anchor, or null for a baked-asl probe that carries no anchor. */
+  anchorZ: string | null;
+  lights: ResolvedAirportLight[];
+  reads: string;
+}
+
+const PROBES: LightProbe[] = [
+  {
+    poiName: "gate_light_ctrl",
+    title: "CONTROL — baked-asl beacon, floating (the guarantee)",
+    heightMode: "baked-asl",
+    anchorZ: null, // baked-asl ships an anchor only for plants; this has none
+    lights: [beacon(-GROUP_EAST / 2, TERRAIN_ASL + CONTROL_FLOAT, CONTROL_COLOUR)],
+    reads: `1 ${CONTROL_COLOUR === "r" ? "RED" : CONTROL_COLOUR} light, floating ~${CONTROL_FLOAT} m over the desert — the WEST group. Proves the beacon emits and you're looking at the right spot.`,
+  },
+  {
+    poiName: "gate_light_ah",
+    title: "AUTOHEIGHT — two beacons, z=0 and z=30 AGL, with the anchor",
+    heightMode: "autoheight",
+    anchorZ: "-1.0", // the buried anchor confirmed in runs 1–3
+    lights: [
+      beacon(GROUP_EAST / 2, AH_LOW, AUTOHEIGHT_COLOUR),
+      beacon(GROUP_EAST / 2, AH_HIGH, AUTOHEIGHT_COLOUR),
+    ],
+    reads: `2 ${AUTOHEIGHT_COLOUR === "g" ? "GREEN" : AUTOHEIGHT_COLOUR} lights (one at ground, one ~${AH_HIGH} m up) if autoheight reaches the lights — the EAST group. NONE if it buries them (the plant failure).`,
+  },
+];
+
+// ── Catalog validation ────────────────────────────────────────────────────────────────────────────────
 
 function loadCatalog(file: string): Catalog {
   if (!existsSync(file)) {
     throw new Error(
-      `Catalog not found: ${file}\n` +
-        `Generate one first:\n` +
+      `Catalog not found: ${file}\n  Generate one first:\n` +
         `  npm run scan -- --install "<AFS4 install dir>" --out "${file}"`,
     );
   }
   return JSON.parse(readFileSync(file, "utf8")) as Catalog;
 }
 
-/** The install's airport-light fixture names, derived exactly as core/catalog/airportLights.ts does:
- *  the `.tmb` basename minus the `al_` prefix, dropping the `*_model` visible-mesh helpers. Reads
- *  DIRECTORY ENTRIES ONLY — PCT never opens a `.tmb` (opaque IPACS binary) and neither does this. */
+/** The install's airport-light fixture names, derived exactly as core/catalog/airportLights.ts does: the
+ *  `.tmb` basename minus `al_`, dropping the `*_model` helpers. Reads DIRECTORY ENTRIES ONLY — no `.tmb`
+ *  is ever opened (it is opaque IPACS binary). The CLI scan omits lights, so a CLI catalog has none. */
 function installFixtureNames(installDir: string): string[] {
   const dir = path.join(installDir, "airport_lights");
   if (!existsSync(dir)) return [];
@@ -252,83 +207,30 @@ function installFixtureNames(installDir: string): string[] {
   return names;
 }
 
-/** Fail loudly, with candidates, when a probe name isn't in the scan. This is the whole reason the
- *  script reads the catalog at all: in the sim a bad name produces silence, not an error, and a
- *  silent probe reads exactly like a failed gate. */
-function validateNames(cat: Catalog): { fixtureCount: number; fixtureSource: string } {
-  const problems: string[] = [];
-
-  for (const [label, name] of [["TALL_XREF", TALL_XREF], ["LOW_XREF", LOW_XREF]] as const) {
-    if (cat.xref.some((o) => o.name === name)) continue;
-    const near = cat.xref.filter((o) => o.name.toLowerCase() === name.toLowerCase());
-    problems.push(
-      near.length > 0
-        ? `${label} = ${JSON.stringify(name)} — WRONG CASE. The scan has ${JSON.stringify(near[0].name)}.`
-        : `${label} = ${JSON.stringify(name)} is not in the scan.`,
-    );
-  }
-
-  // Lights come from the install, not the catalog: `src/cli/scan.ts` never calls buildAirportLights (only
-  // the Electron main-process scan does), so a CLI-made catalog always has airportLights: []. Enumerate
-  // the library the same way main/scan.ts does — FILENAMES ONLY, no bytes read from the opaque .tmb.
+/** Verify LIGHT_TYPE resolves, case-exact, and print the fixture list if not. In the sim a bad name is
+ *  SILENT, and a silent probe reads exactly like a failed gate — so this refuses to build on a mismatch. */
+function validateFixture(cat: Catalog): { count: number; source: string } {
   const fixtures =
-    cat.airportLights.length > 0
-      ? cat.airportLights.map((l) => l.typeName)
-      : installFixtureNames(cat.installDir);
+    cat.airportLights.length > 0 ? cat.airportLights.map((l) => l.typeName) : installFixtureNames(cat.installDir);
 
-  if (fixtures.length === 0) {
-    problems.push(
-      `Could not enumerate any airport-light fixture under ${cat.installDir} — LIGHT_TYPE is UNVERIFIED. ` +
-        `A name AFS4 can't resolve fails silently, so do not fly this.`,
-    );
-  } else if (!fixtures.includes(LIGHT_TYPE)) {
-    const near = fixtures.filter((f) => f.toLowerCase() === LIGHT_TYPE.toLowerCase());
-    problems.push(
-      near.length > 0
+  if (fixtures.includes(LIGHT_TYPE)) {
+    return { count: fixtures.length, source: cat.airportLights.length > 0 ? "catalog" : "install (CLI scan omits lights)" };
+  }
+
+  const near = fixtures.filter((f) => f.toLowerCase() === LIGHT_TYPE.toLowerCase());
+  const why =
+    fixtures.length === 0
+      ? `no airport-light fixtures found under ${cat.installDir}`
+      : near.length > 0
         ? `LIGHT_TYPE = ${JSON.stringify(LIGHT_TYPE)} — WRONG CASE. The install has ${JSON.stringify(near[0])}.`
-        : `LIGHT_TYPE = ${JSON.stringify(LIGHT_TYPE)} is not in the install (${fixtures.length} fixtures found).`,
-    );
-  }
-
-  if (problems.length === 0) {
-    return {
-      fixtureCount: fixtures.length,
-      fixtureSource: cat.airportLights.length > 0 ? "catalog" : "install (the CLI scan omits lights)",
-    };
-  }
-
-  // Rank on bbMax[2] — metres ABOVE the placement point — not size.z. They differ whenever the model
-  // extends below its origin, and then size.z lies: FloodLight02 is size.z 44.17 but only 32.33 m tall.
-  // A ruler you misjudge by 12 m is worse than no ruler.
-  const top = (o: { bbMax: [number, number, number] }): number => o.bbMax[2];
-  const tallest = [...cat.xref].sort((a, b) => top(b) - top(a)).slice(0, 12);
-  const squat = [...cat.xref]
-    .filter((o) => top(o) > 1 && top(o) < 5 && o.size.x < 15 && o.size.y < 15)
-    .sort((a, b) => top(a) - top(b))
-    .slice(0, 12);
-  const dim = (o: (typeof tallest)[number]): string =>
-    `    ${o.name}  (${o.size.x} × ${o.size.y} m, top at ${top(o).toFixed(2)} m above the base, ${o.category})`;
+        : `LIGHT_TYPE = ${JSON.stringify(LIGHT_TYPE)} is not in the install (${fixtures.length} fixtures).`;
 
   throw new Error(
-    [
-      `Probe names don't match the scan:`,
-      ...problems.map((p) => `  • ${p}`),
-      ``,
-      `  Tallest objects in the scan (candidates for TALL_XREF):`,
-      ...tallest.map(dim),
-      ``,
-      `  Low, compact objects (candidates for LOW_XREF):`,
-      ...squat.map(dim),
-      ``,
-      `  Airport-light fixtures (${cat.airportLights.length}):`,
-      ...cat.airportLights.map((l) => `    ${l.typeName}  (${l.displayName}, ${l.category})`),
-      ``,
-      `Copy names VERBATIM from this list into the constants at the top of this script.`,
-    ].join("\n"),
+    [`Fixture doesn't match the scan:`, `  • ${why}`, ``, `  Airport-light fixtures found:`, ...fixtures.map((f) => `    ${f}`)].join("\n"),
   );
 }
 
-// ── Main ──────────────────────────────────────────────────────────────────────────────────────────
+// ── Main ────────────────────────────────────────────────────────────────────────────────────────────
 
 function afs4UserDir(): string {
   const home = os.homedir();
@@ -336,30 +238,6 @@ function afs4UserDir(): string {
   if (process.platform === "win32") return path.join(home, "Documents", "Aerofly FS 4");
   return path.join(home, "Aerofly FS 4");
 }
-
-interface Probe {
-  key: "A" | "B" | "C" | "D";
-  poiName: string;
-  title: string;
-  /** AGL z to force into the .tsl anchor, or null for a probe that carries no anchor (baked-asl). */
-  anchorZ: string | null;
-  withLights: boolean;
-  heightMode: Project["heightMode"];
-  /** Absolute base for the object z. 0 = AGL (autoheight); TERRAIN_ASL = absolute (baked-asl). */
-  base: number;
-  isolates: string;
-}
-
-const PROBES: Probe[] = [
-  { key: "A", poiName: "gate_a_lights_anchor01", title: "Gate A — lights, anchor 0.1 (flown value)", anchorZ: "0.1", withLights: true, heightMode: "autoheight", base: 0, isolates: "lights" },
-  { key: "B", poiName: "gate_b_buried_anchor", title: "Gate B — xrefs only, anchor buried", anchorZ: "-1.0", withLights: false, heightMode: "autoheight", base: 0, isolates: "the buried anchor" },
-  { key: "C", poiName: "gate_c_both", title: "Gate C — lights + buried anchor (production shape)", anchorZ: "-1.0", withLights: true, heightMode: "autoheight", base: 0, isolates: "both together" },
-  // The CANARY. Run 1 saw no lights anywhere, which could not be read: "not placed" and "placed but
-  // not visible" look identical. D flies the SAME two fixtures at the SAME heights down the baked-asl
-  // path — the one already proven to place lights (gate 2026-07-12) — so it produces the signal the
-  // autoheight probes are being read for the absence of. No anchor: baked-asl only ships one for plants.
-  { key: "D", poiName: "gate_d_bakedasl_control", title: "Gate D — CONTROL: same lights, baked ASL, floating", anchorZ: null, withLights: true, heightMode: "baked-asl", base: TERRAIN_ASL + CONTROL_FLOAT, isolates: "whether these fixtures are visible AT ALL" },
-];
 
 function main(): number {
   const argv = process.argv.slice(2);
@@ -372,45 +250,37 @@ function main(): number {
   const outRoot = path.resolve(argOf("--out", path.join("build", "gate")));
 
   let cat: Catalog;
-  let fixtures: { fixtureCount: number; fixtureSource: string };
+  let fixture: { count: number; source: string };
   try {
     cat = loadCatalog(catalogFile);
-    fixtures = validateNames(cat);
+    fixture = validateFixture(cat);
   } catch (e) {
     console.error(`\nERROR: ${(e as Error).message}\n`);
     return 1;
   }
 
+  const site = shiftEastNorth(RUNWAY_CENTRE, 0, DESERT_NORTH);
   console.log(`Catalog: ${catalogFile}`);
-  console.log(`  scanned ${cat.scannedAt} from ${cat.installDir}`);
-  console.log(`  ${cat.xref.length} xref`);
-  console.log(`  ${fixtures.fixtureCount} airport-light fixtures, from the ${fixtures.fixtureSource}`);
-  console.log(`  all three probe names verified present, case-exact\n`);
-  console.log(`Site: KDAG runway 08/26 centre ${RUNWAY_CENTRE.lat}, ${RUNWAY_CENTRE.lon} (on asphalt)`);
-  console.log(`Probe objects: ${TALL_XREF} / ${LOW_XREF} / light ${LIGHT_TYPE} (group ${LIGHT_GROUP}, 24 h)`);
-  console.log(`What to look for: ${rulerReading(cat)}\n`);
+  console.log(`  ${fixture.count} airport-light fixtures, from the ${fixture.source}; ${LIGHT_TYPE} verified case-exact\n`);
+  console.log(`Site: KDAG desert, ${DESERT_NORTH} m NORTH of the runway centre → ${site.lat.toFixed(6)}, ${site.lon.toFixed(6)}`);
+  console.log(`⚠️  FLY AT NIGHT/DUSK. Look NORTH from the runway toward the black desert.\n`);
 
-  const assetsDir = anchorAssetsDir({
-    env: process.env,
-    packaged: false,
-    resourcesPath: undefined,
-    appPath: process.cwd(),
-  });
+  const assetsDir = anchorAssetsDir({ env: process.env, packaged: false, resourcesPath: undefined, appPath: process.cwd() });
 
-  // Sweep the previous run's probes first. A POI folder name encodes its coordinates, so moving a probe
-  // RENAMES it and the old one is orphaned — you then fly two generations at once and the gate's whole
-  // point (one probe, one variable) is gone. This bit already cost the plant gate a flight.
+  // Sweep EVERY previous probe folder first (runs 1–4 put `_gate_a..d_` on the runway; this run writes
+  // `_gate_light_*`). A folder name encodes its coordinates, so a moved probe is orphaned rather than
+  // replaced — fly two generations at once and the gate's whole point is gone. This already cost a flight.
   if (install) {
     const poiRoot = path.join(afs4UserDir(), "scenery", "poi");
     if (existsSync(poiRoot)) {
-      const stale = readdirSync(poiRoot).filter((n) => /_gate_[a-d]_/.test(n));
+      const stale = readdirSync(poiRoot).filter((n) => /_gate_/.test(n));
       for (const n of stale) rmSync(path.join(poiRoot, n), { recursive: true, force: true });
-      if (stale.length > 0) console.log(`Removed ${stale.length} probe folder(s) from the previous run\n`);
+      if (stale.length > 0) console.log(`Removed ${stale.length} probe folder(s) from previous runs\n`);
     }
   }
 
   for (const probe of PROBES) {
-    const resolved = probeObjects(PROBE_EAST[probe.key], probe.withLights, probe.base);
+    const resolved: ResolvedObject[] = probe.lights;
     const plan = planExport(project(probe.poiName, probe.title, probe.heightMode), resolved);
 
     if (!isSafePoiFolderName(plan.folderName)) {
@@ -418,12 +288,8 @@ function main(): number {
       return 1;
     }
 
-    // The .tsl PCT would emit carries ANCHOR_AGL_Z (currently -1.0). Probe A must fly 0.1 instead.
-    // anchorZ null = a baked-asl probe with no plants, whose .tsl carries no anchor object at all.
     const files = plan.files.map((f) =>
-      f.relPath.endsWith(".tsl") && probe.anchorZ !== null
-        ? { ...f, content: setAnchorZ(f.content, probe.anchorZ) }
-        : f,
+      f.relPath.endsWith(".tsl") && probe.anchorZ !== null ? { ...f, content: setAnchorZ(f.content, probe.anchorZ) } : f,
     );
 
     const outDir = path.join(outRoot, plan.folderName);
@@ -431,27 +297,20 @@ function main(): number {
     for (const f of files) writeFileSync(path.join(outDir, f.relPath), f.content, "utf8"); // LF, like AFS4
     for (const name of plan.assets) copyFileSync(path.join(assetsDir, name), path.join(outDir, name));
 
-    // Echo the anchor line actually emitted — the sheet asks you to confirm A carries 0.1 and B/C -1.0
-    // BEFORE flying, and this is the cheapest place to catch a probe that isn't testing what you think.
     const anchorLine =
       files
         .find((f) => f.relPath.endsWith(".tsl"))!
         .content.split("\n")
         .find((l) => l.includes("vector3_float64"))
-        ?.trim() ?? "none (baked-asl carries no anchor without plants)";
+        ?.trim() ?? "none (baked-asl, no anchor)";
 
     console.log(`${probe.title}`);
-    console.log(`  isolates : ${probe.isolates}`);
-    console.log(
-      `  mode     : ${probe.heightMode}` +
-        (probe.base
-          ? ` (z absolute; ${probe.base} m ASL = ${probe.base - TERRAIN_ASL} m above ${TERRAIN_ASL} m terrain)`
-          : " (z is AGL — the sim resolves the ground)"),
-    );
-    console.log(`  folder   : ${plan.folderName}`);
-    console.log(`  objects  : ${resolved.length} (${probe.withLights ? "2 xref + 2 lights" : "2 xref, no lights"})`);
-    console.log(`  anchor   : ${anchorLine}`);
-    for (const w of plan.warnings) console.log(`  WARNING  : ${w}`);
+    console.log(`  mode   : ${probe.heightMode}`);
+    console.log(`  folder : ${plan.folderName}`);
+    console.log(`  lights : ${probe.lights.length} × ${LIGHT_TYPE}`);
+    console.log(`  anchor : ${anchorLine}`);
+    console.log(`  expect : ${probe.reads}`);
+    for (const w of plan.warnings) console.log(`  WARNING: ${w}`);
 
     if (install) {
       const poiRoot = path.join(afs4UserDir(), "scenery", "poi");
@@ -470,7 +329,9 @@ function main(): number {
 
   console.log(
     install
-      ? `Restart Aerofly FS 4, then start at KDAG runway 08/26.\nRead docs/GATE_AUTOHEIGHT_LIGHTS_ANCHOR.md before flying — the pre-flight check is 30 seconds.`
+      ? `Restart Aerofly FS 4, start at KDAG (26 or 08), and look NORTH — AT NIGHT.\n` +
+          `  WEST group  = 1 light floating (the control). If you don't see even this, the fixture/site is still wrong.\n` +
+          `  EAST group  = 2 lights (low + high) ⇒ autoheight places lights; 0 lights ⇒ it buries them (finding).`
       : `Built in ${outRoot}. Re-run with --install to install into AFS4.`,
   );
   return 0;
