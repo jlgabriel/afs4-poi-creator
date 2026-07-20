@@ -65,7 +65,7 @@ export class UnsupportedInAutoheightError extends Error {
   constructor(points: PlacedObject[], reason: "asl" | "lights") {
     super(
       reason === "lights"
-        ? `${points.length} light(s): autoheight mode doesn't support lights yet — export in Baked ASL, or remove them`
+        ? `${points.length} light(s): autoheight isn't verified for lights in the sim yet — export in Baked ASL, or remove them`
         : `${points.length} object(s) use an absolute ASL height, which autoheight can't represent — switch them to Terrain / Terrain + offset, or export in Baked ASL`,
     );
     this.name = "UnsupportedInAutoheightError";

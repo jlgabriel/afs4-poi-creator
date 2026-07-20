@@ -74,11 +74,16 @@ function InstalledPois(): React.ReactElement | null {
   );
 }
 
-/** The fix-it text for an autoheight blocker, shared by the pre-export warning and the error envelope. */
+/** The fix-it text for an autoheight blocker, shared by the pre-export warning and the error envelope.
+ *  The lights wording states the REASON on purpose: "can't use Sim autoheight yet" read as a claim that
+ *  lights are incapable of it, and chrispriv asked why they were refused when xrefs and trees work
+ *  (#151). They may well work — nobody has flown it (the 2026-07-19 gate covered xrefs and plants), and
+ *  PCT doesn't ship a placement it hasn't seen in the sim. Keep the "not verified" in the text:
+ *  untested and unsupported are different promises, and only one of them invites a bug report. */
 function autoheightBlockText(reason: "asl" | "lights", n: number): string {
   const these = n === 1 ? "it" : "them";
   return reason === "lights"
-    ? `${n} placed light${n === 1 ? "" : "s"} can't use Sim autoheight yet — switch to Baked ASL, or remove ${these}.`
+    ? `${n} placed light${n === 1 ? "" : "s"}: lights in Sim autoheight aren't verified in the sim yet, so PCT won't export ${these} unchecked — switch to Baked ASL, or remove ${these}.`
     : `${n} object${n === 1 ? "" : "s"} use an absolute ASL height that Sim autoheight can't place — switch ${these} to Terrain / Terrain + offset, or use Baked ASL.`;
 }
 
