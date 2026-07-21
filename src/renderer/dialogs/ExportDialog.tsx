@@ -75,15 +75,15 @@ function InstalledPois(): React.ReactElement | null {
 }
 
 /** The fix-it text for an autoheight blocker, shared by the pre-export warning and the error envelope.
- *  The lights wording states the REASON on purpose: "can't use Sim autoheight yet" read as a claim that
- *  lights are incapable of it, and chrispriv asked why they were refused when xrefs and trees work
- *  (#151). They may well work — nobody has flown it (the 2026-07-19 gate covered xrefs and plants), and
- *  PCT doesn't ship a placement it hasn't seen in the sim. Keep the "not verified" in the text:
- *  untested and unsupported are different promises, and only one of them invites a bug report. */
+ *  The lights wording states the REASON on purpose: chrispriv asked why lights were refused when xrefs
+ *  and trees work in autoheight (#151). The in-sim gate (2026-07-20) answered it — a silo in an autoheight
+ *  POI lands on the terrain, but airport lights in the same POI are dropped far below the surface: lights
+ *  need an absolute (ASL) height, and autoheight is all ground-relative. So the block is a real sim
+ *  limitation, not caution, and Baked ASL is the path for lights. */
 function autoheightBlockText(reason: "asl" | "lights", n: number): string {
   const these = n === 1 ? "it" : "them";
   return reason === "lights"
-    ? `${n} placed light${n === 1 ? "" : "s"}: lights in Sim autoheight aren't verified in the sim yet, so PCT won't export ${these} unchecked — switch to Baked ASL, or remove ${these}.`
+    ? `${n} placed light${n === 1 ? "" : "s"}: Sim autoheight can't place lights (the sim buries ${these} below the terrain) — use Baked ASL, or remove ${these}.`
     : `${n} object${n === 1 ? "" : "s"} use an absolute ASL height that Sim autoheight can't place — switch ${these} to Terrain / Terrain + offset, or use Baked ASL.`;
 }
 
@@ -147,7 +147,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }): React.ReactE
   );
 
   // In Sim-autoheight mode, warn (and block) BEFORE trying if the scene has something the mode can't
-  // represent — a light (not verified in autoheight yet) or an absolute-ASL height (no AGL meaning). Same
+  // represent — a light (the sim can't place lights in autoheight) or an absolute-ASL height (no AGL meaning). Same
   // pure guard the exporter throws on, surfaced early so the user fixes it here instead of hitting an error.
   const blockedByAutoheight = useMemo(
     () => (autoheight ? unsupportedInAutoheight(objects) : null),

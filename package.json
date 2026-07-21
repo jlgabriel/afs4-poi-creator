@@ -1,6 +1,6 @@
 {
   "name": "afs4-poi-creator",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "private": true,
   "type": "module",
   "description": "PCT — POI Creation Tool: place Aerofly FS 4 built-in objects on a satellite map and export an installable POI folder. Ships zero IPACS assets — scans your own install.",

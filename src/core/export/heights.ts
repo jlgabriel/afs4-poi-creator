@@ -56,16 +56,17 @@ export function resolveHeightsFlat(
  *               metres-ABOVE-GROUND, not ASL. The fix is the user's — switch those to Terrain / Terrain+offset,
  *               or export in Baked ASL. (Deliberately NOT NeedsElevationError, whose "enter a base elevation"
  *               recovery is the wrong advice here.)
- *  • "lights" — a `light` / `airport_light`: whether autoheight reaches the cultivation light lists was never
- *               flown (the gate covered xref + plants), so the beta refuses them rather than ship an unverified
- *               placement. Lift this once an in-sim gate confirms it. */
+ *  • "lights" — a `light` / `airport_light`: the sim can't place lights in autoheight. In-sim gate
+ *               (2026-07-20): a silo in an autoheight POI lands on the terrain, but airport lights in the
+ *               same POI drop far below the surface — lights need an absolute (ASL) height, which autoheight
+ *               (all ground-relative) can't give them. Use Baked ASL for lights. */
 export class UnsupportedInAutoheightError extends Error {
   readonly points: PlacedObject[];
   readonly reason: "asl" | "lights";
   constructor(points: PlacedObject[], reason: "asl" | "lights") {
     super(
       reason === "lights"
-        ? `${points.length} light(s): autoheight isn't verified for lights in the sim yet — export in Baked ASL, or remove them`
+        ? `${points.length} light(s): Sim autoheight can't place lights (the sim buries them below the terrain) — export in Baked ASL, or remove them`
         : `${points.length} object(s) use an absolute ASL height, which autoheight can't represent — switch them to Terrain / Terrain + offset, or export in Baked ASL`,
     );
     this.name = "UnsupportedInAutoheightError";

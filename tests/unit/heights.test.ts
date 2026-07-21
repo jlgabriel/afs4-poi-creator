@@ -91,7 +91,7 @@ describe("resolveHeightsAgl (autoheight mode)", () => {
     }
   });
 
-  it("throws UnsupportedInAutoheightError(reason=lights) — lights aren't verified in autoheight yet", () => {
+  it("throws UnsupportedInAutoheightError(reason=lights) — the sim can't place lights in autoheight", () => {
     const run = () => resolveHeightsAgl([obj({ mode: "terrain" }), light()]);
     expect(run).toThrow(UnsupportedInAutoheightError);
     try {
