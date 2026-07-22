@@ -130,6 +130,9 @@ test("a user photo replaces the glyph for its object, and its absence keeps the 
     const seen = watch(page);
     await expect(page.locator(".leaflet-container")).toBeVisible();
 
+    // Objects starts collapsed now (forum #163); open the section so the seeded cards render visibly.
+    await page.locator("summary.pct-section-summary").click();
+
     // The object WITH a photo renders an <img> whose src is the JPEG data URL main produced (proving the
     // whole main pipeline ran), and NOT the fallback glyph.
     const photoCard = page.getByRole("button", { name: "Photo Tower" });

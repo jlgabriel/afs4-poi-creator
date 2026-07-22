@@ -179,8 +179,10 @@ export function CatalogPanel(): React.ReactElement {
       />
       <RegisterBanner count={unregisteredCount} />
       {/* The XREF objects live in their own collapsible section so folding it lifts the Lights section
-          into view instead of leaving it pinned to the bottom (forum #86-1). Mirrors LightsSection. */}
-      <details className="pct-objects" open>
+          into view instead of leaving it pinned to the bottom (forum #86-1). Starts COLLAPSED like
+          Lights and Plants so all three families and their counts are visible at a glance on open,
+          instead of Objects pushing the other two off-screen (forum #163). */}
+      <details className="pct-objects">
         <summary className="pct-section-summary">Objects ({browsable.length})</summary>
         {tree && <CategoryTree tree={tree} active={category} onSelect={onSelectCategory} />}
         <div className="pct-catalog-list">

@@ -108,6 +108,8 @@ test("seeded cache: boots the editor with a live map and no CSP violations", asy
     const seen = watch(page);
     // The Leaflet map mounts and the seeded object shows in the catalog panel.
     await expect(page.locator(".leaflet-container")).toBeVisible();
+    // Objects starts collapsed now (forum #163) — open the section before asserting a card inside it.
+    await page.locator("summary.pct-section-summary").click();
     await expect(page.getByText("E2E Tower")).toBeVisible();
     // Give Leaflet time to fire its tile requests, then assert the prod CSP didn't refuse them.
     await page.waitForTimeout(2500);
@@ -134,6 +136,8 @@ test("the Inspector's Copy button really reaches the clipboard (deny-all permiss
     await app.evaluate(({ clipboard }) => clipboard.writeText("PCT_E2E_SENTINEL"));
 
     // Arm the catalog card, drop the object on the map (placeAt selects it) → the Inspector shows it.
+    // Objects starts collapsed now (forum #163); open the section to reach the card.
+    await page.locator("summary.pct-section-summary").click();
     await page.getByRole("button", { name: "E2E Tower" }).click();
     await page.locator(".pct-map").click({ position: { x: 200, y: 200 } });
     await expect(page.locator(".pct-inspector .pct-field-title")).toHaveText("E2E Tower");
