@@ -9,6 +9,7 @@ import { editorStore } from "../state/editorStore";
 import type { TilesConfig } from "../state/store";
 import type { TileProvider } from "../map/tileProviders";
 import { getPct } from "../app/pct";
+import { refreshThumbnails } from "../app/useThumbnailSync";
 
 const dash = (p: string | null): string => (p !== null && p.length > 0 ? p : "— not set —");
 const looksLikeXyz = (url: string): boolean => /\{z\}/.test(url) && /\{x\}/.test(url) && /\{y\}/.test(url);
@@ -27,6 +28,7 @@ export function SettingsDialog({
   const [loaded, setLoaded] = useState(false);
   const [installDir, setInstallDir] = useState<string | null>(null);
   const [userDir, setUserDir] = useState<string | null>(null);
+  const [thumbnailsDir, setThumbnailsDir] = useState<string | null>(null);
   const [provider, setProvider] = useState<TileProvider>("esri");
   const [customUrl, setCustomUrl] = useState("");
   const [customAttr, setCustomAttr] = useState("");
@@ -46,6 +48,7 @@ export function SettingsDialog({
       if (cancelled) return;
       setInstallDir(s.installDir);
       setUserDir(s.afs4UserDir);
+      setThumbnailsDir(s.thumbnailsDir);
       setProvider(s.tiles.provider);
       setCustomUrl(s.tiles.customUrl ?? "");
       setCustomAttr(s.tiles.customAttribution ?? "");
@@ -57,12 +60,13 @@ export function SettingsDialog({
     };
   }, [pct]);
 
-  const changeDir = async (which: "install-dir" | "user-dir"): Promise<void> => {
+  const changeDir = async (which: "install-dir" | "user-dir" | "thumbnails-dir"): Promise<void> => {
     if (!pct) return;
     const p = await pct.chooseDirectory(which);
     if (p === null) return; // cancelled
     if (which === "install-dir") setInstallDir(p);
-    else setUserDir(p);
+    else if (which === "user-dir") setUserDir(p);
+    else setThumbnailsDir(p);
   };
 
   const redetect = async (): Promise<void> => {
@@ -87,10 +91,13 @@ export function SettingsDialog({
     const saved = await pct.setSettings({
       installDir,
       afs4UserDir: userDir,
+      thumbnailsDir,
       tiles,
       elevation: { provider: elevation },
     });
     editorStore.getState().setTiles(tiles); // swap the map tile layer live (MapView subscribes)
+    setThumbnailsDir(saved.thumbnailsDir); // main may have refused a vanished folder → show what stuck
+    refreshThumbnails(); // re-index the (possibly new) photo folder so the catalog updates immediately
     setBusy(false);
 
     // Main sanity-checks the folders it is about to write into: a …\scenery\poi mis-nesting is corrected,
@@ -152,6 +159,28 @@ export function SettingsDialog({
                 installs POIs into <code>&lt;this folder&gt;\scenery\poi\</code>.
               </span>
               {pathNote !== null && <span className="pct-warn">{pathNote}</span>}
+            </div>
+
+            <div className="pct-field pct-field-col">
+              <span className="pct-field-label">Object photos folder (optional)</span>
+              <code className="pct-path">{dash(thumbnailsDir)}</code>
+              <div className="pct-settings-actions">
+                <button type="button" disabled={!pct} onClick={() => void changeDir("thumbnails-dir")}>
+                  Change…
+                </button>
+                <button
+                  type="button"
+                  disabled={!pct || thumbnailsDir === null}
+                  onClick={() => setThumbnailsDir(null)}
+                >
+                  Clear
+                </button>
+              </div>
+              <span className="pct-field-meta">
+                Drop a photo named after the object's exact id — e.g. <code>UH60_usarmy.jpg</code> — in this
+                folder and PCT shows it instead of the drawn icon. Formats: <code>jpg</code> / <code>png</code>{" "}
+                / <code>webp</code>. The photos are yours and stay on your disk — never bundled or exported.
+              </span>
             </div>
 
             <div className="pct-field pct-field-col">

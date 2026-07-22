@@ -8,7 +8,7 @@
 // ever make this janky, it takes the same react-window treatment the catalog got.
 import { useMemo } from "react";
 import { editorStore, useEditor } from "../state/editorStore";
-import { CategoryIcon } from "../catalog/categoryIcon";
+import { Thumbnail } from "../catalog/Thumbnail";
 import { rowInfo } from "./rowInfo";
 
 export function PlacedList(): React.ReactElement {
@@ -61,7 +61,7 @@ export function PlacedList(): React.ReactElement {
                 onClick={(e) => editorStore.getState().select([o.id], e.shiftKey)}
                 onDoubleClick={() => editorStore.getState().flyTo(o.position)}
               >
-                <CategoryIcon category={info.category} />
+                <Thumbnail name={o.kind === "xref" ? o.name : null} category={info.category} />
                 <span className="pct-placed-text">
                   <span className="pct-placed-name">
                     <span className="pct-placed-label">{info.name}</span>

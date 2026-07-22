@@ -245,6 +245,11 @@ export interface Settings {
   schemaVersion: 1;
   installDir: string | null; // AFS4 install (read: scenery/xref)
   afs4UserDir: string | null; // AFS4 user folder (write: scenery/poi)
+  // Optional folder of USER-supplied object photos (v0.6). A file named `<xref name>.<jpg|jpeg|png|webp>`
+  // in here replaces that object's generated category glyph in the catalog + placed list. The photos are
+  // the user's OWN sim screenshots, read from their disk, never bundled or exported — the zero-IPACS-assets
+  // line is untouched (same status as the scanned catalog cache). null = not set → every row keeps its glyph.
+  thumbnailsDir: string | null;
   tiles: {
     provider: "esri" | "osm" | "custom"; // esri satellite (default) · OSM streets · custom XYZ URL
     customUrl?: string; // XYZ template, user-supplied

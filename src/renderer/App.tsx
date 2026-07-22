@@ -3,11 +3,13 @@
 // seeding + the real IPC bootstrap both live in app/usePct.ts; this file is just the switch. Rescan
 // (TopBar) flips back to the wizard, which reloads the catalog without disturbing the open project.
 import { useBootstrap } from "./app/usePct";
+import { useThumbnailSync } from "./app/useThumbnailSync";
 import { AppShell } from "./shell/AppShell";
 import { FirstRunWizard } from "./dialogs/FirstRunWizard";
 
 export function App(): React.ReactElement {
   const { phase, showEditor, showWizard } = useBootstrap();
+  useThumbnailSync(); // v0.6: keep object photos in step with the folder (mount + on window focus)
   if (phase === "loading") {
     return (
       <div className="pct-boot">

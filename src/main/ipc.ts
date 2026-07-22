@@ -4,9 +4,9 @@
 // thrown error crossing ipcRenderer.invoke reaches the renderer as a flattened Error with its
 // discriminating fields gone. Paths are owned here and never accepted FROM the renderer (P0-2): the
 // renderer says WHAT (open / save / install / choose-folder), main decides WHERE via the dialogs.
-import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, nativeImage, shell } from "electron";
 import type { OpenDialogOptions, SaveDialogOptions } from "electron";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { ZodError } from "zod";
 import type { Catalog, PlacedObject, Project, ResolvedObject, Settings } from "../core/project/types";
@@ -51,6 +51,7 @@ import {
   writeProjectSidecar,
 } from "./projectFile";
 import { NoXrefError, readCatalogCache, scanXref, writeCatalogCache } from "./scan";
+import { indexThumbnails, isValidThumbName, THUMBNAIL_PX } from "./thumbnails";
 import { planXrefRegistration, registerXref } from "./xrefRegistrar";
 import { defaultXrefTableCandidates, loadXrefTable } from "./xrefTableSource";
 import { normalizeUserDir, readSettings, writeSettings } from "./settings";
@@ -60,6 +61,13 @@ const PROJECT_FILTER = [{ name: "PCT project", extensions: ["json"] }];
 const userData = (): string => app.getPath("userData");
 const documents = (): string => app.getPath("documents"); // OneDrive-safe user-dir detection (R5)
 const currentSettings = (): Settings => readSettings(userData(), documents());
+
+// The v0.6 object-photo index (lowercased catalog name → absolute file path), rebuilt by
+// pct:listThumbnails and read by pct:getThumbnail. Held here so getThumbnail need not re-readdir the
+// folder for every visible card: the renderer calls listThumbnails first (boot + on window focus),
+// then getThumbnail only for names the list reported. A stale entry (file deleted since) just makes
+// nativeImage return empty → the renderer falls back to the glyph.
+let thumbnailIndex = new Map<string, string>();
 
 /** The AFS4 user folder to write into, from settings or auto-detect. Throws a plain (→ "io") error
  *  the renderer can surface — the wizard/Settings is where the user fixes it. */
@@ -233,6 +241,35 @@ export function registerIpc(): void {
   );
 
   ipcMain.handle("pct:getCachedCatalog", (): Catalog | null => readCatalogCache(userData()));
+
+  // ── Object photos (v0.6): a user-chosen folder whose `<name>.<ext>` images replace the glyph ──
+  // listThumbnails re-scans the folder and returns the lowercased names that have a photo (the renderer
+  // holds them as a Set → which cards even attempt an <img>). getThumbnail resolves ONE name to a small
+  // JPEG data URL. Both degrade to "no photo" on any snag — a folder that isn't set, a name with no file,
+  // an unreadable image — so the feature can never break a row, only upgrade it.
+  ipcMain.handle("pct:listThumbnails", (): string[] => {
+    thumbnailIndex = indexThumbnails(currentSettings().thumbnailsDir);
+    return [...thumbnailIndex.keys()];
+  });
+  ipcMain.handle("pct:getThumbnail", (_e, name: string): string | null => {
+    if (!isValidThumbName(name)) return null; // not a catalog-shaped name → also blocks path tricks
+    const file = thumbnailIndex.get(name.toLowerCase());
+    if (file === undefined) return null;
+    try {
+      const img = nativeImage.createFromPath(file);
+      if (!img.isEmpty()) {
+        // Downscale the (1080p+) screenshot to a light thumbnail; JPEG keeps the data URL small. resize
+        // with width only preserves the aspect ratio, and the renderer object-fit: covers it into the slot.
+        return `data:image/jpeg;base64,${img.resize({ width: THUMBNAIL_PX }).toJPEG(80).toString("base64")}`;
+      }
+      // nativeImage couldn't decode it (some webp builds) — serve the bytes verbatim; the <img> decodes
+      // it and the CSP allows `data:`. Only hit for formats resize can't touch, so no size concern in practice.
+      const ext = path.extname(file).slice(1).toLowerCase();
+      return `data:image/${ext === "jpg" ? "jpeg" : ext};base64,${readFileSync(file).toString("base64")}`;
+    } catch {
+      return null; // unreadable/vanished file → the renderer keeps the glyph
+    }
+  });
   ipcMain.handle("pct:getSettings", (): Settings => currentSettings());
   ipcMain.handle(
     "pct:setSettings",
@@ -240,12 +277,14 @@ export function registerIpc(): void {
   );
   ipcMain.handle(
     "pct:chooseDirectory",
-    async (_e, purpose: "install-dir" | "user-dir"): Promise<string | null> => {
-      const dir = await pickDirectory(
+    async (_e, purpose: "install-dir" | "user-dir" | "thumbnails-dir"): Promise<string | null> => {
+      const title =
         purpose === "install-dir"
           ? "Select the Aerofly FS 4 install folder"
-          : "Select the Aerofly FS 4 user folder — the one that CONTAINS scenery/",
-      );
+          : purpose === "user-dir"
+            ? "Select the Aerofly FS 4 user folder — the one that CONTAINS scenery/"
+            : "Select the folder that holds your object photos";
+      const dir = await pickDirectory(title);
       // Correct the path HERE, where main hands it back: browse to …\scenery\poi (the old "POI install
       // target" label invited exactly that) and Settings now shows the corrected …\Aerofly FS 4 straight
       // away, instead of quietly writing into …\scenery\poi\scenery\poi\ at the next export. Main owns

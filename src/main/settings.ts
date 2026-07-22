@@ -19,6 +19,7 @@ export function defaultSettings(documentsDir?: string): Settings {
     schemaVersion: 1,
     installDir: installs[0] ?? null,
     afs4UserDir: detectUserDir(documentsDir),
+    thumbnailsDir: null, // v0.6 object-photo folder — opt-in, chosen in Settings; no default location
     tiles: { provider: "esri" },
     elevation: { provider: "open-meteo" },
     recentProjects: [],
@@ -59,6 +60,12 @@ function sanitizeDirs(patch: Partial<Settings>, base: Settings): Partial<Setting
   }
   if (typeof out.installDir === "string" && !existsSync(out.installDir)) {
     out.installDir = base.installDir;
+  }
+  // The photo folder is a READ-only source (never a write root), but a path that isn't on disk would make
+  // every listThumbnails come back empty for no visible reason — so refuse a vanished one and keep the last
+  // good value, same as the two dirs above. `null` passes through untouched: clearing the folder is allowed.
+  if (typeof out.thumbnailsDir === "string" && !existsSync(out.thumbnailsDir)) {
+    out.thumbnailsDir = base.thumbnailsDir;
   }
   return out;
 }

@@ -127,6 +127,7 @@ function mockSettings(installDir: string | null): Settings {
     schemaVersion: 1,
     installDir,
     afs4UserDir: null,
+    thumbnailsDir: null,
     tiles: { provider: "esri" },
     elevation: { provider: "open-meteo" },
     recentProjects: [],
@@ -200,6 +201,9 @@ export function installMockBridge(): void {
       return settings;
     },
     chooseDirectory: async () => "C:/Mock/Aerofly FS 4",
+    // No real disk in the preview harness → no photos; every card keeps its glyph (the fallback path).
+    listThumbnails: async () => [],
+    getThumbnail: async () => null,
     planXrefRegistration: async () => ({
       ok: true,
       value: {

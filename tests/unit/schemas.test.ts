@@ -39,6 +39,7 @@ const validSettings = (): Settings => ({
   schemaVersion: 1,
   installDir: null,
   afs4UserDir: null,
+  thumbnailsDir: null,
   tiles: { provider: "esri" },
   elevation: { provider: "open-meteo" },
   recentProjects: [],
@@ -125,6 +126,25 @@ describe("parseSettings", () => {
   });
   it("rejects an unknown tile provider", () => {
     expect(() => parseSettings({ ...validSettings(), tiles: { provider: "bing" } })).toThrow();
+  });
+
+  // A settings.json written before v0.6 has no `thumbnailsDir`. The zod `.default(null)` MUST fill it in
+  // rather than reject: readSettings falls back to defaults on any throw, so a rejection would silently
+  // wipe the user's install dir + tile provider — the same trap the window field's `.catch` guards.
+  it("defaults a missing thumbnailsDir to null WITHOUT losing the rest (pre-v0.6 file)", () => {
+    const preV06 = {
+      schemaVersion: 1,
+      installDir: "/afs4",
+      afs4UserDir: "/user",
+      tiles: { provider: "custom", customUrl: "https://t/{z}/{x}/{y}.png" },
+      elevation: { provider: "open-meteo" },
+      recentProjects: ["/a.json"],
+      lastScanAt: "2026-01-01T00:00:00Z",
+    };
+    const got = parseSettings(preV06);
+    expect(got.thumbnailsDir).toBeNull();
+    expect(got.installDir).toBe("/afs4"); // the real settings survived the upgrade
+    expect(got.tiles).toEqual({ provider: "custom", customUrl: "https://t/{z}/{x}/{y}.png" });
   });
 
   // The saved window placement (forum #125) is cosmetic, and readSettings falls back to DEFAULTS on any

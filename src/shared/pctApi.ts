@@ -93,7 +93,14 @@ export interface PctApi {
   // Native folder picker for the first-run wizard / Settings — main runs the dialog. Returns the
   // chosen path OUTward for display + a follow-up scan(installDir, …) / setSettings; the P0-2 rule
   // forbids paths flowing IN, not out (same as detectPaths → scan). null = the user cancelled.
-  chooseDirectory(purpose: "install-dir" | "user-dir"): Promise<string | null>;
+  chooseDirectory(purpose: "install-dir" | "user-dir" | "thumbnails-dir"): Promise<string | null>;
+
+  // Object photos (v0.6). listThumbnails re-scans the settings.thumbnailsDir folder and returns the
+  // lowercased catalog names that have a `<name>.<ext>` photo; getThumbnail resolves one name to a small
+  // JPEG data URL (or null — no folder / no file / unreadable). The renderer never sends a path (P0-2):
+  // it names an OBJECT, main maps it to a file within the one folder the user chose.
+  listThumbnails(): Promise<string[]>;
+  getThumbnail(name: string): Promise<string | null>;
 
   // Project files — main owns the path + dialogs (P0-2). A returned `path` is for display only.
   openProject(): Promise<PctResult<{ path: string; project: Project } | null>>;

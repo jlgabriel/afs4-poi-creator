@@ -483,6 +483,21 @@ body {
   border-radius: 5px;
   background: #f1f5f9;
 }
+/* v0.6: a user photo (Settings → object photos folder) fills the slot instead of the drawn glyph. It
+   also carries `.pct-thumb`, so it inherits the slot's size + radius; here we drop the glyph's inner
+   padding and cover the square. The padding zeroing uses the doubled class `.pct-thumb.pct-thumb-photo`
+   so it OUT-RANKS `.pct-placed-row .pct-thumb` (which sets 3px and appears later in the file) rather
+   than relying on source order. */
+.pct-thumb-photo {
+  object-fit: cover;
+  object-position: center;
+  display: block;
+  background: #e2e8f0;
+}
+.pct-thumb.pct-thumb-photo,
+.pct-placed-row .pct-thumb.pct-thumb-photo {
+  padding: 0;
+}
 .pct-obj-text {
   flex: 1 1 auto;
   min-width: 0;

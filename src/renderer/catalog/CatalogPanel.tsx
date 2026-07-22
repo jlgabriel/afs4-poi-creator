@@ -19,7 +19,7 @@ import { matchesFilter } from "./catalogFilter";
 import { isBrowsable } from "./browseVisibility";
 import { buildCatalogTree, hasCategory } from "./catalogTree";
 import { CategoryTree } from "./CategoryTree";
-import { CategoryIcon } from "./categoryIcon";
+import { Thumbnail } from "./Thumbnail";
 import { LightsSection } from "./LightsSection";
 import { PlantsSection } from "./PlantsSection";
 
@@ -44,7 +44,7 @@ const ObjectCard = memo(function ObjectCard({ o, armed, onArm }: ObjectCardProps
       disabled={unregistered}
       onClick={() => onArm(o.name)}
     >
-      <CategoryIcon category={o.category} />
+      <Thumbnail key={o.name} name={o.name} category={o.category} />
       <span className="pct-obj-text">
         <span className="pct-obj-name">
           {o.displayName}

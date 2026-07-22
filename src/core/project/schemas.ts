@@ -180,6 +180,10 @@ export const zSettings = z.looseObject({
   schemaVersion: z.literal(CURRENT_SETTINGS_VERSION),
   installDir: z.string().nullable(),
   afs4UserDir: z.string().nullable(),
+  // v0.6 object-photo folder. `.default(null)` is load-bearing: a settings.json written by an older PCT
+  // has no such key, and without the default a required field would fail parse → readSettings would fall
+  // back to DEFAULTS, silently wiping the user's install dir + tile provider. Absent → null (not set).
+  thumbnailsDir: z.string().nullable().default(null),
   tiles: z.looseObject({
     provider: z.enum(["esri", "osm", "custom"]),
     customUrl: z.string().optional(),

@@ -103,6 +103,12 @@ export interface EditorState {
   plantIndex: Map<string, CatalogPlant>; // v0.4 plants, by plantKey() — "group/species", not one name
   airports: Airport[]; // sim airport list (bundled), for the TopBar search → flyTo; never saved
   tiles: TilesConfig; // map tile provider (from Settings); MapView subscribes → live tile swap
+  // v0.6 object photos: the lowercased catalog names that have a user photo in settings.thumbnailsDir.
+  // Reference data (never saved/undone); a Set so a card's <Thumbnail> is an O(1) has() check. `epoch`
+  // bumps only when the set CONTENT changes, so the image-data cache busts on a real change but a
+  // no-op focus refresh doesn't churn every thumbnail.
+  thumbnailNames: Set<string>;
+  thumbnailEpoch: number;
 
   // ── DOCUMENT (snapshotted / dirtied / autosaved) ──
   project: Project;
@@ -129,6 +135,7 @@ export interface EditorState {
   loadCatalog: (catalog: Catalog) => void;
   loadAirports: (airports: Airport[]) => void;
   setTiles: (tiles: TilesConfig) => void;
+  setThumbnails: (names: string[]) => void; // v0.6 — adopt a fresh photo-name list (boot / focus / Settings)
   openProject: (path: string | null, project: Project) => void;
   newProject: (project: Project) => void;
   recoverProject: (project: Project) => void; // load a crash-recovery shadow as UNSAVED (dirty) work
@@ -296,6 +303,8 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
         plantIndex: new Map(),
         airports: [],
         tiles: DEFAULT_TILES,
+        thumbnailNames: new Set(),
+        thumbnailEpoch: 0,
         project: deps.initialProject,
         projectPath: null,
         dirty: false,
@@ -333,6 +342,14 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
         },
         loadAirports: (airports) => set({ airports }),
         setTiles: (tiles) => set({ tiles }),
+        setThumbnails: (names) => {
+          // Skip the write when nothing changed — a plain window-focus refresh usually returns the same
+          // list, and a no-op set()+epoch bump would needlessly re-fetch every visible thumbnail.
+          const next = new Set(names);
+          const prev = get().thumbnailNames;
+          if (next.size === prev.size && [...next].every((n) => prev.has(n))) return;
+          set((s) => ({ thumbnailNames: next, thumbnailEpoch: s.thumbnailEpoch + 1 }));
+        },
         openProject: (path, project) => load(project, path),
         newProject: (project) => load(project, null),
         recoverProject: (project) => load(project, null, true), // no path yet; unsaved → dirty

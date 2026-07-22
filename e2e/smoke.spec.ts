@@ -66,6 +66,7 @@ function seedEditor(tag: string): string {
     schemaVersion: 1,
     installDir: userData, // any non-null path → decideBootPhase() picks "editor"
     afs4UserDir: null,
+    thumbnailsDir: null,
     tiles: { provider: "esri" },
     elevation: { provider: "open-meteo" },
     recentProjects: [],
