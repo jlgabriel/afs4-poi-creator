@@ -498,6 +498,48 @@ body {
 .pct-placed-row .pct-thumb.pct-thumb-photo {
   padding: 0;
 }
+/* Hover-preview (forum #170/#166): a floating popup that enlarges the user photo (~3× the 40px thumb —
+   Michael's max) and shows the object's REAL catalog name, the string a photo file is named after.
+   Portalled to <body>, so its position:fixed coords come straight from the anchor's bounding rect and
+   nothing (the panel's overflow:hidden, the map's stacking context) can clip it. pointer-events:none so
+   it never steals the hover from the card underneath; z-index sits above the map, below the modal
+   layer (1000). */
+.pct-hover-preview {
+  position: fixed;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  max-width: 220px;
+  padding: 6px;
+  background: #fff;
+  border: 1px solid #cbd5e1; /* the thin frame Michael asked for */
+  border-radius: 10px; /* rounded corners */
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.18);
+  pointer-events: none;
+}
+.pct-hover-preview-imgbox {
+  width: 120px; /* 3 × the 40px row thumb */
+  height: 120px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #e2e8f0;
+}
+.pct-hover-preview-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain; /* show the WHOLE photo uncropped (the row thumb is cover-cropped to a square) */
+  display: block;
+}
+.pct-hover-preview-name {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.35;
+  color: #0f172a;
+  text-align: center;
+  word-break: break-all; /* long technical names wrap rather than overflow the frame */
+}
 .pct-obj-text {
   flex: 1 1 auto;
   min-width: 0;

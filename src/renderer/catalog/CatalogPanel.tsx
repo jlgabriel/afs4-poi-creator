@@ -8,7 +8,7 @@
 // element array the M1e-6 fix had to memoize simply no longer exists. The input still echoes at
 // urgent priority via useDeferredValue while the filtered `objects` array is a deferred pass, and
 // `onArm` is stable so arming re-renders only the affected rows.
-import { memo, useCallback, useDeferredValue, useMemo, useState } from "react";
+import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { List, type RowComponentProps } from "react-window";
 import type { CatalogObject } from "../../core/project/types";
 import { editorStore, useEditor } from "../state/editorStore";
@@ -20,18 +20,34 @@ import { isBrowsable } from "./browseVisibility";
 import { buildCatalogTree, hasCategory } from "./catalogTree";
 import { CategoryTree } from "./CategoryTree";
 import { Thumbnail } from "./Thumbnail";
+import { HoverPreview } from "./HoverPreview";
 import { LightsSection } from "./LightsSection";
 import { PlantsSection } from "./PlantsSection";
 
 const ROW_H = 64; // must match .pct-row height budget in styles.css (card + row padding)
+const HOVER_DELAY_MS = 250; // rest-before-show, so sweeping the mouse down the list doesn't strobe popups
 
 interface ObjectCardProps {
   o: CatalogObject;
   armed: boolean;
   onArm: (name: string) => void;
+  onShow: (o: CatalogObject, anchor: DOMRect) => void;
+  onHide: () => void;
 }
 
-const ObjectCard = memo(function ObjectCard({ o, armed, onArm }: ObjectCardProps): React.ReactElement {
+/** The hover-preview anchors to the thumbnail (the card's left edge) so the popup appears beside the
+ *  image, as in Michael's mock; fall back to the whole card if the thumb somehow isn't there. */
+function anchorRectOf(card: HTMLElement): DOMRect {
+  return (card.querySelector(".pct-thumb") ?? card).getBoundingClientRect();
+}
+
+const ObjectCard = memo(function ObjectCard({
+  o,
+  armed,
+  onArm,
+  onShow,
+  onHide,
+}: ObjectCardProps): React.ReactElement {
   // A loose user `.tmb` can't be placed until it's registered (it wouldn't resolve in the sim), so its
   // card is disabled and badged — the Register banner above turns it into a normal, placeable object.
   const unregistered = o.unregistered === true;
@@ -39,10 +55,17 @@ const ObjectCard = memo(function ObjectCard({ o, armed, onArm }: ObjectCardProps
     <button
       type="button"
       className={armed ? "pct-obj-card armed" : "pct-obj-card"}
-      title={unregistered ? `${o.name} — a loose user .tmb; use Register (above) before placing it` : o.name}
+      // The real object name now lives in the hover-preview (reliable on every OS); the native `title`
+      // tooltip was flaky on macOS (#166). Kept ONLY for the disabled/unregistered card — its preview
+      // never fires (disabled buttons emit no hover) and this text is a placement hint, not the name.
+      title={unregistered ? `${o.name} — a loose user .tmb; use Register (above) before placing it` : undefined}
       aria-pressed={armed}
       disabled={unregistered}
       onClick={() => onArm(o.name)}
+      onMouseEnter={(e) => onShow(o, anchorRectOf(e.currentTarget))}
+      onMouseLeave={onHide}
+      onFocus={(e) => onShow(o, anchorRectOf(e.currentTarget))}
+      onBlur={onHide}
     >
       <Thumbnail key={o.name} name={o.name} category={o.category} />
       <span className="pct-obj-text">
@@ -97,6 +120,8 @@ interface RowProps {
   objects: CatalogObject[];
   placing: PlacingSpec | null;
   onArm: (name: string) => void;
+  onShow: (o: CatalogObject, anchor: DOMRect) => void;
+  onHide: () => void;
 }
 
 // react-window renders this per visible index. `style` positions the row absolutely and MUST land on
@@ -108,12 +133,14 @@ function Row({
   objects,
   placing,
   onArm,
+  onShow,
+  onHide,
 }: RowComponentProps<RowProps>): React.ReactElement {
   const o = objects[index];
   const armed = placing?.kind === "xref" && placing.name === o.name;
   return (
     <div className="pct-row" style={style} {...ariaAttributes}>
-      <ObjectCard o={o} armed={armed} onArm={onArm} />
+      <ObjectCard o={o} armed={armed} onArm={onArm} onShow={onShow} onHide={onHide} />
     </div>
   );
 }
@@ -122,6 +149,11 @@ export function CatalogPanel(): React.ReactElement {
   const catalog = useEditor((s) => s.catalog);
   const filter = useEditor((s) => s.filter);
   const placing = useEditor((s) => s.placing);
+
+  // Hover-preview (forum #170/#166): the card the mouse is resting on, plus where its thumbnail sits.
+  // A short rest-delay via `hoverTimer` keeps a fast scan down the list from strobing popups.
+  const [hovered, setHovered] = useState<{ object: CatalogObject; anchor: DOMRect } | null>(null);
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   // Browse view hides objects that only make sense assembled inside an airport (the loose jetway
   // parts) — a DISPLAY filter, so the tree counts and the gallery agree while the full catalog and
@@ -165,7 +197,20 @@ export function CatalogPanel(): React.ReactElement {
     [],
   );
 
-  const rowProps = useMemo<RowProps>(() => ({ objects, placing, onArm }), [objects, placing, onArm]);
+  const onShowPreview = useCallback((object: CatalogObject, anchor: DOMRect) => {
+    clearTimeout(hoverTimer.current);
+    hoverTimer.current = setTimeout(() => setHovered({ object, anchor }), HOVER_DELAY_MS);
+  }, []);
+  const onHidePreview = useCallback(() => {
+    clearTimeout(hoverTimer.current);
+    setHovered(null);
+  }, []);
+  useEffect(() => () => clearTimeout(hoverTimer.current), []); // never fire after unmount
+
+  const rowProps = useMemo<RowProps>(
+    () => ({ objects, placing, onArm, onShow: onShowPreview, onHide: onHidePreview }),
+    [objects, placing, onArm, onShowPreview, onHidePreview],
+  );
 
   return (
     <section className="pct-catalog">
@@ -185,7 +230,9 @@ export function CatalogPanel(): React.ReactElement {
       <details className="pct-objects">
         <summary className="pct-section-summary">Objects ({browsable.length})</summary>
         {tree && <CategoryTree tree={tree} active={category} onSelect={onSelectCategory} />}
-        <div className="pct-catalog-list">
+        {/* Wheel-scrolling slides the rows out from under a shown popup → hide it (it reappears on the
+            next mouse rest). onWheel bubbles from the virtualized list; the scroll event doesn't. */}
+        <div className="pct-catalog-list" onWheel={onHidePreview}>
           {objects.length === 0 ? (
             <p className="pct-empty">{catalog ? "No matching objects" : "No catalog loaded"}</p>
           ) : (
@@ -202,6 +249,7 @@ export function CatalogPanel(): React.ReactElement {
       </details>
       <LightsSection />
       <PlantsSection />
+      {hovered !== null && <HoverPreview object={hovered.object} anchor={hovered.anchor} />}
     </section>
   );
 }

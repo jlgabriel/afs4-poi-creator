@@ -49,9 +49,10 @@ treats it like any built-in: place it, rotate it, set its height, export. See
 **Real photos on the cards, too.** Since **v0.6**, you can swap PCT's drawn category icons for real
 photos of the objects. Point *Settings → Object photos folder* at a folder and drop an image named
 after an object's exact id — `a380_klm.jpg` (jpg, png or webp) — and that photo shows on the object's
-card, in both the catalog and the placed list; anything without a photo keeps its drawn icon. The
-photos are **yours**, read straight from your disk — never bundled into PCT and never written into
-your POIs.
+card, in both the catalog and the placed list; anything without a photo keeps its drawn icon. Rest the
+mouse on a card to see the photo enlarged and the object's exact id — handy for naming the next photo
+file. The photos are **yours**, read straight from your disk — never bundled into PCT and never written
+into your POIs.
 
 **It ships no Aerofly content.** PCT reads the object catalog from *your* installed copy of the sim,
 so you only ever place objects you already own. Nothing from the sim is copied into this project or

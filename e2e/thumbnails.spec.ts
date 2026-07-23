@@ -152,3 +152,35 @@ test("a user photo replaces the glyph for its object, and its absence keeps the 
     await app.close();
   }
 });
+
+// The hover-preview (forum #170/#166): resting on a card enlarges the photo AND shows the object's REAL
+// catalog name — the string a photo file is named after, previously only the macOS-flaky native title.
+// Driven here with a REAL mouse hover (Playwright), the one thing the browser-preview harness fakes.
+test("hovering a card enlarges its photo and shows the real name; a photo-less card shows the name only", async () => {
+  const app = await launch(seed());
+  try {
+    const page = await app.firstWindow();
+    await expect(page.locator(".leaflet-container")).toBeVisible();
+    await page.locator("summary.pct-section-summary").click(); // Objects starts collapsed (#163)
+
+    // A card WITH a photo → the popup carries the enlarged <img> and the raw name (PHOTO = "photo_tower",
+    // not the "Photo Tower" display label the row already shows).
+    await page.getByRole("button", { name: "Photo Tower" }).hover();
+    const preview = page.locator(".pct-hover-preview");
+    await expect(preview).toBeVisible();
+    await expect(preview.locator("img.pct-hover-preview-img")).toBeVisible();
+    await expect(preview.locator(".pct-hover-preview-name")).toHaveText(PHOTO);
+
+    // Moving off the card hides it.
+    await page.getByRole("button", { name: "Rescan" }).hover();
+    await expect(preview).toHaveCount(0);
+
+    // A card WITHOUT a photo → the popup shows the real name but NO image box (name-only tooltip).
+    await page.getByRole("button", { name: "Glyph Tower" }).hover();
+    await expect(preview).toBeVisible();
+    await expect(preview.locator(".pct-hover-preview-name")).toHaveText(GLYPH);
+    await expect(preview.locator(".pct-hover-preview-imgbox")).toHaveCount(0);
+  } finally {
+    await app.close();
+  }
+});

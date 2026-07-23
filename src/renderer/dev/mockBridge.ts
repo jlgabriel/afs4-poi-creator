@@ -122,6 +122,29 @@ function buildBigCatalog(): Catalog {
   };
 }
 
+// v0.6.2: the browser preview has no disk, so object photos (v0.6) were entirely un-exercisable here —
+// every card kept its glyph and the hover-preview's photo path couldn't be seen without a packaged
+// build. These synthetic photos fix that: a few stems get a generated SVG "photo" so `preview:renderer`
+// shows real <img> thumbs AND the enlarged hover, while every other card still falls back to its glyph.
+const PHOTO_STEMS = ["tower00_small_plates", "car_sedan", "staticpeople_standing"];
+function hasMockPhoto(name: string): boolean {
+  return PHOTO_STEMS.some((stem) => name.startsWith(stem));
+}
+/** A stand-in "photo": a tall SVG (200×280, like a person/tower shot) so object-fit:contain visibly
+ *  letterboxes in the square thumb and the hover box, exactly as a real portrait photo would. */
+function mockPhoto(o: CatalogObject): string {
+  const hue = (o.name.length * 47) % 360;
+  const label = o.displayName.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="280" viewBox="0 0 200 280">` +
+    `<rect width="200" height="280" fill="hsl(${hue} 45% 62%)"/>` +
+    `<rect x="66" y="70" width="68" height="150" rx="10" fill="hsl(${hue} 40% 34%)"/>` +
+    `<circle cx="100" cy="66" r="28" fill="hsl(${hue} 45% 82%)"/>` +
+    `<text x="100" y="256" text-anchor="middle" font-family="sans-serif" font-size="15" fill="#fff">${label}</text>` +
+    `</svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}
+
 function mockSettings(installDir: string | null): Settings {
   return {
     schemaVersion: 1,
@@ -201,9 +224,13 @@ export function installMockBridge(): void {
       return settings;
     },
     chooseDirectory: async () => "C:/Mock/Aerofly FS 4",
-    // No real disk in the preview harness → no photos; every card keeps its glyph (the fallback path).
-    listThumbnails: async () => [],
-    getThumbnail: async () => null,
+    // Synthetic photos for a few stems (PHOTO_STEMS) so the preview exercises the object-photo path and
+    // the hover-preview's enlarged image; every other card still falls back to its glyph.
+    listThumbnails: async () => catalog.xref.filter((o) => hasMockPhoto(o.name)).map((o) => o.name.toLowerCase()),
+    getThumbnail: async (name) => {
+      const o = catalog.xref.find((x) => x.name === name);
+      return o && hasMockPhoto(o.name) ? mockPhoto(o) : null;
+    },
     planXrefRegistration: async () => ({
       ok: true,
       value: {
