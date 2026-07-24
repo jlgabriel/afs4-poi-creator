@@ -21,6 +21,7 @@ import { buildCatalogTree, hasCategory } from "./catalogTree";
 import { CategoryTree } from "./CategoryTree";
 import { Thumbnail } from "./Thumbnail";
 import { HoverPreview } from "./HoverPreview";
+import { ObjectContextMenu } from "./ObjectContextMenu";
 import { LightsSection } from "./LightsSection";
 import { PlantsSection } from "./PlantsSection";
 
@@ -33,6 +34,7 @@ interface ObjectCardProps {
   onArm: (name: string) => void;
   onShow: (o: CatalogObject, anchor: DOMRect) => void;
   onHide: () => void;
+  onMenu: (o: CatalogObject, x: number, y: number) => void;
 }
 
 /** The hover-preview anchors to the thumbnail (the card's left edge) so the popup appears beside the
@@ -47,6 +49,7 @@ const ObjectCard = memo(function ObjectCard({
   onArm,
   onShow,
   onHide,
+  onMenu,
 }: ObjectCardProps): React.ReactElement {
   // A loose user `.tmb` can't be placed until it's registered (it wouldn't resolve in the sim), so its
   // card is disabled and badged — the Register banner above turns it into a normal, placeable object.
@@ -62,6 +65,11 @@ const ObjectCard = memo(function ObjectCard({
       aria-pressed={armed}
       disabled={unregistered}
       onClick={() => onArm(o.name)}
+      // Right-click arms nothing — it opens the photo menu at the cursor (preventDefault stops the OS menu).
+      onContextMenu={(e) => {
+        e.preventDefault();
+        onMenu(o, e.clientX, e.clientY);
+      }}
       onMouseEnter={(e) => onShow(o, anchorRectOf(e.currentTarget))}
       onMouseLeave={onHide}
       onFocus={(e) => onShow(o, anchorRectOf(e.currentTarget))}
@@ -122,6 +130,7 @@ interface RowProps {
   onArm: (name: string) => void;
   onShow: (o: CatalogObject, anchor: DOMRect) => void;
   onHide: () => void;
+  onMenu: (o: CatalogObject, x: number, y: number) => void;
 }
 
 // react-window renders this per visible index. `style` positions the row absolutely and MUST land on
@@ -135,12 +144,13 @@ function Row({
   onArm,
   onShow,
   onHide,
+  onMenu,
 }: RowComponentProps<RowProps>): React.ReactElement {
   const o = objects[index];
   const armed = placing?.kind === "xref" && placing.name === o.name;
   return (
     <div className="pct-row" style={style} {...ariaAttributes}>
-      <ObjectCard o={o} armed={armed} onArm={onArm} onShow={onShow} onHide={onHide} />
+      <ObjectCard o={o} armed={armed} onArm={onArm} onShow={onShow} onHide={onHide} onMenu={onMenu} />
     </div>
   );
 }
@@ -154,6 +164,8 @@ export function CatalogPanel(): React.ReactElement {
   // A short rest-delay via `hoverTimer` keeps a fast scan down the list from strobing popups.
   const [hovered, setHovered] = useState<{ object: CatalogObject; anchor: DOMRect } | null>(null);
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  // Right-click "Paste photo" menu (v0.7): which object, and where the click landed (viewport coords).
+  const [menu, setMenu] = useState<{ object: CatalogObject; x: number; y: number } | null>(null);
 
   // Browse view hides objects that only make sense assembled inside an airport (the loose jetway
   // parts) — a DISPLAY filter, so the tree counts and the gallery agree while the full catalog and
@@ -205,11 +217,18 @@ export function CatalogPanel(): React.ReactElement {
     clearTimeout(hoverTimer.current);
     setHovered(null);
   }, []);
+  // Opening the menu hides any hover-preview and cancels a pending one, so the popup and the menu never
+  // stack. Coords come straight from the contextmenu event (the menu is portalled + position:fixed).
+  const onOpenMenu = useCallback((object: CatalogObject, x: number, y: number) => {
+    clearTimeout(hoverTimer.current);
+    setHovered(null);
+    setMenu({ object, x, y });
+  }, []);
   useEffect(() => () => clearTimeout(hoverTimer.current), []); // never fire after unmount
 
   const rowProps = useMemo<RowProps>(
-    () => ({ objects, placing, onArm, onShow: onShowPreview, onHide: onHidePreview }),
-    [objects, placing, onArm, onShowPreview, onHidePreview],
+    () => ({ objects, placing, onArm, onShow: onShowPreview, onHide: onHidePreview, onMenu: onOpenMenu }),
+    [objects, placing, onArm, onShowPreview, onHidePreview, onOpenMenu],
   );
 
   return (
@@ -249,7 +268,11 @@ export function CatalogPanel(): React.ReactElement {
       </details>
       <LightsSection />
       <PlantsSection />
-      {hovered !== null && <HoverPreview object={hovered.object} anchor={hovered.anchor} />}
+      {/* Suppress the hover-preview while the menu is open so the two popups never stack. */}
+      {hovered !== null && menu === null && <HoverPreview object={hovered.object} anchor={hovered.anchor} />}
+      {menu !== null && (
+        <ObjectContextMenu object={menu.object} x={menu.x} y={menu.y} onClose={() => setMenu(null)} />
+      )}
     </section>
   );
 }

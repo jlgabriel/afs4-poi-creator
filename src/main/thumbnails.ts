@@ -56,3 +56,52 @@ export function indexThumbnails(dir: string | null): Map<string, string> {
   }
   return index;
 }
+
+// ── v0.7 "Paste photo" write path (still no Electron import — unit-tests directly; ipc.ts reads the
+//    clipboard and calls these). Two typed errors so ipc.ts can map them to their own PctError codes. ──
+
+/** No photo folder is set (settings.thumbnailsDir is null) but a write/delete was asked for. Maps to the
+ *  "no-photos-dir" PctError so the renderer can point the user at Settings (v0.6 keeps the folder opt-in). */
+export class NoPhotosDirError extends Error {
+  constructor() {
+    super("No photo folder is set — choose one in Settings first.");
+    this.name = "NoPhotosDirError";
+  }
+}
+
+/** "Paste photo" ran but the clipboard holds no image. Maps to the "clipboard-empty" PctError. */
+export class ClipboardEmptyError extends Error {
+  constructor() {
+    super("No image on the clipboard — capture one (Win+Shift+S) and try again.");
+    this.name = "ClipboardEmptyError";
+  }
+}
+
+/** Where a pasted photo is written: always `<dir>/<name>.png` (the clipboard gives a bitmap and PNG is
+ *  lossless). Throws on a name that isn't catalog-shaped — the SAME guard getThumbnail uses, so a name
+ *  arriving over IPC from the renderer can never escape the folder (no separators, no `..`). */
+export function photoWritePath(dir: string, name: string): string {
+  if (!isValidThumbName(name)) throw new Error(`unsafe photo name: ${name}`);
+  return path.join(dir, `${name}.png`);
+}
+
+/** Every photo file in `dir` whose stem === `name` (any of our extensions) — what "Remove photo" deletes,
+ *  so a stem holding both `name.png` and an older `name.jpg` is cleared fully, not left half-there. Empty
+ *  on a missing/unreadable dir or an unsafe name. */
+export function photoFilesForStem(dir: string, name: string): string[] {
+  if (!isValidThumbName(name)) return [];
+  let entries: string[];
+  try {
+    entries = readdirSync(dir);
+  } catch {
+    return [];
+  }
+  const target = name.toLowerCase();
+  const out: string[] = [];
+  for (const file of entries) {
+    const ext = path.extname(file).slice(1).toLowerCase();
+    if (!PRIORITY.has(ext)) continue; // not one of our image extensions
+    if (path.basename(file, path.extname(file)).toLowerCase() === target) out.push(path.join(dir, file));
+  }
+  return out;
+}

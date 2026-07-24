@@ -206,6 +206,12 @@ export function installMockBridge(): void {
     { folderName: "e00698n4627_suiza", byPct: true },
     { folderName: "toulouse_city", byPct: false },
   ];
+  // v0.7: a MUTABLE set of lowercased names that have a photo, seeded from PHOTO_STEMS. saveObjectPhoto
+  // adds and deleteObjectPhoto removes, so the right-click menu's paste/remove flow is exercisable with no
+  // disk (the preview has none). Respects settings.thumbnailsDir like main: none set → "no-photos-dir".
+  const mockPhotos = new Set<string>(
+    catalog.xref.filter((o) => hasMockPhoto(o.name)).map((o) => o.name.toLowerCase()),
+  );
 
   const api: PctApi = {
     detectPaths: async () => ({ installDirs: ["C:/Mock/Aerofly FS 4"], userDir: "C:/Mock/User" }),
@@ -226,11 +232,26 @@ export function installMockBridge(): void {
     chooseDirectory: async () => "C:/Mock/Aerofly FS 4",
     // Synthetic photos for a few stems (PHOTO_STEMS) so the preview exercises the object-photo path and
     // the hover-preview's enlarged image; every other card still falls back to its glyph.
-    listThumbnails: async () => catalog.xref.filter((o) => hasMockPhoto(o.name)).map((o) => o.name.toLowerCase()),
+    listThumbnails: async () => [...mockPhotos],
     getThumbnail: async (name) => {
       const o = catalog.xref.find((x) => x.name === name);
-      return o && hasMockPhoto(o.name) ? mockPhoto(o) : null;
+      return o && mockPhotos.has(name.toLowerCase()) ? mockPhoto(o) : null;
     },
+    saveObjectPhoto: async (name) => {
+      if (settings.thumbnailsDir === null) {
+        return { ok: false, error: { code: "no-photos-dir", message: "No photo folder is set — choose one in Settings first." } };
+      }
+      mockPhotos.add(name.toLowerCase()); // no clipboard in the preview → a paste always "succeeds"
+      return { ok: true, value: undefined };
+    },
+    deleteObjectPhoto: async (name) => {
+      if (settings.thumbnailsDir === null) {
+        return { ok: false, error: { code: "no-photos-dir", message: "No photo folder is set — choose one in Settings first." } };
+      }
+      mockPhotos.delete(name.toLowerCase());
+      return { ok: true, value: undefined };
+    },
+    openPhotosDir: noop,
     planXrefRegistration: async () => ({
       ok: true,
       value: {

@@ -16,11 +16,14 @@ import path from "node:path";
  *  opens an exact filename (shadow.json, poi.toc, …), so a leftover from a crash is inert litter. */
 const TMP_SUFFIX = ".pct-tmp";
 
-/** Write `data` to `file` atomically. If anything fails, `file` keeps whatever it held before. */
-export function writeFileAtomic(file: string, data: string): void {
+/** Write `data` to `file` atomically. If anything fails, `file` keeps whatever it held before. A string
+ *  is text (UTF-8, LF preserved for AFS4 files); a Buffer — e.g. a PNG pasted from the clipboard (v0.7) —
+ *  is written verbatim as binary. */
+export function writeFileAtomic(file: string, data: string | Buffer): void {
   mkdirSync(path.dirname(file), { recursive: true });
   const tmp = file + TMP_SUFFIX;
-  writeFileSync(tmp, data, "utf8"); // LF endings preserved — AFS4 text files use them
+  if (typeof data === "string") writeFileSync(tmp, data, "utf8"); // LF endings preserved (AFS4 text files)
+  else writeFileSync(tmp, data); // binary verbatim (PNG from the clipboard)
   try {
     renameSync(tmp, file);
   } catch (e) {

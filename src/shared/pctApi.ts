@@ -26,6 +26,9 @@ export type PctError =
   | { code: "unsupported-schema"; message: string; found: unknown }
   | { code: "invalid-project"; message: string }
   | { code: "folder-exists"; message: string; folderName: string }
+  // v0.7 "Paste photo": the photo folder isn't chosen yet (Settings), or the clipboard holds no image.
+  | { code: "no-photos-dir"; message: string }
+  | { code: "clipboard-empty"; message: string }
   | { code: "io"; message: string };
 
 export type PctResult<T> = { ok: true; value: T } | { ok: false; error: PctError };
@@ -101,6 +104,13 @@ export interface PctApi {
   // it names an OBJECT, main maps it to a file within the one folder the user chose.
   listThumbnails(): Promise<string[]>;
   getThumbnail(name: string): Promise<string | null>;
+  // v0.7 — populate that folder from PCT. The renderer names an OBJECT (never a path or the bytes — P0-2);
+  // main reads the clipboard image itself and writes `<name>.png`, so the file is named right by
+  // construction. saveObjectPhoto → "no-photos-dir"/"clipboard-empty" on the two expected snags;
+  // deleteObjectPhoto clears every extension of the stem; openPhotosDir reveals the folder (best-effort).
+  saveObjectPhoto(name: string): Promise<PctResult<void>>;
+  deleteObjectPhoto(name: string): Promise<PctResult<void>>;
+  openPhotosDir(): Promise<void>;
 
   // Project files — main owns the path + dialogs (P0-2). A returned `path` is for display only.
   openProject(): Promise<PctResult<{ path: string; project: Project } | null>>;

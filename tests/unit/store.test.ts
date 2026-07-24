@@ -465,6 +465,39 @@ describe("M2h tile config", () => {
   });
 });
 
+describe("object photos (v0.6/v0.7)", () => {
+  it("setThumbnails bumps the epoch only when the set CONTENT changes", () => {
+    const { store } = makeStore();
+    const e0 = store.getState().thumbnailEpoch;
+    store.getState().setThumbnails(["tower", "hangar"]);
+    const e1 = store.getState().thumbnailEpoch;
+    expect(e1).toBe(e0 + 1);
+    store.getState().setThumbnails(["hangar", "tower"]); // same set, different order → no-op
+    expect(store.getState().thumbnailEpoch).toBe(e1);
+  });
+
+  it("invalidateThumbnail bumps the epoch even for a name ALREADY in the set (a re-paste busts the cache)", () => {
+    const { store } = makeStore();
+    store.getState().setThumbnails(["tower"]); // tower already has a photo
+    const e1 = store.getState().thumbnailEpoch;
+    const set1 = store.getState().thumbnailNames;
+    store.getState().invalidateThumbnail("Tower"); // case-insensitive, already present
+    const s = store.getState();
+    expect(s.thumbnailEpoch).toBe(e1 + 1); // epoch moved → useThumbnailSrc re-fetches the new bytes
+    expect(s.thumbnailNames).toBe(set1); // same reference — only the epoch changed
+    expect(s.thumbnailNames.has("tower")).toBe(true);
+  });
+
+  it("invalidateThumbnail adds a brand-new (lowercased) name and bumps the epoch (first photo)", () => {
+    const { store } = makeStore();
+    const e0 = store.getState().thumbnailEpoch;
+    store.getState().invalidateThumbnail("Hangar_02");
+    const s = store.getState();
+    expect(s.thumbnailNames.has("hangar_02")).toBe(true);
+    expect(s.thumbnailEpoch).toBe(e0 + 1);
+  });
+});
+
 describe("lifecycle", () => {
   it("openProject resets history, dirty, selection, and adopts the project's camera", () => {
     const { store } = makeStore();

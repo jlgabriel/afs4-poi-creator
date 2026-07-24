@@ -1,7 +1,7 @@
 // AppShell.tsx — the editor layout: a spanning TopBar over a 3-panel grid (Catalog | Map | Inspector),
 // plus the modal Export dialog (design §5). All three panels are direct children of the `.pct-app` CSS
 // grid; the Export dialog is a fixed-position overlay, so its DOM position in the tree doesn't matter.
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { TopBar } from "./TopBar";
 import { RecoveryBanner } from "./RecoveryBanner";
 import { CatalogPanel } from "../catalog/CatalogPanel";
@@ -16,6 +16,13 @@ export function AppShell({ onRescan }: { onRescan: () => void }): React.ReactEle
   useKeyboardShortcuts();
   const [exportOpen, setExportOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // The photo menu (v0.7) fires this when the user has no photo folder yet and clicks "Open Settings" on
+  // its inline error — the portalled menu can't set this state directly, so it asks via a window event.
+  useEffect(() => {
+    const open = (): void => setSettingsOpen(true);
+    window.addEventListener("pct:open-settings", open);
+    return () => window.removeEventListener("pct:open-settings", open);
+  }, []);
   return (
     <div className="pct-app">
       <TopBar

@@ -2,7 +2,13 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { indexThumbnails, isValidThumbName, THUMBNAIL_EXTS } from "../../src/main/thumbnails";
+import {
+  indexThumbnails,
+  isValidThumbName,
+  photoFilesForStem,
+  photoWritePath,
+  THUMBNAIL_EXTS,
+} from "../../src/main/thumbnails";
 
 let tmp: string;
 beforeEach(() => {
@@ -72,5 +78,36 @@ describe("indexThumbnails", () => {
     // Guards the ordering the dedup test depends on — a reshuffle here would silently change which
     // duplicate wins across the app.
     expect(THUMBNAIL_EXTS).toEqual(["png", "jpg", "jpeg", "webp"]);
+  });
+});
+
+// ── v0.7 "Paste photo" write side ──
+describe("photoWritePath", () => {
+  it("builds <dir>/<name>.png for a valid catalog name (a pasted bitmap is always saved as PNG)", () => {
+    expect(photoWritePath(tmp, "UH60_usarmy")).toBe(path.join(tmp, "UH60_usarmy.png"));
+  });
+
+  it("throws on a name that isn't catalog-shaped — the boundary guard against a path escape over IPC", () => {
+    for (const n of ["../evil", "a/b", "a\\b", "foo.bar", "foo bar", ""]) {
+      expect(() => photoWritePath(tmp, n)).toThrow();
+    }
+  });
+});
+
+describe("photoFilesForStem", () => {
+  it("returns every image file whose stem matches the name (so Remove clears all extensions of a stem)", () => {
+    touch("tower.png");
+    touch("tower.jpg");
+    touch("tower.txt"); // not an image → ignored
+    touch("towers.png"); // different stem → ignored
+    const files = photoFilesForStem(tmp, "tower").map((f) => path.basename(f)).sort();
+    expect(files).toEqual(["tower.jpg", "tower.png"]);
+  });
+
+  it("is case-insensitive on the stem (Windows); empty for a missing dir or an unsafe name", () => {
+    touch("Tower.PNG");
+    expect(photoFilesForStem(tmp, "tower").map((f) => path.basename(f))).toEqual(["Tower.PNG"]);
+    expect(photoFilesForStem(path.join(tmp, "nope"), "tower")).toEqual([]);
+    expect(photoFilesForStem(tmp, "../evil")).toEqual([]);
   });
 });

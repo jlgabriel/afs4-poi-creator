@@ -4,9 +4,9 @@
 // thrown error crossing ipcRenderer.invoke reaches the renderer as a flattened Error with its
 // discriminating fields gone. Paths are owned here and never accepted FROM the renderer (P0-2): the
 // renderer says WHAT (open / save / install / choose-folder), main decides WHERE via the dialogs.
-import { app, BrowserWindow, dialog, ipcMain, nativeImage, shell } from "electron";
+import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeImage, shell } from "electron";
 import type { OpenDialogOptions, SaveDialogOptions } from "electron";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync } from "node:fs";
 import path from "node:path";
 import { ZodError } from "zod";
 import type { Catalog, PlacedObject, Project, ResolvedObject, Settings } from "../core/project/types";
@@ -51,10 +51,19 @@ import {
   writeProjectSidecar,
 } from "./projectFile";
 import { NoXrefError, readCatalogCache, scanXref, writeCatalogCache } from "./scan";
-import { indexThumbnails, isValidThumbName, THUMBNAIL_PX } from "./thumbnails";
+import {
+  ClipboardEmptyError,
+  NoPhotosDirError,
+  indexThumbnails,
+  isValidThumbName,
+  photoFilesForStem,
+  photoWritePath,
+  THUMBNAIL_PX,
+} from "./thumbnails";
 import { planXrefRegistration, registerXref } from "./xrefRegistrar";
 import { defaultXrefTableCandidates, loadXrefTable } from "./xrefTableSource";
 import { normalizeUserDir, readSettings, writeSettings } from "./settings";
+import { writeFileAtomic } from "./fsAtomic";
 
 const PROJECT_FILTER = [{ name: "PCT project", extensions: ["json"] }];
 
@@ -77,6 +86,15 @@ function afs4UserDirOrThrow(): string {
   return dir;
 }
 
+/** The photo folder the user chose in Settings (v0.6), or throw NoPhotosDirError. v0.7 keeps the folder
+ *  opt-in: "Paste photo" fails clearly and the renderer sends the user to Settings, rather than PCT
+ *  inventing a write location behind their back. */
+function photosDirOrThrow(): string {
+  const dir = currentSettings().thumbnailsDir;
+  if (!dir) throw new NoPhotosDirError();
+  return dir;
+}
+
 /** Map a typed core/main error to the serialization-safe PctError the renderer can switch on. */
 function toPctError(e: unknown): PctError {
   if (e instanceof NoXrefError) return { code: "no-xref", message: e.message, installDir: e.installDir };
@@ -92,6 +110,8 @@ function toPctError(e: unknown): PctError {
   if (e instanceof FolderExistsError) {
     return { code: "folder-exists", message: e.message, folderName: e.folderName };
   }
+  if (e instanceof NoPhotosDirError) return { code: "no-photos-dir", message: e.message };
+  if (e instanceof ClipboardEmptyError) return { code: "clipboard-empty", message: e.message };
   if (e instanceof UnsafeFolderNameError) return { code: "invalid-project", message: e.message };
   if (e instanceof ZodError) return { code: "invalid-project", message: e.message };
   return { code: "io", message: e instanceof Error ? e.message : String(e) };
@@ -269,6 +289,33 @@ export function registerIpc(): void {
     } catch {
       return null; // unreadable/vanished file → the renderer keeps the glyph
     }
+  });
+
+  // ── Object photos: WRITE side (v0.7 "Paste photo") ──
+  // The renderer names an OBJECT; main reads the clipboard image itself and writes `<name>.png` into the
+  // folder the user chose — no path and no image bytes ever cross FROM the renderer (P0-2). The photo
+  // folder stays opt-in (v0.6): with none set we throw NoPhotosDirError so the menu can send the user to
+  // Settings, instead of PCT inventing a location. Each write/delete rebuilds the in-memory index so the
+  // very next getThumbnail (the card refreshing) resolves the change without waiting for a folder re-scan.
+  ipcMain.handle("pct:saveObjectPhoto", (_e, name: string) =>
+    guarded((): void => {
+      const dir = photosDirOrThrow();
+      const img = clipboard.readImage();
+      if (img.isEmpty()) throw new ClipboardEmptyError();
+      writeFileAtomic(photoWritePath(dir, name), img.toPNG()); // photoWritePath validates the name
+      thumbnailIndex = indexThumbnails(dir);
+    }),
+  );
+  ipcMain.handle("pct:deleteObjectPhoto", (_e, name: string) =>
+    guarded((): void => {
+      const dir = photosDirOrThrow();
+      for (const file of photoFilesForStem(dir, name)) rmSync(file, { force: true }); // every extension
+      thumbnailIndex = indexThumbnails(dir);
+    }),
+  );
+  ipcMain.handle("pct:openPhotosDir", async (): Promise<void> => {
+    const dir = currentSettings().thumbnailsDir;
+    if (dir !== null && existsSync(dir)) await shell.openPath(dir); // best-effort, like revealInFolder
   });
   ipcMain.handle("pct:getSettings", (): Settings => currentSettings());
   ipcMain.handle(

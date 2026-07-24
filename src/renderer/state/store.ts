@@ -136,6 +136,7 @@ export interface EditorState {
   loadAirports: (airports: Airport[]) => void;
   setTiles: (tiles: TilesConfig) => void;
   setThumbnails: (names: string[]) => void; // v0.6 — adopt a fresh photo-name list (boot / focus / Settings)
+  invalidateThumbnail: (name: string) => void; // v0.7 — a paste changed ONE object's photo; force a re-fetch
   openProject: (path: string | null, project: Project) => void;
   newProject: (project: Project) => void;
   recoverProject: (project: Project) => void; // load a crash-recovery shadow as UNSAVED (dirty) work
@@ -349,6 +350,18 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
           const prev = get().thumbnailNames;
           if (next.size === prev.size && [...next].every((n) => prev.has(n))) return;
           set((s) => ({ thumbnailNames: next, thumbnailEpoch: s.thumbnailEpoch + 1 }));
+        },
+        invalidateThumbnail: (name) => {
+          // A "Paste photo" (v0.7) overwrote or added ONE object's file. A brand-new name must enter the
+          // set so the card even attempts an <img>; a name already present would make setThumbnails no-op
+          // (same set) and useThumbnailSrc would keep serving the CACHED old bytes. Either way bump the
+          // epoch so the image cache (keyed `name#epoch`) misses and re-fetches. When the name is already
+          // present we keep the SAME set reference — only the epoch changed.
+          const key = name.toLowerCase();
+          set((s) => ({
+            thumbnailNames: s.thumbnailNames.has(key) ? s.thumbnailNames : new Set(s.thumbnailNames).add(key),
+            thumbnailEpoch: s.thumbnailEpoch + 1,
+          }));
         },
         openProject: (path, project) => load(project, path),
         newProject: (project) => load(project, null),
