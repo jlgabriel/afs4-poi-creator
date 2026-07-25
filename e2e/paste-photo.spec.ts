@@ -18,6 +18,10 @@ import type { Catalog, CatalogObject, Settings } from "../src/core/project/types
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const MAIN = path.join(ROOT, "out", "main", "index.js");
 const OBJ = "tower_e2e"; // catalog name → the file is written as tower_e2e.png, by construction
+// A user-registered XREF (v0.3) whose name carries a `-` — the forum #176 shape. Before the fix the photo
+// guard was `[A-Za-z0-9_]+`, so Paste threw "unsafe photo name" AND a hand-named file was skipped at index
+// time, which is why the user couldn't get it to show "no matter how I change the name".
+const DASH_OBJ = "cabin-boat-red";
 
 // A 1×1 PNG as a data URL — enough for clipboard.writeImage to hand the paste handler a non-empty image.
 const PNG_1x1 =
@@ -26,22 +30,27 @@ const PNG_1x1 =
 const launch = (userDataDir: string): Promise<ElectronApplication> =>
   electron.launch({ args: [MAIN, `--user-data-dir=${userDataDir}`], cwd: ROOT });
 
-function tower(name: string): CatalogObject {
+function tower(
+  name: string,
+  displayName = "Tower E2E",
+  source: "install" | "user" = "install",
+): CatalogObject {
   return {
     name,
     bundle: "e2e",
-    source: "install",
+    source,
     bbMin: [-4, -4, 0],
     bbMax: [4, 4, 26],
     bsRadius: 14,
     size: { x: 8, y: 8, z: 26 },
     category: "buildings/tower",
-    displayName: "Tower E2E",
+    displayName,
     act: true,
   };
 }
 
-/** Seed userData → editor boot, an EMPTY photo folder chosen in Settings, and one photo-less tower. */
+/** Seed userData → editor boot, an EMPTY photo folder chosen in Settings, and two photo-less towers:
+ *  a built-in one and a user-registered one whose name has a `-` (#176). */
 function seed(): { userData: string; photos: string } {
   const userData = mkdtempSync(path.join(tmpdir(), "pct-e2e-paste-"));
   const photos = path.join(userData, "photos");
@@ -62,7 +71,7 @@ function seed(): { userData: string; photos: string } {
     installDir: userData,
     userXrefDir: null,
     bundles: [],
-    xref: [tower(OBJ)],
+    xref: [tower(OBJ), tower(DASH_OBJ, "Cabin Boat Red", "user")],
     plants: [],
     airportLights: [],
     animated: [],
@@ -110,6 +119,36 @@ test("right-click Paste writes the clipboard image as the object's photo; Remove
     await expect(card.locator("svg.pct-thumb")).toBeVisible();
     await expect(card.locator("img.pct-thumb-photo")).toHaveCount(0);
     expect(readdirSync(photos)).toEqual([]);
+  } finally {
+    await app.close();
+  }
+});
+
+test("a user-registered XREF whose name has a `-` can be pasted too (forum #176)", async () => {
+  const { userData, photos } = seed();
+  const app = await launch(userData);
+  try {
+    const page = await app.firstWindow();
+    await expect(page.locator(".leaflet-container")).toBeVisible();
+    await page.locator("summary.pct-section-summary").click();
+
+    const card = page.getByRole("button", { name: "Cabin Boat Red" });
+    await expect(card.locator("svg.pct-thumb")).toBeVisible();
+
+    await app.evaluate(({ clipboard, nativeImage }, url) => {
+      clipboard.writeImage(nativeImage.createFromDataURL(url));
+    }, PNG_1x1);
+
+    await card.click({ button: "right" });
+    const menu = page.locator(".pct-context-menu");
+    await expect(menu.locator(".pct-context-menu-name")).toHaveText(DASH_OBJ);
+    await menu.getByRole("menuitem", { name: "Paste photo from clipboard" }).click();
+
+    // No "unsafe photo name" error line, the file lands under the dashed stem, and — the half that used
+    // to fail silently even when the file was named by hand — indexing serves it back to the card.
+    await expect(menu.locator(".pct-context-menu-error")).toHaveCount(0);
+    expect(existsSync(path.join(photos, `${DASH_OBJ}.png`))).toBe(true);
+    await expect(card.locator("img.pct-thumb-photo")).toBeVisible();
   } finally {
     await app.close();
   }

@@ -19,12 +19,16 @@ const PRIORITY = new Map<string, number>(THUMBNAIL_EXTS.map((e, i) => [e, i]));
  *  1080p+; the thumbnail slot is 40px, so 160 covers hi-DPI with a tiny payload. Consumed in ipc.ts. */
 export const THUMBNAIL_PX = 160;
 
-/** A photo maps to a catalog object by its stem === the object's exact `name`. Every scanned name is
- *  `[A-Za-z0-9_]` (see schemas.ts XREF_NAME_RE's note: 837/837), so we match that set exactly — which
- *  ALSO makes the name safe to join into a path (no separators, no `..`) even though it arrives over IPC
- *  from the renderer. A name outside the set simply has no photo and keeps its generated glyph. */
+/** A photo maps to a catalog object by its stem === the object's exact `name`. The set is the SAME slug
+ *  shape a bundle base must have (xrefRegistrar.isSafeBundleName): starts alphanumeric, then letters,
+ *  digits, `_`, `.`, `-`. That covers the 837 scanned `[A-Za-z0-9_]` names AND the user's OWN registered
+ *  XREF objects (v0.3), whose names routinely carry a `-` — forum #176: `cabin-boat-red` could neither be
+ *  pasted (this guard threw) nor even be indexed when named by hand, so the photo silently never showed.
+ *  Leading `.`/`-` and `..` stay out, so the name is still safe to join into a path (no separators, no
+ *  escape) even though it arrives over IPC from the renderer. A name outside the set simply has no photo
+ *  and keeps its generated glyph. */
 export function isValidThumbName(name: string): boolean {
-  return /^[A-Za-z0-9_]+$/.test(name);
+  return /^[A-Za-z0-9][A-Za-z0-9_.-]*$/.test(name);
 }
 
 /** Build a lowercased-stem → absolute-path index of the photos in `dir`. Lowercased because Windows is
@@ -46,7 +50,7 @@ export function indexThumbnails(dir: string | null): Map<string, string> {
     const prio = PRIORITY.get(ext);
     if (prio === undefined) continue; // not one of our image extensions
     const stem = path.basename(file, path.extname(file));
-    if (!isValidThumbName(stem)) continue; // can't correspond to any catalog name (has a space, dot, …)
+    if (!isValidThumbName(stem)) continue; // can't correspond to any catalog name (a space, a leading dot, …)
     const key = stem.toLowerCase();
     const prev = chosenPriority.get(key);
     if (prev === undefined || prio < prev) {

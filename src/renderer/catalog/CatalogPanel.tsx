@@ -26,7 +26,12 @@ import { LightsSection } from "./LightsSection";
 import { PlantsSection } from "./PlantsSection";
 
 const ROW_H = 64; // must match .pct-row height budget in styles.css (card + row padding)
-const HOVER_DELAY_MS = 250; // rest-before-show, so sweeping the mouse down the list doesn't strobe popups
+// Rest-before-show, so sweeping the mouse down the list doesn't strobe popups. 250 ms turned out to be
+// too eager in practice (forum #172): the popup kept opening while people were only reading the rows, and
+// they had to jiggle the mouse to stop it. 1 s is the floor of the "at least 1 s, 2 s is long" band
+// ApfelFlieger gave at #178: enough rest that reading the list never triggers it, while still feeling
+// responsive when you do stop on a card (1.5 s and 1.2 s both read as sluggish when actually flown).
+const HOVER_DELAY_MS = 1000;
 
 interface ObjectCardProps {
   o: CatalogObject;

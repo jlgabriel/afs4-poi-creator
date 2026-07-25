@@ -29,8 +29,17 @@ describe("isValidThumbName", () => {
       expect(isValidThumbName(n)).toBe(true);
     }
   });
-  it("rejects anything that couldn't be a scanned name (dots, spaces, dashes, separators, empty)", () => {
-    for (const n of ["foo.bar", "foo bar", "foo-bar", "../evil", "a/b", "a\\b", "", "café"]) {
+
+  it("accepts a user-registered XREF name with `-` or `.` (forum #176 — the whole point of the widening)", () => {
+    // A user's own .tmb objects are NOT limited to the sim's `[A-Za-z0-9_]`; XREF_NAME_RE and
+    // isSafeBundleName have always allowed these, and a photo must be nameable after the object.
+    for (const n of ["cabin-boat-red", "my.obj-1_v2", "boat-01", "a.b"]) {
+      expect(isValidThumbName(n)).toBe(true);
+    }
+  });
+
+  it("still rejects what could escape the folder or match no object (separators, `..`, leading dot/dash)", () => {
+    for (const n of ["../evil", "a/b", "a\\b", "..", ".", ".hidden", "-dash", "foo bar", "", "café"]) {
       expect(isValidThumbName(n)).toBe(false);
     }
   });
@@ -47,13 +56,21 @@ describe("indexThumbnails", () => {
     touch("UH60_usarmy.jpg");
     touch("a380_klm.png");
     touch("f18.webp");
+    touch("cabin-boat-red.png"); // a user-registered XREF name (forum #176) — must index, not be skipped
+    touch("with.dot.jpg"); // a dot in the stem is legal too; extname still splits off only `.jpg`
     touch("notes.txt"); // not an image
     touch("readme.md"); // not an image
     touch("bad name.jpg"); // space → not a catalog-shaped name
-    touch("with.dot.jpg"); // dot in stem → not a catalog-shaped name
+    touch(".hidden.jpg"); // leading dot → not a catalog-shaped name
 
     const index = indexThumbnails(tmp);
-    expect([...index.keys()].sort()).toEqual(["a380_klm", "f18", "uh60_usarmy"]);
+    expect([...index.keys()].sort()).toEqual([
+      "a380_klm",
+      "cabin-boat-red",
+      "f18",
+      "uh60_usarmy",
+      "with.dot",
+    ]);
     expect(path.basename(index.get("uh60_usarmy")!)).toBe("UH60_usarmy.jpg");
     expect(index.get("uh60_usarmy")).toBe(path.join(tmp, "UH60_usarmy.jpg")); // absolute path back to the file
   });
@@ -87,8 +104,12 @@ describe("photoWritePath", () => {
     expect(photoWritePath(tmp, "UH60_usarmy")).toBe(path.join(tmp, "UH60_usarmy.png"));
   });
 
+  it("builds it for a user-registered XREF name with a `-` too (forum #176: Paste used to throw here)", () => {
+    expect(photoWritePath(tmp, "cabin-boat-red")).toBe(path.join(tmp, "cabin-boat-red.png"));
+  });
+
   it("throws on a name that isn't catalog-shaped — the boundary guard against a path escape over IPC", () => {
-    for (const n of ["../evil", "a/b", "a\\b", "foo.bar", "foo bar", ""]) {
+    for (const n of ["../evil", "a/b", "a\\b", "..", ".hidden", "-dash", "foo bar", ""]) {
       expect(() => photoWritePath(tmp, n)).toThrow();
     }
   });
@@ -109,5 +130,13 @@ describe("photoFilesForStem", () => {
     expect(photoFilesForStem(tmp, "tower").map((f) => path.basename(f))).toEqual(["Tower.PNG"]);
     expect(photoFilesForStem(path.join(tmp, "nope"), "tower")).toEqual([]);
     expect(photoFilesForStem(tmp, "../evil")).toEqual([]);
+  });
+
+  it("finds a user-XREF stem with a `-` (so Remove photo can clear one — forum #176)", () => {
+    touch("cabin-boat-red.png");
+    touch("cabin-boat-red.jpg");
+    touch("cabin-boat-blue.png"); // a near-miss stem must not be swept up
+    const files = photoFilesForStem(tmp, "cabin-boat-red").map((f) => path.basename(f)).sort();
+    expect(files).toEqual(["cabin-boat-red.jpg", "cabin-boat-red.png"]);
   });
 });

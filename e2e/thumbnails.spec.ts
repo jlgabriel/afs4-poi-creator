@@ -156,6 +156,9 @@ test("a user photo replaces the glyph for its object, and its absence keeps the 
 // The hover-preview (forum #170/#166): resting on a card enlarges the photo AND shows the object's REAL
 // catalog name — the string a photo file is named after, previously only the macOS-flaky native title.
 // Driven here with a REAL mouse hover (Playwright), the one thing the browser-preview harness fakes.
+// The popup only appears after CatalogPanel's HOVER_DELAY_MS rest (1 s since #178) — the assertions
+// below are auto-retrying, so they simply absorb it while the 12 s expect timeout leaves 12× headroom.
+// If that delay is ever raised past a few seconds, raise the timeout with it rather than debug a hang.
 test("hovering a card enlarges its photo and shows the real name; a photo-less card shows the name only", async () => {
   const app = await launch(seed());
   try {
