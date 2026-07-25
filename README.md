@@ -1,6 +1,7 @@
 # PCT — POI Creation Tool
 
 [![CI](https://github.com/jlgabriel/afs4-poi-creator/actions/workflows/ci.yml/badge.svg)](https://github.com/jlgabriel/afs4-poi-creator/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/jlgabriel/afs4-poi-creator?label=download)](https://github.com/jlgabriel/afs4-poi-creator/releases/latest)
 
 **Decorate your Aerofly FS 4 world with the sim's own built-in objects** — hangars, towers,
 terminals, vehicles, parked aircraft, street lamps and more — **and light it up at night**. Place
@@ -17,12 +18,13 @@ POI-folder conventions.
 > **Status — released and actively developed.** The object scanner, the export core, and the full
 > desktop editor (first-run wizard, satellite/streets map, object catalog, inspector, airport
 > search, per-object height, export / install / uninstall) are built and tested — unit + golden
-> tests, typecheck, and an Electron smoke test, all green in [CI](.github/workflows/ci.yml). **v0.2
-> added lights, v0.3 lets you place your own custom XREF objects, v0.4 adds plants, and v0.5 adds an
-> optional "Sim autoheight" export mode.** The export format is **confirmed working in the sim**. Builds are currently
-> **unsigned**, so your OS will warn you once on first launch — see
+> tests, typecheck, and Electron end-to-end tests, all green in [CI](.github/workflows/ci.yml).
+> Lights, plants, your own custom XREF objects, an optional "Sim autoheight" export mode and real
+> object photos are all in — each feature below is tagged with the version it arrived in, and the
+> release notes carry the full history. The export format is **confirmed working in the sim**. Builds
+> are currently **unsigned**, so your OS will warn you once on first launch — see
 > [Installing PCT](#installing-pct). Grab the newest build from
-> [Releases](https://github.com/jlgabriel/afs4-poi-creator/releases).
+> [Releases](https://github.com/jlgabriel/afs4-poi-creator/releases/latest).
 
 ## What it is
 
@@ -30,7 +32,7 @@ PCT lets you place **Aerofly FS 4's own built-in objects** onto a real satellite
 into a standard **POI scenery folder** that Aerofly loads like any other add-on. You never touch a
 model or a config file — you click on a map, and PCT writes the folder.
 
-**Lights, too.** Since v0.2 you can place the sim's own **airport-light fixtures** (runway edge, PAPI,
+**Lights, too.** Since **v0.2** you can place the sim's own **airport-light fixtures** (runway edge, PAPI,
 approach, taxiway, helipad…) and fully parametric **point lights**, where you pick the colour, the
 brightness and the flash pattern. Stagger the flash across a row of them and you get a running-light
 sweep. Lights only show at night in the sim — that's Aerofly's behaviour, not a bug.
@@ -46,13 +48,11 @@ folder. PCT reads each model's name and footprint, registers it so the sim can r
 treats it like any built-in: place it, rotate it, set its height, export. See
 [Placing your own XREF objects](#placing-your-own-xref-objects).
 
-**Real photos on the cards, too.** Since **v0.6**, you can swap PCT's drawn category icons for real
-photos of the objects. Point *Settings → Object photos folder* at a folder and drop an image named
-after an object's exact id — `a380_klm.jpg` (jpg, png or webp) — and that photo shows on the object's
-card, in both the catalog and the placed list; anything without a photo keeps its drawn icon. Rest the
-mouse on a card to see the photo enlarged and the object's exact id — handy for naming the next photo
-file. The photos are **yours**, read straight from your disk — never bundled into PCT and never written
-into your POIs.
+**Real photos on the cards, too.** Since **v0.6** you can swap PCT's drawn category icons for real
+photos of the objects, and since **v0.7** putting one there takes two clicks: screenshot the object in
+the sim, then right-click its card and choose **Paste photo**. The photos are **yours**, read straight
+from your disk — never bundled into PCT and never written into your POIs. See
+[Photos of your objects](#photos-of-your-objects).
 
 **It ships no Aerofly content.** PCT reads the object catalog from *your* installed copy of the sim,
 so you only ever place objects you already own. Nothing from the sim is copied into this project or
@@ -73,6 +73,10 @@ into your finished POIs — just the *names* of the objects you chose.
 4. **Export & install** — *Export POI → Install into Aerofly FS 4* writes the folder into your
    `scenery/poi/`. Restart Aerofly and fly to the spot. The same dialog can **uninstall** POIs that
    PCT made, so nothing is permanent.
+5. **Optional: photograph what you placed** — once you're out there looking at your objects,
+   screenshot one to the clipboard and right-click its card in PCT to paste it in. From then on the
+   catalog shows the real thing instead of a drawn icon. See
+   [Photos of your objects](#photos-of-your-objects).
 
 **The POIs you create are yours.** They're the program's output and are **not** covered by PCT's
 license — share them, post them, or sell them however you like.
@@ -98,6 +102,28 @@ generated for it, in its **own subfolder**. PCT does that for you:
 read fully (name, footprint, textures). IPACS's **pre-compiled binary** `.tmb` can't be read
 automatically and appear greyed out. As everywhere else, PCT ships and copies **no model bytes**: it
 only re-lays *your* files and writes the small `.tmi` index next to them.
+
+### Photos of your objects
+
+A catalog card normally shows a drawn icon sized to the object's real footprint. If you'd rather see
+the object itself, PCT can show **your own photos** instead — on the catalog cards and in the placed
+list. It never ships or downloads any: the pictures are ones you took, on your own disk.
+
+First, pick where they live: *Settings → Object photos folder*. Then, for each object:
+
+1. **Photograph it in the sim.** Get a good view of something you've placed, frame it, and take a
+   screenshot **to the clipboard** — `Win+Shift+S` on Windows, `Cmd+Ctrl+Shift+4` on macOS.
+2. **Right-click that object's card in PCT** and choose **Paste photo from clipboard**. PCT saves the
+   image into your folder named after that exact object, and the card updates immediately — no
+   filename to type and no ids to match by hand. The same menu also has **Remove photo** and **Open
+   photos folder**.
+
+You can also fill the folder yourself: name a file after an object's exact id — `a380_klm.jpg`, in
+jpg, jpeg, png or webp — and it will be picked up. That works for your own registered XREF objects
+too, dashes and dots in the name included. Anything without a photo simply keeps its drawn icon.
+
+To read an id, **rest the mouse on a card** for a moment: a preview pops up with the photo enlarged
+and the object's exact id spelled out — which is the string a file has to be named after.
 
 ### Good to know
 
@@ -167,9 +193,9 @@ As it took shape, more of the community pitched in:
   were validated on the ground. Christophe went on to design the **Sim-autoheight** mode added in v0.5 —
   the project-level approach and the exact `.tsl` / `.toc` behaviour behind it — with **@ApfelFlieger**.
 
-The code itself was built by two of Anthropic's **Claude** models working in tandem: **Fable 5**
-designed the architecture and reviewed every milestone, and **Opus 4.8** wrote the implementation —
-all under the direction of **Juan Luis Gabriel (@Jugac64)**, who created and steers the project.
+The code itself was built by Anthropic's **Claude** models working in tandem: **Fable 5** designed the
+architecture and reviewed every milestone, and **Claude Opus** wrote the implementation — all under
+the direction of **Juan Luis Gabriel (@Jugac64)**, who created and steers the project.
 
 ## Thanks
 
@@ -180,7 +206,7 @@ all under the direction of **Juan Luis Gabriel (@Jugac64)**, who created and ste
 - **Christophe — @chrispriv** — the object-height mechanics for library objects, and the design of the
   **Sim-autoheight** mode (v0.5) ([GitHub](https://chrispriv.github.io/aeroscenery-afs_addons/)).
 - **Rodeo (forum)** — the in-sim ground-truth method for validating terrain elevation.
-- **Fable 5** & **Claude Opus 4.8** (Anthropic) — architecture/reviews and implementation.
+- **Fable 5** & **Claude Opus** (Anthropic) — architecture/reviews and implementation.
 
 …and the wider Aerofly FS 4 forum community, who tested ideas and kept the thread alive.
 
