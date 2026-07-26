@@ -242,6 +242,24 @@ PCT is an **independent, unofficial community project** — not affiliated with 
 Aerofly FS 4 and all its content belong to IPACS; PCT bundles none of it, and the POIs you create only
 reference objects you already own.
 
+## The Aerofly FS 4 technical reference
+
+Building PCT meant working out how Aerofly FS 4 actually stores and places scenery — much of which
+IPACS never documented. That knowledge is written up as a standalone field guide to **the simulator
+and its on-disk format**, not to this tool:
+
+**→ [reference/AFS4_KNOWLEDGE_BASE_EN.md](reference/AFS4_KNOWLEDGE_BASE_EN.md)**
+
+Fifteen sections: where everything lives in an install, the `<[type][name][value]>` file grammar,
+what `tm.log` tells you before you ever take off, POI vs airport placement, the built-in XREF
+catalog, orientation and heading maths, heights and autoheight, plants, lights, your own `.tmb`
+objects, built-in POIs and landmarks, heliports and the `.wad` projection, the UDP flight-data
+stream, the Blender-to-`.tmb` pipeline, and the public datasets worth knowing about.
+
+It's there for anyone building things for AFS4, whether or not they ever touch PCT. Verify anything
+critical against your own install: the sim is undocumented in these areas and changes between
+versions.
+
 ## For developers
 
 PCT is an **Electron + TypeScript** app (Windows / macOS / Linux) built around a deliberately
