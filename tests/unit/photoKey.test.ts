@@ -60,7 +60,10 @@ describe("photoKeyForPlaced", () => {
   // a mismatch would show a photo on the card and a glyph on the row for the very same object.
   const base = { id: "x", position: { lon: 0, lat: 0 }, height: { mode: "terrain" } } as const;
   const cases: [PlacedObject, string][] = [
-    [{ ...base, kind: "xref", name: "tower00_small_plates", direction: 0 }, "tower00_small_plates"],
+    [
+      { ...base, kind: "xref", name: "tower00_small_plates", direction: 0, scale: 1 },
+      "tower00_small_plates",
+    ],
     [{ ...base, kind: "plant", group: "palm", species: "08", heightRange: [0, 0] }, "plant.palm.08"],
     [
       {
