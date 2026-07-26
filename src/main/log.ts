@@ -199,6 +199,32 @@ export function formatBootHeader(i: BootInfo): string {
   ].join("\n");
 }
 
+// ── Line formatters ──────────────────────────────────────────────────────────
+// Kept here, pure and on PRIMITIVES (no Project import — log.ts stays dependency-free), so the shape of a
+// line that has to be right can be asserted in a test instead of read in a review.
+
+/** The export line. Takes `heightMode` as it is ON THE PROJECT, i.e. possibly absent.
+ *
+ *  The first version of this printed `project.heightMode` raw and the very first real log said
+ *  "undefined mode" — because absent IS the default (mutate.setHeightMode deletes the key for "baked-asl"
+ *  so saved projects stay byte-identical, and every other reader spells the `?? "baked-asl"` out). A log
+ *  answering "which height mode did this export use?" with "undefined" answers nothing, and heights are
+ *  exactly the class of question that otherwise costs a test flight. Resolve it here, once. */
+export function formatExportSummary(i: {
+  poiName: string;
+  objects: number;
+  heightMode: string | undefined;
+  target: string;
+  overwrite: boolean;
+  baseElevation?: number;
+}): string {
+  return (
+    `export "${i.poiName}" — ${i.objects} objects, ${i.heightMode ?? "baked-asl"} mode, ` +
+    `target ${i.target}${i.overwrite ? " (overwrite)" : ""}` +
+    `${i.baseElevation != null ? `, manual base ${i.baseElevation} m` : ""}`
+  );
+}
+
 // ── The process-wide instance ────────────────────────────────────────────────
 // Main opens it once at boot (initLog) and every module just imports `log`. Before initLog — and in the
 // unit tests, which never boot Electron — `log` is the no-op, so importing a module that logs costs

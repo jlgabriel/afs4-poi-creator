@@ -41,7 +41,7 @@ import {
   writePoi,
 } from "./installer";
 import { anchorAssetsDir } from "./anchorAsset";
-import { log, type LogLevel } from "./log";
+import { formatExportSummary, log, type LogLevel } from "./log";
 import {
   autosaveShadow,
   clearShadow,
@@ -197,9 +197,14 @@ const pickDirectory = (title: string): Promise<string | null> =>
 async function runExport(project: Project, opts: ExportOptions): Promise<InstallResult | null> {
   const settings = currentSettings();
   log.info(
-    `export "${project.poiName}" — ${project.objects.length} objects, ${project.heightMode} mode, ` +
-      `target ${opts.target}${opts.overwrite ? " (overwrite)" : ""}` +
-      `${opts.baseElevation != null ? `, manual base ${opts.baseElevation} m` : ""}`,
+    formatExportSummary({
+      poiName: project.poiName,
+      objects: project.objects.length,
+      heightMode: project.heightMode, // absent ≡ "baked-asl" — resolved inside the formatter
+      target: opts.target,
+      overwrite: opts.overwrite,
+      baseElevation: opts.baseElevation,
+    }),
   );
   // Autoheight mode is fully OFFLINE — the sim resolves the terrain, so there is no elevation lookup and
   // baseElevation is ignored (resolveHeightsAgl throws UnsupportedInAutoheightError on an asl height / a

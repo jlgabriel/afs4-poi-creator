@@ -5,7 +5,12 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { createLogger, formatBootHeader, redactHome } from "../../src/main/log";
+import {
+  createLogger,
+  formatBootHeader,
+  formatExportSummary,
+  redactHome,
+} from "../../src/main/log";
 
 let tmp: string;
 let file: string;
@@ -141,6 +146,44 @@ describe("the log never breaks the app", () => {
       log.close();
     }).not.toThrow();
     expect(log.file).toBe(""); // "" is how Settings knows there is nothing to open
+  });
+});
+
+describe("export summary", () => {
+  const base = { poiName: "munich_2", objects: 2, target: "install", overwrite: false };
+
+  // The regression. The first real log ever produced read "2 objects, undefined mode": absent IS the
+  // default (setHeightMode deletes the key for baked-asl), and this line printed the field raw.
+  it("an ABSENT heightMode reads as baked-asl, never as undefined", () => {
+    const line = formatExportSummary({ ...base, heightMode: undefined });
+    expect(line).toContain("baked-asl mode");
+    expect(line).not.toContain("undefined");
+  });
+
+  it("an explicit mode is passed through", () => {
+    expect(formatExportSummary({ ...base, heightMode: "autoheight" })).toContain("autoheight mode");
+  });
+
+  it("carries the facts an export report needs, and nothing it doesn't", () => {
+    expect(formatExportSummary({ ...base, heightMode: undefined })).toBe(
+      'export "munich_2" — 2 objects, baked-asl mode, target install',
+    );
+  });
+
+  it("mentions overwrite and a manual base only when they apply", () => {
+    const full = formatExportSummary({
+      ...base,
+      heightMode: "baked-asl",
+      target: "choose-folder",
+      overwrite: true,
+      baseElevation: 584,
+    });
+    expect(full).toContain("(overwrite)");
+    expect(full).toContain("manual base 584 m");
+    // A base of 0 is a REAL value (sea level), not an absent one — `!= null`, not falsy.
+    expect(formatExportSummary({ ...base, heightMode: undefined, baseElevation: 0 })).toContain(
+      "manual base 0 m",
+    );
   });
 });
 
