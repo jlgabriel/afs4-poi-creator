@@ -132,4 +132,14 @@ export interface PctApi {
   uninstallPoi(folderName: string): Promise<PctResult<void>>;
   listInstalledPois(): Promise<InstalledPoi[]>;
   revealInFolder(folderName: string): Promise<void>; // main validates + resolves within known roots
+
+  // The session log (main/log.ts): one plain-text file in userData, rewritten from scratch at every
+  // launch. The renderer writes its OWN uncaught errors into it (they would otherwise die in a DevTools
+  // console nobody has open) and can ask main to open it, so a bug report is a paste rather than a
+  // conversation. Write-only from here: the renderer never reads the log back and never names a path
+  // (P0-2) — main owns the one file. `getLogPath` returns it for DISPLAY (main-produced, like every
+  // other path flowing out); "" means the log could not be opened this session.
+  log(level: "info" | "warn" | "error", message: string): Promise<void>;
+  openLog(): Promise<void>;
+  getLogPath(): Promise<string>;
 }

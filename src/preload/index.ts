@@ -30,6 +30,9 @@ const pct: PctApi = {
   uninstallPoi: (folderName) => ipcRenderer.invoke("pct:uninstallPoi", folderName),
   listInstalledPois: () => ipcRenderer.invoke("pct:listInstalledPois"),
   revealInFolder: (folderName) => ipcRenderer.invoke("pct:revealInFolder", folderName),
+  log: (level, message) => ipcRenderer.invoke("pct:log", level, message),
+  openLog: () => ipcRenderer.invoke("pct:openLog"),
+  getLogPath: () => ipcRenderer.invoke("pct:getLogPath"),
 };
 
 contextBridge.exposeInMainWorld("pct", pct);

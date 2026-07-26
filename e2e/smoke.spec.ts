@@ -13,8 +13,8 @@ import {
   type ElectronApplication,
   type Page,
 } from "@playwright/test";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Catalog, Settings } from "../src/core/project/types";
@@ -204,6 +204,43 @@ test("the window reopens at the size and place it was closed at", async () => {
     await second.firstWindow();
     const reopened = await second.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getBounds());
     expect(reopened).toMatchObject(want);
+  } finally {
+    await second.close();
+  }
+});
+
+// The session log's one promise is that it is REWRITTEN at every launch — the whole reason it is safe to
+// ship without rotation or cleanup. That promise is made by main/log.ts (unit-tested there) but KEPT only
+// if the real boot path actually opens the real file in userData, which is what this launches to check.
+test("session log: written to userData at boot, and truncated by the next launch", async () => {
+  const userData = seedEditor("log");
+  const logFile = path.join(userData, "pct.log");
+
+  const first = await launch(userData);
+  try {
+    await first.firstWindow();
+    // The header is written inside whenReady(), i.e. possibly a beat after the window exists.
+    await expect.poll(() => (existsSync(logFile) ? readFileSync(logFile, "utf8") : "")).toContain(
+      `PCT ${VERSION}`,
+    );
+    const header = readFileSync(logFile, "utf8");
+    expect(header, "the header must say the log is disposable").toContain("rewritten from scratch");
+    expect(header, "a dev/e2e launch must not claim to be a packaged build").toContain("dev (");
+    // The home folder must never reach the file — this log is meant to be pasted in public.
+    expect(header).not.toContain(homedir());
+  } finally {
+    await first.close();
+  }
+
+  // A marker no boot could produce. If the second launch APPENDED, it survives.
+  const marker = "MARKER-FROM-THE-PREVIOUS-RUN";
+  writeFileSync(logFile, `${marker}\n${readFileSync(logFile, "utf8")}`);
+
+  const second = await launch(userData);
+  try {
+    await second.firstWindow();
+    await expect.poll(() => readFileSync(logFile, "utf8")).toContain(`PCT ${VERSION}`);
+    expect(readFileSync(logFile, "utf8"), "the launch must TRUNCATE, not append").not.toContain(marker);
   } finally {
     await second.close();
   }

@@ -148,6 +148,10 @@ A couple of things worth knowing about the editor:
     so heights come out more reliable than a baked value, at the cost of leaning on undocumented sim
     behaviour (hence *opt-in*, and it may change with a sim update). *ASL* has no meaning in this mode.
     Suggested and worked out on the forum by **@chrispriv**, with **@ApfelFlieger**.
+- **If something goes wrong**, PCT keeps a plain-text log of the session — the folders it used, what
+  the scan found, and anything that failed. **Settings → Diagnostics → Open log file**. It's
+  **rewritten from scratch every time PCT starts**, so it never grows and there's nothing to clean up,
+  and nothing in it is sent anywhere. Pasting it into a bug report saves a round of questions.
 
 ### Installing PCT
 

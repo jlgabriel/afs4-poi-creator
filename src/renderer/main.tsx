@@ -1,6 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
+import { installErrorLog } from "./app/errorLog";
 import { installMockBridge } from "./dev/mockBridge";
 import "./styles.css";
 
@@ -10,6 +11,9 @@ import "./styles.css";
 if (import.meta.env.DEV && new URLSearchParams(window.location.search).has("mockpct")) {
   installMockBridge();
 }
+
+// Before the first render, so a component that throws on mount is already covered.
+installErrorLog();
 
 const root = document.getElementById("root");
 if (!root) throw new Error("root element missing");

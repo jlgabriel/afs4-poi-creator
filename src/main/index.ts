@@ -2,9 +2,11 @@
 // Fable review (P1-6): sandboxed renderer, a locked-down navigation/permission surface, and a CSP
 // applied to the packaged renderer. All real I/O lives in the main modules reached through
 // main/ipc.ts; the renderer stays sandboxed and talks only to the preload bridge.
+import { homedir } from "node:os";
 import { join } from "node:path";
 import { app, BrowserWindow, screen, session, shell } from "electron";
 import { registerIpc } from "./ipc";
+import { LOG_FILE_NAME, formatBootHeader, initLog, log } from "./log";
 import { readSettings, writeSettings } from "./settings";
 import { restoreBounds } from "./windowBounds";
 
@@ -15,6 +17,34 @@ const RENDERER_URL = process.env["ELECTRON_RENDERER_URL"];
  *  why this is NOT app.getVersion(): that returns Electron's own version when the main script is launched
  *  by path, so the title read "PCT 43.0.0" under the e2e while being correct in a packaged build. */
 declare const __APP_VERSION__: string;
+
+// Open (and truncate) the session log before anything else can fail. Everything after this point that
+// goes wrong leaves a trace; before it, only an import could fail, and that dies with a stack on stderr
+// anyway. The boot HEADER is written inside whenReady(), because app.getLocale() is only trustworthy
+// after the ready event on Windows.
+initLog(join(app.getPath("userData"), LOG_FILE_NAME), { home: homedir() });
+
+// The two process-level escape hatches, routed into the log — and then DELIBERATELY re-crashed.
+//
+// Merely registering these listeners suppresses Node's default "print the stack and exit(1)", so the
+// naive version of this (log it, return) would silently turn every fatal main-process error into PCT
+// limping on in an unknown state. That is a behaviour change smuggled in by a diagnostics feature, and
+// the wrong direction besides: a crash at least surfaces the problem, and PCT's autosave shadow already
+// exists to make one survivable. So the handler adds a record of WHY and preserves the outcome —
+// stderr for the terminal, the log for the user, exit(1) as before.
+const fatal = (what: string) => (e: unknown) => {
+  log.error(`${what} — PCT will now quit`, e);
+  log.close();
+  console.error(`[main] ${what}:`, e);
+  process.exit(1);
+};
+process.on("uncaughtException", fatal("uncaught exception in main"));
+process.on("unhandledRejection", fatal("unhandled promise rejection in main"));
+
+app.on("will-quit", () => {
+  log.info("quitting");
+  log.close();
+});
 
 // Packaged-renderer CSP. NOT applied in dev: Vite HMR injects an inline react-refresh preamble + a
 // ws: connection that a strict policy would block. The dev renderer is a local-only page; the
@@ -91,9 +121,14 @@ function createWindow(): void {
     if (/^https?:\/\//.test(url)) void shell.openExternal(url);
   });
 
-  // Diagnostics: surface any renderer load failure to the dev terminal.
+  // Diagnostics: surface any renderer load failure to the dev terminal AND the log — a window that comes
+  // up blank is the one report where the user has literally nothing else to tell us.
   win.webContents.on("did-fail-load", (_event, code, desc, url) => {
     console.error(`[main] renderer failed to load (${code} ${desc}): ${url}`);
+    log.error(`renderer failed to load (${code} ${desc}): ${url}`);
+  });
+  win.webContents.on("render-process-gone", (_event, details) => {
+    log.error(`renderer process gone: ${details.reason} (exit ${details.exitCode})`);
   });
 
   if (RENDERER_URL) {
@@ -107,7 +142,47 @@ function createWindow(): void {
   }
 }
 
+/** The boot header + a one-line snapshot of the settings that decide almost everything downstream: a
+ *  scan that found nothing, photos that never appear and an export that lands in the wrong place are all,
+ *  most of the time, one of these four values being not what the user thinks it is. */
+function logEnvironment(): void {
+  log.banner(
+    formatBootHeader({
+      appVersion: __APP_VERSION__,
+      electron: process.versions.electron,
+      chrome: process.versions.chrome,
+      node: process.versions.node,
+      platform: process.platform,
+      arch: process.arch,
+      // Electron's own, not os.release(): on macOS the kernel version ("24.2.0") is not what anyone
+      // reports or recognises, and "15.2" is. On Windows both agree.
+      osVersion: process.getSystemVersion(),
+      packaged: app.isPackaged,
+      locale: app.getLocale(),
+      userData: app.getPath("userData"),
+      startedAt: new Date(),
+    }),
+  );
+  try {
+    const s = readSettings(app.getPath("userData"), app.getPath("documents"));
+    const dash = (p: string | null): string => p ?? "— not set —";
+    log.banner(
+      [
+        `install dir  ${dash(s.installDir)}`,
+        `user dir     ${dash(s.afs4UserDir)}`,
+        `photos dir   ${dash(s.thumbnailsDir)}`,
+        `tiles ${s.tiles.provider} · elevation ${s.elevation.provider} · last scan ${dash(s.lastScanAt)}`,
+        `${"─".repeat(78)}`,
+      ].join("\n"),
+    );
+  } catch (e) {
+    log.error("could not read settings for the log header", e);
+  }
+}
+
 app.whenReady().then(() => {
+  logEnvironment();
+
   // Deny every permission request app-wide (no camera/mic/geolocation/notifications are needed) — with
   // exactly ONE exception. Electron routes navigator.clipboard.writeText through this handler, so the
   // blanket cb(false) made the Inspector's Copy button silently do nothing: it looked like it worked and

@@ -35,6 +35,7 @@ export function SettingsDialog({
   const [elevation, setElevation] = useState<"open-meteo" | "none">("open-meteo");
   const [busy, setBusy] = useState(false);
   const [pathNote, setPathNote] = useState<string | null>(null);
+  const [logPath, setLogPath] = useState("");
 
   // Load current settings once (or store defaults when there's no bridge — the dialog stays previewable).
   useEffect(() => {
@@ -54,6 +55,9 @@ export function SettingsDialog({
       setCustomAttr(s.tiles.customAttribution ?? "");
       setElevation(s.elevation.provider);
       setLoaded(true);
+    });
+    void pct.getLogPath().then((p: string) => {
+      if (!cancelled) setLogPath(p);
     });
     return () => {
       cancelled = true;
@@ -277,6 +281,24 @@ export function SettingsDialog({
                   Rescan the object catalog…
                 </button>
               </div>
+            </div>
+
+            {/* Diagnostics. The log has no value if nobody can find it, and "open %APPDATA% and look for
+                a file" is a step people don't complete — so the button IS the feature. */}
+            <div className="pct-field pct-field-col">
+              <span className="pct-field-label">Diagnostics</span>
+              <div className="pct-settings-actions">
+                <button type="button" disabled={!pct || logPath === ""} onClick={() => void pct?.openLog()}>
+                  Open log file
+                </button>
+              </div>
+              <span className="pct-field-meta">
+                PCT keeps a plain-text log of what it did this session — the folders it used, what the scan
+                found, and anything that went wrong. It is <strong>rewritten every time PCT starts</strong>,
+                so it never grows and never needs cleaning up. Nothing is sent anywhere; if you report a
+                problem, opening this and pasting it saves a lot of back and forth.
+                {logPath !== "" && <code className="pct-path">{logPath}</code>}
+              </span>
             </div>
 
             <details className="pct-about">

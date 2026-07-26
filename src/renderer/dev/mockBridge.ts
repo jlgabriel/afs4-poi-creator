@@ -310,6 +310,13 @@ export function installMockBridge(): void {
     },
     listInstalledPois: async () => installedPois,
     revealInFolder: noop,
+    // No file in the preview harness — send the log to the console the previewer already has open.
+    log: async (level, message) => {
+      // eslint-disable-next-line no-console
+      console[level === "error" ? "error" : level === "warn" ? "warn" : "info"](`[pct.log] ${message}`);
+    },
+    openLog: noop,
+    getLogPath: async () => "",
   };
 
   (window as unknown as { pct: PctApi }).pct = api;

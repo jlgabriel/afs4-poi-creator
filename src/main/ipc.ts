@@ -41,6 +41,7 @@ import {
   writePoi,
 } from "./installer";
 import { anchorAssetsDir } from "./anchorAsset";
+import { log, type LogLevel } from "./log";
 import {
   autosaveShadow,
   clearShadow,
@@ -77,6 +78,16 @@ const currentSettings = (): Settings => readSettings(userData(), documents());
 // then getThumbnail only for names the list reported. A stale entry (file deleted since) just makes
 // nativeImage return empty → the renderer falls back to the glyph.
 let thumbnailIndex = new Map<string, string>();
+
+/** Log `message` only when it differs from the last one logged under `key`. For handlers the UI polls
+ *  (window focus, a refresh) — the interesting event is the value CHANGING, and a log that repeats itself
+ *  is a log nobody reads to the end of. */
+const lastLogged = new Map<string, string>();
+function logOnce(key: string, message: string): void {
+  if (lastLogged.get(key) === message) return;
+  lastLogged.set(key, message);
+  log.info(message);
+}
 
 /** The AFS4 user folder to write into, from settings or auto-detect. Throws a plain (→ "io") error
  *  the renderer can surface — the wizard/Settings is where the user fixes it. */
@@ -117,12 +128,22 @@ function toPctError(e: unknown): PctError {
   return { code: "io", message: e instanceof Error ? e.message : String(e) };
 }
 
-/** Run a fallible handler body and wrap its outcome in a PctResult envelope. */
-async function guarded<T>(fn: () => T | Promise<T>): Promise<PctResult<T>> {
+/** Run a fallible handler body and wrap its outcome in a PctResult envelope — and record the failure in
+ *  the session log. EVERY expected failure in PCT already funnels through here, so this is the one place
+ *  worth logging from: no handler has to remember to, and none can forget.
+ *
+ *  The two buckets are logged differently on purpose. A typed code (folder-exists, clipboard-empty, …) is
+ *  the app working — the user asked for something it declined — so it is a `warn` and its message says
+ *  everything; a stack would be noise. `io` is the unexpected bucket, the one that means a bug or a broken
+ *  install, and there the stack is the whole point. */
+async function guarded<T>(channel: string, fn: () => T | Promise<T>): Promise<PctResult<T>> {
   try {
     return { ok: true, value: await fn() };
   } catch (e) {
-    return { ok: false, error: toPctError(e) };
+    const error = toPctError(e);
+    if (error.code === "io") log.error(`${channel} failed: ${error.message}`, e);
+    else log.warn(`${channel} refused [${error.code}]: ${error.message}`);
+    return { ok: false, error };
   }
 }
 
@@ -175,6 +196,11 @@ const pickDirectory = (title: string): Promise<string | null> =>
  *  into scenery/poi/ (install) or a chosen folder. Returns null only when choose-folder is cancelled. */
 async function runExport(project: Project, opts: ExportOptions): Promise<InstallResult | null> {
   const settings = currentSettings();
+  log.info(
+    `export "${project.poiName}" — ${project.objects.length} objects, ${project.heightMode} mode, ` +
+      `target ${opts.target}${opts.overwrite ? " (overwrite)" : ""}` +
+      `${opts.baseElevation != null ? `, manual base ${opts.baseElevation} m` : ""}`,
+  );
   // Autoheight mode is fully OFFLINE — the sim resolves the terrain, so there is no elevation lookup and
   // baseElevation is ignored (resolveHeightsAgl throws UnsupportedInAutoheightError on an asl height / a
   // light, which toPctError surfaces). Baked-asl keeps the manual-base / provider path unchanged.
@@ -197,16 +223,27 @@ async function runExport(project: Project, opts: ExportOptions): Promise<Install
     appPath: app.getAppPath(),
   });
 
+  // Where it actually LANDED, verbatim. "I exported it and the sim doesn't see it" is answered by this
+  // one line far more often than by anything the user can describe.
+  const done = (r: InstallResult): InstallResult => {
+    log.info(`export ok — ${r.installed ? "installed" : "written"} to ${r.path}`);
+    for (const w of r.warnings) log.warn(`export warning: ${w}`);
+    return r;
+  };
+
   if (opts.target === "install") {
     const w = writePoi(plan, poiRoot(afs4UserDirOrThrow()), { overwrite: opts.overwrite, assetsDir });
     writeProjectSidecar(w.path, project); // #89-3: re-openable copy beside the POI
-    return { folderName: w.folderName, path: w.path, installed: true, warnings: plan.warnings };
+    return done({ folderName: w.folderName, path: w.path, installed: true, warnings: plan.warnings });
   }
   const chosen = await pickExportFolder();
-  if (!chosen) return null;
+  if (!chosen) {
+    log.info("export cancelled at the folder picker");
+    return null;
+  }
   const w = writePoi(plan, chosen, { overwrite: opts.overwrite, assetsDir });
   writeProjectSidecar(w.path, project); // #89-3: re-openable copy beside the POI
-  return { folderName: w.folderName, path: w.path, installed: false, warnings: plan.warnings };
+  return done({ folderName: w.folderName, path: w.path, installed: false, warnings: plan.warnings });
 }
 
 /** Load the optional official overlay, scan, cache the catalog, and record lastScanAt. Shared by
@@ -218,7 +255,18 @@ function scanAndCache(installDir: string, userXrefDir: string | null): ScanResul
   const { catalog, warnings } = scanXref(installDir, userXrefDir, undefined, load.table);
   writeCatalogCache(userData(), catalog);
   writeSettings(userData(), { lastScanAt: catalog.scannedAt }, documents());
-  return { catalog, warnings: [...load.warnings, ...warnings] };
+  const all = [...load.warnings, ...warnings];
+  // The per-KIND counts, not just a total: "plants 0" is the entire diagnosis of "trees don't load", and
+  // it is invisible in a total of 900. Warnings are listed, not counted — a scan that quietly dropped a
+  // corrupt .tmi looks exactly like a PCT bug from the outside.
+  log.info(
+    `scan ok — ${catalog.xref.length} xref in ${catalog.bundles.length} bundles, ` +
+      `${catalog.plants.length} plants, ${catalog.airportLights.length} airport lights` +
+      (catalog.xrefTable ? `, xref_table ${catalog.xrefTable.matched}/${catalog.xrefTable.rows} matched` : "") +
+      ` · install ${installDir} · user xref ${userXrefDir ?? "— none —"}`,
+  );
+  for (const w of all) log.warn(`scan warning: ${w}`);
+  return { catalog, warnings: all };
 }
 
 export function registerIpc(): void {
@@ -229,12 +277,12 @@ export function registerIpc(): void {
   );
 
   ipcMain.handle("pct:scan", (_e, installDir: string, userXrefDir: string | null) =>
-    guarded((): ScanResult => scanAndCache(installDir, userXrefDir)),
+    guarded("scan", (): ScanResult => scanAndCache(installDir, userXrefDir)),
   );
 
   // ── User-XREF registration (design B2) — main owns the user dir + the rescan (P0-2: no paths in) ──
   ipcMain.handle("pct:planXrefRegistration", () =>
-    guarded((): XrefRegistrationPlan => {
+    guarded("planXrefRegistration", (): XrefRegistrationPlan => {
       const plan = planXrefRegistration(afs4UserDirOrThrow());
       return {
         registerable: plan.registerable.map((b) => ({
@@ -248,7 +296,7 @@ export function registerIpc(): void {
     }),
   );
   ipcMain.handle("pct:registerXref", () =>
-    guarded((): XrefRegistrationResult => {
+    guarded("registerXref", (): XrefRegistrationResult => {
       const userDir = afs4UserDirOrThrow();
       const result = registerXref(userDir, userData());
       // Rescan so the renderer just reloads the fresh catalog: a registered bundle now resolves via its
@@ -256,6 +304,8 @@ export function registerIpc(): void {
       const installDir = currentSettings().installDir;
       if (!installDir) throw new Error("Scan your Aerofly install first, then register.");
       const scan = scanAndCache(installDir, userDir);
+      log.info(`registerXref ok — ${result.registered.length} bundles registered under ${userDir}`);
+      for (const w of result.warnings) log.warn(`registerXref warning: ${w}`);
       return { registered: result.registered.length, scan, warnings: result.warnings };
     }),
   );
@@ -268,7 +318,15 @@ export function registerIpc(): void {
   // JPEG data URL. Both degrade to "no photo" on any snag — a folder that isn't set, a name with no file,
   // an unreadable image — so the feature can never break a row, only upgrade it.
   ipcMain.handle("pct:listThumbnails", (): string[] => {
-    thumbnailIndex = indexThumbnails(currentSettings().thumbnailsDir);
+    const dir = currentSettings().thumbnailsDir;
+    thumbnailIndex = indexThumbnails(dir);
+    // "my photos don't show up" splits cleanly on this line: no folder, a folder with 0 usable files, or
+    // files present and the name not matching — which is exactly how the dashed-XREF bug looked (#176).
+    //
+    // Logged only when the ANSWER changes. This handler runs on every window focus, and the v0.7 photo
+    // workflow is a loop of alt-tab → screenshot → alt-tab back; logging each call would bury the session
+    // in a line that says the same thing thirty times, which is how a log stops being read.
+    logOnce("photos", `photos — ${thumbnailIndex.size} usable in ${dir ?? "— no folder set —"}`);
     return [...thumbnailIndex.keys()];
   });
   ipcMain.handle("pct:getThumbnail", (_e, name: string): string | null => {
@@ -298,19 +356,25 @@ export function registerIpc(): void {
   // Settings, instead of PCT inventing a location. Each write/delete rebuilds the in-memory index so the
   // very next getThumbnail (the card refreshing) resolves the change without waiting for a folder re-scan.
   ipcMain.handle("pct:saveObjectPhoto", (_e, name: string) =>
-    guarded((): void => {
+    guarded("saveObjectPhoto", (): void => {
       const dir = photosDirOrThrow();
       const img = clipboard.readImage();
       if (img.isEmpty()) throw new ClipboardEmptyError();
-      writeFileAtomic(photoWritePath(dir, name), img.toPNG()); // photoWritePath validates the name
+      const file = photoWritePath(dir, name); // validates the name
+      writeFileAtomic(file, img.toPNG());
       thumbnailIndex = indexThumbnails(dir);
+      // The FILE PCT chose, not the object the renderer named: the name PCT derives is the whole feature,
+      // and a photo written under a name the catalog then can't find is precisely bug #176.
+      log.info(`photo pasted — ${name} → ${file}`);
     }),
   );
   ipcMain.handle("pct:deleteObjectPhoto", (_e, name: string) =>
-    guarded((): void => {
+    guarded("deleteObjectPhoto", (): void => {
       const dir = photosDirOrThrow();
-      for (const file of photoFilesForStem(dir, name)) rmSync(file, { force: true }); // every extension
+      const files = photoFilesForStem(dir, name);
+      for (const file of files) rmSync(file, { force: true }); // every extension
       thumbnailIndex = indexThumbnails(dir);
+      log.info(`photo removed — ${name} (${files.length} file(s))`);
     }),
   );
   ipcMain.handle("pct:openPhotosDir", async (): Promise<void> => {
@@ -318,10 +382,21 @@ export function registerIpc(): void {
     if (dir !== null && existsSync(dir)) await shell.openPath(dir); // best-effort, like revealInFolder
   });
   ipcMain.handle("pct:getSettings", (): Settings => currentSettings());
-  ipcMain.handle(
-    "pct:setSettings",
-    (_e, patch: Partial<Settings>): Settings => writeSettings(userData(), patch, documents()),
-  );
+  ipcMain.handle("pct:setSettings", (_e, patch: Partial<Settings>): Settings => {
+    const before = currentSettings();
+    const after = writeSettings(userData(), patch, documents());
+    // The SAVED value, and only the fields that moved. writeSettings silently keeps the previous path when
+    // the new one isn't on disk (Fable I6), so "I changed the folder and nothing happened" is a real
+    // outcome — and this is the line that shows the change didn't take.
+    for (const key of ["installDir", "afs4UserDir", "thumbnailsDir"] as const) {
+      if (after[key] !== before[key]) log.info(`settings — ${key} is now ${after[key] ?? "— not set —"}`);
+    }
+    if (after.tiles.provider !== before.tiles.provider) log.info(`settings — tiles ${after.tiles.provider}`);
+    if (after.elevation.provider !== before.elevation.provider) {
+      log.info(`settings — elevation ${after.elevation.provider}`);
+    }
+    return after;
+  });
   ipcMain.handle(
     "pct:chooseDirectory",
     async (_e, purpose: "install-dir" | "user-dir" | "thumbnails-dir"): Promise<string | null> => {
@@ -341,12 +416,12 @@ export function registerIpc(): void {
   );
 
   // ── Project files (M1e-2b) — main owns the path + dialogs ──
-  ipcMain.handle("pct:openProject", () => guarded(() => openProject(pickOpenProject)));
+  ipcMain.handle("pct:openProject", () => guarded("openProject", () => openProject(pickOpenProject)));
   ipcMain.handle("pct:saveProject", (_e, project: Project) =>
-    guarded(() => saveProject(project, () => pickSaveProject(project))),
+    guarded("saveProject", () => saveProject(project, () => pickSaveProject(project))),
   );
   ipcMain.handle("pct:saveProjectAs", (_e, project: Project) =>
-    guarded(() => saveProjectAs(project, () => pickSaveProject(project))),
+    guarded("saveProjectAs", () => saveProjectAs(project, () => pickSaveProject(project))),
   );
   ipcMain.handle("pct:autosaveShadow", (_e, project: Project): void => {
     try {
@@ -367,6 +442,7 @@ export function registerIpc(): void {
   // ── Elevation / export / install (M1e-2b) ──
   ipcMain.handle("pct:resolveHeights", (_e, objects: PlacedObject[]) =>
     guarded(
+      "resolveHeights",
       (): Promise<ResolvedObject[]> =>
         resolveHeights(objects, currentSettings().elevation.provider, {
           cacheDir: userData(),
@@ -375,15 +451,38 @@ export function registerIpc(): void {
     ),
   );
   ipcMain.handle("pct:exportPoi", (_e, project: Project, opts: ExportOptions) =>
-    guarded(() => runExport(project, opts)),
+    guarded("exportPoi", () => runExport(project, opts)),
   );
   ipcMain.handle("pct:uninstallPoi", (_e, folderName: string) =>
-    guarded((): void => uninstallPoi(afs4UserDirOrThrow(), folderName)),
+    guarded("uninstallPoi", (): void => {
+      uninstallPoi(afs4UserDirOrThrow(), folderName);
+      log.info(`uninstalled POI "${folderName}"`); // PCT deleting a folder is worth a permanent record
+    }),
   );
   ipcMain.handle("pct:listInstalledPois", (): InstalledPoi[] => {
     const dir = currentSettings().afs4UserDir ?? detectUserDir(documents());
     return dir ? listInstalledPois(dir) : [];
   });
+  // ── The session log ──
+  // The renderer can WRITE to it (its own uncaught errors — otherwise they die in a DevTools console
+  // nobody has open) and ASK FOR IT to be opened. It cannot read it back or name a path: `log` takes a
+  // level and a string, `openLog` takes nothing and main opens the one file it owns (P0-2).
+  ipcMain.handle("pct:log", (_e, level: LogLevel, message: string): void => {
+    // Clamp what crosses the boundary. A renderer bug (or a loop) must not be able to define the log's
+    // shape: one line, bounded length, and only the three known levels.
+    const clean = String(message).replace(/\r?\n/g, " ⏎ ").slice(0, 2000);
+    log.line(level === "error" || level === "warn" ? level : "info", `renderer: ${clean}`);
+  });
+  ipcMain.handle("pct:openLog", async (): Promise<void> => {
+    if (log.file === "") return; // the log could not be opened this session — nothing to show
+    // openPath hands it to whatever opens .log (Notepad, Console, an editor) so the user can select-all
+    // and paste. It returns a non-empty STRING on failure rather than throwing — a machine with no .log
+    // association is common — so fall back to revealing it in the file manager, which always works.
+    const problem = await shell.openPath(log.file);
+    if (problem !== "") shell.showItemInFolder(log.file);
+  });
+  ipcMain.handle("pct:getLogPath", (): string => log.file);
+
   ipcMain.handle("pct:revealInFolder", (_e, folderName: string): void => {
     try {
       const dir = currentSettings().afs4UserDir ?? detectUserDir(documents());
