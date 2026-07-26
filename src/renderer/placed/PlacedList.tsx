@@ -9,6 +9,7 @@
 import { useMemo } from "react";
 import { editorStore, useEditor } from "../state/editorStore";
 import { Thumbnail } from "../catalog/Thumbnail";
+import { photoKeyForPlaced as placedPhotoKey } from "../../core/catalog/photoKey";
 import { rowInfo } from "./rowInfo";
 
 export function PlacedList(): React.ReactElement {
@@ -61,7 +62,10 @@ export function PlacedList(): React.ReactElement {
                 onClick={(e) => editorStore.getState().select([o.id], e.shiftKey)}
                 onDoubleClick={() => editorStore.getState().flyTo(o.position)}
               >
-                <Thumbnail name={o.kind === "xref" ? o.name : null} category={info.category} />
+                {/* v0.8: every kind resolves a photo, not just xref. `null` was never a "this kind has no
+                    photo" rule — it was "only an xref has a name I can use", and photoKey removes that
+                    limit. A placed plant now shows the same picture its catalog card does. */}
+                <Thumbnail name={placedPhotoKey(o)} category={info.category} />
                 <span className="pct-placed-text">
                   <span className="pct-placed-name">
                     <span className="pct-placed-label">{info.name}</span>

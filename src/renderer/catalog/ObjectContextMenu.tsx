@@ -1,7 +1,11 @@
 // ObjectContextMenu.tsx — the right-click menu on a catalog card (v0.7). It turns "I photographed this
 // object in the sim" into "this object now shows that photo", named right by construction: the card already
-// knows the object's exact catalog name, so Paste writes `<name>.png` with zero typing (main/ipc.ts
+// knows the object's exact photo key, so Paste writes `<key>.png` with zero typing (main/ipc.ts
 // saveObjectPhoto reads the clipboard itself — the renderer only NAMES the object; P0-2).
+//
+// v0.8: the key comes from core/catalog/photoKey rather than being an XREF's `name`, so this same menu
+// now serves the Lights and Plants cards. main/ipc.ts is untouched — it always took an opaque, guarded
+// name string, and a namespaced key is just another one.
 //
 // The three actions map 1:1 to the PctApi write side: Paste photo (clipboard → file), Remove photo (delete
 // every extension of the stem, behind a confirm), Open photos folder. The two EXPECTED snags surface INLINE
@@ -12,7 +16,7 @@
 // usual triggers: Escape, a pointerdown anywhere outside, a scroll, or a completed action.
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import type { CatalogObject } from "../../core/project/types";
+import type { CardPhoto } from "./cardPhoto";
 import { editorStore, useEditor } from "../state/editorStore";
 import { getPct } from "../app/pct";
 import { refreshThumbnails } from "../app/useThumbnailSync";
@@ -24,17 +28,17 @@ interface InlineError {
 }
 
 export function ObjectContextMenu({
-  object,
+  card,
   x,
   y,
   onClose,
 }: {
-  object: CatalogObject;
+  card: CardPhoto;
   x: number;
   y: number;
   onClose: () => void;
 }): React.ReactElement {
-  const key = object.name.toLowerCase();
+  const key = card.photoName.toLowerCase();
   const hasPhoto = useEditor((s) => s.thumbnailNames.has(key));
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<Pos | null>(null);
@@ -81,10 +85,10 @@ export function ObjectContextMenu({
     if (pct === null || busy) return;
     setBusy(true);
     setError(null);
-    const r = await pct.saveObjectPhoto(object.name);
+    const r = await pct.saveObjectPhoto(card.photoName);
     setBusy(false);
     if (r.ok) {
-      editorStore.getState().invalidateThumbnail(object.name); // the card shows the new photo at once
+      editorStore.getState().invalidateThumbnail(card.photoName); // the card shows the new photo at once
       onClose();
       return;
     }
@@ -101,10 +105,10 @@ export function ObjectContextMenu({
     const pct = getPct();
     if (pct === null || busy) return;
     // Deleting the user's own file is deliberate and only undone by pasting again — confirm first.
-    if (!window.confirm(`Remove the photo for "${object.displayName}"?`)) return;
+    if (!window.confirm(`Remove the photo for "${card.displayName}"?`)) return;
     setBusy(true);
     setError(null);
-    const r = await pct.deleteObjectPhoto(object.name);
+    const r = await pct.deleteObjectPhoto(card.photoName);
     setBusy(false);
     if (r.ok) {
       refreshThumbnails(); // the name leaves the set → the card falls back to its generated glyph
@@ -131,7 +135,7 @@ export function ObjectContextMenu({
       role="menu"
       style={{ left: pos?.left ?? x, top: pos?.top ?? y, visibility: pos === null ? "hidden" : "visible" }}
     >
-      <div className="pct-context-menu-name">{object.name}</div>
+      <div className="pct-context-menu-name">{card.photoName}</div>
       <button type="button" role="menuitem" disabled={busy} onClick={paste}>
         Paste photo from clipboard
       </button>

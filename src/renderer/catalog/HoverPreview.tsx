@@ -9,20 +9,26 @@
 //
 // It is portalled to <body> so the panel's overflow:hidden (and the map's stacking context) can't clip
 // it, and it's pointer-events:none so it never steals the hover from the card underneath.
+//
+// v0.8: it takes a CardPhoto rather than a CatalogObject, so Lights and Plants get the same popup. The
+// monospace line shows the PHOTO KEY, which for an XREF is still its catalog name and for the other two
+// families is the namespaced stem (`plant.palm.08`) — in every case the exact string the file must be
+// named after, which is the job #160 asked this line to do. A plant's own `group`/`species` identity is
+// on its card subtitle, so nothing is hidden by the change.
 import { useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import type { CatalogObject } from "../../core/project/types";
+import type { CardPhoto } from "./cardPhoto";
 import { useThumbnailSrc } from "./useThumbnailSrc";
 import { computePreviewPosition, type Pos } from "./previewPosition";
 
 export function HoverPreview({
-  object,
+  card,
   anchor,
 }: {
-  object: CatalogObject;
+  card: CardPhoto;
   anchor: DOMRect;
 }): React.ReactElement {
-  const src = useThumbnailSrc(object.name);
+  const src = useThumbnailSrc(card.photoName);
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<Pos | null>(null);
 
@@ -39,7 +45,7 @@ export function HoverPreview({
         { width: window.innerWidth, height: window.innerHeight },
       ),
     );
-  }, [anchor, src, object.name]);
+  }, [anchor, src, card.photoName]);
 
   return createPortal(
     <div
@@ -57,7 +63,7 @@ export function HoverPreview({
           <img className="pct-hover-preview-img" src={src} alt="" draggable={false} />
         </span>
       )}
-      <span className="pct-hover-preview-name">{object.name}</span>
+      <span className="pct-hover-preview-name">{card.photoName}</span>
     </div>,
     document.body,
   );

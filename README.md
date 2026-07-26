@@ -50,8 +50,9 @@ treats it like any built-in: place it, rotate it, set its height, export. See
 
 **Real photos on the cards, too.** Since **v0.6** you can swap PCT's drawn category icons for real
 photos of the objects, and since **v0.7** putting one there takes two clicks: screenshot the object in
-the sim, then right-click its card and choose **Paste photo**. The photos are **yours**, read straight
-from your disk — never bundled into PCT and never written into your POIs. See
+the sim, then right-click its card and choose **Paste photo**. **v0.8** extends that to the **lights**
+and the **plants**, so every card in the catalog can show the real thing. The photos are **yours**, read
+straight from your disk — never bundled into PCT and never written into your POIs. See
 [Photos of your objects](#photos-of-your-objects).
 
 **It ships no Aerofly content.** PCT reads the object catalog from *your* installed copy of the sim,
@@ -109,6 +110,10 @@ A catalog card normally shows a drawn icon sized to the object's real footprint.
 the object itself, PCT can show **your own photos** instead — on the catalog cards and in the placed
 list. It never ships or downloads any: the pictures are ones you took, on your own disk.
 
+Since **v0.8** this covers **every** card: the objects, the **lights** and the **plants**. Those two
+sections are where a drawn icon says least — a runway edge light and a taxiway edge light get the same
+glyph, and Broadleaf 00 and 01 are the same tree a metre apart in height.
+
 First, pick where they live: *Settings → Object photos folder*. Then, for each object:
 
 1. **Photograph it in the sim.** Get a good view of something you've placed, frame it, and take a
@@ -118,12 +123,22 @@ First, pick where they live: *Settings → Object photos folder*. Then, for each
    filename to type and no ids to match by hand. The same menu also has **Remove photo** and **Open
    photos folder**.
 
-You can also fill the folder yourself: name a file after an object's exact id — `a380_klm.jpg`, in
-jpg, jpeg, png or webp — and it will be picked up. That works for your own registered XREF objects
-too, dashes and dots in the name included. Anything without a photo simply keeps its drawn icon.
+You can also fill the folder yourself: name a file after the card's id, in jpg, jpeg, png or webp, and
+it will be picked up. Objects use their bare id; lights and plants are prefixed, because they share the
+one folder with the ~900 objects:
 
-To read an id, **rest the mouse on a card** for a moment: a preview pops up with the photo enlarged
-and the object's exact id spelled out — which is the string a file has to be named after.
+| Card | File name |
+| --- | --- |
+| an object (built-in or your own XREF) | `a380_klm.jpg`, `cabin-boat-red.png` |
+| an airport light | `light.runway_edge_light.jpg` |
+| the custom point light | `light.point.jpg` |
+| a plant | `plant.palm.08.jpg`, `plant.conifer_forest.01.jpg` |
+
+Anything without a photo simply keeps its drawn icon.
+
+You never have to work this out by hand — **rest the mouse on a card** for a moment and a preview pops
+up with the photo enlarged and the file name spelled out, and **Paste photo** writes it for you. Photos
+you took with v0.6 or v0.7 keep working untouched: an object's file name has not changed.
 
 ### Good to know
 

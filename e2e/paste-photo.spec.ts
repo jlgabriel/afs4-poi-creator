@@ -18,6 +18,10 @@ import type { Catalog, CatalogObject, Settings } from "../src/core/project/types
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const MAIN = path.join(ROOT, "out", "main", "index.js");
 const OBJ = "tower_e2e"; // catalog name → the file is written as tower_e2e.png, by construction
+// v0.8: a plant is identified by a group + species PAIR, which plantKey joins with a `/` — so its photo
+// name has to be derived (core/catalog/photoKey) rather than read off the object. `conifer_forest` is the
+// group whose own underscore the derivation must not mangle, and the `/` must become the family separator.
+const PLANT_STEM = "plant.conifer_forest.01";
 // A user-registered XREF (v0.3) whose name carries a `-` — the forum #176 shape. Before the fix the photo
 // guard was `[A-Za-z0-9_]+`, so Paste threw "unsafe photo name" AND a hand-named file was skipped at index
 // time, which is why the user couldn't get it to show "no matter how I change the name".
@@ -72,7 +76,16 @@ function seed(): { userData: string; photos: string } {
     userXrefDir: null,
     bundles: [],
     xref: [tower(OBJ), tower(DASH_OBJ, "Cabin Boat Red", "user")],
-    plants: [],
+    plants: [
+      {
+        group: "conifer_forest",
+        species: "01",
+        naturalHeight: 28.2,
+        source: "install",
+        category: "plants/conifer_forest",
+        displayName: "Conifer Forest 01",
+      },
+    ],
     airportLights: [],
     animated: [],
   };
@@ -149,6 +162,41 @@ test("a user-registered XREF whose name has a `-` can be pasted too (forum #176)
     await expect(menu.locator(".pct-context-menu-error")).toHaveCount(0);
     expect(existsSync(path.join(photos, `${DASH_OBJ}.png`))).toBe(true);
     await expect(card.locator("img.pct-thumb-photo")).toBeVisible();
+  } finally {
+    await app.close();
+  }
+});
+
+test("a plant gets a photo under its derived, namespaced stem (v0.8)", async () => {
+  const { userData, photos } = seed();
+  const app = await launch(userData);
+  try {
+    const page = await app.firstWindow();
+    await expect(page.locator(".leaflet-container")).toBeVisible();
+    // Plants is its own collapsed section, below Objects and Lights (#163).
+    await page.locator("summary.pct-lights-summary").filter({ hasText: "Plants" }).click();
+
+    const card = page.getByRole("button", { name: "Conifer Forest 01" });
+    await expect(card.locator("svg.pct-thumb")).toBeVisible(); // the glyph every plant card used to be stuck with
+
+    await app.evaluate(({ clipboard, nativeImage }, url) => {
+      clipboard.writeImage(nativeImage.createFromDataURL(url));
+    }, PNG_1x1);
+
+    // The menu header is the FILE NAME, so this assertion is the derivation itself: the `/` became the
+    // family separator and the group kept its own underscore.
+    await card.click({ button: "right" });
+    const menu = page.locator(".pct-context-menu");
+    await expect(menu.locator(".pct-context-menu-name")).toHaveText(PLANT_STEM);
+    await menu.getByRole("menuitem", { name: "Paste photo from clipboard" }).click();
+
+    await expect(menu.locator(".pct-context-menu-error")).toHaveCount(0);
+    expect(existsSync(path.join(photos, `${PLANT_STEM}.png`))).toBe(true);
+    // The half that unit tests can't reach: main's REAL indexer accepts the dotted stem and serves the
+    // bytes back, so the card actually shows the photo instead of silently keeping its glyph (#176's
+    // failure mode, which was invisible precisely because the write half had succeeded).
+    await expect(card.locator("img.pct-thumb-photo")).toBeVisible();
+    await expect(card.locator("svg.pct-thumb")).toHaveCount(0);
   } finally {
     await app.close();
   }

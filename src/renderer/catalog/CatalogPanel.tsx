@@ -24,6 +24,7 @@ import { HoverPreview } from "./HoverPreview";
 import { ObjectContextMenu } from "./ObjectContextMenu";
 import { LightsSection } from "./LightsSection";
 import { PlantsSection } from "./PlantsSection";
+import { anchorRectOf, xrefCardPhoto, type CardPhoto, type CardPopovers } from "./cardPhoto";
 
 const ROW_H = 64; // must match .pct-row height budget in styles.css (card + row padding)
 // Rest-before-show, so sweeping the mouse down the list doesn't strobe popups. 250 ms turned out to be
@@ -37,25 +38,16 @@ interface ObjectCardProps {
   o: CatalogObject;
   armed: boolean;
   onArm: (name: string) => void;
-  onShow: (o: CatalogObject, anchor: DOMRect) => void;
-  onHide: () => void;
-  onMenu: (o: CatalogObject, x: number, y: number) => void;
-}
-
-/** The hover-preview anchors to the thumbnail (the card's left edge) so the popup appears beside the
- *  image, as in Michael's mock; fall back to the whole card if the thumb somehow isn't there. */
-function anchorRectOf(card: HTMLElement): DOMRect {
-  return (card.querySelector(".pct-thumb") ?? card).getBoundingClientRect();
+  popovers: CardPopovers;
 }
 
 const ObjectCard = memo(function ObjectCard({
   o,
   armed,
   onArm,
-  onShow,
-  onHide,
-  onMenu,
+  popovers,
 }: ObjectCardProps): React.ReactElement {
+  const card = xrefCardPhoto(o);
   // A loose user `.tmb` can't be placed until it's registered (it wouldn't resolve in the sim), so its
   // card is disabled and badged — the Register banner above turns it into a normal, placeable object.
   const unregistered = o.unregistered === true;
@@ -73,14 +65,14 @@ const ObjectCard = memo(function ObjectCard({
       // Right-click arms nothing — it opens the photo menu at the cursor (preventDefault stops the OS menu).
       onContextMenu={(e) => {
         e.preventDefault();
-        onMenu(o, e.clientX, e.clientY);
+        popovers.onMenu(card, e.clientX, e.clientY);
       }}
-      onMouseEnter={(e) => onShow(o, anchorRectOf(e.currentTarget))}
-      onMouseLeave={onHide}
-      onFocus={(e) => onShow(o, anchorRectOf(e.currentTarget))}
-      onBlur={onHide}
+      onMouseEnter={(e) => popovers.onShow(card, anchorRectOf(e.currentTarget))}
+      onMouseLeave={popovers.onHide}
+      onFocus={(e) => popovers.onShow(card, anchorRectOf(e.currentTarget))}
+      onBlur={popovers.onHide}
     >
-      <Thumbnail key={o.name} name={o.name} category={o.category} />
+      <Thumbnail key={card.photoName} name={card.photoName} category={o.category} />
       <span className="pct-obj-text">
         <span className="pct-obj-name">
           {o.displayName}
@@ -133,9 +125,7 @@ interface RowProps {
   objects: CatalogObject[];
   placing: PlacingSpec | null;
   onArm: (name: string) => void;
-  onShow: (o: CatalogObject, anchor: DOMRect) => void;
-  onHide: () => void;
-  onMenu: (o: CatalogObject, x: number, y: number) => void;
+  popovers: CardPopovers;
 }
 
 // react-window renders this per visible index. `style` positions the row absolutely and MUST land on
@@ -147,15 +137,13 @@ function Row({
   objects,
   placing,
   onArm,
-  onShow,
-  onHide,
-  onMenu,
+  popovers,
 }: RowComponentProps<RowProps>): React.ReactElement {
   const o = objects[index];
   const armed = placing?.kind === "xref" && placing.name === o.name;
   return (
     <div className="pct-row" style={style} {...ariaAttributes}>
-      <ObjectCard o={o} armed={armed} onArm={onArm} onShow={onShow} onHide={onHide} onMenu={onMenu} />
+      <ObjectCard o={o} armed={armed} onArm={onArm} popovers={popovers} />
     </div>
   );
 }
@@ -167,10 +155,15 @@ export function CatalogPanel(): React.ReactElement {
 
   // Hover-preview (forum #170/#166): the card the mouse is resting on, plus where its thumbnail sits.
   // A short rest-delay via `hoverTimer` keeps a fast scan down the list from strobing popups.
-  const [hovered, setHovered] = useState<{ object: CatalogObject; anchor: DOMRect } | null>(null);
+  //
+  // Both popups are owned HERE, for the whole panel, and handed to the Lights and Plants sections as
+  // `popovers` (v0.8). Per-section state would have been less plumbing but would let a menu opened in
+  // Plants sit on screen underneath a hover-preview raised in Objects — the exact stacking the
+  // "suppress hover while the menu is open" rule below exists to prevent.
+  const [hovered, setHovered] = useState<{ card: CardPhoto; anchor: DOMRect } | null>(null);
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  // Right-click "Paste photo" menu (v0.7): which object, and where the click landed (viewport coords).
-  const [menu, setMenu] = useState<{ object: CatalogObject; x: number; y: number } | null>(null);
+  // Right-click "Paste photo" menu (v0.7): which card, and where the click landed (viewport coords).
+  const [menu, setMenu] = useState<{ card: CardPhoto; x: number; y: number } | null>(null);
 
   // Browse view hides objects that only make sense assembled inside an airport (the loose jetway
   // parts) — a DISPLAY filter, so the tree counts and the gallery agree while the full catalog and
@@ -214,9 +207,9 @@ export function CatalogPanel(): React.ReactElement {
     [],
   );
 
-  const onShowPreview = useCallback((object: CatalogObject, anchor: DOMRect) => {
+  const onShowPreview = useCallback((card: CardPhoto, anchor: DOMRect) => {
     clearTimeout(hoverTimer.current);
-    hoverTimer.current = setTimeout(() => setHovered({ object, anchor }), HOVER_DELAY_MS);
+    hoverTimer.current = setTimeout(() => setHovered({ card, anchor }), HOVER_DELAY_MS);
   }, []);
   const onHidePreview = useCallback(() => {
     clearTimeout(hoverTimer.current);
@@ -224,16 +217,23 @@ export function CatalogPanel(): React.ReactElement {
   }, []);
   // Opening the menu hides any hover-preview and cancels a pending one, so the popup and the menu never
   // stack. Coords come straight from the contextmenu event (the menu is portalled + position:fixed).
-  const onOpenMenu = useCallback((object: CatalogObject, x: number, y: number) => {
+  const onOpenMenu = useCallback((card: CardPhoto, x: number, y: number) => {
     clearTimeout(hoverTimer.current);
     setHovered(null);
-    setMenu({ object, x, y });
+    setMenu({ card, x, y });
   }, []);
   useEffect(() => () => clearTimeout(hoverTimer.current), []); // never fire after unmount
 
+  // One stable object for all three sections — stable so the memoized cards don't re-render on a
+  // keystroke (the same reason `onArm` is a useCallback).
+  const popovers = useMemo<CardPopovers>(
+    () => ({ onShow: onShowPreview, onHide: onHidePreview, onMenu: onOpenMenu }),
+    [onShowPreview, onHidePreview, onOpenMenu],
+  );
+
   const rowProps = useMemo<RowProps>(
-    () => ({ objects, placing, onArm, onShow: onShowPreview, onHide: onHidePreview, onMenu: onOpenMenu }),
-    [objects, placing, onArm, onShowPreview, onHidePreview, onOpenMenu],
+    () => ({ objects, placing, onArm, popovers }),
+    [objects, placing, onArm, popovers],
   );
 
   return (
@@ -271,12 +271,12 @@ export function CatalogPanel(): React.ReactElement {
           )}
         </div>
       </details>
-      <LightsSection />
-      <PlantsSection />
+      <LightsSection popovers={popovers} />
+      <PlantsSection popovers={popovers} />
       {/* Suppress the hover-preview while the menu is open so the two popups never stack. */}
-      {hovered !== null && menu === null && <HoverPreview object={hovered.object} anchor={hovered.anchor} />}
+      {hovered !== null && menu === null && <HoverPreview card={hovered.card} anchor={hovered.anchor} />}
       {menu !== null && (
-        <ObjectContextMenu object={menu.object} x={menu.x} y={menu.y} onClose={() => setMenu(null)} />
+        <ObjectContextMenu card={menu.card} x={menu.x} y={menu.y} onClose={() => setMenu(null)} />
       )}
     </section>
   );

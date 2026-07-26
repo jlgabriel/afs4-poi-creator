@@ -9,6 +9,7 @@
 // the real scanner uses, so object field shapes match production exactly.
 import type { Catalog, CatalogObject, PlacedXref, Project, Settings } from "../../core/project/types";
 import { categorize, displayName } from "../../core/catalog/categorize";
+import { photoKey } from "../../core/catalog/photoKey";
 import type { InstalledPoi, PctApi } from "../../shared/pctApi";
 
 // A spread of real-ish name stems across the catalog's categories, expanded with numeric suffixes to
@@ -116,8 +117,25 @@ function buildBigCatalog(): Catalog {
     userXrefDir: null,
     bundles: [{ bundle, source: "install", path: "C:/Mock/.../tmi", count: xref.length }],
     xref,
-    plants: [],
-    airportLights: [],
+    // v0.8: the Plants and Lights sections were mocked as EMPTY, which meant the preview harness (and the
+    // e2e that drives it) could only ever see their "Rescan to load…" state — so the photo surfaces those
+    // two sections just gained would have been unverifiable outside a packaged build, which is exactly the
+    // hole v0.6.2 closed for the xref gallery. A handful of real-shaped entries each is enough.
+    //
+    // The plants are picked deliberately: `conifer_forest` is the group whose own underscore the photo key
+    // must not mangle, and `palm`/`08` is the pair the format author's proven file places (plants.ts).
+    plants: [
+      { group: "broadleaf", species: "00", naturalHeight: 17.5, source: "install", category: "plants/broadleaf", displayName: "Broadleaf 00" },
+      { group: "broadleaf", species: "01", naturalHeight: 16.5, source: "install", category: "plants/broadleaf", displayName: "Broadleaf 01" },
+      { group: "conifer_forest", species: "01", naturalHeight: 28.2, source: "install", category: "plants/conifer_forest", displayName: "Conifer Forest 01" },
+      { group: "palm", species: "08", naturalHeight: 12.5, source: "install", category: "plants/palm", displayName: "Palm 08" },
+      { group: "shrub", species: "11", naturalHeight: 0.8, source: "install", category: "plants/shrub", displayName: "Shrub 11" },
+    ],
+    airportLights: [
+      { typeName: "runway_edge_light", folder: "al_runway_edge_light", source: "install", category: "lights/runway", displayName: "Runway Edge Light" },
+      { typeName: "taxiway_edge_light", folder: "al_taxiway_edge_light", source: "install", category: "lights/taxiway", displayName: "Taxiway Edge Light" },
+      { typeName: "papi_left", folder: "al_papi_left", source: "install", category: "lights/approach", displayName: "Papi Left" },
+    ],
     animated: [],
   };
 }
@@ -126,15 +144,26 @@ function buildBigCatalog(): Catalog {
 // every card kept its glyph and the hover-preview's photo path couldn't be seen without a packaged
 // build. These synthetic photos fix that: a few stems get a generated SVG "photo" so `preview:renderer`
 // shows real <img> thumbs AND the enlarged hover, while every other card still falls back to its glyph.
-const PHOTO_STEMS = ["tower00_small_plates", "car_sedan", "staticpeople_standing"];
+// v0.8 adds two non-xref stems (a plant and a fixture) so the harness shows the namespaced keys working
+// end to end, not just the xref path they were modelled on.
+const PHOTO_STEMS = [
+  "tower00_small_plates",
+  "car_sedan",
+  "staticpeople_standing",
+  "plant.palm.08",
+  "light.runway_edge_light",
+];
 function hasMockPhoto(name: string): boolean {
   return PHOTO_STEMS.some((stem) => name.startsWith(stem));
 }
 /** A stand-in "photo": a tall SVG (200×280, like a person/tower shot) so object-fit:contain visibly
- *  letterboxes in the square thumb and the hover box, exactly as a real portrait photo would. */
-function mockPhoto(o: CatalogObject): string {
-  const hue = (o.name.length * 47) % 360;
-  const label = o.displayName.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+ *  letterboxes in the square thumb and the hover box, exactly as a real portrait photo would.
+ *
+ *  Keyed by the photo STEM rather than a CatalogObject (v0.8): plants and lights have no CatalogObject to
+ *  look up, and the mock's job is only to prove the key round-trips. */
+function mockPhoto(stem: string): string {
+  const hue = (stem.length * 47) % 360;
+  const label = stem.replace(/&/g, "&amp;").replace(/</g, "&lt;");
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="280" viewBox="0 0 200 280">` +
     `<rect width="200" height="280" fill="hsl(${hue} 45% 62%)"/>` +
@@ -210,7 +239,13 @@ export function installMockBridge(): void {
   // adds and deleteObjectPhoto removes, so the right-click menu's paste/remove flow is exercisable with no
   // disk (the preview has none). Respects settings.thumbnailsDir like main: none set → "no-photos-dir".
   const mockPhotos = new Set<string>(
-    catalog.xref.filter((o) => hasMockPhoto(o.name)).map((o) => o.name.toLowerCase()),
+    [
+      ...catalog.xref.map((o) => o.name),
+      ...catalog.plants.map((p) => photoKey({ kind: "plant", group: p.group, species: p.species })),
+      ...catalog.airportLights.map((l) => photoKey({ kind: "airport_light", typeName: l.typeName })),
+    ]
+      .filter(hasMockPhoto)
+      .map((stem) => stem.toLowerCase()),
   );
 
   const api: PctApi = {
@@ -233,10 +268,9 @@ export function installMockBridge(): void {
     // Synthetic photos for a few stems (PHOTO_STEMS) so the preview exercises the object-photo path and
     // the hover-preview's enlarged image; every other card still falls back to its glyph.
     listThumbnails: async () => [...mockPhotos],
-    getThumbnail: async (name) => {
-      const o = catalog.xref.find((x) => x.name === name);
-      return o && mockPhotos.has(name.toLowerCase()) ? mockPhoto(o) : null;
-    },
+    // Keyed purely on the stem, exactly like main's index — no catalog lookup, so an xref name, a
+    // `plant.…` and a `light.…` all resolve the same way.
+    getThumbnail: async (name) => (mockPhotos.has(name.toLowerCase()) ? mockPhoto(name) : null),
     saveObjectPhoto: async (name) => {
       if (settings.thumbnailsDir === null) {
         return { ok: false, error: { code: "no-photos-dir", message: "No photo folder is set — choose one in Settings first." } };
