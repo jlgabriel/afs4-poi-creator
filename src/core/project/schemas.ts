@@ -10,6 +10,8 @@
 
 import { z } from "zod";
 import type { LonLat, Project, Settings } from "./types";
+import type { FootprintOverrides } from "../catalog/footprints";
+import { isValidPhotoKey } from "../catalog/photoKey";
 
 export const CURRENT_PROJECT_VERSION = 1;
 export const CURRENT_SETTINGS_VERSION = 1;
@@ -207,6 +209,40 @@ export const zSettings = z.looseObject({
     .optional()
     .catch(undefined),
 });
+
+// ── Footprint overrides (v0.9) ───────────────────────────────────────────────
+
+/** The largest measurement PCT accepts, metres. Not a limit of the format — a typo guard. The biggest
+ *  scanned XREF is under 100 m in any axis, so a slipped decimal ("500" for "50.0") is the realistic
+ *  failure and a 10 km polygon covering the whole map is how it would show up. */
+export const MAX_FOOTPRINT_M = 10000;
+
+const zMetres = z.number().finite().positive().max(MAX_FOOTPRINT_M);
+
+export const zFootprintOverride = z.looseObject({
+  width: zMetres,
+  depth: zMetres,
+  // Height alone may be 0: a painted marking or an inset light is flat, and a flat thing still has a
+  // ground footprint worth drawing. Width/depth of 0 would draw nothing, so those stay positive.
+  height: z.number().finite().nonnegative().max(MAX_FOOTPRINT_M),
+  note: z.string().optional(),
+});
+
+/** `footprints.json`. Like project.json this is untrusted input the moment the import button exists —
+ *  the whole point of the feature is that files travel between users — so the shape is validated rather
+ *  than trusted. Keys are gated by isValidPhotoKey: a key outside that set can't name any card, so it is
+ *  a hand-edit typo, and failing loudly on it beats importing a file that silently does nothing. */
+export const zFootprints = z.looseObject({
+  schemaVersion: z.literal(1),
+  entries: z.record(
+    z.string().refine(isValidPhotoKey, "must be an object photo key (letters, digits, _ . -)"),
+    zFootprintOverride,
+  ),
+});
+
+export function parseFootprints(raw: unknown): FootprintOverrides {
+  return zFootprints.parse(raw);
+}
 
 // ── Migration + parse entry points ───────────────────────────────────────────
 

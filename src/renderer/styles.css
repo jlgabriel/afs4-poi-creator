@@ -586,6 +586,12 @@ body {
   color: #94a3b8;
   cursor: default;
 }
+/* Separates the photo actions from the footprint one (v0.9) — two different things about the same object. */
+.pct-context-menu-sep {
+  margin: 4px 8px;
+  border: 0;
+  border-top: 1px solid #e2e8f0;
+}
 /* Inline error (the two expected snags: no folder / empty clipboard) — amber, matching the register banner. */
 .pct-context-menu-error {
   margin: 4px 4px 2px;
@@ -1398,4 +1404,23 @@ body {
   padding: 6px 4px;
   font-size: 12px;
   margin: 0;
+}
+
+/* Footprint dialog (v0.9): the three metre fields side by side, so width × depth × height reads as one
+   measurement rather than three unrelated settings. Wraps on a narrow window instead of squeezing. */
+.pct-footprint-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.pct-footprint-row label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 90px;
+  font-size: 12px;
+  color: #475569;
+}
+.pct-footprint-row .pct-text {
+  width: 100%;
 }

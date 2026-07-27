@@ -10,6 +10,7 @@
 //      WHERE. (Paths flowing back OUT, for display, are fine — they are main-produced.)
 // Types only, no runtime code — safe to import from any target (main / preload / renderer).
 import type { Catalog, PlacedObject, Project, ResolvedObject, Settings } from "../core/project/types";
+import type { FootprintOverride, FootprintOverrides } from "../core/catalog/footprints";
 
 export interface DetectResult {
   installDirs: string[];
@@ -69,6 +70,16 @@ export interface XrefRegistrationResult {
   warnings: string[];
 }
 
+/** What an import folded in (v0.9). `overrides` is the merged set the renderer adopts wholesale; the two
+ *  counts are what it tells the user, and `updated` matters most — it is the number of their own
+ *  measurements the imported file redefined. */
+export interface FootprintImport {
+  overrides: FootprintOverrides;
+  added: number;
+  updated: number;
+  path: string; // the file it came from (main-produced — display only)
+}
+
 export interface InstalledPoi {
   folderName: string;
   byPct: boolean; // carries PCT's README marker → safe to offer Uninstall
@@ -111,6 +122,20 @@ export interface PctApi {
   saveObjectPhoto(name: string): Promise<PctResult<void>>;
   deleteObjectPhoto(name: string): Promise<PctResult<void>>;
   openPhotosDir(): Promise<void>;
+
+  // Footprint overrides (v0.9) — the user's own width × depth × height for objects the scan can't measure
+  // (every airport light and plant, forum #126/#129), stored in their own userData file. Same naming
+  // discipline as the photos: the renderer names an OBJECT by its photo key and main owns the file.
+  // `setFootprint(key, null)` clears one. Every write returns the FULL set, so the renderer adopts one
+  // value rather than maintaining its own copy of the truth.
+  getFootprints(): Promise<FootprintOverrides>;
+  setFootprint(key: string, override: FootprintOverride | null): Promise<PctResult<FootprintOverrides>>;
+  // Both run a native dialog (P0-2 — main picks the file); `null` means the user cancelled. Import MERGES
+  // into what the user already has and reports how much it added vs. redefined; export writes the whole
+  // set out so it can be handed to somebody else, which is the point: PCT ships none of these numbers,
+  // but nothing stops one user measuring them once and posting the file.
+  importFootprints(): Promise<PctResult<FootprintImport | null>>;
+  exportFootprints(): Promise<PctResult<{ path: string; count: number } | null>>;
 
   // Project files — main owns the path + dialogs (P0-2). A returned `path` is for display only.
   openProject(): Promise<PctResult<{ path: string; project: Project } | null>>;

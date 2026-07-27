@@ -13,6 +13,7 @@ import type { Catalog, PlacedObject, Project, ResolvedObject, Settings } from ".
 import type {
   DetectResult,
   ExportOptions,
+  FootprintImport,
   InstallResult,
   InstalledPoi,
   PctError,
@@ -21,6 +22,15 @@ import type {
   XrefRegistrationPlan,
   XrefRegistrationResult,
 } from "../shared/pctApi";
+import {
+  countFootprints,
+  mergeFootprints,
+  setFootprint as setFootprintEntry,
+  type FootprintOverride,
+  type FootprintOverrides,
+} from "../core/catalog/footprints";
+import { isValidPhotoKey } from "../core/catalog/photoKey";
+import { readFootprints, readFootprintsFile, writeFootprints } from "./footprints";
 import {
   NeedsElevationError,
   UnsupportedInAutoheightError,
@@ -67,6 +77,7 @@ import { normalizeUserDir, readSettings, writeSettings } from "./settings";
 import { writeFileAtomic } from "./fsAtomic";
 
 const PROJECT_FILTER = [{ name: "PCT project", extensions: ["json"] }];
+const FOOTPRINTS_FILTER = [{ name: "PCT footprints", extensions: ["json"] }];
 
 const userData = (): string => app.getPath("userData");
 const documents = (): string => app.getPath("documents"); // OneDrive-safe user-dir detection (R5)
@@ -386,6 +397,57 @@ export function registerIpc(): void {
     const dir = currentSettings().thumbnailsDir;
     if (dir !== null && existsSync(dir)) await shell.openPath(dir); // best-effort, like revealInFolder
   });
+
+  // ── Footprint overrides (v0.9) ──
+  // The user's own width × depth × height for the objects PCT cannot measure — every airport light and
+  // plant, which have no `.tmi` and therefore draw as bare dots on the map (forum #126/#129). Kept in
+  // their own userData file, NOT in the catalog cache, so a Rescan can't wipe them; applied over the scan
+  // in the renderer (core/catalog/footprints). Nothing here ever reaches an exported POI.
+  ipcMain.handle("pct:getFootprints", (): FootprintOverrides => readFootprints(userData()));
+  ipcMain.handle("pct:setFootprint", (_e, key: string, override: FootprintOverride | null) =>
+    guarded("setFootprint", (): FootprintOverrides => {
+      // The renderer sends a key it derived from a card, but this is a trust boundary: reject anything
+      // that isn't key-shaped rather than writing it into a file the next launch would refuse to parse.
+      if (!isValidPhotoKey(key)) throw new Error(`unsafe footprint key: ${key}`);
+      const next = setFootprintEntry(readFootprints(userData()), key, override);
+      const saved = writeFootprints(userData(), next);
+      log.info(
+        override === null
+          ? `footprint cleared — ${key}`
+          : `footprint set — ${key} = ${override.width} × ${override.depth} × ${override.height} m`,
+      );
+      return saved;
+    }),
+  );
+  ipcMain.handle("pct:importFootprints", () =>
+    guarded("importFootprints", async (): Promise<FootprintImport | null> => {
+      const file = await showOpenFile({
+        title: "Import object footprints",
+        properties: ["openFile"],
+        filters: FOOTPRINTS_FILTER,
+      });
+      if (file === null) return null;
+      const { merged, added, updated } = mergeFootprints(readFootprints(userData()), readFootprintsFile(file));
+      const saved = writeFootprints(userData(), merged);
+      log.info(`footprints imported — ${added} new, ${updated} replaced, from ${file}`);
+      return { overrides: saved, added, updated, path: file };
+    }),
+  );
+  ipcMain.handle("pct:exportFootprints", () =>
+    guarded("exportFootprints", async (): Promise<{ path: string; count: number } | null> => {
+      const fp = readFootprints(userData());
+      const file = await showSaveFile({
+        title: "Export object footprints",
+        defaultPath: "pct-footprints.json",
+        filters: FOOTPRINTS_FILTER,
+      });
+      if (file === null) return null;
+      writeFileAtomic(file, JSON.stringify(fp, null, 2));
+      const count = countFootprints(fp);
+      log.info(`footprints exported — ${count} entries to ${file}`);
+      return { path: file, count };
+    }),
+  );
   ipcMain.handle("pct:getSettings", (): Settings => currentSettings());
   ipcMain.handle("pct:setSettings", (_e, patch: Partial<Settings>): Settings => {
     const before = currentSettings();

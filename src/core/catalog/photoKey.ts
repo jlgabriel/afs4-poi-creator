@@ -31,6 +31,20 @@ import { plantKey } from "./plants";
 export const PLANT_PHOTO_PREFIX = "plant";
 export const LIGHT_PHOTO_PREFIX = "light";
 
+/** The shape a photo key may have: starts alphanumeric, then letters, digits, `_`, `.`, `-`. It covers
+ *  every key `photoKey` produces (the 837 scanned `[A-Za-z0-9_]` XREF names, the user's own registered
+ *  objects — which routinely carry a `-`, forum #176 — and the dotted `plant.`/`light.` keys) while
+ *  leaving out a leading `.`/`-` and any `..`, so a key is still safe to join into a path.
+ *
+ *  Two consumers, one shape: main/thumbnails.ts guards a FILE NAME with it (a key arrives over IPC and
+ *  becomes `<dir>/<key>.png`), and v0.9's footprints.json guards a JSON KEY with it. The path-safety
+ *  reason belongs to the first; the second wants it because a key outside this set can't correspond to
+ *  any card, and a file full of such keys is a typo, not data. They share the predicate so the two can
+ *  never drift into disagreeing about what a key is. */
+export function isValidPhotoKey(key: string): boolean {
+  return /^[A-Za-z0-9][A-Za-z0-9_.-]*$/.test(key);
+}
+
 /** The stem the parametric "Point light (custom)" card uses. It has no catalog entry at all — it's fully
  *  described by its parameters — but it's a card in the Lights section like any other, so it gets a key
  *  rather than an exception. */

@@ -5,7 +5,8 @@
 // map swaps live (MapView subscribes to store.tiles). aria-modal suspends the global shortcuts (P1-2).
 import { useEffect, useState } from "react";
 import type { Settings } from "../../core/project/types";
-import { editorStore } from "../state/editorStore";
+import { countFootprints } from "../../core/catalog/footprints";
+import { editorStore, useEditor } from "../state/editorStore";
 import type { TilesConfig } from "../state/store";
 import type { TileProvider } from "../map/tileProviders";
 import { getPct } from "../app/pct";
@@ -36,6 +37,45 @@ export function SettingsDialog({
   const [busy, setBusy] = useState(false);
   const [pathNote, setPathNote] = useState<string | null>(null);
   const [logPath, setLogPath] = useState("");
+  // Footprint overrides (v0.9). Read live from the store rather than loaded here: the count has to move
+  // when an import lands, and the store is what the rest of the app already watches.
+  const footprintCount = useEditor((s) => countFootprints(s.footprints));
+  const [fpBusy, setFpBusy] = useState(false);
+  const [fpNote, setFpNote] = useState<string | null>(null);
+
+  /** Merge a file the user picks into their own set. The counts are reported rather than swallowed:
+   *  `updated` is the number of THEIR measurements the imported file redefined, which is the one outcome
+   *  a merge can produce that somebody might not have wanted. */
+  const importFootprints = async (): Promise<void> => {
+    if (!pct) return;
+    setFpBusy(true);
+    setFpNote(null);
+    const r = await pct.importFootprints();
+    setFpBusy(false);
+    if (!r.ok) {
+      setFpNote(`Import failed — ${r.error.message}`);
+      return;
+    }
+    if (r.value === null) return; // cancelled at the picker
+    editorStore.getState().setFootprints(r.value.overrides);
+    setFpNote(
+      `Imported ${r.value.added} new footprint${r.value.added === 1 ? "" : "s"}` +
+        (r.value.updated > 0 ? `, replacing ${r.value.updated} of your own.` : "."),
+    );
+  };
+
+  const exportFootprints = async (): Promise<void> => {
+    if (!pct) return;
+    setFpBusy(true);
+    setFpNote(null);
+    const r = await pct.exportFootprints();
+    setFpBusy(false);
+    if (!r.ok) {
+      setFpNote(`Export failed — ${r.error.message}`);
+      return;
+    }
+    if (r.value !== null) setFpNote(`Exported ${r.value.count} footprints to ${r.value.path}`);
+  };
 
   // Load current settings once (or store defaults when there's no bridge — the dialog stays previewable).
   useEffect(() => {
@@ -281,6 +321,31 @@ export function SettingsDialog({
                   Rescan the object catalog…
                 </button>
               </div>
+            </div>
+
+            {/* v0.9. The measurements are the user's own file, so they can leave the machine: one person
+                measures the airport lights once, posts the file, everyone else imports it — and PCT still
+                ships none of those numbers itself. */}
+            <div className="pct-field pct-field-col">
+              <span className="pct-field-label">Object footprints ({footprintCount})</span>
+              <div className="pct-settings-actions">
+                <button type="button" disabled={!pct || fpBusy} onClick={() => void importFootprints()}>
+                  Import…
+                </button>
+                <button
+                  type="button"
+                  disabled={!pct || fpBusy || footprintCount === 0}
+                  onClick={() => void exportFootprints()}
+                >
+                  Export…
+                </button>
+              </div>
+              <span className="pct-field-meta">
+                Sizes you measured yourself for objects your install doesn't describe — every airport light
+                and plant. Right-click a card in the Catalog to set one. They live in your own{" "}
+                <code>footprints.json</code>, survive a Rescan, and are never exported into a POI.
+              </span>
+              {fpNote !== null && <span className="pct-field-meta">{fpNote}</span>}
             </div>
 
             {/* Diagnostics. The log has no value if nobody can find it, and "open %APPDATA% and look for

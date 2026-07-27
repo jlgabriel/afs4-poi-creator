@@ -4,10 +4,17 @@
 // through React state.
 //
 // Two entry shapes share one layer + one drag machinery (Fable v0.2: extend, don't add a sibling
-// layer): xref objects draw as a footprint POLYGON with an anchor, heading tick and rotate handle;
-// v0.2 lights draw as a fixed-size point MARKER (a circleMarker coloured by the light itself), with an
-// amber halo ring for selection so the colour you're editing stays visible. Both use the same
-// select-click, the same layer-local move drag, and the same document-level mouseup.
+// layer): an object with a bounding box draws as a footprint POLYGON with an anchor, heading tick and
+// rotate handle; one without draws as a fixed-size point MARKER (a circleMarker coloured by the light
+// itself), with an amber halo ring for selection so the colour you're editing stays visible. Both use
+// the same select-click, the same layer-local move drag, and the same document-level mouseup.
+//
+// v0.9: the shape is chosen by "does this object HAVE a box", not by its kind. Until now the two were the
+// same question — only an XREF had one, because only an XREF is indexed in a `.tmi` — and that is why a
+// Runway Approach Light Center 5 (8 × 0.5 × 10 m) and a Center 1 (0.5 × 0.5 × 2 m) were the same 6-pixel
+// dot (forum #126/#129). A user who measures one by hand (core/catalog/footprints) gives it a box, and
+// from here on it is a footprint like any other. What differs per kind is only WHERE the facing is stored
+// and what it means — see boxDirection.
 //
 // P1-5 contract honoured here:
 //   • Reference-diff sync — mutate.ts guarantees structural sharing, so an object whose reference AND
@@ -35,12 +42,20 @@ import type {
   PlacedLight,
   PlacedObject,
   PlacedPlant,
-  PlacedXref,
   Vec3,
 } from "../../core/project/types";
 import { footprintCorners } from "../../core/geo/footprint";
 import { destination, initialBearing, wrapLon } from "../../core/geo/geo";
 import { directionToHeading, headingToDirection } from "../../core/geo/orientation";
+import {
+  boxDirection,
+  boxFor,
+  extentOf,
+  orientationOf,
+  PLACEHOLDER_BOX,
+  scaleOf,
+  type Box,
+} from "./footprintBox";
 import { diffEntry, isMissing } from "./syncDiff";
 import { snapAngle } from "./rotate";
 
@@ -55,9 +70,6 @@ const COLOR_SELECTED = "#f59e0b"; // amber highlight
 const COLOR_MISSING = "#ef4444"; // object not in the catalog → red dashed placeholder
 const COLOR_HANDLE = "#06b6d4"; // rotate grip — cyan (complementary to the amber selection) so the drag control never reads as the object itself
 const LIGHT_OUTLINE = "#0f172a"; // dark ring around a light marker so a white/pale fill reads on satellite imagery
-const PLACEHOLDER_M = 5; // half-extent of the 10×10 m square drawn for catalog-missing objects
-const PH_MIN: Vec3 = [-PLACEHOLDER_M, -PLACEHOLDER_M, 0];
-const PH_MAX: Vec3 = [PLACEHOLDER_M, PLACEHOLDER_M, 0];
 const SNAP_DEG = 5; // Shift-snap increment for the rotate handle (design §5)
 const HANDLE_MARGIN_M = 6; // gap in metres between the footprint's farthest corner and the handle
 const LIGHT_RADIUS = 6; // light marker radius, pixels (zoom-independent — a point fixture, not a footprint)
@@ -96,25 +108,17 @@ function pointColor(obj: PlacedAirportLight | PlacedLight | PlacedPlant): string
   return `#${hex2(r)}${hex2(g)}${hex2(b)}`;
 }
 
-/** The orientation a rotate-grip edits, or null for a kind that has none. A parametric point light has no
- *  orientation at all (mutate.rotateObject is a deliberate no-op for it), so it gets no grip: an
- *  interactive control that commits nothing is a lie. A plant is the same case for a different reason —
- *  it is a billboard that turns to face the camera, so there is no heading for a grip to act on, and the
- *  `.toc` plant element has no direction field to write one into. */
-function orientationOf(obj: PlacedObject): number | null {
-  if (obj.kind === "xref") return obj.direction;
-  if (obj.kind === "airport_light") return obj.orientation;
-  return null;
-}
-
 interface FootprintEntry {
   shape: "footprint";
-  obj: PlacedXref;
+  obj: PlacedObject;
+  /** The box this entry was BUILT from. Cached rather than re-looked-up per mousemove; it cannot go
+   *  stale, because any catalog/override change swaps the index Maps and rebuilds every entry (I3). */
+  box: Box;
   selected: boolean;
   missing: boolean;
   poly: L.Polygon;
   anchor: L.CircleMarker;
-  heading: L.Polyline;
+  heading?: L.Polyline; // the facing tick — absent for a kind with no orientation (a plant)
   handle?: L.CircleMarker; // present only while selected & unlocked (the rotate grip)
 }
 interface PointEntry {
@@ -210,16 +214,15 @@ export class FootprintLayer {
     for (const id of [...this.entries.keys()]) if (!seen.has(id)) this.remove(id);
   }
 
-  // ── geometry helpers (footprint only; the optional `direction` lets a rotate-drag preview an
-  //    un-committed bearing) ──
+  // ── geometry helpers (footprint only; the optional `facing` lets a rotate-drag preview an
+  //    un-committed bearing — in the object's OWN units, converted by boxDirection) ──
   private cornersAt(
     anchor: LonLat,
-    obj: PlacedXref,
-    cat: CatalogObject | undefined,
-    direction = obj.direction,
+    obj: PlacedObject,
+    box: Box,
+    facing = orientationOf(obj) ?? 0,
   ): LonLat[] {
-    const [min, max] = cat ? [cat.bbMin, cat.bbMax] : [PH_MIN, PH_MAX];
-    return footprintCorners(anchor, min, max, direction, obj.scale);
+    return footprintCorners(anchor, box.bbMin, box.bbMax, boxDirection(obj, facing), scaleOf(obj));
   }
 
   // The orientation tick points where the object FACES in-sim (heading = 90 − direction, calibrated
@@ -231,55 +234,62 @@ export class FootprintLayer {
   // wrong side of the anchor outright — so users watched the box turn against its own tick (forum #120).
   private headingAt(
     anchor: LonLat,
-    obj: PlacedXref,
-    cat: CatalogObject | undefined,
-    direction = obj.direction,
+    obj: PlacedObject,
+    box: Box,
+    facing = orientationOf(obj) ?? 0,
   ): LonLat {
-    const [min, max] = cat ? [cat.bbMin, cat.bbMax] : [PH_MIN, PH_MAX];
-    const ext = Math.max(Math.abs(min[0]), Math.abs(max[0]), Math.abs(min[1]), Math.abs(max[1]));
-    return destination(anchor, ext * obj.scale, directionToHeading(direction));
+    const ext = extentOf(box);
+    return destination(anchor, ext * scaleOf(obj), directionToHeading(boxDirection(obj, facing)));
   }
 
   /** Distance from the anchor to the rotate handle: past the farthest bbox corner so the grip always
    *  sits clear of the footprint whatever the box's shape (RCT's handleDistFor idiom). */
-  private handleDist(obj: PlacedXref, cat: CatalogObject | undefined): number {
-    const [min, max] = cat ? [cat.bbMin, cat.bbMax] : [PH_MIN, PH_MAX];
-    const ext = Math.max(Math.abs(min[0]), Math.abs(max[0]), Math.abs(min[1]), Math.abs(max[1]));
-    return ext * obj.scale + HANDLE_MARGIN_M;
+  private handleDist(obj: PlacedObject, box: Box): number {
+    return extentOf(box) * scaleOf(obj) + HANDLE_MARGIN_M;
   }
 
   private handleAt(
     anchor: LonLat,
-    obj: PlacedXref,
-    cat: CatalogObject | undefined,
-    direction = obj.direction,
+    obj: PlacedObject,
+    box: Box,
+    facing = orientationOf(obj) ?? 0,
   ): LonLat {
-    return destination(anchor, this.handleDist(obj, cat), directionToHeading(direction));
+    return destination(
+      anchor,
+      this.handleDist(obj, box),
+      directionToHeading(boxDirection(obj, facing)),
+    );
   }
 
   private add(obj: PlacedObject, selected: boolean): void {
-    // xref is the only kind with a footprint: it's the only one with a bounding box. Lights are point
-    // fixtures and a plant is a billboard, so both draw as a dot.
-    if (obj.kind === "xref") this.addFootprint(obj, selected);
-    else this.addPoint(obj, selected);
+    // Shape follows the BOX, not the kind (v0.9). An xref always has one, so the point branch can only
+    // be reached by the kinds addPoint accepts; the `?? placeholder` keeps this total anyway.
+    const box = boxFor(obj, this.index, this.lightIndex, this.plantIndex);
+    if (box === null && obj.kind !== "xref") this.addPoint(obj, selected);
+    else this.addFootprint(obj, box ?? PLACEHOLDER_BOX, selected);
   }
 
-  private addFootprint(obj: PlacedXref, selected: boolean): void {
-    const cat = this.index.get(obj.name);
-    const missing = cat === undefined; // the isMissing() predicate for an xref; `cat` is already in hand
+  private addFootprint(obj: PlacedObject, box: Box, selected: boolean): void {
+    const missing = isMissing(obj, this.index, this.lightIndex, this.plantIndex);
     const color = selected ? COLOR_SELECTED : missing ? COLOR_MISSING : COLOR;
 
-    const poly = L.polygon(this.cornersAt(obj.position, obj, cat).map(toLatLng), {
+    const poly = L.polygon(this.cornersAt(obj.position, obj, box).map(toLatLng), {
       color,
       weight: selected ? 3 : 2,
       fillOpacity: 0.2,
       dashArray: missing ? "5,5" : undefined,
       bubblingMouseEvents: false, // a footprint click never leaks to the map (select ≠ place)
     });
-    const heading = L.polyline(
-      [toLatLng(obj.position), toLatLng(this.headingAt(obj.position, obj, cat))],
-      { color, weight: 2, interactive: false },
-    );
+    // No facing, no tick: a plant is a billboard, and a line drawn where nothing points is a claim the
+    // object doesn't make (the same reason it gets no rotate grip).
+    const heading =
+      orientationOf(obj) === null
+        ? undefined
+        : L.polyline([toLatLng(obj.position), toLatLng(this.headingAt(obj.position, obj, box))], {
+            color,
+            weight: 2,
+            interactive: false,
+          });
     const anchor = L.circleMarker(toLatLng(obj.position), {
       radius: 4,
       color,
@@ -293,9 +303,18 @@ export class FootprintLayer {
     poly.on("mousedown", (e) => this.onGrab(obj.id, e));
 
     this.group.addLayer(poly);
-    this.group.addLayer(heading);
+    if (heading) this.group.addLayer(heading);
     this.group.addLayer(anchor);
-    const entry: FootprintEntry = { shape: "footprint", obj, selected, missing, poly, anchor, heading };
+    const entry: FootprintEntry = {
+      shape: "footprint",
+      obj,
+      box,
+      selected,
+      missing,
+      poly,
+      anchor,
+      heading,
+    };
     this.entries.set(obj.id, entry);
     this.syncHandle(entry, selected); // draw the grip if this object came in selected
   }
@@ -328,7 +347,7 @@ export class FootprintLayer {
     if (entry.shape === "footprint") {
       const color = selected ? COLOR_SELECTED : entry.missing ? COLOR_MISSING : COLOR;
       entry.poly.setStyle({ color, weight: selected ? 3 : 2 });
-      entry.heading.setStyle({ color });
+      entry.heading?.setStyle({ color });
       entry.anchor.setStyle({ color });
       this.syncHandle(entry, selected); // a restyle is a selection flip (same ref) → add/remove the grip
     } else {
@@ -344,7 +363,7 @@ export class FootprintLayer {
     if (!e) return;
     if (e.shape === "footprint") {
       this.group.removeLayer(e.poly);
-      this.group.removeLayer(e.heading);
+      if (e.heading) this.group.removeLayer(e.heading);
       this.group.removeLayer(e.anchor);
       if (e.handle) this.group.removeLayer(e.handle);
     } else {
@@ -356,11 +375,15 @@ export class FootprintLayer {
     this.entries.delete(id);
   }
 
-  // ── the rotate handle (footprint only; drawn while selected & unlocked) ──
+  // ── the rotate handle (footprint only; drawn while selected & unlocked, and only for a kind that has
+  //    a facing to edit — a plant footprint gets none, same rule as its missing tick) ──
   private syncHandle(entry: FootprintEntry, selected: boolean): void {
-    const want = selected && !entry.obj.locked;
+    const want = selected && !entry.obj.locked && orientationOf(entry.obj) !== null;
     if (want && !entry.handle) {
-      entry.handle = this.makeHandle(entry.obj);
+      entry.handle = this.makeGrip(
+        this.handleAt(entry.obj.position, entry.obj, entry.box),
+        entry.obj.id,
+      );
       this.group.addLayer(entry.handle);
     } else if (!want && entry.handle) {
       this.group.removeLayer(entry.handle);
@@ -431,11 +454,6 @@ export class FootprintLayer {
     return grip;
   }
 
-  private makeHandle(obj: PlacedXref): L.CircleMarker {
-    const cat = this.index.get(obj.name);
-    return this.makeGrip(this.handleAt(obj.position, obj, cat), obj.id);
-  }
-
   // ── drag (layer-local preview → one commit on release) ──
   // Left button ONLY. Leaflet's mousedown fires for any button, so a right-click (to reach a browser/OS
   // context menu) or a middle-click started a real drag that no matching mouseup ever ended cleanly.
@@ -486,11 +504,11 @@ export class FootprintLayer {
   /** Re-lay a shape at a previewed anchor during a move drag (kind-dispatched geometry). */
   private previewMove(entry: Entry, anchor: LonLat): void {
     if (entry.shape === "footprint") {
-      const cat = this.index.get(entry.obj.name);
-      entry.poly.setLatLngs(this.cornersAt(anchor, entry.obj, cat).map(toLatLng));
+      const { obj, box } = entry;
+      entry.poly.setLatLngs(this.cornersAt(anchor, obj, box).map(toLatLng));
       entry.anchor.setLatLng(toLatLng(anchor));
-      entry.heading.setLatLngs([toLatLng(anchor), toLatLng(this.headingAt(anchor, entry.obj, cat))]);
-      entry.handle?.setLatLng(toLatLng(this.handleAt(anchor, entry.obj, cat)));
+      entry.heading?.setLatLngs([toLatLng(anchor), toLatLng(this.headingAt(anchor, obj, box))]);
+      entry.handle?.setLatLng(toLatLng(this.handleAt(anchor, obj, box)));
     } else {
       entry.body.setLatLng(toLatLng(anchor));
       entry.halo?.setLatLng(toLatLng(anchor));
@@ -519,18 +537,22 @@ export class FootprintLayer {
       // The cursor's bearing from the anchor is the compass direction the grip is dragged TOWARD. For an
       // xref that IS the facing the user wants, so the raw direction to store = headingToDirection(facing);
       // a light's orientation is the raw bearing itself. The tooltip shows that same compass value.
+      //
+      // Branching on KIND, not on shape: since v0.9 a measured airport light draws as a footprint, and it
+      // still stores a raw compass bearing. Branching on shape here would have silently started writing
+      // `90 − bearing` into its `orientation` the moment somebody gave it a box.
       let facing = initialBearing(d.anchor, { lon: e.latlng.lng, lat: e.latlng.lat });
       if (e.originalEvent.shiftKey) facing = snapAngle(facing, SNAP_DEG);
-      const dir = entry.shape === "footprint" ? headingToDirection(facing) : facing;
+      const dir = entry.obj.kind === "xref" ? headingToDirection(facing) : facing;
       d.bearing = dir; // the RAW direction/orientation committed on release
       if (entry.shape === "footprint") {
-        const cat = this.index.get(entry.obj.name);
-        entry.poly.setLatLngs(this.cornersAt(d.anchor, entry.obj, cat, dir).map(toLatLng));
-        entry.heading.setLatLngs([
+        const { obj, box } = entry;
+        entry.poly.setLatLngs(this.cornersAt(d.anchor, obj, box, dir).map(toLatLng));
+        entry.heading?.setLatLngs([
           toLatLng(d.anchor),
-          toLatLng(this.headingAt(d.anchor, entry.obj, cat, dir)),
+          toLatLng(this.headingAt(d.anchor, obj, box, dir)),
         ]);
-        entry.handle?.setLatLng(toLatLng(this.handleAt(d.anchor, entry.obj, cat, dir)));
+        entry.handle?.setLatLng(toLatLng(this.handleAt(d.anchor, obj, box, dir)));
       } else if (entry.obj.kind === "airport_light") {
         const tip = this.lightHandleAt(entry.obj, d.anchor, dir);
         entry.tick?.setLatLngs([toLatLng(d.anchor), toLatLng(tip)]);

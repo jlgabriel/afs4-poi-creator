@@ -34,6 +34,7 @@ export interface CatalogObject {
   //    its own subfolder). Absent on every built-in and every already-bundled object. ──
   unregistered?: true; // from a loose user `.tmb` not yet registered → surfaced for registration, not placement
   sizeUnknown?: true; // an OPAQUE (IPACS-compiled) `.tmb`: filename only, no derivable bbox/footprint
+  footprintSource?: "user"; // v0.9: bbMin/bbMax/size came from the user's own measurement, not the scan
 }
 
 /** One scanned `.tmi` bundle. */
@@ -49,7 +50,7 @@ export interface BundleInfo {
  *  footprint objects. `typeName` is the exact string8u written into a POI `.toc` (the `.tmb`
  *  basename minus the `al_` prefix). PCT never opens the `.tmb` (opaque IPACS binary); the "scan"
  *  is pure name derivation, so it ships zero proprietary bytes — even stronger than the `.tmi` case. */
-export interface CatalogAirportLight {
+export interface CatalogAirportLight extends UserFootprint {
   typeName: string; // ".tmb basename minus al_", e.g. "runway_edge_light" — the .toc type_name
   folder: string; // provenance: the al_<type> folder it came from, e.g. "al_runway_edge_light"
   source: "install";
@@ -57,12 +58,30 @@ export interface CatalogAirportLight {
   displayName: string; // derived pretty label, e.g. "Runway Edge Light"
 }
 
+/** A bounding box PCT could not scan and the user measured by hand (v0.9, forum #126/#129 — ApfelFlieger
+ *  noticed the `airport_lights` draw as bare points on the map because they have no `.tmi` and therefore
+ *  no bbox, while a Runway Approach Light Center 2 and a Center 5 differ by metres that matter when you
+ *  place them). The user types width × depth × height into the card's right-click menu; it is stored in
+ *  their OWN `footprints.json` (userData, outside the catalog cache, so a Rescan never wipes it) and
+ *  applied over the scan at load — see core/catalog/footprints.
+ *
+ *  All optional, so the catalog cache stays schemaVersion 1 and a user with no overrides gets byte-identical
+ *  data. `bbMin`/`bbMax` are model-local metres, z up — the same frame the scanned XREF boxes use, which is
+ *  what lets one map layer draw both. ABSENT ≡ "this family has no footprint", which stays the default for
+ *  every light and plant: PCT ships none of these numbers, it only reads the ones the user has. */
+export interface UserFootprint {
+  bbMin?: Vec3;
+  bbMax?: Vec3;
+  size?: { x: number; y: number; z: number };
+  footprintSource?: "user";
+}
+
 /** One plant texture, enumerated from the install's `scenery/plants` folder (v0.4). Like
  *  CatalogAirportLight there is NO `.tmi` and NO bounding box — but here there is no MESH either:
  *  all 41 install files are `.ttx` textures, so the sim draws a plant from its texture alone and the
  *  "scan" is pure name derivation (`broadleaf__i00__h1750_color.ttx`). `group` + `species` are the
  *  exact strings a POI `.toc` writes; see core/catalog/plants.ts. */
-export interface CatalogPlant {
+export interface CatalogPlant extends UserFootprint {
   group: string; // the .toc `group`, e.g. "conifer_forest" — verbatim from the filename
   species: string; // the .toc `species`, e.g. "00" — 2 zero-padded digits, verbatim
   naturalHeight: number; // metres, decoded from the filename's h#### (h1750 → 17.5)

@@ -34,6 +34,11 @@ import type {
 } from "../../core/project/types";
 import type { Airport } from "../../core/airports/types";
 import { plantKey } from "../../core/catalog/plants";
+import {
+  EMPTY_FOOTPRINTS,
+  applyFootprintOverrides,
+  type FootprintOverrides,
+} from "../../core/catalog/footprints";
 import { destination } from "../../core/geo/geo";
 import * as mutate from "../../core/project/mutate";
 
@@ -95,12 +100,46 @@ function nudgeHeightSpec(h: HeightSpec, delta: number): HeightSpec {
   }
 }
 
+/** The catalog + its three indexes, with the user's footprint measurements already applied. ONE derivation
+ *  shared by "a catalog arrived" and "the measurements changed", because the two must produce identical
+ *  state — and because every index below has to be a FRESH Map on either event: FootprintLayer rebuilds an
+ *  entry when an index's identity changes (Fable I3), which is exactly how a measurement typed in the
+ *  dialog reaches the map. `catalogRaw` is the scan as it came, kept so a later edit re-derives from the
+ *  scan rather than from an already-overridden catalog. */
+function catalogSlice(
+  raw: Catalog,
+  footprints: FootprintOverrides,
+): Pick<EditorState, "catalogRaw" | "catalog" | "catalogIndex" | "airportLightIndex" | "plantIndex"> {
+  const applied = applyFootprintOverrides(raw, footprints);
+  // Browse the catalog A–Z instead of raw .tmi scan order (community request — chrispriv & Michael).
+  // Sorted here at the renderer funnel (not in buildCatalog) so users booting from a cached catalog get it
+  // without a Rescan. Array.sort is stable, so same-name install/user duplicates keep their order — the
+  // name→object index below (last-wins = user wins) and the self-sorting category tree are unaffected.
+  const xref = [...applied.xref].sort(byDisplayName);
+  return {
+    catalogRaw: raw,
+    catalog: { ...applied, xref },
+    catalogIndex: new Map(xref.map((o) => [o.name, o])),
+    airportLightIndex: new Map(applied.airportLights.map((l) => [l.typeName, l])),
+    // A catalog.json cached by v0.3 DOES have a `plants` key — it has been `plants: []` in the type since
+    // M0 — so this can't crash on upgrade. It resolves to an EMPTY palette instead, which is the same
+    // first-launch-after-update state v0.2's lights had, and it is handled the same way: PlantsSection
+    // shows a Rescan hint rather than an unexplained empty list.
+    plantIndex: new Map((applied.plants ?? []).map((p) => [plantKey(p), p])),
+  };
+}
+
 export interface EditorState {
   // ── reference data (loaded, not part of the document) ──
-  catalog: Catalog | null;
+  catalog: Catalog | null; // as BROWSED: sorted, with footprint overrides applied
+  catalogRaw: Catalog | null; // as SCANNED — the input catalogSlice re-derives from when overrides change
   catalogIndex: Map<string, CatalogObject>; // xref, by exact name
   airportLightIndex: Map<string, CatalogAirportLight>; // v0.2 airport lights, by typeName
   plantIndex: Map<string, CatalogPlant>; // v0.4 plants, by plantKey() — "group/species", not one name
+  // v0.9 footprint overrides: the user's own width × depth × height for objects the scan can't measure.
+  // Reference data like the photos — main owns the file, this is the loaded copy, and every write comes
+  // back as a whole new set (there is no partial update path to get out of sync with).
+  footprints: FootprintOverrides;
   airports: Airport[]; // sim airport list (bundled), for the TopBar search → flyTo; never saved
   tiles: TilesConfig; // map tile provider (from Settings); MapView subscribes → live tile swap
   // v0.6 object photos: the lowercased catalog names that have a user photo in settings.thumbnailsDir.
@@ -137,6 +176,7 @@ export interface EditorState {
   setTiles: (tiles: TilesConfig) => void;
   setThumbnails: (names: string[]) => void; // v0.6 — adopt a fresh photo-name list (boot / focus / Settings)
   invalidateThumbnail: (name: string) => void; // v0.7 — a paste changed ONE object's photo; force a re-fetch
+  setFootprints: (footprints: FootprintOverrides) => void; // v0.9 — adopt a saved/imported measurement set
   openProject: (path: string | null, project: Project) => void;
   newProject: (project: Project) => void;
   recoverProject: (project: Project) => void; // load a crash-recovery shadow as UNSAVED (dirty) work
@@ -299,9 +339,11 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
 
       return {
         catalog: null,
+        catalogRaw: null,
         catalogIndex: new Map(),
         airportLightIndex: new Map(),
         plantIndex: new Map(),
+        footprints: EMPTY_FOOTPRINTS,
         airports: [],
         tiles: DEFAULT_TILES,
         thumbnailNames: new Set(),
@@ -323,23 +365,13 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
         commitCoalesced,
         serialize: () => serializeProject(get()),
 
-        loadCatalog: (catalog) => {
-          // Browse the catalog A–Z instead of raw .tmi scan order (community request — chrispriv &
-          // Michael). Sorted here at the renderer funnel (not in buildCatalog) so users booting from a
-          // cached catalog get it without a Rescan. Array.sort is stable, so same-name install/user
-          // duplicates keep their order — the name→object index below (last-wins = user wins) and the
-          // self-sorting category tree are both unaffected.
-          const xref = [...catalog.xref].sort(byDisplayName);
-          set({
-            catalog: { ...catalog, xref },
-            catalogIndex: new Map(xref.map((o) => [o.name, o])),
-            airportLightIndex: new Map(catalog.airportLights.map((l) => [l.typeName, l])),
-            // A catalog.json cached by v0.3 DOES have a `plants` key — it has been `plants: []` in the
-            // type since M0 — so this can't crash on upgrade. It resolves to an EMPTY palette instead,
-            // which is the same first-launch-after-update state v0.2's lights had, and it is handled the
-            // same way: PlantsSection shows a Rescan hint rather than an unexplained empty list.
-            plantIndex: new Map((catalog.plants ?? []).map((p) => [plantKey(p), p])),
-          });
+        loadCatalog: (catalog) => set(catalogSlice(catalog, get().footprints)),
+        // A measurement was saved, cleared or imported. Re-derive from the RAW scan so clearing an
+        // override actually restores the scanned box (re-deriving from the overridden catalog would leave
+        // the old numbers baked in), and so the fresh index Maps make the map redraw.
+        setFootprints: (footprints) => {
+          const raw = get().catalogRaw;
+          set(raw === null ? { footprints } : { footprints, ...catalogSlice(raw, footprints) });
         },
         loadAirports: (airports) => set({ airports }),
         setTiles: (tiles) => set({ tiles }),

@@ -7,8 +7,14 @@
 // now serves the Lights and Plants cards. main/ipc.ts is untouched — it always took an opaque, guarded
 // name string, and a namespaced key is just another one.
 //
-// The three actions map 1:1 to the PctApi write side: Paste photo (clipboard → file), Remove photo (delete
-// every extension of the stem, behind a confirm), Open photos folder. The two EXPECTED snags surface INLINE
+// v0.9 adds a second, separated group: the object's FOOTPRINT. It belongs on this menu for the same reason
+// the photo does — the card knows which object it names, so neither action needs the user to type an id —
+// and it is the answer to forum #126/#129: an airport light has no `.tmi` and therefore no size, so it
+// draws as a bare point until somebody measures it. The editing itself lives in FootprintDialog; this menu
+// only routes to it (the panel owns the dialog, since every menu action closes the menu).
+//
+// The three photo actions map 1:1 to the PctApi write side: Paste photo (clipboard → file), Remove photo
+// (delete every extension of the stem, behind a confirm), Open photos folder. The two EXPECTED snags surface INLINE
 // — the menu stays open showing the reason — because each has a fix the user acts on next: no folder yet
 // (→ Open Settings) and an empty clipboard (→ go capture one). Any other failure shows its message verbatim.
 //
@@ -32,14 +38,21 @@ export function ObjectContextMenu({
   x,
   y,
   onClose,
+  onEditFootprint,
 }: {
   card: CardPhoto;
   x: number;
   y: number;
   onClose: () => void;
+  /** Hand the card up to the panel, which owns the dialog — this menu closes on every action, and a
+   *  dialog rendered from here would be unmounted by its own opening click. */
+  onEditFootprint: (card: CardPhoto) => void;
 }): React.ReactElement {
   const key = card.photoName.toLowerCase();
   const hasPhoto = useEditor((s) => s.thumbnailNames.has(key));
+  // The footprint key is the photo key VERBATIM (not lowercased): a file name has to survive a
+  // case-insensitive Windows disk, but this is a JSON key both written and read through photoKey.
+  const hasFootprint = useEditor((s) => s.footprints.entries[card.photoName] !== undefined);
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<Pos | null>(null);
   const [error, setError] = useState<InlineError | null>(null);
@@ -146,6 +159,18 @@ export function ObjectContextMenu({
       )}
       <button type="button" role="menuitem" disabled={busy} onClick={openFolder}>
         Open photos folder
+      </button>
+      <hr className="pct-context-menu-sep" />
+      <button
+        type="button"
+        role="menuitem"
+        disabled={busy}
+        onClick={() => {
+          onEditFootprint(card);
+          onClose();
+        }}
+      >
+        {hasFootprint ? "Edit footprint…" : "Set footprint…"}
       </button>
       {error !== null && (
         <div className="pct-context-menu-error">

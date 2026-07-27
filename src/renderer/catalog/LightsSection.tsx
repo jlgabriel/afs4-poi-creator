@@ -9,10 +9,10 @@
 // They benefit as much: a Runway Edge Light and a Taxiway Edge Light are the same generated glyph, and
 // what a fixture actually looks like lit at night is precisely what a screenshot answers.
 import { memo, useCallback, useMemo } from "react";
-import { photoKey, POINT_LIGHT_PHOTO_KEY } from "../../core/catalog/photoKey";
 import { editorStore, useEditor } from "../state/editorStore";
 import { Thumbnail } from "./Thumbnail";
-import { anchorRectOf, type CardPhoto, type CardPopovers } from "./cardPhoto";
+import { anchorRectOf, cardFor, type CardPhoto, type CardPopovers } from "./cardPhoto";
+import { sizeSuffix } from "./sizeLabel";
 
 interface LightCardProps {
   icon: string; // a category path → CategoryIcon glyph (the fallback when there's no photo)
@@ -99,7 +99,7 @@ export function LightsSection({ popovers }: { popovers: CardPopovers }): React.R
             // The point light has no catalog entry — it's fully described by its parameters — but it's a
             // card like any other, so it gets a photo key rather than an exception. A screenshot of one
             // configuration is still a better hint than a glyph at what a point light looks like lit.
-            card={{ photoName: POINT_LIGHT_PHOTO_KEY, displayName: POINT_TITLE }}
+            card={cardFor({ kind: "light" }, POINT_TITLE)}
             subtitle="parametric · colour + intensity + flash"
             armed={placing?.kind === "light"}
             onArm={armPointLight}
@@ -110,11 +110,10 @@ export function LightsSection({ popovers }: { popovers: CardPopovers }): React.R
           <LightCard
             key={l.typeName}
             icon={l.category}
-            card={{
-              photoName: photoKey({ kind: "airport_light", typeName: l.typeName }),
-              displayName: l.displayName,
-            }}
-            subtitle={l.typeName}
+            card={cardFor({ kind: "airport_light", typeName: l.typeName }, l.displayName)}
+            // The measured size joins the subtitle once there is one (v0.9). It is the whole reason the
+            // feature exists: nine Runway Approach fixtures whose only difference is how big they are.
+            subtitle={`${l.typeName}${sizeSuffix(l)}`}
             armed={placing?.kind === "airport_light" && placing.name === l.typeName}
             onArm={() => armAirportLight(l.typeName)}
             popovers={popovers}

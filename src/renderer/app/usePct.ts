@@ -43,12 +43,16 @@ export function useBootstrap(): Bootstrap {
     }
 
     void (async () => {
-      const [settings, cached, shadow] = await Promise.all([
+      const [settings, cached, shadow, footprints] = await Promise.all([
         pct.getSettings(),
         pct.getCachedCatalog(),
         pct.loadShadow(), // a crash-recovery copy from a previous session, or null
+        pct.getFootprints(), // v0.9 measurements — applied to whichever catalog arrives below
       ]);
       if (cancelled) return;
+      // BEFORE the branch, so it holds on both paths: loadCatalog reads the current overrides, and on the
+      // wizard path the catalog only arrives after a scan, later.
+      store.setFootprints(footprints);
       if (cached !== null && decideBootPhase(settings, cached) === "editor") {
         store.loadCatalog(cached);
         store.setTiles(settings.tiles); // adopt the saved tile provider before the map mounts

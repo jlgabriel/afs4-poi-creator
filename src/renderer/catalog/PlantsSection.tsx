@@ -10,10 +10,10 @@
 // it was that `plantKey` joins the pair with a `/`, which no file name can hold; see core/catalog/photoKey.
 import { memo, useCallback, useMemo } from "react";
 import { plantKey } from "../../core/catalog/plants";
-import { photoKey } from "../../core/catalog/photoKey";
 import { editorStore, useEditor } from "../state/editorStore";
 import { Thumbnail } from "./Thumbnail";
-import { anchorRectOf, type CardPhoto, type CardPopovers } from "./cardPhoto";
+import { anchorRectOf, cardFor, type CardPhoto, type CardPopovers } from "./cardPhoto";
+import { sizeSuffix } from "./sizeLabel";
 
 interface PlantCardProps {
   card: CardPhoto;
@@ -96,15 +96,13 @@ export function PlantsSection({ popovers }: { popovers: CardPopovers }): React.R
         {shown.map((p) => (
           <PlantCard
             key={plantKey(p)}
-            card={{
-              photoName: photoKey({ kind: "plant", group: p.group, species: p.species }),
-              displayName: p.displayName,
-            }}
+            card={cardFor({ kind: "plant", group: p.group, species: p.species }, p.displayName)}
             // The height IS the differentiator: Broadleaf 00 and 01 are the same tree at 17.5 m and
             // 16.5 m, so a subtitle of just "broadleaf" would make the 9 cards indistinguishable. The
             // `group/species` here is also what keeps the sim's own identity on screen now that the
-            // hover-preview's monospace line shows the PHOTO key instead.
-            subtitle={`${p.naturalHeight} m · ${plantKey(p)}`}
+            // hover-preview's monospace line shows the PHOTO key instead. A measured footprint (v0.9)
+            // joins the tail — the sim's own height, then the canopy the user measured.
+            subtitle={`${p.naturalHeight} m · ${plantKey(p)}${sizeSuffix(p)}`}
             // The glyph every plant card has always drawn — one generic tree, not p.category, so a
             // photo-less card looks exactly as it did before this feature.
             category="plants/tree"

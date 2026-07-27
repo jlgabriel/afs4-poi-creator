@@ -7,14 +7,26 @@
 // neither hover-preview nor menu. Narrowing the props to this pair is the whole unlock — a section
 // supplies a photo key (core/catalog/photoKey) and a label, and gets all three surfaces for free.
 import type { CatalogObject } from "../../core/project/types";
-import { photoKey } from "../../core/catalog/photoKey";
+import { photoKey, type PhotoSubject } from "../../core/catalog/photoKey";
 
 export interface CardPhoto {
-  /** The photo file-name stem — `photoKey(...)`. Also the string the hover-preview shows in monospace,
-   *  because it IS what the user must name the file (forum #160). */
+  /** WHICH object the card names. Carried as well as the derived key because v0.9's footprint editor
+   *  needs to look the object back up (to show what the scan says before the user overrides it), and
+   *  recovering a subject from a flat key would mean parsing the `plant.`/`light.` prefixes back apart —
+   *  a second, silently-drifting spelling of the convention photoKey already owns. */
+  subject: PhotoSubject;
+  /** The photo file-name stem — `photoKey(subject)`. Also the string the hover-preview shows in monospace,
+   *  because it IS what the user must name the file (forum #160), and the key a footprint override is
+   *  stored under. */
   photoName: string;
   /** The human label, used in the "Remove the photo for …?" confirm. Never a file name. */
   displayName: string;
+}
+
+/** Build a card from what identifies the object plus what to call it on screen. The one place a
+ *  `photoName` is derived, so subject and key can never disagree. */
+export function cardFor(subject: PhotoSubject, displayName: string): CardPhoto {
+  return { subject, photoName: photoKey(subject), displayName };
 }
 
 /** The handlers a card fires. Owned by CatalogPanel (one hover popup and one menu for the WHOLE panel,
@@ -34,5 +46,5 @@ export function anchorRectOf(card: HTMLElement): DOMRect {
 /** The CardPhoto for an XREF gallery object. Its key is the bare `name` (v0.6 compatibility), so this is
  *  a rename rather than a change — kept as a function anyway so no call site hard-codes that equivalence. */
 export function xrefCardPhoto(o: CatalogObject): CardPhoto {
-  return { photoName: photoKey({ kind: "xref", name: o.name }), displayName: o.displayName };
+  return cardFor({ kind: "xref", name: o.name }, o.displayName);
 }

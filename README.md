@@ -19,8 +19,9 @@ POI-folder conventions.
 > desktop editor (first-run wizard, satellite/streets map, object catalog, inspector, airport
 > search, per-object height, export / install / uninstall) are built and tested — unit + golden
 > tests, typecheck, and Electron end-to-end tests, all green in [CI](.github/workflows/ci.yml).
-> Lights, plants, your own custom XREF objects, an optional "Sim autoheight" export mode and real
-> object photos are all in — each feature below is tagged with the version it arrived in, and the
+> Lights, plants, your own custom XREF objects, an optional "Sim autoheight" export mode, real
+> object photos and hand-measured footprints are all in — each feature below is tagged with the
+> version it arrived in, and the
 > release notes carry the full history. The export format is **confirmed working in the sim**. Builds
 > are currently **unsigned**, so your OS will warn you once on first launch — see
 > [Installing PCT](#installing-pct). Grab the newest build from
@@ -55,6 +56,14 @@ and the **plants**, so every card in the catalog can show the real thing. The ph
 straight from your disk — never bundled into PCT and never written into your POIs. See
 [Photos of your objects](#photos-of-your-objects).
 
+**Sizes you measure, too.** Since **v0.9**, anything the sim doesn't describe can be given a size by
+hand. Your install tells PCT how big each **object** is, but it says nothing about the **lights** or the
+**plants** — so those drew on the map as bare points, and a big approach-light bar looked exactly like a
+single lamp. Right-click a card, choose **Set footprint**, type width × depth × height, and it draws at
+that size from then on. The measurements are **yours**: they live in your own file, survive a rescan, and
+can be exported and handed to somebody else. See
+[Footprints you measure yourself](#footprints-you-measure-yourself).
+
 **It ships no Aerofly content.** PCT reads the object catalog from *your* installed copy of the sim,
 so you only ever place objects you already own. Nothing from the sim is copied into this project or
 into your finished POIs — just the *names* of the objects you chose.
@@ -69,8 +78,10 @@ into your finished POIs — just the *names* of the objects you chose.
    installed and where your user folder lives, then scans your object catalog.
 3. **Place objects, lights and plants** — search the catalog, click on the map to drop an object, then
    drag, rotate, scale and fine-tune its height. Every object's footprint is drawn at its true size, so
-   you can line things up precisely. Below the catalog, the **Lights** section holds the airport-light
-   fixtures and the custom point light, and **Plants** holds the trees and shrubs.
+   you can line things up precisely — and since **v0.9** you can give a **light or a plant** a size too,
+   by measuring it yourself: see [Footprints you measure yourself](#footprints-you-measure-yourself).
+   Below the catalog, the **Lights** section holds the airport-light fixtures and the custom point light,
+   and **Plants** holds the trees and shrubs.
 4. **Export & install** — *Export POI → Install into Aerofly FS 4* writes the folder into your
    `scenery/poi/`. Restart Aerofly and fly to the spot. The same dialog can **uninstall** POIs that
    PCT made, so nothing is permanent.
@@ -139,6 +150,30 @@ Anything without a photo simply keeps its drawn icon.
 You never have to work this out by hand — **rest the mouse on a card** for a moment and a preview pops
 up with the photo enlarged and the file name spelled out, and **Paste photo** writes it for you. Photos
 you took with v0.6 or v0.7 keep working untouched: an object's file name has not changed.
+
+### Footprints you measure yourself
+
+*(v0.9)* On the map, an object is drawn as a **rectangle at its true size** — that's how you line things
+up against the imagery. A **light** or a **plant** isn't, because nothing in your install says how big
+one is: objects are indexed with their dimensions, lights and plants are not indexed at all. So they draw
+as a **point**, and nine different approach-light bars all look identical.
+
+If you know the size, you can just say so. **Right-click the card → Set footprint**, type the three
+numbers in metres, Save. From then on that light or plant draws as a real rectangle you can align, and
+the card shows its size.
+
+- **Width (X) runs along the facing arrow** the map draws, depth (Y) across it. If the box comes out
+  turned 90°, swap the two numbers — for a light, PCT has no way to know which way its model was built,
+  so it assumes the common one and lets you correct it.
+- **Height is stored but doesn't change the map.** A footprint is a ground outline.
+- It works on **objects** as well, if your install's own figure is wrong or missing.
+- **Nothing here is exported.** The Aerofly POI format has no footprint field — this only changes what
+  PCT draws while you're placing things.
+
+The measurements are yours, kept in your own `footprints.json` next to your settings. **Rescanning your
+install never clears them.** *Settings → Object footprints* has **Export** and **Import**, so one person
+can measure a family of fixtures once and post the file for everyone else — importing merges it into
+yours and tells you how many entries it added and how many of yours it replaced.
 
 ### Good to know
 

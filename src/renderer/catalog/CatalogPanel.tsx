@@ -25,6 +25,8 @@ import { ObjectContextMenu } from "./ObjectContextMenu";
 import { LightsSection } from "./LightsSection";
 import { PlantsSection } from "./PlantsSection";
 import { anchorRectOf, xrefCardPhoto, type CardPhoto, type CardPopovers } from "./cardPhoto";
+import { sizeLabel } from "./sizeLabel";
+import { FootprintDialog } from "../dialogs/FootprintDialog";
 
 const ROW_H = 64; // must match .pct-row height budget in styles.css (card + row padding)
 // Rest-before-show, so sweeping the mouse down the list doesn't strobe popups. 250 ms turned out to be
@@ -79,9 +81,10 @@ const ObjectCard = memo(function ObjectCard({
           {unregistered && <span className="pct-badge">unregistered</span>}
         </span>
         <span className="pct-obj-meta">
-          {o.sizeUnknown
-            ? "size unknown"
-            : `${o.size.x.toFixed(1)} × ${o.size.y.toFixed(1)} × ${o.size.z.toFixed(1)} m`}
+          {o.sizeUnknown ? "size unknown" : sizeLabel(o.size)}
+          {/* Say when the numbers are the user's own rather than the scan's — an overridden object looks
+              identical otherwise, and "why is this one 2 m wide" should be answerable from the card. */}
+          {o.footprintSource === "user" && <span className="pct-badge">custom</span>}
         </span>
         <span className="pct-obj-cat">{o.category}</span>
       </span>
@@ -164,6 +167,9 @@ export function CatalogPanel(): React.ReactElement {
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   // Right-click "Paste photo" menu (v0.7): which card, and where the click landed (viewport coords).
   const [menu, setMenu] = useState<{ card: CardPhoto; x: number; y: number } | null>(null);
+  // The footprint editor (v0.9), opened from that menu. Owned here rather than inside the menu, which
+  // closes on every action — a dialog rendered from a closing menu unmounts with it.
+  const [footprintCard, setFootprintCard] = useState<CardPhoto | null>(null);
 
   // Browse view hides objects that only make sense assembled inside an airport (the loose jetway
   // parts) — a DISPLAY filter, so the tree counts and the gallery agree while the full catalog and
@@ -276,7 +282,16 @@ export function CatalogPanel(): React.ReactElement {
       {/* Suppress the hover-preview while the menu is open so the two popups never stack. */}
       {hovered !== null && menu === null && <HoverPreview card={hovered.card} anchor={hovered.anchor} />}
       {menu !== null && (
-        <ObjectContextMenu card={menu.card} x={menu.x} y={menu.y} onClose={() => setMenu(null)} />
+        <ObjectContextMenu
+          card={menu.card}
+          x={menu.x}
+          y={menu.y}
+          onClose={() => setMenu(null)}
+          onEditFootprint={setFootprintCard}
+        />
+      )}
+      {footprintCard !== null && (
+        <FootprintDialog card={footprintCard} onClose={() => setFootprintCard(null)} />
       )}
     </section>
   );

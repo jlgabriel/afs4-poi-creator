@@ -10,6 +10,7 @@
 import type { Catalog, CatalogObject, PlacedXref, Project, Settings } from "../../core/project/types";
 import { categorize, displayName } from "../../core/catalog/categorize";
 import { photoKey } from "../../core/catalog/photoKey";
+import { EMPTY_FOOTPRINTS, setFootprint, type FootprintOverrides } from "../../core/catalog/footprints";
 import type { InstalledPoi, PctApi } from "../../shared/pctApi";
 
 // A spread of real-ish name stems across the catalog's categories, expanded with numeric suffixes to
@@ -238,6 +239,7 @@ export function installMockBridge(): void {
   // v0.7: a MUTABLE set of lowercased names that have a photo, seeded from PHOTO_STEMS. saveObjectPhoto
   // adds and deleteObjectPhoto removes, so the right-click menu's paste/remove flow is exercisable with no
   // disk (the preview has none). Respects settings.thumbnailsDir like main: none set → "no-photos-dir".
+  let mockFootprints: FootprintOverrides = EMPTY_FOOTPRINTS;
   const mockPhotos = new Set<string>(
     [
       ...catalog.xref.map((o) => o.name),
@@ -286,6 +288,16 @@ export function installMockBridge(): void {
       return { ok: true, value: undefined };
     },
     openPhotosDir: noop,
+    // v0.9 footprint overrides — in-memory, so the right-click "Edit footprint…" flow and the map's
+    // point→polygon switch are exercisable in the preview harness with no disk. Import/export need a
+    // native file dialog, so they report "cancelled" (null) rather than pretending.
+    getFootprints: async () => mockFootprints,
+    setFootprint: async (key, override) => {
+      mockFootprints = setFootprint(mockFootprints, key, override);
+      return { ok: true, value: mockFootprints };
+    },
+    importFootprints: async () => ({ ok: true, value: null }),
+    exportFootprints: async () => ({ ok: true, value: null }),
     planXrefRegistration: async () => ({
       ok: true,
       value: {
