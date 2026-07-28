@@ -1,0 +1,137 @@
+{
+  "schemaVersion": 1,
+  "app": "pct",
+  "name": "KDAG starter - a desert outpost at Barstow-Daggett",
+  "poiName": "kdag_starter",
+  "createdAt": "2026-07-27T00:00:00.000Z",
+  "modifiedAt": "2026-07-27T00:00:00.000Z",
+  "reference": null,
+  "heightMode": "baked-asl",
+  "camera": {
+    "lon": -116.795,
+    "lat": 34.8535,
+    "zoom": 17
+  },
+  "objects": [
+    {
+      "id": "aaaaaaaa-0000-4000-8000-000000000001",
+      "kind": "xref",
+      "name": "hangar_small_plates_ds_02_15_42",
+      "label": "The hangar. Heading 90 puts its long side parallel to runway 08/26.",
+      "position": { "lon": -116.795, "lat": 34.8536 },
+      "height": { "mode": "terrain" },
+      "direction": 0,
+      "scale": 1
+    },
+    {
+      "id": "aaaaaaaa-0000-4000-8000-000000000002",
+      "kind": "xref",
+      "name": "fuel_station_tanks",
+      "label": "Fuel, west of the hangar",
+      "position": { "lon": -116.7954, "lat": 34.8536 },
+      "height": { "mode": "terrain" },
+      "direction": 0,
+      "scale": 1
+    },
+    {
+      "id": "aaaaaaaa-0000-4000-8000-000000000003",
+      "kind": "xref",
+      "name": "airport_windsock_large2",
+      "label": "Windsock, out toward the runway",
+      "position": { "lon": -116.7943, "lat": 34.8533 },
+      "height": { "mode": "terrain" },
+      "direction": 0,
+      "scale": 1
+    },
+    {
+      "id": "aaaaaaaa-0000-4000-8000-000000000004",
+      "kind": "xref",
+      "name": "C172_livery1",
+      "label": "Parked Cessna - direction 250 = heading 200 (nose to the south-southwest)",
+      "position": { "lon": -116.7951, "lat": 34.85335 },
+      "height": { "mode": "terrain" },
+      "direction": 250,
+      "scale": 1
+    },
+    {
+      "id": "aaaaaaaa-0000-4000-8000-000000000005",
+      "kind": "xref",
+      "name": "C172_livery2",
+      "label": "Parked Cessna, second one",
+      "position": { "lon": -116.7949, "lat": 34.85333 },
+      "height": { "mode": "terrain" },
+      "direction": 250,
+      "scale": 1
+    },
+    {
+      "id": "aaaaaaaa-0000-4000-8000-000000000006",
+      "kind": "xref",
+      "name": "car_15",
+      "label": "Somebody drove here",
+      "position": { "lon": -116.7951, "lat": 34.85375 },
+      "height": { "mode": "terrain" },
+      "direction": 0,
+      "scale": 1
+    },
+    {
+      "id": "aaaaaaaa-0000-4000-8000-000000000007",
+      "kind": "xref",
+      "name": "car_17",
+      "label": "And so did somebody else",
+      "position": { "lon": -116.7951, "lat": 34.85378 },
+      "height": { "mode": "terrain" },
+      "direction": 0,
+      "scale": 1
+    },
+    {
+      "id": "aaaaaaaa-0000-4000-8000-000000000010",
+      "kind": "plant",
+      "group": "palm",
+      "species": "11",
+      "label": "Palms behind the hangar - natural height is 15 m, so stay near it",
+      "position": { "lon": -116.7953, "lat": 34.85395 },
+      "height": { "mode": "terrain" },
+      "heightRange": [14, 14]
+    },
+    {
+      "id": "aaaaaaaa-0000-4000-8000-000000000011",
+      "kind": "plant",
+      "group": "palm",
+      "species": "10",
+      "position": { "lon": -116.7952, "lat": 34.85395 },
+      "height": { "mode": "terrain" },
+      "heightRange": [10.5, 10.5]
+    },
+    {
+      "id": "aaaaaaaa-0000-4000-8000-000000000012",
+      "kind": "plant",
+      "group": "palm",
+      "species": "11",
+      "position": { "lon": -116.7951, "lat": 34.85395 },
+      "height": { "mode": "terrain" },
+      "heightRange": [15.5, 15.5]
+    },
+    {
+      "id": "aaaaaaaa-0000-4000-8000-000000000020",
+      "kind": "light",
+      "label": "Apron light - 6 m up, on at night. Group 3 would make it 24 h.",
+      "position": { "lon": -116.79515, "lat": 34.8535 },
+      "height": { "mode": "terrain-offset", "offset": 6 },
+      "color": [1, 1, 1],
+      "intensity": 2000,
+      "flashing": [0, 0, 0, 0],
+      "groupIndex": 0
+    },
+    {
+      "id": "aaaaaaaa-0000-4000-8000-000000000021",
+      "kind": "light",
+      "label": "Apron light, the other one",
+      "position": { "lon": -116.79485, "lat": 34.8535 },
+      "height": { "mode": "terrain-offset", "offset": 6 },
+      "color": [1, 1, 1],
+      "intensity": 2000,
+      "flashing": [0, 0, 0, 0],
+      "groupIndex": 0
+    }
+  ]
+}
