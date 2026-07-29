@@ -88,6 +88,9 @@ you're in.
 
 ![Shot 2.3 — the catalog PCT found, bundle by bundle](images/02_3_wizard_catalog_ready.jpg)
 
+Bundles you added yourself are listed here too, tagged `user` instead of `install` — that's the
+`xref_air_race_pylons` line above, and section 11 covers how to register your own.
+
 You can change the install folder later in **Settings**, and you can re-run this same scan at any
 time with **Rescan** — which is how PCT picks up anything you add to the sim afterwards.
 
