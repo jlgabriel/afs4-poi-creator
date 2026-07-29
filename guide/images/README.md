@@ -5,13 +5,16 @@ The images `GUIDE.md` expects, by exact filename. Anything not on this list isn'
 - `01_1_map_in_pct.jpg` — a scene arranged on the satellite map in PCT.
 - `01_2_same_place_in_sim.jpg` — that same place, flown in Aerofly FS 4. The pair carries the whole
   idea; they run one after the other, not composed into a single file.
-- `02_first_run_wizard.png` — the first-run wizard reporting the catalog it found.
-- `03_quickstart_map.png` — `tower00_large` placed beside the KDAG runway, selected.
+- `02_1_wizard_welcome.jpg` — the first-run wizard's opening screen.
+- `02_2_wizard_install_folder.jpg` — the wizard asking you to confirm the Aerofly FS 4 install.
+- `02_3_wizard_catalog_ready.jpg` — the scan result, bundle by bundle.
+- `03_quickstart_map.jpg` — `tower00_large` placed beside the KDAG runway, selected.
 - `04_quickstart_sim.jpg` — the same tower seen from the runway in the sim.
-- `05_editor_overview.png` — the whole editor: top bar, catalog, map, inspector.
+- `05_editor_overview.jpg` — the whole editor: top bar, catalog, map, inspector.
 - `06_rotate_handle.gif` — dragging the cyan handle to rotate an object.
-- `07_export_dialog.png` — the Export POI dialog, filled in.
+- `07_export_dialog.jpg` — the Export POI dialog, filled in.
 - `08_paste_photo.gif` — right-click a card → Paste photo → the card updates.
 
-Keep every file **under 1 MB**: JPEG ~q85 for sim captures, PNG for UI (crop before you scale —
-scaled UI text stops being readable), and crop GIFs hard.
+Keep every file **under 1 MB**. The stills are JPEG (~q85): at full window size a PNG blows past the
+limit and only gets under it by losing colours or scale, and scaled UI text stops being readable.
+Crop GIFs hard.

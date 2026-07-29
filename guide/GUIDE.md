@@ -72,14 +72,24 @@ project without a paid signing certificate — so your OS warns you once:
 
       xattr -cr /Applications/PCT.app
 
-**Then point PCT at your sim.** A short wizard runs on first launch. It auto-detects where Aerofly
-FS 4 is installed, you confirm or browse to it, and PCT scans your object catalog. That scan is the
-whole setup — when it reports how many objects it found, you're done.
+**Then point PCT at your sim.** A short wizard runs on first launch. Three screens, and that is the
+whole setup.
 
-![Shot 02 — the first-run wizard reporting the catalog it found](images/02_first_run_wizard.png)
+![Shot 2.1 — the wizard's welcome screen](images/02_1_wizard_welcome.jpg)
 
-If the auto-detect misses (a non-standard Steam library, a moved install), use **Browse…** and pick
-the folder that contains the sim's `scenery` directory. You can change it later in **Settings**.
+It auto-detects where Aerofly FS 4 is installed and asks you to confirm. If it guessed wrong — a
+non-standard Steam library, a moved install — use **Browse…** and pick the folder that *contains*
+the sim's `scenery` directory. Then press **Scan**.
+
+![Shot 2.2 — confirming the Aerofly FS 4 install folder](images/02_2_wizard_install_folder.jpg)
+
+The scan takes a few seconds and reports what it found, bundle by bundle. Press **Open editor** and
+you're in.
+
+![Shot 2.3 — the catalog PCT found, bundle by bundle](images/02_3_wizard_catalog_ready.jpg)
+
+You can change the install folder later in **Settings**, and you can re-run this same scan at any
+time with **Rescan** — which is how PCT picks up anything you add to the sim afterwards.
 
 ---
 
@@ -103,7 +113,7 @@ and nothing around to hide what you place.
    *Auto*, leave *Destination* on **Install into Aerofly FS 4**, and click **Install into AFS4**.
 6. **Restart Aerofly FS 4** and fly to KDAG.
 
-![Shot 03 — the tower placed beside the KDAG runway in PCT](images/03_quickstart_map.png)
+![Shot 03 — the tower placed beside the KDAG runway in PCT](images/03_quickstart_map.jpg)
 
 ![Shot 04 — the same tower seen from the runway in the sim](images/04_quickstart_sim.jpg)
 
@@ -121,7 +131,7 @@ To take it out again: **Export POI…** → the **Installed POIs** list at the b
 
 Four areas, and that's the whole app.
 
-![Shot 05 — the editor with its four panels labelled](images/05_editor_overview.png)
+![Shot 05 — the editor with its four panels labelled](images/05_editor_overview.jpg)
 
 **The top bar** holds the project (name, New / Open / Save / Save As…), **Export POI…**,
 **Rescan**, **Settings**, the airport search, the **Heights** mode switch, the map style switch
@@ -278,7 +288,7 @@ it makes the tree look stretched or squashed.
 
 **Export POI…** opens one dialog that does everything.
 
-![Shot 07 — the Export dialog](images/07_export_dialog.png)
+![Shot 07 — the Export dialog](images/07_export_dialog.jpg)
 
 **POI name (folder slug)** — lowercase letters, digits and underscores. This names the folder.
 
