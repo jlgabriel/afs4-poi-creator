@@ -677,5 +677,30 @@ Blender 5.2.0 LTS  +  io_scene_tgi addon (from the SDK zip)  →  .tgi
 
 ---
 
+## Credits
+
+Most of what follows was learned the slow way — writing files, flying to look at them, and
+reading `tm.log`. But several findings here were **shared publicly by other members of the
+Aerofly FS 4 community**, and it would be wrong not to say so. By their forum handles:
+
+- **ApfelFlieger** — the three GCS→WAD conversions in §12, published on the community forum
+  together with a complete, working, hand‑built heliport. The independent check of the
+  latitude projection (tangent vs. Mercator, inverted out of 47 binary IPACS `.wad` files)
+  was done here, but **the formulas are his**. He also supplied the `.tsl` details in §4 —
+  which fields a POI entry‑point file actually needs, and which ones do nothing.
+- **Rodeo** — the public release of the official XREF library described in §15, which is
+  where the display names, the taxonomy and the true footprint polygons come from.
+- **Frank Boës (fboes)** — the MIT‑licensed AFS4 airport dataset in §15.
+- **chrispriv** — the field report that prompted the lights‑and‑autoheight investigation
+  whose results are in §9.
+
+Errors, over‑readings and anything that turns out to be wrong are the author's own, not
+theirs.
+
+This document is an independent community effort. It is **not affiliated with, endorsed by,
+or sponsored by IPACS GbR**, and it documents behavior that IPACS does not document.
+
+---
+
 *End. This document is a distillation; verify against your own install, because the sim is
 undocumented in these areas and changes between versions.*
