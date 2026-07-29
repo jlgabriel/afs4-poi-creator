@@ -2,8 +2,9 @@
 
 The images `GUIDE.md` expects, by exact filename. Anything not on this list isn't referenced.
 
-- `01_hero_map_and_sim.jpg` — the same place in PCT and in the sim, composed side by side into one
-  file. The one image that carries the whole idea.
+- `01_1_map_in_pct.jpg` — a scene arranged on the satellite map in PCT.
+- `01_2_same_place_in_sim.jpg` — that same place, flown in Aerofly FS 4. The pair carries the whole
+  idea; they run one after the other, not composed into a single file.
 - `02_first_run_wizard.png` — the first-run wizard reporting the catalog it found.
 - `03_quickstart_map.png` — `tower00_large` placed beside the KDAG runway, selected.
 - `04_quickstart_sim.jpg` — the same tower seen from the runway in the sim.

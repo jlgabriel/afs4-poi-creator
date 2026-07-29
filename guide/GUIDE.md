@@ -32,9 +32,13 @@ only IPACS's own scenery uses them.
 PCT lets you place those same objects yourself. You click on a satellite map, PCT writes a standard
 POI scenery folder, you drop it into Aerofly, and the objects are there next time you fly.
 
-![Shot 01 — the same place in PCT and in the sim](images/01_hero_map_and_sim.jpg)
+![Shot 01.1 — objects placed on the satellite map in PCT](images/01_1_map_in_pct.jpg)
 
-That is the whole idea: what you arrange on the left is what you fly through on the right.
+Placed in PCT, on a satellite map. And then the same spot, flown:
+
+![Shot 01.2 — the same place, seen from the cockpit in Aerofly FS 4](images/01_2_same_place_in_sim.jpg)
+
+That is the whole idea: what you arrange on the map is what you fly through in the sim.
 
 Three things are worth knowing up front:
 
