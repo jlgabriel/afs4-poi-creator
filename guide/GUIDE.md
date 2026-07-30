@@ -202,7 +202,8 @@ positioning from a stray click. Set it once a piece is exactly where you want it
 
 ## 6. Heights — the one thing that isn't obvious
 
-Everything else in PCT is a click on a map. Height is the part that repays two minutes of reading.
+Everything else in PCT is a click on a map. Height is the part that repays two minutes of reading,
+and the worked example at the end of this section is the whole of it in practice.
 
 Aerofly places library objects at an **absolute elevation** — metres above sea level. There is no
 "just put it on the ground" in the file format. So PCT has to work out what the ground is.
@@ -242,61 +243,64 @@ air:
 the Export dialog. Every object that needs a ground height uses that one number — fine for a flat
 site, wrong for a hillside. (KDAG is 588 m.)
 
-### A worked example: three passes to make it sit down
+### A worked example: getting a site onto the ground
 
-Heights usually take more than one try, and that is normal — the trial and error *is* the work. Here
-is `guide/example/kdag_starter.json`, a twelve-object outpost at KDAG, in the three passes it took.
+Height is where a POI stops being a map exercise. It normally takes three passes, and the third one
+takes several — which isn't a sign of doing it wrong, it's the job. Re-exporting over an installed
+POI is one click and a few seconds, so this is a loop worth running rather than something to get
+right first time.
 
-**Pass one — let PCT look the ground up.** Export with *Baked ASL* and **Base elevation** left
-empty, so PCT asks an online elevation service. At KDAG it answered 585 m, and that is the figure
-written into the POI.
+Here is `guide/example/kdag_starter.json`, a twelve-object outpost at KDAG, pass by pass.
 
-![Shot 09.1 — the outpost baked at 585 m, everything sitting into the ground](images/09_1_baked_585_sunk.jpg)
+**Pass one — export with the defaults.** Leave **Base elevation** empty and PCT asks an online
+elevation service what the ground is. At KDAG it answered 585 m.
 
-The whole site is underground. Notice *how* it fails, because that is the diagnostic: the cars and
-the parked Cessnas have vanished outright, the fuel tanks show only their top and their walkway, and
-the hangar merely looks oddly squat. One error, applied equally to all twelve objects — but a metre
-matters far more to a 1.5-metre car than to a 7-metre hangar. **If the small objects disappear while
-the tall ones only look low, suspect the site elevation, not the objects.**
+![Shot 09.1 — the outpost on the elevation service's figure, sitting into the ground](images/09_1_defaults_sunk.jpg)
 
-**Pass two — use the sim's own number.** The sim's terrain is the only authority on the sim's
-terrain, so go and read it: altitude minus height-above-ground, off the instruments. We read 588 m,
-typed it into **Base elevation**, and installed again.
+The whole site is underground. Read *how* it fails, because that is the diagnostic: the cars and the
+parked Cessnas have vanished outright, the fuel tanks show only their tops and their walkway, and the
+hangar merely looks oddly squat. One error, applied equally to all twelve objects — but a metre costs
+a 1.5-metre car far more than a 7-metre hangar. **When the small objects disappear while the tall
+ones only look low, suspect the site figure, not the objects.**
 
-![Shot 09.2 — the outpost baked at 588 m, the big objects sitting and the small ones floating](images/09_2_baked_588_floating.jpg)
+**Pass two — give the whole site the sim's own figure.** The sim's terrain is the only authority on
+the sim's terrain, so go and read it off the instruments: altitude minus height-above-ground. Type
+that into **Base elevation** and export again.
 
-Better, and wrong in the other direction. The hangar sits, but the cars, the aircraft and even the
-palms now hover. Two things went wrong at once, and both are worth knowing:
+Expect to need more than one try at it. Read from the air the figure is a metre or two out, because
+you are over *near* the objects rather than on them, and the ground here slopes away toward the
+runway: 588 m overshot and left everything hovering, 587 m landed it. The reading with no parallax
+in it is **to set down beside the objects and take the altitude with height-above-ground at zero**.
 
-- **The instruments were read in the wrong place.** That reading was taken hovering *near* the
-  outpost rather than over it, and the ground there slopes away toward the runway — so "near" was a
-  metre or two out.
-- **One number cannot describe a site that isn't flat.** Even the right average leaves the low corner
-  floating and the high corner buried.
+![Shot 09.2 — the same outpost once the site figure is right](images/09_2_site_figure_fixed.jpg)
 
-The measurement with no parallax in it: **set down beside the objects and read the altitude with
-height-above-ground at zero.** That figure *is* the ground under them.
+That is the site correct, and almost everything sits.
 
-**Pass three — the last metre, object by object.** With the site figure right, whatever the slope
-still leaves over gets a per-object nudge: select the object and press **−0.5** in the Inspector.
-*Terrain* becomes *Terrain + offset* with a negative value, which is exactly what it's for. Export,
-restart, look again.
+**Pass three — the last half-metre, object by object.** One figure can describe a site but not its
+slope, so a few objects are still out. From a hundred metres up you can't see it. From close in you
+can:
 
-![Shot 09.3 — the outpost after per-object offsets](images/09_3_offsets_fixed.jpg)
+![Shot 09.3 — close in: the fuel tanks and a palm still off the ground](images/09_3_residual_close.jpg)
+
+Select each one and press **−0.5** or **+0.5** in the Inspector. *Terrain* becomes *Terrain + offset*,
+which is exactly what it's for, and negative values are perfectly normal. Export, restart, look,
+repeat. There is no shame in a pass 3.1, 3.2 and 3.3 — each round is a couple of minutes, and each
+one is smaller than the last.
+
+![Shot 09.4 — the same objects after their per-object offsets](images/09_4_offsets_tuned.jpg)
 
 Three things worth taking from this:
 
 - **Fix the site first, the objects second.** Nudging twelve objects to compensate for one wrong site
-  elevation is work you can skip.
-- **Yes, Sim autoheight would have done all of this for you** — and this project can't use it,
-  because it has two apron lights. That's the trade-off described above, in a real case rather than
-  in the abstract.
-- **Flying out to look is part of building a POI, not a sign that you got it wrong.** No elevation
+  figure is work you can skip.
+- **Yes, Sim autoheight would have done all of it for you** — and this project can't use it, because
+  it has two apron lights. That's the trade-off described above, in a real case rather than in the
+  abstract.
+- **Flying out to look is part of building a POI, not evidence that you got it wrong.** No elevation
   service and no figure in this guide beats reading it off your own instruments.
 
-The example project ships as it came out of pass one, on purpose. Install it, fly out, and walk it
-through the other two yourself — the shortest exercise in this guide that ends with you having
-changed something in Aerofly.
+The example project ships as it came out of pass one, on purpose. Install it, fly out, and take it
+through the other two yourself.
 
 Sim autoheight was designed on the forum by **@chrispriv**, with **@ApfelFlieger**.
 
