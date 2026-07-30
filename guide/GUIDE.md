@@ -174,7 +174,7 @@ to disarm.
 **To rotate:** drag the **cyan handle**, holding **Shift** to snap to 5°. Or press **R** to jump
 straight to the rotation field and type a number.
 
-![Shot 06 — an object turned off the cardinals, its footprint rectangle askew and the cyan handle showing which way it faces](images/06_rotate_handle.jpg)
+![Shot 06 — rotating an object: the footprint rectangle swung off the cardinals, the cyan handle, and the angle read out beside it](images/06_rotate_handle.jpg)
 
 **"Heading °" is a real compass heading** — 0 = north, 90 = east, clockwise. PCT applies the
 object-facing convention it calibrated inside the sim, so the number means what you'd expect from
@@ -452,10 +452,11 @@ So PCT can show **your own photos** instead — on every card, including lights 
    Windows, `Cmd+Ctrl+Shift+4` on macOS.
 3. Back in PCT, **right-click that object's card** → **Paste photo from clipboard**.
 
-![Shot 08 — the right-click menu open on a card, among cards already carrying their own photos](images/08_paste_photo.jpg)
+![Shot 08 — the right-click menu open on a catalog card](images/08_paste_photo.jpg)
 
-That's it: no filename to type, no id to match. The card knows which object it is, so the file is
-named correctly by construction. The same menu has **Remove photo** and **Open photos folder**.
+That's it: no filename to type, no id to match. The card knows which object it is — the menu prints
+the exact name at the top — so the file is named correctly by construction. **Open photos folder** is
+in the same menu, and **Remove photo** joins it once the card has one.
 
 The photos are yours. They're read from your disk, never bundled into PCT, and never written into
 your POIs.

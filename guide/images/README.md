@@ -11,11 +11,11 @@ The images `GUIDE.md` expects, by exact filename. Anything not on this list isn'
 - `03_quickstart_map.jpg` — `tower00_large` placed beside the KDAG runway, selected.
 - `04_quickstart_sim.jpg` — the same tower seen from the runway in the sim.
 - `05_editor_overview.jpg` — the whole editor: top bar, catalog, map, inspector.
-- `06_rotate_handle.jpg` — an object turned off the cardinals: footprint rectangle askew, cyan handle
-  visible, and a non-round heading in the Inspector.
+- `06_rotate_handle.jpg` — mid-rotation: footprint rectangle swung off the cardinals, cyan handle, the
+  live angle badge beside it, and the heading in the Inspector.
 - `07_export_dialog.jpg` — the Export POI dialog, filled in.
-- `08_paste_photo.jpg` — the right-click menu open on a card, framed so neighbouring cards already
-  show real photos instead of drawn icons: the mechanism and the result in one shot.
+- `08_paste_photo.jpg` — the right-click menu open on a catalog card, with the object's exact photo
+  name printed at the top of it.
 - `09_1_defaults_sunk.jpg` — the example outpost exported with the defaults: the elevation service's
   figure puts the whole site underground.
 - `09_2_site_figure_fixed.jpg` — the same outpost, same viewpoint, once **Base elevation** carries the
