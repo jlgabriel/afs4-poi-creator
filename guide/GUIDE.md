@@ -7,19 +7,24 @@ file editing.
 This guide is written to be read straight through the first time, and dipped into afterwards. Each
 section stands on its own.
 
-1. What PCT actually does
-2. Getting PCT running
-3. Quickstart — one object, five minutes
-4. The editor in one screen
-5. Placing, moving, rotating
-6. Heights — the one thing that isn't obvious
-7. Lights and plants
-8. Exporting and installing
-9. Cookbook — five things worth building
-10. Making the catalog yours — photos and footprints
-11. Your own models
-12. When something goes wrong
-13. Where to go next
+| § | Section | What's in it |
+|---|---|---|
+| 1 | [What PCT actually does](#1-what-pct-actually-does) | The idea in two pictures, and three things to know up front. |
+| 2 | [Getting PCT running](#2-getting-pct-running) | Download, the one-time warning from your OS, the first-run wizard. |
+| 3 | [Quickstart](#3-quickstart--one-object-five-minutes) | The shortest route to "it worked": one object, five minutes. |
+| 4 | [The editor in one screen](#4-the-editor-in-one-screen) | Four panels, and what each one is for. |
+| 5 | [Placing, moving, rotating](#5-placing-moving-rotating) | Placement, the rotate handle, whole selections, tidy rows, shortcuts. |
+| 6 | [Heights](#6-heights--the-one-thing-that-isnt-obvious) | The one genuinely fiddly part, with a worked example flown at KDAG. |
+| 7 | [Lights and plants](#7-lights-and-plants) | Why a light shows nothing at noon, and the two fields both called "height". |
+| 8 | [Exporting and installing](#8-exporting-and-installing) | The Export dialog field by field. Uninstalling, and sharing what you made. |
+| 9 | [Cookbook](#9-cookbook--six-things-worth-building) | Six scenes worth building, and a starter project to take apart. |
+| 10 | [Making the catalog yours](#10-making-the-catalog-yours--photos-and-footprints) | Your own photos on the cards, and sizes for the objects the sim doesn't measure. |
+| 11 | [Your own models](#11-your-own-models) | Placing custom XREF objects you've added to the sim. |
+| 12 | [When something goes wrong](#12-when-something-goes-wrong) | Symptom by symptom — and where the log file is. |
+| 13 | [Where to go next](#13-where-to-go-next) | The forum, the technical reference, the source, and who built what. |
+
+**In a hurry?** Section 3 puts one object into the sim in five minutes. If it doesn't turn up, the
+answer is almost always the first line of section 12.
 
 ---
 
@@ -32,7 +37,7 @@ only IPACS's own scenery uses them.
 PCT lets you place those same objects yourself. You click on a satellite map, PCT writes a standard
 POI scenery folder, you drop it into Aerofly, and the objects are there next time you fly.
 
-![Shot 01.1 — objects placed on the satellite map in PCT](images/01_1_map_in_pct.jpg)
+![Shot 01.1 — an object placed on the satellite map in PCT, beside the runway at KDAG](images/01_1_map_in_pct.jpg)
 
 Placed in PCT, on a satellite map. And then the same spot, flown:
 
@@ -49,8 +54,8 @@ Three things are worth knowing up front:
   Share them, post them, sell them.
 - **Nothing is permanent.** PCT installs POI folders and can uninstall the ones it made.
 
-A stock install gives PCT about **911 objects**, **41 plants**, and the sim's **airport light
-fixtures** to work with.
+A stock install gives PCT about **911 objects**, **41 plants** and **22 airport light fixtures** to
+work with, plus a parametric point light of PCT's own.
 
 ---
 
@@ -92,7 +97,12 @@ Bundles you added yourself are listed here too, tagged `user` instead of `instal
 `xref_air_race_pylons` line above, and section 11 covers how to register your own.
 
 You can change the install folder later in **Settings**, and you can re-run this same scan at any
-time with **Rescan** — which is how PCT picks up anything you add to the sim afterwards.
+time with **Rescan** — which is how PCT picks up anything you add to the sim afterwards. Settings is
+also where the photo and footprint folders live (section 10) and where the log file is (section 12).
+
+<!-- SHOT 13_settings.jpg — the Settings dialog: install folder, object photos folder, object
+     footprints, Diagnostics. Sections 2, 10 and 12 all send the reader here, and none of them shows
+     it. Desktop only. See guide/images/README.md. -->
 
 ---
 
@@ -128,6 +138,10 @@ restarted the sim.
 
 To take it out again: **Export POI…** → the **Installed POIs** list at the bottom → **Uninstall**.
 
+That loop — place, export, restart, look — is the whole of PCT. Everything after this section refines
+it: [section 6](#6-heights--the-one-thing-that-isnt-obvious) for getting things properly onto the
+ground, and [section 9](#9-cookbook--six-things-worth-building) for ideas about what to build.
+
 ---
 
 ## 4. The editor in one screen
@@ -142,15 +156,21 @@ Four areas, and that's the whole app.
 
 **The Catalog panel**, on the left, is everything you can place, in three collapsible sections:
 
-- **Objects** — the built-in XREF models, with a category tree (hangars, towers, terminals,
-  aircraft, vehicles, jetways, churches, furniture, people…) and a search box.
-- **Lights** — the sim's airport light fixtures plus a fully parametric point light.
+- **Objects** — the built-in XREF models, with a category tree (buildings, aircraft, vehicles, items,
+  jetways, construction, furniture, people, churches, comm-towers…) and a search box.
+- **Lights** — the sim's 22 airport light fixtures plus a fully parametric point light.
 - **Plants** — 41 trees and shrubs.
 
 All three start collapsed, so you can see the three families and their counts at a glance; open the
-ones you're working with. Each
-card shows the object's name, its real footprint in metres, and its category. **Rest the mouse on a
-card** for a second and a preview pops up with the object's exact id spelled out.
+ones you're working with. Each card shows the object's name, its real footprint in metres, and its
+category. **Rest the mouse on a card** for a second and a preview pops up with the object's exact id
+spelled out.
+
+The Objects count reads about **850**, not the 911 the scan reported. The difference is the flexible
+jetways: some 60 of those parts are bends and passenger bridges that only line up when an airport's own
+scenery assembles them, and on their own they're noise in a browser. PCT hides those and keeps the 20
+free-standing footway pieces you can place yourself. Nothing is lost — a hidden object stays in the
+catalog, so an old project that used one still opens, exports and flies.
 
 **The map**, in the middle. Satellite imagery from Esri by default; switch to streets when the
 imagery is poor in your area, or plug in your own tile URL in Settings. Every placed object is
@@ -158,7 +178,15 @@ drawn as a rectangle **at its true size** — that's what lets you line things u
 features.
 
 **The Inspector**, on the right, edits whatever is selected: exact coordinates, heading, scale,
-height, a free-text label, and a lock. Below it, the placed list is everything in the project.
+height, a free-text label, and a lock. Select more than one object and it turns into the arrange
+panel instead — section 5. Collapsed at the bottom, **FS4 internal (.wad)** reads the same position
+back in the projected units the sim uses inside its own airport database; it changes nothing and is
+there for the few people who hand-build heliport files (section 13 says where that's documented).
+
+Below the Inspector, **the placed list** is everything in the project. Click a row to select it,
+shift-click to add to the selection, **double-click to send the map to it** — handy once a project has
+grown past what fits on screen — and **Duplicate** / **Delete** at the top of the list act on whatever
+is selected.
 
 ---
 
@@ -185,18 +213,79 @@ matter how the model was authored.
 **Scale ×** resizes the object uniformly. Useful, but a scaled object often looks scaled — treat it
 as a nudge, not a modelling tool.
 
-The shortcuts worth memorising:
-
-- **Ctrl+D** — duplicate the selection. This is how you build a row of anything.
-- **Ctrl+Z / Ctrl+Shift+Z** — undo / redo.
-- **Delete** — remove the selection.
-- **Ctrl+S** — save. Works even while you're typing in a field.
-- **Esc** — disarm placement.
-
 **Lock** in the Inspector ("ignore map drag & rotate") protects an object you've finished
 positioning from a stray click. Set it once a piece is exactly where you want it.
 
 **Label** is a note to yourself. It never reaches the sim.
+
+### Several objects at once
+
+**Shift-click** adds an object to the selection — on the map, or in the placed list. The Inspector
+header changes to "N objects selected", and the editing gestures start working on the whole set:
+
+- **Arrow keys** move all of them together, 0.5 m per press and 5 m with **Shift**. Dragging on the
+  map is the one gesture that stays single: it moves the object you grabbed and leaves the rest.
+- **Ctrl+D** duplicates everything selected — 5 m east — and leaves *the copies* selected, so a
+  second **Ctrl+D** gives you a third set rather than a second one.
+- **Delete** removes them all.
+
+Each gesture is a single undo step, however many objects it moved. Holding an arrow key down counts
+as one gesture too, so **Ctrl+Z** takes back the whole slide rather than the last half-metre of it.
+
+### Tidy rows — Line up, Space evenly
+
+Rows are what people build most: parked aircraft along an apron, lamps down a taxiway, trees along a
+track. Placed by hand they come out nearly-but-not-quite straight, and nearly-but-not-quite evenly
+spaced.
+
+Select three or more objects and the Inspector offers two buttons for exactly that. Both read the row
+you already made — the line through the **two objects farthest apart** — and the line beneath them
+reports what PCT found, e.g. `Row: 143.6 m at 128.4°`:
+
+- **Line up** slides every object sideways onto that line. The two at the ends are already on it, so
+  they don't move.
+- **Space evenly** gives every gap along the line the same length, and leaves each object's distance
+  *off* the line alone.
+
+They're independent: run either one, or both, in any order. There's no "align left" here on purpose —
+left is *west*, and the row you actually want is hardly ever north-south or east-west. Both tools work
+along the row itself, whatever angle it runs at.
+
+Underneath, when everything selected is the same kind of thing, one **Heading °** field writes a
+single heading to all of them; blank means they currently disagree. **Match row** turns the whole
+selection to face along the row, which is the fast way to park a line of aircraft nose-to-tail — add
+180 to the number if they end up facing the wrong end of it.
+
+Two objects are a line already, so both buttons wait for a third. Objects that are **locked** still
+count when PCT works out where the row runs, but they stay put — so a piece you'd already finished
+positioning doesn't get pulled into line with the rest.
+
+What the panel covers is positions and headings. **Heights are still edited one object at a time** —
+that's [section 6](#6-heights--the-one-thing-that-isnt-obvious).
+
+<!-- SHOT 10_1_arrange_before.jpg / 10_2_arrange_after.jpg — arrange, before and after, same viewpoint
+     both times: a crooked, unevenly spaced row of 5-6 parked aircraft selected on the map, with the
+     Inspector showing "N objects selected" and the "Row: … m at …°" read-out; then the same row after
+     Line up + Space evenly + Match row. Desktop only, no flying. See guide/images/README.md. -->
+
+### The keyboard
+
+| Gesture | What it does |
+|---|---|
+| Click a card, then the map | Place. The card stays armed for the next click. |
+| **Esc** | Disarm placement. |
+| Drag an object | Move it. |
+| **Arrow keys** · **Shift** + arrows | Move the selection 0.5 m · 5 m. |
+| Drag the cyan handle · with **Shift** | Rotate freely · snap to 5°. |
+| **R** | Jump to the rotation field and select it. |
+| **Shift**-click | Add to the selection. |
+| **Ctrl+D** | Duplicate the selection, 5 m east. |
+| **Delete** or **Backspace** | Remove the selection. |
+| **Ctrl+Z** · **Ctrl+Shift+Z** or **Ctrl+Y** | Undo · redo. |
+| **Ctrl+S** · **Ctrl+Shift+S** | Save · Save As. Works even while you're typing in a field. |
+| **Ctrl+N** · **Ctrl+O** | New project · Open. |
+
+On macOS, **Cmd** does the job of Ctrl throughout.
 
 ---
 
@@ -223,10 +312,10 @@ under the selected object and shows it as `terrain ≈ 588.0 m ASL`.
 
 - **Baked ASL** (the default) — PCT resolves each object's ground elevation and writes an absolute
   number into the POI. It looks the elevation up online, once, at export.
-- **Sim autoheight (beta)** — Aerofly itself grounds each object when it loads the scenery. The
-  export is then **fully offline**, and objects follow the terrain even if a sim update re-levels
-  it. In this mode *Terrain* means "on the ground", *Terrain + offset* floats N metres above it,
-  and *ASL* has no meaning at all.
+- **Sim autoheight (beta)** — shortened to **Autoheight** on the top bar. Aerofly itself grounds each
+  object when it loads the scenery. The export is then **fully offline**, and objects follow the
+  terrain even if a sim update re-levels it. In this mode *Terrain* means "on the ground",
+  *Terrain + offset* floats N metres above it, and *ASL* has no meaning at all.
 
 Autoheight is generally the more reliable of the two, because the sim's own terrain is the final
 authority — the elevation service and the sim's mesh disagree by a few metres in places (at KDAG:
@@ -320,13 +409,23 @@ Two kinds, both in the **Lights** section:
   up to 100000 = very bright), and optionally a flash pattern.
 
 **Lights only render at night.** This is Aerofly's behaviour, not a bug, and it is the single most
-common "PCT is broken" report. The **Visibility group** field controls the window: group 0 is
-night ±40 minutes, groups 1 and 2 are night ±90 minutes, and **group 3 is always on, 24 hours**.
-If you want to see a light at noon while you're building, use group 3.
+common "PCT is broken" report. The **Visibility group** field on each light controls the window:
+
+| Visibility group | On for |
+|---|---|
+| 0 | night ±40 min |
+| 1 | night ±90 min |
+| 2 | night ±90 min |
+| 3 | **always on (24 h)** |
+
+While you're building in daylight, set group 3 so you can see what you're doing, and drop it back to
+0 or 1 when the row is right. Or leave it at 3 on purpose: a light that burns through the afternoon is
+wrong for a runway edge and right for a lit-up factory yard.
 
 **Flashing** takes four numbers, of which three matter: *Cycle* (bigger = slower), *Sequence*
 (the phase), and *Length* (how long each flash lasts). Stagger *Sequence* 1, 2, 3, 4… across a row
-of point lights and you get a running-light sweep down the row.
+of point lights and you get a running-light sweep down the row — worth doing after **Space evenly**
+(section 5), since a sweep is only convincing if the gaps it crosses are equal.
 
 Remember: lights need **Baked ASL**.
 
@@ -400,21 +499,45 @@ delete a folder it didn't create.
 `Aerofly FS 4/scenery/poi/` gets your scene, as long as they own the same objects — which, for
 built-in objects, everyone does.
 
+There are two different things you can hand someone, and they're worth keeping straight:
+
+| What you hand over | What it is | What they can do with it |
+|---|---|---|
+| **The project file** (`.json`) | What **Save** writes: a plain text list of what you placed and where. | Open it in PCT and change it. Needs PCT; installs nothing on its own. |
+| **The POI folder** | What **Export** writes: the scenery Aerofly reads. | Drop it into `scenery/poi/` and fly. Needs nothing but the sim. |
+
+Post both and you've given people something to fly *and* something to learn from — which is exactly
+what the starter project in section 9 is.
+
 ---
 
-## 9. Cookbook — five things worth building
+## 9. Cookbook — six things worth building
 
-The map and 911 names is a blank canvas, and a blank canvas is the hardest place to start. Here are
-five scenes that take minutes and teach the tool.
+A map and 850 names is a blank canvas, and a blank canvas is the hardest place to start. Here are six
+scenes that take minutes and teach the tool. The first three are all rows, because rows are most of
+what anyone builds — and the three of them together are a tour of section 5.
 
-**A row of trees along a road.** Place one plant beside the road. **Ctrl+D** to duplicate, arrow
-keys to walk it along, repeat. Vary the species and the height every few trees or the row reads as
-a fence. Plants are billboards, so nothing needs rotating.
+**A row of trees along a road.** Place one plant at each end of the stretch and a handful in between:
+the catalog card stays armed, so that's just clicking. Then shift-click the lot and press **Space
+evenly**. Don't reach for **Line up** unless the road is genuinely straight — Space evenly keeps each
+tree's distance off the line, so a row that follows a bend stays bent and only its gaps get tidied.
+Vary the species and the height every few trees or the row reads as a fence. Plants are billboards, so
+nothing needs rotating.
 
 **A lit runway where there isn't one.** Plenty of small strips in the sim have no lighting at all.
-Place a point light at one corner of the strip, **Ctrl+D**, nudge it down the edge, repeat — then
-mirror the row on the other side. White, intensity around 1000, visibility group 0. Come back at
-dusk. (Remember: Baked ASL.)
+Place a point light near each end of one edge and four or five roughly along it, shift-click them all,
+then **Line up** and **Space evenly** — the row is now as straight and as regular as a real one, at
+whatever angle the strip happens to run. To mirror it on the other side, keep the row selected, press
+**Ctrl+D**, and walk the copy across with **Shift** + arrow keys, 5 m a press, watching the footprints
+against the imagery. White, intensity around 1000. Set visibility group 3 while you're working so you
+can see them in daylight, then drop it to 0 and come back at dusk. (Remember: lights need Baked ASL.)
+
+**A line of parked aircraft.** The thing that makes an apron look like an airport rather than a car
+park. Drop four or five airliners or light aircraft roughly along the stand, shift-click them, then
+**Line up**, **Space evenly**, and **Match row** — that last one turns every one of them to face along
+the row, so they park nose-to-tail in one click. If they end up pointing at the wrong end of it, add
+180 to the heading, which is one edit for the whole selection. Real stands are hardly ever
+north-south, and none of these tools mind what angle yours runs at.
 
 **A working-looking apron.** A hangar, a fuel installation beside it, two or three parked light
 aircraft angled toward the taxiway, a couple of cars, and a windsock. Five minutes, and an empty
@@ -458,6 +581,15 @@ That's it: no filename to type, no id to match. The card knows which object it i
 the exact name at the top — so the file is named correctly by construction. **Open photos folder** is
 in the same menu, and **Remove photo** joins it once the card has one.
 
+<!-- SHOT 11_photo_on_cards.jpg — the payoff shot this section is missing: the Objects (or Lights)
+     list with real photos on several cards at once, next to a couple still showing the drawn icon, so
+     the difference is visible in one frame. Ideally with the hover preview open on one of them.
+     Desktop only. See guide/images/README.md. -->
+
+From then on the card carries the photo everywhere it appears, and resting the mouse on it enlarges
+the shot — which is the point: two runway light fixtures that share one glyph stop being
+interchangeable.
+
 The photos are yours. They're read from your disk, never bundled into PCT, and never written into
 your POIs.
 
@@ -486,6 +618,10 @@ height in metres, Save. From then on it draws as a real rectangle you can align.
 Your measurements live in your own file, and **rescanning your install never clears them**.
 **Settings → Object footprints** has Export and Import, so one person can measure a family of
 fixtures once and post the file for everyone else.
+
+<!-- SHOT 12_set_footprint.jpg — the Set footprint dialog open on a light card with figures typed in,
+     ideally with that light already on the map behind it so the point-vs-rectangle difference shows.
+     Desktop only. See guide/images/README.md. -->
 
 ---
 
@@ -544,6 +680,19 @@ autoheight**, which needs no lookup at all.
 **Export refuses in autoheight mode.** Autoheight can't place lights (the sim buries them) and
 can't use ASL heights. Switch those objects to Terrain, or switch the project to Baked ASL.
 
+**Line up and Space evenly are greyed out.** They need **three or more** objects selected —
+shift-click to add to a selection — since two objects are a straight, evenly spaced row already. If
+three are selected and the buttons are still dead, they're all sitting on the same spot, and a row of
+coincident points has no direction to line up along.
+
+**Arrange moved everything except one object.** That one is **locked**. Locked objects still count
+when PCT works out where the row runs, but they never move; clear the lock in the Inspector if you
+want it included.
+
+**The catalog says fewer objects than the scan did.** Expected: the scan reports 911, the Objects
+list browses about 850. The gap is the flexible-jetway parts, which PCT hides because they only line
+up assembled inside an airport's own scenery. Section 4 has the detail.
+
 **Something else.** PCT keeps a plain-text log of the session: which folders it used, what the scan
 found, and anything that failed. **Settings → Diagnostics → Open log file**. It's rewritten from
 scratch every time PCT starts, so it never grows, and nothing in it is sent anywhere. Pasting it
@@ -564,6 +713,11 @@ Fifteen sections — where everything lives in an install, the file grammar, wha
 before you ever take off, POI vs airport placement, orientation maths, heights, plants, lights,
 your own `.tmb` objects, heliports, the UDP flight-data stream, the Blender pipeline. Useful to
 anyone building things for AFS4, whether or not they ever touch PCT.
+
+That reference is also where the Inspector's **FS4 internal (.wad)** read-out is explained: the
+projected 0–65536 grid and the radians the sim keeps inside its own world-airport database. PCT never
+writes those files. It shows you the numbers in that form because a handful of people build heliports
+by hand and were converting them in a spreadsheet.
 
 **The source.** PCT is GPL-3.0, Electron + TypeScript:
 https://github.com/jlgabriel/afs4-poi-creator
