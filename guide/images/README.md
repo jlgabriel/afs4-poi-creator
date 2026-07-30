@@ -14,8 +14,8 @@ The images `GUIDE.md` expects, by exact filename. Anything not on this list isn'
 - `06_rotate_handle.jpg` — an object turned off the cardinals: footprint rectangle askew, cyan handle
   visible, and a non-round heading in the Inspector.
 - `07_export_dialog.jpg` — the Export POI dialog, filled in.
-- `08_1_card_menu.jpg` — the right-click menu open on a catalog card.
-- `08_2_cards_with_photos.jpg` — cards showing real photos instead of drawn icons.
+- `08_paste_photo.jpg` — the right-click menu open on a card, framed so neighbouring cards already
+  show real photos instead of drawn icons: the mechanism and the result in one shot.
 - `09_1_defaults_sunk.jpg` — the example outpost exported with the defaults: the elevation service's
   figure puts the whole site underground.
 - `09_2_site_figure_fixed.jpg` — the same outpost, same viewpoint, once **Base elevation** carries the
@@ -30,4 +30,4 @@ the others, not because it appears last.
 
 Keep every file **under 1 MB**. The stills are JPEG (~q85): at full window size a PNG blows past the
 limit and only gets under it by losing colours or scale, and scaled UI text stops being readable.
-Every shot is a still: the two planned GIFs became stills, and the paste-photo one became a pair.
+Every shot is a still: the two planned GIFs became stills.

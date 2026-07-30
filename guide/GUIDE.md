@@ -452,9 +452,7 @@ So PCT can show **your own photos** instead — on every card, including lights 
    Windows, `Cmd+Ctrl+Shift+4` on macOS.
 3. Back in PCT, **right-click that object's card** → **Paste photo from clipboard**.
 
-![Shot 08.1 — the right-click menu on a catalog card](images/08_1_card_menu.jpg)
-
-![Shot 08.2 — the same cards afterwards, each showing its own photo](images/08_2_cards_with_photos.jpg)
+![Shot 08 — the right-click menu open on a card, among cards already carrying their own photos](images/08_paste_photo.jpg)
 
 That's it: no filename to type, no id to match. The card knows which object it is, so the file is
 named correctly by construction. The same menu has **Remove photo** and **Open photos folder**.
