@@ -69,9 +69,10 @@ Lights and plants, section 7:
 
 Dialogs:
 
-- `11_photo_on_cards.jpg` — a card carrying a photo among cards still showing the drawn icon, hover
-  preview open, the exact id spelled out. Section 10's payoff. The photo on it is a test placeholder;
-  a real in-sim shot would sell the feature harder.
+- `11_photo_on_cards.jpg` — a card carrying a real in-sim photo of a B777 among cards still showing
+  the drawn icon, hover preview enlarging it, the exact id spelled out. Section 10's payoff, and the
+  hole that section carried from the day it was written. Re-shot: the first take used a test
+  placeholder, which undersold the feature it exists to sell.
 - `12_set_footprint.jpg` — the footprint dialog on a light fixture, figures typed in.
 - `13_settings.jpg` — Settings entire: both folders, the photos folder, map tiles, elevation
   provider, Rescan, the footprints Import / Export, Diagnostics. Sections 2, 10 and 12 all send the

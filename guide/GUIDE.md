@@ -603,7 +603,7 @@ That's it: no filename to type, no id to match. The card knows which object it i
 the exact name at the top — so the file is named correctly by construction. **Open photos folder** is
 in the same menu, and **Remove photo** joins it once the card has one.
 
-![Shot 11 — one card carrying a photo among cards still showing the drawn icon, with the hover preview open on it and the object's exact id spelled out underneath](images/11_photo_on_cards.jpg)
+![Shot 11 — one card carrying a photo taken in the sim, among cards still showing the drawn icon, with the hover preview enlarging it and the object's exact id spelled out underneath](images/11_photo_on_cards.jpg)
 
 From then on the card carries the photo everywhere it appears, and resting the mouse on it enlarges
 the shot — which is the point: two runway light fixtures that share one glyph stop being
