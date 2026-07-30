@@ -154,6 +154,9 @@ Four areas, and that's the whole app.
 **Rescan**, **Settings**, the airport search, the **Heights** mode switch, the map style switch
 (Satellite / Streets / Custom), and a running count of what you've placed.
 
+<!-- SHOT 14_topbar.jpg — the top bar alone, full width, cropped to the strip: every control this
+     paragraph names, in one line. See guide/images/README.md. -->
+
 **The Catalog panel**, on the left, is everything you can place, in three collapsible sections:
 
 - **Objects** — the built-in XREF models, with a category tree (buildings, aircraft, vehicles, items,
@@ -161,10 +164,16 @@ Four areas, and that's the whole app.
 - **Lights** — the sim's 22 airport light fixtures plus a fully parametric point light.
 - **Plants** — 41 trees and shrubs.
 
+<!-- SHOT 18_catalog_collapsed.jpg — the catalog with all three sections shut, so the three families
+     and their counts read at a glance. Crop of the panel. See guide/images/README.md. -->
+
 All three start collapsed, so you can see the three families and their counts at a glance; open the
 ones you're working with. Each card shows the object's name, its real footprint in metres, and its
 category. **Rest the mouse on a card** for a second and a preview pops up with the object's exact id
 spelled out.
+
+<!-- SHOT 15_catalog_objects.jpg — Objects open: the category tree, the search box, and cards showing
+     name, footprint and category. Crop of the panel. See guide/images/README.md. -->
 
 The Objects count reads about **850**, not the 911 the scan reported. The difference is the flexible
 jetways: some 60 of those parts are bends and passenger bridges that only line up when an airport's own
@@ -183,10 +192,17 @@ panel instead — section 5. Collapsed at the bottom, **FS4 internal (.wad)** re
 back in the projected units the sim uses inside its own airport database; it changes nothing and is
 there for the few people who hand-build heliport files (section 13 says where that's documented).
 
+<!-- SHOT 16_inspector_object.jpg — the Inspector column with one object selected: Lat/Lon, Heading °,
+     Scale ×, the Height control, Label, Lock, and the FS4 internal (.wad) row shut at the bottom.
+     Crop of the panel. See guide/images/README.md. -->
+
 Below the Inspector, **the placed list** is everything in the project. Click a row to select it,
 shift-click to add to the selection, **double-click to send the map to it** — handy once a project has
 grown past what fits on screen — and **Duplicate** / **Delete** at the top of the list act on whatever
 is selected.
+
+<!-- SHOT 17_placed_list.jpg — the placed list with a dozen rows, one of them selected, and the
+     Duplicate / Delete buttons above it. Crop. See guide/images/README.md. -->
 
 ---
 
@@ -308,6 +324,12 @@ The ± buttons nudge by 0.5 m and 5 m. Nudging a *Terrain* object quietly promot
 *Terrain + offset*, so "lift it half a metre" is one click. **Fetch elevation** looks up the ground
 under the selected object and shows it as `terrain ≈ 588.0 m ASL`.
 
+<!-- SHOT 19_height_control.jpg — the Height block on its own: the three mode radios, the metres
+     field, the ±0.5 / ±5 buttons and the resolved `terrain ≈ … m ASL` read-out. Best shot in
+     Terrain + offset with a negative number, which is pass three below. Crop, and the most valuable
+     of the missing frames: this section explains a control it never shows.
+     See guide/images/README.md. -->
+
 **Per project**, the top bar picks how those modes reach the sim:
 
 - **Baked ASL** (the default) — PCT resolves each object's ground elevation and writes an absolute
@@ -408,6 +430,9 @@ Two kinds, both in the **Lights** section:
 - **The point light** — fully parametric. Pick a colour, an intensity (0 = off, ~1000 = visible,
   up to 100000 = very bright), and optionally a flash pattern.
 
+<!-- SHOT 20_lights_catalog.jpg — the Lights section open in the catalog: the sim's fixtures and the
+     point light together. Crop of the panel. See guide/images/README.md. -->
+
 **Lights only render at night.** This is Aerofly's behaviour, not a bug, and it is the single most
 common "PCT is broken" report. The **Visibility group** field on each light controls the window:
 
@@ -422,10 +447,18 @@ While you're building in daylight, set group 3 so you can see what you're doing,
 0 or 1 when the row is right. Or leave it at 3 on purpose: a light that burns through the afternoon is
 wrong for a runway edge and right for a lit-up factory yard.
 
+<!-- SHOT 21_light_inspector.jpg — the Inspector with an airport light fixture selected: Fixture,
+     Colour, Opposite, Orientation °, and the Visibility group field. Crop. The whole of this section
+     in one panel. See guide/images/README.md. -->
+
 **Flashing** takes four numbers, of which three matter: *Cycle* (bigger = slower), *Sequence*
 (the phase), and *Length* (how long each flash lasts). Stagger *Sequence* 1, 2, 3, 4… across a row
 of point lights and you get a running-light sweep down the row — worth doing after **Space evenly**
 (section 5), since a sweep is only convincing if the gaps it crosses are equal.
+
+<!-- SHOT 22_point_light.jpg — the Inspector with the point light selected: colour, intensity, and
+     Flashing ticked so Cycle / Sequence / Length are visible. Crop.
+     See guide/images/README.md. -->
 
 Remember: lights need **Baked ASL**.
 
@@ -441,6 +474,10 @@ rotation to get wrong.
 
 - **Plant height (m)** — how tall the tree grows.
 - **Height** (the shared control below it) — where its base sits, same as every other object.
+
+<!-- SHOT 23_plant_height.jpg — the Inspector with a plant selected, cropped so **Plant height (m)**
+     and the shared **Height** control are both in frame, one above the other. The classic mistake,
+     shown instead of described. See guide/images/README.md. -->
 
 Each plant card shows its natural height — the size the texture was authored at. Straying far from
 it makes the tree look stretched or squashed.
@@ -494,6 +531,10 @@ Then: **restart Aerofly FS 4**. The dialog says so for a reason.
 **Uninstalling.** The bottom of the dialog lists the POIs currently installed. Anything PCT made
 gets an **Uninstall** button. Anything else is listed as "not by PCT" and left alone — PCT will not
 delete a folder it didn't create.
+
+<!-- SHOT 24_installed_pois.jpg — the foot of the Export dialog: the Installed POIs list with an
+     Uninstall button, and a "not by PCT" row if your install has one. Crop. Sections 3, 8 and 12 all
+     send the reader here. See guide/images/README.md. -->
 
 **Sharing.** Export to a folder, zip it, post it. Whoever unzips it into their own
 `Aerofly FS 4/scenery/poi/` gets your scene, as long as they own the same objects — which, for
@@ -718,6 +759,10 @@ That reference is also where the Inspector's **FS4 internal (.wad)** read-out is
 projected 0–65536 grid and the radians the sim keeps inside its own world-airport database. PCT never
 writes those files. It shows you the numbers in that form because a handful of people build heliports
 by hand and were converting them in a spreadsheet.
+
+<!-- SHOT 25_wad_readout.jpg — the FS4 internal (.wad) block expanded at the foot of the Inspector,
+     with its projected coordinates and the rotation in radians. Small crop; section 4 mentions it
+     shut, this is the one place it's open. See guide/images/README.md. -->
 
 **The source.** PCT is GPL-3.0, Electron + TypeScript:
 https://github.com/jlgabriel/afs4-poi-creator
