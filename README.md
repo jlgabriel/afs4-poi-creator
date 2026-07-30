@@ -70,6 +70,9 @@ into your finished POIs — just the *names* of the objects you chose.
 
 ## How to use it
 
+The short version is below. For the whole thing walked through with pictures, see
+**[the guide](guide/GUIDE.md)**.
+
 1. **Install PCT** — download the build for your system from the
    [Releases](https://github.com/jlgabriel/afs4-poi-creator/releases) page (Windows installer or
    portable · macOS `.dmg` · Linux AppImage). First launch needs one extra click — see
@@ -276,6 +279,22 @@ simulator open enough to let its community build on it like this.
 PCT is an **independent, unofficial community project** — not affiliated with or endorsed by IPACS.
 Aerofly FS 4 and all its content belong to IPACS; PCT bundles none of it, and the POIs you create only
 reference objects you already own.
+
+## The guide
+
+This README says what PCT is and how to install it. The guide takes you through using it, illustrated
+from a real session at Barstow-Daggett:
+
+**→ [guide/GUIDE.md](guide/GUIDE.md)**
+
+Thirteen sections: a five-minute quickstart that puts one unmissable object beside a runway, the
+editor screen by screen, placing and rotating, **heights** — the part that repays reading, worked
+through as the three passes it actually takes rather than the one you would hope for — lights and
+plants, exporting and installing, a cookbook of five scenes worth building, photos and footprints of
+your own, your own models, and what to look at when something doesn't show up in the sim.
+
+A twelve-object starter project comes with it, ready to install and then take apart:
+[guide/example/kdag_starter.json](guide/example/kdag_starter.json).
 
 ## The Aerofly FS 4 technical reference
 
