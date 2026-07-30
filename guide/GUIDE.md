@@ -346,6 +346,17 @@ rotation to get wrong.
 Each plant card shows its natural height — the size the texture was authored at. Straying far from
 it makes the tree look stretched or squashed.
 
+**A grey disc lying among your plants?** Because plants are billboards with no mesh of their own,
+Aerofly can't size the scenery tile around them, and left alone they blink in and out as you fly. So
+any POI containing plants carries one small flat disc of ours, placed at the centre of the plants at
+their average height, purely to give the tile something to measure. If the site is baked a little
+high — the same half-metre from section 6, surfacing in one more place — that disc ends up lying on
+the ground where you can see it.
+
+The fix is one field: give the plants a **larger negative offset** until it goes under the surface
+with them. Minus 1.5 m was enough at KDAG. Plants take burial well — you lose the very bottom of the
+trunk and nothing else.
+
 ---
 
 ## 8. Exporting and installing
