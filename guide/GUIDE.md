@@ -346,23 +346,6 @@ rotation to get wrong.
 Each plant card shows its natural height — the size the texture was authored at. Straying far from
 it makes the tree look stretched or squashed.
 
-**The grey disc among your plants is ours, and it's supposed to be there.** Being billboards, plants
-carry no mesh of their own, so Aerofly sizes the scenery tile as though the ground under them were at
-sea level — and at any real elevation that puts the tile far below the plants, out of view, and they
-blink in and out as you fly. The cure is one meshed object in the same cultivation to give the tile a
-correct volume, so any POI containing plants ships a small disc of ours and places it among them.
-
-Two things follow, and neither is anything you did:
-
-- **You can't move it or hide it.** It goes at the centre of your plants, at their average ground
-  height, and there's no control for it. If you'd rather not see it, arrange the plants so their
-  centre falls somewhere you don't mind — a row of three puts it right at the middle one's trunk.
-- **It doesn't follow one plant's height.** Nudge a single plant and the disc moves by only a share
-  of that, because it tracks the average of all of them.
-
-It should be invisible, and it will be: making it so is on the list for the next release. It costs
-you nothing but the look of it, and the alternative — flickering trees — is far worse.
-
 ---
 
 ## 8. Exporting and installing
