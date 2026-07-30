@@ -8,6 +8,12 @@ terminals, vehicles, parked aircraft, street lamps and more — **and light it u
 them on a real satellite map, and PCT hands you a scenery folder you drop straight into the sim.
 No modelling, no file editing.
 
+**New here? → [Read the guide](guide/GUIDE.md).** Thirteen sections and thirty-one pictures, from a
+[five-minute quickstart](guide/GUIDE.md#3-quickstart--one-object-five-minutes) to the one part that
+isn't obvious — getting what you place onto the ground. A twelve-object
+[starter project](guide/example/kdag_starter.json) comes with it, ready to install and then take
+apart.
+
 A community tool, born on the [Aerofly forum](https://www.aerofly.com/community/) and built with
 the help of the people credited [below](#how-pct-came-to-be). It's the POI-placing cousin of
 [afs4-pylon-race](https://github.com/jlgabriel/afs4-pylon-race), and shares its geometry and
@@ -287,11 +293,12 @@ from a real session at Barstow-Daggett:
 
 **→ [guide/GUIDE.md](guide/GUIDE.md)**
 
-Thirteen sections: a five-minute quickstart that puts one unmissable object beside a runway, the
-editor screen by screen, placing and rotating, **heights** — the part that repays reading, worked
-through as the three passes it actually takes rather than the one you would hope for — lights and
-plants, exporting and installing, a cookbook of five scenes worth building, photos and footprints of
-your own, your own models, and what to look at when something doesn't show up in the sim.
+Thirteen sections and thirty-one pictures: a five-minute quickstart that puts one unmissable object
+beside a runway, the editor panel by panel, placing and rotating, straightening and spacing a whole
+row at once, **heights** — the part that repays reading, worked through as the three passes it
+actually takes rather than the one you would hope for — lights and plants, exporting and installing,
+a cookbook of six scenes worth building, photos and footprints of your own, your own models, and
+what to look at when something doesn't show up in the sim.
 
 A twelve-object starter project comes with it, ready to install and then take apart:
 [guide/example/kdag_starter.json](guide/example/kdag_starter.json).
