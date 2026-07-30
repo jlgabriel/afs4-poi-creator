@@ -26,8 +26,8 @@ POI-folder conventions.
 > search, per-object height, export / install / uninstall) are built and tested — unit + golden
 > tests, typecheck, and Electron end-to-end tests, all green in [CI](.github/workflows/ci.yml).
 > Lights, plants, your own custom XREF objects, an optional "Sim autoheight" export mode, real
-> object photos and hand-measured footprints are all in — each feature below is tagged with the
-> version it arrived in, and the
+> object photos, hand-measured footprints and one-click straightening of a whole row are all in —
+> each feature below is tagged with the version it arrived in, and the
 > release notes carry the full history. The export format is **confirmed working in the sim**. Builds
 > are currently **unsigned**, so your OS will warn you once on first launch — see
 > [Installing PCT](#installing-pct). Grab the newest build from
@@ -70,6 +70,14 @@ that size from then on. The measurements are **yours**: they live in your own fi
 can be exported and handed to somebody else. See
 [Footprints you measure yourself](#footprints-you-measure-yourself).
 
+**Rows that come out straight, too.** Rows are what people build most — parked aircraft along an
+apron, lamps down a taxiway, trees along a track — and placed by hand they come out nearly-but-not-quite
+straight. Since **v0.9.2**, shift-click three or more and the inspector turns into an arrange panel:
+**Line up** slides every object onto the line through the two farthest apart, **Space evenly** gives
+every gap the same length, and **Match row** turns them all to face along it, which parks a line of
+aircraft nose-to-tail in one click. There's no "align left" here on purpose — left is *west*, and a
+real apron is hardly ever north-south. All three work along the row itself, at whatever angle it runs.
+
 **It ships no Aerofly content.** PCT reads the object catalog from *your* installed copy of the sim,
 so you only ever place objects you already own. Nothing from the sim is copied into this project or
 into your finished POIs — just the *names* of the objects you chose.
@@ -86,9 +94,12 @@ The short version is below. For the whole thing walked through with pictures, se
 2. **Point PCT at your sim** — on first run, a short wizard auto-detects where Aerofly FS 4 is
    installed and where your user folder lives, then scans your object catalog.
 3. **Place objects, lights and plants** — search the catalog, click on the map to drop an object, then
-   drag, rotate, scale and fine-tune its height. Every object's footprint is drawn at its true size, so
-   you can line things up precisely — and since **v0.9** you can give a **light or a plant** a size too,
-   by measuring it yourself: see [Footprints you measure yourself](#footprints-you-measure-yourself).
+   drag, rotate, scale and fine-tune its height. **Shift-click** to work on several at once: move,
+   duplicate or straighten them as one row
+   ([the guide walks it through](guide/GUIDE.md#5-placing-moving-rotating)). Every object's footprint is
+   drawn at its true size, so you can line things up precisely — and since **v0.9** you can give a
+   **light or a plant** a size too, by measuring it yourself: see
+   [Footprints you measure yourself](#footprints-you-measure-yourself).
    Below the catalog, the **Lights** section holds the airport-light fixtures and the custom point light,
    and **Plants** holds the trees and shrubs.
 4. **Export & install** — *Export POI → Install into Aerofly FS 4* writes the folder into your
@@ -205,8 +216,17 @@ A couple of things worth knowing about the editor:
     *Terrain* means "on the ground" and *Terrain + offset* floats N metres above it. The export is then
     **fully offline** (no elevation lookup) and objects follow the terrain even if the sim re-levels it —
     so heights come out more reliable than a baked value, at the cost of leaning on undocumented sim
-    behaviour (hence *opt-in*, and it may change with a sim update). *ASL* has no meaning in this mode.
+    behaviour (hence *opt-in*, and it may change with a sim update). Two things it can't do: *ASL*
+    heights have no meaning in this mode, and it **can't place lights** — the sim buries those below the
+    terrain — so a project with lights in it needs Baked ASL. PCT checks both before it writes anything,
+    so you find out in the Export dialog rather than in the air.
     Suggested and worked out on the forum by **@chrispriv**, with **@ApfelFlieger**.
+- **FS4 internal (.wad)** *(v0.9.1)* — a read-out, collapsed at the foot of the inspector, giving the
+  selected object's position in the projected units Aerofly keeps inside its own **world-airport
+  database**, and its rotation in radians. It changes nothing and PCT never writes those files; it's
+  there because a handful of people hand-build heliport entries and were converting coordinates in a
+  spreadsheet. The projection is documented in the
+  [technical reference](reference/AFS4_KNOWLEDGE_BASE_EN.md).
 - **If something goes wrong**, PCT keeps a plain-text log of the session — the folders it used, what
   the scan found, and anything that failed. **Settings → Diagnostics → Open log file**. It's
   **rewritten from scratch every time PCT starts**, so it never grows and there's nothing to clean up,
