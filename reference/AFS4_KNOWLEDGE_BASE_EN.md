@@ -261,7 +261,7 @@ is one log line.** A POI cannot do this; only the airport route can.
 
 ---
 
-## 5. Built‑in XREF objects
+## 5. Built-in XREF objects
 
 Built‑in scenery objects (buildings, towers, hangars, vehicles, parked aircraft…) are placed
 **by name** from a `list_xref` cultivation in the `.toc`:
@@ -438,7 +438,7 @@ is at the right position and height ⇒ this is **culling/visibility, not placem
 Two sibling lists in the **`.toc`** (there's no pairing with the `.tsl`; everything lives in
 the `.toc`). They go **before** `list_xref` in the `cultivation` container.
 
-### `list_airport_light` (built‑in fixtures)
+### `list_airport_light` (built-in fixtures)
 
 Real field order (**name‑first**; the spec has it inverted):
 
@@ -537,7 +537,7 @@ official pipeline (§14). Blender does **not** speak `.tmb`/`.ttx` directly.
 
 ---
 
-## 11. Built‑in POIs and landmarks
+## 11. Built-in POIs and landmarks
 
 - **Built‑in POIs** (the landmarks in the Location menu's "POI map layer" — famous buildings,
   bridges, etc.): live in `<install>/scenery/poi/`, **449 folders**. Content is **compiled to
