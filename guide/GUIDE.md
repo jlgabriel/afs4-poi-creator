@@ -134,7 +134,7 @@ To take it out again: **Export POI…** → the **Installed POIs** list at the b
 
 Four areas, and that's the whole app.
 
-![Shot 05 — the editor with its four panels labelled](images/05_editor_overview.jpg)
+![Shot 05 — the whole editor: top bar, catalog, map, inspector](images/05_editor_overview.jpg)
 
 **The top bar** holds the project (name, New / Open / Save / Save As…), **Export POI…**,
 **Rescan**, **Settings**, the airport search, the **Heights** mode switch, the map style switch
@@ -147,7 +147,8 @@ Four areas, and that's the whole app.
 - **Lights** — the sim's airport light fixtures plus a fully parametric point light.
 - **Plants** — 41 trees and shrubs.
 
-All three start collapsed, so you can see the three families and their counts at a glance. Each
+All three start collapsed, so you can see the three families and their counts at a glance; open the
+ones you're working with. Each
 card shows the object's name, its real footprint in metres, and its category. **Rest the mouse on a
 card** for a second and a preview pops up with the object's exact id spelled out.
 
