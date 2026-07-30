@@ -689,7 +689,11 @@ function ArrangePanel(): React.ReactElement {
     <div className="pct-inspector-body">
       <div className="pct-field-title">{picked.length} objects selected</div>
 
-      <div className="pct-field pct-field-col">
+      {/* `pct-field` only — NOT `pct-field-col`, which carries `flex: 1 1 0` for the side-by-side
+          Lon/Lat columns. As a direct child of the column-flex body it would grow into all the free
+          vertical space and shove the heading row to the bottom of the panel. It goes unnoticed in the
+          single-object panel because that one has enough fields to fill the height; this one doesn't. */}
+      <div className="pct-field">
         <span className="pct-field-label">Arrange</span>
         <div className="pct-arrange-row">
           <button
