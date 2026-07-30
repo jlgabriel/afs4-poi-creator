@@ -154,8 +154,7 @@ Four areas, and that's the whole app.
 **Rescan**, **Settings**, the airport search, the **Heights** mode switch, the map style switch
 (Satellite / Streets / Custom), and a running count of what you've placed.
 
-<!-- SHOT 14_topbar.jpg — the top bar alone, full width, cropped to the strip: every control this
-     paragraph names, in one line. See guide/images/README.md. -->
+![Shot 14 — the top bar: project, New / Open / Save / Save As…, Export POI…, Rescan, Settings, the airport search, the Heights switch, the map style switch, and the object count](images/14_topbar.jpg)
 
 **The Catalog panel**, on the left, is everything you can place, in three collapsible sections:
 
@@ -172,8 +171,7 @@ ones you're working with. Each card shows the object's name, its real footprint 
 category. **Rest the mouse on a card** for a second and a preview pops up with the object's exact id
 spelled out.
 
-<!-- SHOT 15_catalog_objects.jpg — Objects open: the category tree, the search box, and cards showing
-     name, footprint and category. Crop of the panel. See guide/images/README.md. -->
+![Shot 15 — the Catalog panel with all three sections open: the search box, the category tree, and cards carrying each object's name, footprint and category](images/15_catalog_objects.jpg)
 
 The Objects count reads about **850**, not the 911 the scan reported. The difference is the flexible
 jetways: some 60 of those parts are bends and passenger bridges that only line up when an airport's own
@@ -192,17 +190,14 @@ panel instead — section 5. Collapsed at the bottom, **FS4 internal (.wad)** re
 back in the projected units the sim uses inside its own airport database; it changes nothing and is
 there for the few people who hand-build heliport files (section 13 says where that's documented).
 
-<!-- SHOT 16_inspector_object.jpg — the Inspector column with one object selected: Lat/Lon, Heading °,
-     Scale ×, the Height control, Label, Lock, and the FS4 internal (.wad) row shut at the bottom.
-     Crop of the panel. See guide/images/README.md. -->
+![Shot 16 — the Inspector with one object selected: the object's name and category, Lon/Lat, Heading °, Scale ×, the Height control, Label, Lock, and the FS4 internal (.wad) row shut at the bottom](images/16_inspector_object.jpg)
 
 Below the Inspector, **the placed list** is everything in the project. Click a row to select it,
 shift-click to add to the selection, **double-click to send the map to it** — handy once a project has
 grown past what fits on screen — and **Duplicate** / **Delete** at the top of the list act on whatever
 is selected.
 
-<!-- SHOT 17_placed_list.jpg — the placed list with a dozen rows, one of them selected, and the
-     Duplicate / Delete buttons above it. Crop. See guide/images/README.md. -->
+![Shot 17 — the placed list: every object in the project, one row selected, with Duplicate and Delete above](images/17_placed_list.jpg)
 
 ---
 
@@ -324,11 +319,7 @@ The ± buttons nudge by 0.5 m and 5 m. Nudging a *Terrain* object quietly promot
 *Terrain + offset*, so "lift it half a metre" is one click. **Fetch elevation** looks up the ground
 under the selected object and shows it as `terrain ≈ 588.0 m ASL`.
 
-<!-- SHOT 19_height_control.jpg — the Height block on its own: the three mode radios, the metres
-     field, the ±0.5 / ±5 buttons and the resolved `terrain ≈ … m ASL` read-out. Best shot in
-     Terrain + offset with a negative number, which is pass three below. Crop, and the most valuable
-     of the missing frames: this section explains a control it never shows.
-     See guide/images/README.md. -->
+![Shot 19 — the Height control after one press of −0.5: Terrain has become Terrain + offset, and the offset reads −0.50 m](images/19_height_control.jpg)
 
 **Per project**, the top bar picks how those modes reach the sim:
 
@@ -760,9 +751,7 @@ projected 0–65536 grid and the radians the sim keeps inside its own world-airp
 writes those files. It shows you the numbers in that form because a handful of people build heliports
 by hand and were converting them in a spreadsheet.
 
-<!-- SHOT 25_wad_readout.jpg — the FS4 internal (.wad) block expanded at the foot of the Inspector,
-     with its projected coordinates and the rotation in radians. Small crop; section 4 mentions it
-     shut, this is the one place it's open. See guide/images/README.md. -->
+![Shot 25 — the FS4 internal (.wad) block expanded: the projected longitude and latitude, and the rotation in radians](images/25_wad_readout.jpg)
 
 **The source.** PCT is GPL-3.0, Electron + TypeScript:
 https://github.com/jlgabriel/afs4-poi-creator

@@ -28,42 +28,46 @@ them. There is no 09.4: a close-up of the residual float was planned and dropped
 detached shadows in 09.2 already show it. The numbers run past 08 because the example was added after
 the others, not because it appears last.
 
+From here on the frames are crops of the app itself, not windows — the pass that shows the UI the
+text names instead of only describing it. They come off one staged editor screen (session A below):
+
+- `14_topbar.jpg` — the top bar, cropped to the strip: project, New/Open/Save, Export POI…, Rescan,
+  Settings, airport search, the Heights switch, the map style switch, the count.
+- `15_catalog_objects.jpg` — the Catalog panel, all three sections open: search box, category tree,
+  and cards carrying name, footprint and category.
+- `16_inspector_object.jpg` — the Inspector on one selected object, with `FS4 internal (.wad)` shut.
+- `17_placed_list.jpg` — the placed list, one row selected, Duplicate / Delete above it.
+- `19_height_control.jpg` — the Inspector after one press of −0.5: *Terrain* has become
+  *Terrain + offset* at −0.50 m. Section 6's control, shown instead of only explained.
+- `25_wad_readout.jpg` — `FS4 internal (.wad)` expanded, in section 13 where it's explained.
+
+16 and 19 are the same panel a click apart, and that's the point of the pair: 19 is what section 6's
+nudge does to it.
+
 ## Still to shoot
 
-Seventeen frames the guide asks for and doesn't have. **None of them needs a flight** — every one is
-a desktop screenshot of PCT. Each has a `<!-- SHOT … -->` comment sitting at the exact spot in
+Eleven frames the guide asks for and doesn't have. **None of them needs a flight** — every one is a
+desktop screenshot of PCT. Each has a `<!-- SHOT … -->` comment sitting at the exact spot in
 `GUIDE.md` where it goes; the guide reads fine without them, which is why they're comments and not
 broken image links.
 
-Twelve of them (14–25) come from the pass Juan asked for on 2026-07-30: **show the app instead of
-only describing it** — every panel, field and dialog the text names and never puts on screen.
-Sections 6 and 7 are the reason it matters. Section 6 explains the height control and shows only
-in-sim photos; section 7 has no image at all.
+They're the rest of the pass Juan asked for on 2026-07-30: **show the app instead of only describing
+it** — every panel, field and dialog the text names and never puts on screen. Section 7 is the reason
+it still matters; it has no image at all. **Session A is shot and in** (14, 15, 16, 17, 19, 25).
 
-**Most of these are crops, not windows.** A crop of the Inspector column is 40–100 KB, so the twelve
-together weigh about as much as *one* of the existing full-window frames. Nothing here needs to be
-cut for page weight. They're grouped below by what has to be on screen at once, because one staged
-screenshot yields several crops.
+**These are crops, not windows.** A crop of the Inspector column is 40–100 KB — the six from session A
+together weigh less than *one* of the existing full-window frames. Nothing here needs to be cut for
+page weight.
 
-### Session A — the editor, one object selected
+**Each frame is cropped as it's shot**, so what's below is a framing spec, one entry per file. They're
+grouped by what has to be on screen at once, because staging the app once yields several frames off
+the same screen. A crop that's already JPEG and under the limit passes through `fit` untouched: the
+framing you shoot is the framing that ships.
 
-Open `guide/example/kdag_starter.json`, **Objects** expanded, one object selected (the hangar is a
-good one), and press **Fetch elevation** before shooting so the resolved ground figure is on screen.
-One screenshot, six images:
+### Session A — the editor, one object selected — DONE
 
-- `05_editor_overview.jpg` — **re-shoot.** The current one is from 0.9.0: the title bar says so, and
-  its Inspector predates the `FS4 internal (.wad)` row section 4 now describes.
-- `14_topbar.jpg` — the top bar alone, full width, cropped to the strip. Everything section 4 lists:
-  project, New/Open/Save, Export POI…, Rescan, Settings, airport search, the Heights switch, the map
-  style switch, the count.
-- `15_catalog_objects.jpg` — the catalog panel with Objects open: category tree, search box, cards
-  showing name, footprint and category.
-- `16_inspector_object.jpg` — the Inspector column: Lat/Lon, Heading °, Scale ×, Height, Label, Lock,
-  and `FS4 internal (.wad)` **shut** at the bottom.
-- `17_placed_list.jpg` — the placed list with a dozen rows, one selected, Duplicate / Delete above.
-- `19_height_control.jpg` — the Height block on its own: the three mode radios, the metres field, the
-  ±0.5 / ±5 buttons, and `terrain ≈ … m ASL`. **The most valuable frame on this list.** Best shot
-  with the object in *Terrain + offset* on a negative number — that's pass three of section 6.
+Left over from it, optional: **re-shoot `05_editor_overview.jpg`.** The current one is from 0.9.0 —
+the title bar says so, and its Inspector predates the `FS4 internal (.wad)` row section 4 describes.
 
 ### Session B — the catalog in its two states
 
