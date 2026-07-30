@@ -242,38 +242,61 @@ air:
 the Export dialog. Every object that needs a ground height uses that one number — fine for a flat
 site, wrong for a hillside. (KDAG is 588 m.)
 
-### A worked example: something is half-buried
+### A worked example: three passes to make it sit down
 
-This is the most common way heights bite, so it's worth walking through once. The example project
-in section 9 puts a cluster of fuel tanks west of the hangar. Flown, they sit slightly *into* the
-ground:
+Heights usually take more than one try, and that is normal — the trial and error *is* the work. Here
+is `guide/example/kdag_starter.json`, a twelve-object outpost at KDAG, in the three passes it took.
 
-![Shot 09.1 — the fuel tanks partly sunk into the terrain](images/09_1_tanks_sunk.jpg)
+**Pass one — let PCT look the ground up.** Export with *Baked ASL* and **Base elevation** left
+empty, so PCT asks an online elevation service. At KDAG it answered 585 m, and that is the figure
+written into the POI.
 
-Nothing is wrong with the model, and nothing is wrong with PCT. The POI was baked at one elevation
-for the whole site, and the sim's terrain under the tanks is a little higher than that number. A
-hangar seven metres tall shrugs that off. A four-metre tank cluster loses its feet.
+![Shot 09.1 — the outpost baked at 585 m, everything sitting into the ground](images/09_1_baked_585_sunk.jpg)
 
-The fix is two clicks. Select the object and press **+0.5** in the Inspector: *Terrain* becomes
-*Terrain + offset* and it rises half a metre. Export again, restart the sim, and go look. If it's
-still low, press it again — you are aiming at a target only the sim can show you.
+The whole site is underground. Notice *how* it fails, because that is the diagnostic: the cars and
+the parked Cessnas have vanished outright, the fuel tanks show only their top and their walkway, and
+the hangar merely looks oddly squat. One error, applied equally to all twelve objects — but a metre
+matters far more to a 1.5-metre car than to a 7-metre hangar. **If the small objects disappear while
+the tall ones only look low, suspect the site elevation, not the objects.**
 
-![Shot 09.2 — the same tanks sitting on the ground after nudging them up](images/09_2_tanks_fixed.jpg)
+**Pass two — use the sim's own number.** The sim's terrain is the only authority on the sim's
+terrain, so go and read it: altitude minus height-above-ground, off the instruments. We read 588 m,
+typed it into **Base elevation**, and installed again.
+
+![Shot 09.2 — the outpost baked at 588 m, the big objects sitting and the small ones floating](images/09_2_baked_588_floating.jpg)
+
+Better, and wrong in the other direction. The hangar sits, but the cars, the aircraft and even the
+palms now hover. Two things went wrong at once, and both are worth knowing:
+
+- **The instruments were read in the wrong place.** That reading was taken hovering *near* the
+  outpost rather than over it, and the ground there slopes away toward the runway — so "near" was a
+  metre or two out.
+- **One number cannot describe a site that isn't flat.** Even the right average leaves the low corner
+  floating and the high corner buried.
+
+The measurement with no parallax in it: **set down beside the objects and read the altitude with
+height-above-ground at zero.** That figure *is* the ground under them.
+
+**Pass three — the last metre, object by object.** With the site figure right, whatever the slope
+still leaves over gets a per-object nudge: select the object and press **−0.5** in the Inspector.
+*Terrain* becomes *Terrain + offset* with a negative value, which is exactly what it's for. Export,
+restart, look again.
+
+![Shot 09.3 — the outpost after per-object offsets](images/09_3_offsets_fixed.jpg)
 
 Three things worth taking from this:
 
-- **Nudge the object, not the project.** A base elevation that suits eleven objects doesn't need
-  changing because the twelfth sits in a dip.
-- **Yes, Sim autoheight would have grounded it for you** — and this project can't use it, because it
-  has two apron lights. That's the trade-off described above, in a real case rather than in the
-  abstract.
-- **The sim is the only authority on its own terrain.** No elevation service and no number in this
-  guide beats going and looking. Height is the one part of PCT where flying out to check is part of
-  the work.
+- **Fix the site first, the objects second.** Nudging twelve objects to compensate for one wrong site
+  elevation is work you can skip.
+- **Yes, Sim autoheight would have done all of this for you** — and this project can't use it,
+  because it has two apron lights. That's the trade-off described above, in a real case rather than
+  in the abstract.
+- **Flying out to look is part of building a POI, not a sign that you got it wrong.** No elevation
+  service and no figure in this guide beats reading it off your own instruments.
 
-The example project ships with this *not* fixed, on purpose. Install it, fly out, and make the tanks
-sit down yourself — it's the shortest exercise in this guide that ends with you having changed
-something in Aerofly.
+The example project ships as it came out of pass one, on purpose. Install it, fly out, and walk it
+through the other two yourself — the shortest exercise in this guide that ends with you having
+changed something in Aerofly.
 
 Sim autoheight was designed on the forum by **@chrispriv**, with **@ApfelFlieger**.
 
@@ -338,6 +361,12 @@ placed (right almost always), or *Current map center* if you want to pin it deli
 
 **Heights** repeats the Baked ASL / Sim autoheight choice from the top bar. Same setting, shown in
 both places so it can't surprise you at the last step.
+
+**Base elevation — m ASL** is the ground figure PCT uses for every object that needs one, instead of
+looking it up. Leave it empty and PCT asks an online elevation service; fill it in and that number
+wins. It's worth filling in: the service and the sim's terrain mesh disagree by a few metres in
+places, and only the sim's number puts your objects on the sim's ground. The worked example in
+section 6 is exactly this, measured in flight.
 
 **Shift — metres** nudges the whole scene east/west and north/south. It exists because Aerofly's
 terrain tiles don't always agree perfectly with satellite imagery: if everything you built lands
