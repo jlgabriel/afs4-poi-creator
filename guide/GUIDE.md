@@ -100,9 +100,7 @@ You can change the install folder later in **Settings**, and you can re-run this
 time with **Rescan** — which is how PCT picks up anything you add to the sim afterwards. Settings is
 also where the photo and footprint folders live (section 10) and where the log file is (section 12).
 
-<!-- SHOT 13_settings.jpg — the Settings dialog: install folder, object photos folder, object
-     footprints, Diagnostics. Sections 2, 10 and 12 all send the reader here, and none of them shows
-     it. Desktop only. See guide/images/README.md. -->
+![Shot 13 — Settings: the install and user folders, the photos folder, map tiles, the elevation provider, Rescan, the footprints Import / Export, and Diagnostics](images/13_settings.jpg)
 
 ---
 
@@ -163,8 +161,7 @@ Four areas, and that's the whole app.
 - **Lights** — the sim's 22 airport light fixtures plus a fully parametric point light.
 - **Plants** — 41 trees and shrubs.
 
-<!-- SHOT 18_catalog_collapsed.jpg — the catalog with all three sections shut, so the three families
-     and their counts read at a glance. Crop of the panel. See guide/images/README.md. -->
+![Shot 18 — the Catalog panel as it opens: three sections shut, and their counts](images/18_catalog_collapsed.jpg)
 
 All three start collapsed, so you can see the three families and their counts at a glance; open the
 ones you're working with. Each card shows the object's name, its real footprint in metres, and its
@@ -274,10 +271,12 @@ positioning doesn't get pulled into line with the rest.
 What the panel covers is positions and headings. **Heights are still edited one object at a time** —
 that's [section 6](#6-heights--the-one-thing-that-isnt-obvious).
 
-<!-- SHOT 10_1_arrange_before.jpg / 10_2_arrange_after.jpg — arrange, before and after, same viewpoint
-     both times: a crooked, unevenly spaced row of 5-6 parked aircraft selected on the map, with the
-     Inspector showing "N objects selected" and the "Row: … m at …°" read-out; then the same row after
-     Line up + Space evenly + Match row. Desktop only, no flying. See guide/images/README.md. -->
+![Shot 10.1 — five aircraft parked by hand along the apron at KDAG: nearly straight, nearly evenly spaced](images/10_1_arrange_before.jpg)
+
+The same five, selected together, after **Line up** and **Space evenly** — and with one heading
+written across the whole selection:
+
+![Shot 10.2 — the tidied row, with the arrange panel reading Row: 368.8 m at 50.8°](images/10_2_arrange_after.jpg)
 
 ### The keyboard
 
@@ -421,8 +420,7 @@ Two kinds, both in the **Lights** section:
 - **The point light** — fully parametric. Pick a colour, an intensity (0 = off, ~1000 = visible,
   up to 100000 = very bright), and optionally a flash pattern.
 
-<!-- SHOT 20_lights_catalog.jpg — the Lights section open in the catalog: the sim's fixtures and the
-     point light together. Crop of the panel. See guide/images/README.md. -->
+![Shot 20 — the Lights section open: PCT's parametric point light at the top, then the sim's own fixtures](images/20_lights_catalog.jpg)
 
 **Lights only render at night.** This is Aerofly's behaviour, not a bug, and it is the single most
 common "PCT is broken" report. The **Visibility group** field on each light controls the window:
@@ -438,18 +436,14 @@ While you're building in daylight, set group 3 so you can see what you're doing,
 0 or 1 when the row is right. Or leave it at 3 on purpose: a light that burns through the afternoon is
 wrong for a runway edge and right for a lit-up factory yard.
 
-<!-- SHOT 21_light_inspector.jpg — the Inspector with an airport light fixture selected: Fixture,
-     Colour, Opposite, Orientation °, and the Visibility group field. Crop. The whole of this section
-     in one panel. See guide/images/README.md. -->
+![Shot 21 — a runway end light in the Inspector: the fixture, Orientation °, red one way and green the other, and the visibility group](images/21_light_inspector.jpg)
 
 **Flashing** takes four numbers, of which three matter: *Cycle* (bigger = slower), *Sequence*
 (the phase), and *Length* (how long each flash lasts). Stagger *Sequence* 1, 2, 3, 4… across a row
 of point lights and you get a running-light sweep down the row — worth doing after **Space evenly**
 (section 5), since a sweep is only convincing if the gaps it crosses are equal.
 
-<!-- SHOT 22_point_light.jpg — the Inspector with the point light selected: colour, intensity, and
-     Flashing ticked so Cycle / Sequence / Length are visible. Crop.
-     See guide/images/README.md. -->
+![Shot 22 — the point light in the Inspector: the colour swatches, the intensity, and the Flashing tick-box that opens those four numbers](images/22_point_light.jpg)
 
 Remember: lights need **Baked ASL**.
 
@@ -466,9 +460,7 @@ rotation to get wrong.
 - **Plant height (m)** — how tall the tree grows.
 - **Height** (the shared control below it) — where its base sits, same as every other object.
 
-<!-- SHOT 23_plant_height.jpg — the Inspector with a plant selected, cropped so **Plant height (m)**
-     and the shared **Height** control are both in frame, one above the other. The classic mistake,
-     shown instead of described. See guide/images/README.md. -->
+![Shot 23 — a conifer in the Inspector: Plant height (m) is how tall it grows, and the Height control below it is where its base sits](images/23_plant_height.jpg)
 
 Each plant card shows its natural height — the size the texture was authored at. Straying far from
 it makes the tree look stretched or squashed.
@@ -523,9 +515,7 @@ Then: **restart Aerofly FS 4**. The dialog says so for a reason.
 gets an **Uninstall** button. Anything else is listed as "not by PCT" and left alone — PCT will not
 delete a folder it didn't create.
 
-<!-- SHOT 24_installed_pois.jpg — the foot of the Export dialog: the Installed POIs list with an
-     Uninstall button, and a "not by PCT" row if your install has one. Crop. Sections 3, 8 and 12 all
-     send the reader here. See guide/images/README.md. -->
+![Shot 24 — the foot of the Export dialog: the POIs currently installed, each with its Uninstall button](images/24_installed_pois.jpg)
 
 **Sharing.** Export to a folder, zip it, post it. Whoever unzips it into their own
 `Aerofly FS 4/scenery/poi/` gets your scene, as long as they own the same objects — which, for
@@ -613,10 +603,7 @@ That's it: no filename to type, no id to match. The card knows which object it i
 the exact name at the top — so the file is named correctly by construction. **Open photos folder** is
 in the same menu, and **Remove photo** joins it once the card has one.
 
-<!-- SHOT 11_photo_on_cards.jpg — the payoff shot this section is missing: the Objects (or Lights)
-     list with real photos on several cards at once, next to a couple still showing the drawn icon, so
-     the difference is visible in one frame. Ideally with the hover preview open on one of them.
-     Desktop only. See guide/images/README.md. -->
+![Shot 11 — one card carrying a photo among cards still showing the drawn icon, with the hover preview open on it and the object's exact id spelled out underneath](images/11_photo_on_cards.jpg)
 
 From then on the card carries the photo everywhere it appears, and resting the mouse on it enlarges
 the shot — which is the point: two runway light fixtures that share one glyph stop being
@@ -651,9 +638,7 @@ Your measurements live in your own file, and **rescanning your install never cle
 **Settings → Object footprints** has Export and Import, so one person can measure a family of
 fixtures once and post the file for everyone else.
 
-<!-- SHOT 12_set_footprint.jpg — the Set footprint dialog open on a light card with figures typed in,
-     ideally with that light already on the map behind it so the point-vs-rectangle difference shows.
-     Desktop only. See guide/images/README.md. -->
+![Shot 12 — the footprint dialog on a light fixture: width, depth and height in metres, and a note recording how it was measured](images/12_set_footprint.jpg)
 
 ---
 
