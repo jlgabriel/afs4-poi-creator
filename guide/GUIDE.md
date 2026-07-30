@@ -242,6 +242,39 @@ air:
 the Export dialog. Every object that needs a ground height uses that one number — fine for a flat
 site, wrong for a hillside. (KDAG is 588 m.)
 
+### A worked example: something is half-buried
+
+This is the most common way heights bite, so it's worth walking through once. The example project
+in section 9 puts a cluster of fuel tanks west of the hangar. Flown, they sit slightly *into* the
+ground:
+
+![Shot 09.1 — the fuel tanks partly sunk into the terrain](images/09_1_tanks_sunk.jpg)
+
+Nothing is wrong with the model, and nothing is wrong with PCT. The POI was baked at one elevation
+for the whole site, and the sim's terrain under the tanks is a little higher than that number. A
+hangar seven metres tall shrugs that off. A four-metre tank cluster loses its feet.
+
+The fix is two clicks. Select the object and press **+0.5** in the Inspector: *Terrain* becomes
+*Terrain + offset* and it rises half a metre. Export again, restart the sim, and go look. If it's
+still low, press it again — you are aiming at a target only the sim can show you.
+
+![Shot 09.2 — the same tanks sitting on the ground after nudging them up](images/09_2_tanks_fixed.jpg)
+
+Three things worth taking from this:
+
+- **Nudge the object, not the project.** A base elevation that suits eleven objects doesn't need
+  changing because the twelfth sits in a dip.
+- **Yes, Sim autoheight would have grounded it for you** — and this project can't use it, because it
+  has two apron lights. That's the trade-off described above, in a real case rather than in the
+  abstract.
+- **The sim is the only authority on its own terrain.** No elevation service and no number in this
+  guide beats going and looking. Height is the one part of PCT where flying out to check is part of
+  the work.
+
+The example project ships with this *not* fixed, on purpose. Install it, fly out, and make the tanks
+sit down yourself — it's the shortest exercise in this guide that ends with you having changed
+something in Aerofly.
+
 Sim autoheight was designed on the forum by **@chrispriv**, with **@ApfelFlieger**.
 
 ---
