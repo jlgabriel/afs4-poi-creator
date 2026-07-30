@@ -4,7 +4,7 @@
 // map's O(changed) footprint diff stays intact. The body dispatches by `kind`: xref (footprint) |
 // airport_light | light (the two point kinds) | plant (v0.4), sharing the position row + the
 // height/label/lock tail.
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type {
   CatalogAirportLight,
   CatalogObject,
@@ -20,6 +20,7 @@ import { plantKey } from "../../core/catalog/plants";
 import { clampLonLat } from "../../core/project/schemas";
 import { directionToHeading, headingToDirection } from "../../core/geo/orientation";
 import { directionToWad, formatWad, latToWad, lonToWad } from "../../core/geo/wad";
+import { rowAxis } from "../../core/geo/arrange";
 import { editorStore, useEditor } from "../state/editorStore";
 import { HeightControl } from "./HeightControl";
 import { NumberInput } from "./NumberInput";
@@ -600,6 +601,162 @@ function PlantFields({
   );
 }
 
+// ── multi-selection: arrange (v0.9.2) ─────────────────────────────────────────
+/** The RAW `.toc` rotation an object carries, if it has one at all (a point light and a plant don't). */
+function rawRotation(o: PlacedObject): number | undefined {
+  return o.kind === "xref" ? o.direction : o.kind === "airport_light" ? o.orientation : undefined;
+}
+
+/** A rotation field for the WHOLE selection. Shows the shared value, or nothing with a "mixed"
+ *  placeholder when they disagree — a number that claims to be "the" heading of seven objects pointing
+ *  seven ways would be the whole bug. Typing one writes it to all of them, as one undo entry. */
+function BulkRotationField({
+  label,
+  title,
+  common,
+  onCommit,
+}: {
+  label: string;
+  title: string;
+  common: number | undefined;
+  onCommit: (deg: number) => void;
+}): React.ReactElement {
+  const [draft, setDraft] = useState<string | null>(null);
+  const commit = (): void => {
+    if (draft !== null) {
+      const n = Number.parseFloat(draft);
+      if (Number.isFinite(n)) onCommit(n);
+    }
+    setDraft(null);
+  };
+  return (
+    <label className="pct-field-col">
+      <span className="pct-field-label" title={title}>
+        {label}
+      </span>
+      <input
+        className="pct-num"
+        type="text"
+        inputMode="decimal"
+        value={draft ?? (common === undefined ? "" : common.toFixed(1))}
+        placeholder={common === undefined ? "mixed" : undefined}
+        aria-label={`${label} for the whole selection`}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.currentTarget.blur();
+          else if (e.key === "Escape") setDraft(null);
+        }}
+      />
+    </label>
+  );
+}
+
+/** What the Inspector shows for 2+ selected objects: put them in a tidy row.
+ *
+ *  The 2D-editor "align left / align top" does not survive the trip to a map — left is WEST, and the
+ *  row you actually want is almost never axis-aligned (the parked B747s that prompted this run at
+ *  135°). So the two position tools work in the row's own frame: LINE UP zeroes each object's offset
+ *  across the line through the two farthest apart, SPACE EVENLY equalises the gaps along it. They are
+ *  orthogonal, so running both gives a clean row and running one leaves the other property alone. */
+function ArrangePanel(): React.ReactElement {
+  const objects = useEditor((s) => s.project.objects);
+  const selection = useEditor((s) => s.selection);
+  const store = editorStore.getState;
+
+  // Both inputs are stable store references, so the derived work happens here rather than in a
+  // selector — a selector that built a new array every call would re-render this panel on every pan.
+  const picked = useMemo(() => {
+    const wanted = new Set(selection);
+    return objects.filter((o) => wanted.has(o.id));
+  }, [objects, selection]);
+  const axis = useMemo(() => rowAxis(picked.map((o) => o.position)), [picked]);
+
+  const canArrange = picked.length >= 3 && axis !== null;
+  const lockedCount = picked.filter((o) => o.locked).length;
+
+  // A bulk rotation must mean ONE thing. An xref's field is a calibrated compass heading; an airport
+  // light's is the raw model rotation it shines along — same slot in the file, different quantity. So
+  // the control appears only for a selection of a single kind, and speaks that kind's language.
+  const kind = new Set(picked.map((o) => o.kind)).size === 1 ? picked[0].kind : undefined;
+  const isXref = kind === "xref";
+  const shown = isXref || kind === "airport_light" ? picked.map((o) => rawRotation(o) ?? 0) : null;
+  const displayed = shown?.map((raw) => (isXref ? directionToHeading(raw) : raw));
+  const common =
+    displayed && displayed.every((v) => Math.abs(v - displayed[0]) < 0.05) ? displayed[0] : undefined;
+
+  return (
+    <div className="pct-inspector-body">
+      <div className="pct-field-title">{picked.length} objects selected</div>
+
+      <div className="pct-field pct-field-col">
+        <span className="pct-field-label">Arrange</span>
+        <div className="pct-arrange-row">
+          <button
+            type="button"
+            disabled={!canArrange}
+            title="Move every selected object onto the straight line through the two farthest apart. The two ends stay where they are."
+            onClick={() => store().lineUpSelection()}
+          >
+            Line up
+          </button>
+          <button
+            type="button"
+            disabled={!canArrange}
+            title="Give every gap along that line the same length, keeping each object's offset across it."
+            onClick={() => store().spaceSelectionEvenly()}
+          >
+            Space evenly
+          </button>
+        </div>
+        <span className="pct-field-meta">
+          {canArrange
+            ? `Row: ${axis.lengthM.toFixed(1)} m at ${axis.bearing.toFixed(1)}°`
+            : picked.length < 3
+              ? "Select 3 or more to line them up."
+              : "They're all in the same spot — no row to line up."}
+        </span>
+        {lockedCount > 0 && (
+          <span className="pct-field-meta">
+            {lockedCount} locked — {lockedCount === 1 ? "it helps" : "they help"} define the row but
+            won&apos;t move.
+          </span>
+        )}
+      </div>
+
+      {displayed && (
+        <div className="pct-field pct-field-row">
+          <BulkRotationField
+            label={isXref ? "Heading °" : "Orientation °"}
+            title={
+              isXref
+                ? "Give every selected object the same compass heading. Blank means they currently differ."
+                : "Give every selected light the same raw rotation. Blank means they currently differ."
+            }
+            common={common}
+            onCommit={(deg) => store().setSelectionRotation(isXref ? headingToDirection(deg) : deg)}
+          />
+          {/* Only for xrefs: this button asserts that a compass bearing IS the object's facing, which
+              is the mapping calibrated in-sim for xrefs and never measured for a light fixture. */}
+          {isXref && axis && (
+            <label className="pct-field-col">
+              <span className="pct-field-label">&nbsp;</span>
+              <button
+                type="button"
+                className="pct-arrange-btn"
+                title={`Face every object along the row (${axis.bearing.toFixed(1)}°). Add 180 to face the other way.`}
+                onClick={() => store().setSelectionRotation(headingToDirection(axis.bearing))}
+              >
+                Match row
+              </button>
+            </label>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** Dispatch the editor body by object kind. */
 function ObjectFields({
   obj,
@@ -650,10 +807,10 @@ export function Inspector(): React.ReactElement {
           plantMeta={plantMeta}
           resolvedAsl={resolvedAsl}
         />
+      ) : selCount === 0 ? (
+        <p className="pct-empty">Select an object on the map</p>
       ) : (
-        <p className="pct-empty">
-          {selCount === 0 ? "Select an object on the map" : `${selCount} objects selected`}
-        </p>
+        <ArrangePanel />
       )}
     </aside>
   );

@@ -40,6 +40,7 @@ import {
   type FootprintOverrides,
 } from "../../core/catalog/footprints";
 import { destination } from "../../core/geo/geo";
+import { lineUp, spaceEvenly } from "../../core/geo/arrange";
 import * as mutate from "../../core/project/mutate";
 
 export type Camera = Project["camera"];
@@ -215,6 +216,16 @@ export interface EditorState {
   duplicateSelection: (offsetM?: number) => void;
   deleteSelection: () => void;
 
+  // ── arrange the selection (v0.9.2) — each is ONE undo entry for the whole group, and each is a true
+  //    no-op (no entry at all) when nothing actually moves. A LOCKED object helps define the row but is
+  //    never moved or turned, so locking the two ends is how you pin the axis by hand.
+  /** Straighten: every selected object moves onto the line through the two farthest apart. */
+  lineUpSelection: () => void;
+  /** Equalise the gaps along that same line, keeping each object's offset across it. */
+  spaceSelectionEvenly: () => void;
+  /** Write one RAW rotation (`.toc` degrees) to every selected object that has one. */
+  setSelectionRotation: (deg: number) => void;
+
   // ── camera + resolved elevation (ephemeral) ──
   setMapView: (camera: Camera) => void;
   flyTo: (p: LonLat, zoom?: number) => void;
@@ -310,6 +321,39 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
         }));
         coalesce = { key, at: t };
         scheduleAutosave();
+      };
+
+      // Shared body of the two arrange actions: hand the selection's positions to a pure transform
+      // (core/geo/arrange.ts) and write back only what genuinely moved. `transform` returns the SAME
+      // reference for an untouched point, which is what makes "line up an already-straight row" cost
+      // nothing — no writes, so `commit` sees an unchanged project and adds no undo entry.
+      const arrangeSelection = (transform: (points: LonLat[]) => LonLat[]): void => {
+        const ids = get().selection;
+        if (ids.length < 3) return; // two objects are a line, and are evenly spaced by definition
+        const objects = get().project.objects;
+        const picked = ids.flatMap((id) => objects.find((o) => o.id === id) ?? []);
+        if (picked.length < 3) return;
+        const before = picked.map((o) => o.position);
+        const after = transform(before);
+        const moved: string[] = [];
+        commit((proj) => {
+          let next = proj;
+          picked.forEach((o, i) => {
+            if (o.locked || after[i] === before[i]) return;
+            next = mutate.moveObject(next, o.id, after[i]);
+            moved.push(o.id);
+          });
+          return next;
+        });
+        // they moved → the terrain under them changed → drop their cached elevations (P2-8)
+        if (moved.length > 0) {
+          set((s) => {
+            if (!moved.some((id) => s.resolvedElev.has(id))) return s;
+            const resolvedElev = new Map(s.resolvedElev);
+            for (const id of moved) resolvedElev.delete(id);
+            return { resolvedElev };
+          });
+        }
       };
 
       const prune = (project: Project, selection: string[]): string[] => {
@@ -505,6 +549,21 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
             return next;
           });
           if (created.length > 0) set({ selection: created }); // select the copies
+        },
+
+        lineUpSelection: () => arrangeSelection(lineUp),
+        spaceSelectionEvenly: () => arrangeSelection(spaceEvenly),
+
+        setSelectionRotation: (deg) => {
+          const ids = get().selection;
+          if (ids.length === 0) return;
+          commit((proj) =>
+            ids.reduce((p, id) => {
+              const o = p.objects.find((x) => x.id === id);
+              // `locked` reads "ignore map drag & rotate" — a bulk turn is a rotate.
+              return o && !o.locked ? mutate.rotateObject(p, id, deg) : p;
+            }, proj),
+          );
         },
 
         deleteSelection: () => {

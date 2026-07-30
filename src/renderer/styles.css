@@ -821,6 +821,33 @@ body {
   color: #334155;
 }
 
+/* Arrange (v0.9.2) — the multi-selection panel's two position buttons, side by side and equal width so
+   neither reads as the primary one; they do different jobs and are often used together. */
+.pct-arrange-row {
+  display: flex;
+  gap: 6px;
+}
+.pct-arrange-row button,
+.pct-arrange-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 6px;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  background: #fff;
+  color: #0f172a;
+  cursor: pointer;
+}
+.pct-arrange-row button:disabled,
+.pct-arrange-btn:disabled {
+  color: #94a3b8;
+  border-color: #e2e8f0;
+  background: #f1f5f9;
+  cursor: default;
+}
+
 /* FS4 internal (.wad) read-out — collapsed, at the very bottom of every kind's body. Nobody needs it to
    place an object, so it must not cost a line of vertical space until it's opened (Inspector.tsx). */
 .pct-wad {

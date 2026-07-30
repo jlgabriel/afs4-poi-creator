@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Catalog, PlacedXref, Project } from "../../src/core/project/types";
 import { createEditorStore, type EditorDeps } from "../../src/renderer/state/store";
+import { destination, haversine } from "../../src/core/geo/geo";
 
 function baseProject(objects: PlacedXref[] = []): Project {
   return {
@@ -551,5 +552,137 @@ describe("lifecycle", () => {
     expect(store.getState().airports).toHaveLength(1);
     expect(store.getState().dirty).toBe(false);
     expect(persist).not.toHaveBeenCalled();
+  });
+});
+
+// ── v0.9.2 arrange ────────────────────────────────────────────────────────────
+// Three objects 100 m apart along a 135° row, with the middle one pushed 12 m off the line.
+const ROW_ORIGIN = { lon: 10, lat: 48 };
+const rowPoint = (along: number, cross: number) => {
+  const p = destination(ROW_ORIGIN, along, 135);
+  return cross === 0 ? p : destination(p, cross, 225);
+};
+const strayRow = () =>
+  baseProject([
+    xref("a", { position: rowPoint(0, 0) }),
+    xref("b", { position: rowPoint(100, 12) }),
+    xref("c", { position: rowPoint(200, 0) }),
+  ]);
+
+describe("lineUpSelection / spaceSelectionEvenly", () => {
+  it("straightens the row in ONE undo entry, and one undo puts it back", () => {
+    const { store } = makeStore();
+    const before = strayRow();
+    store.getState().openProject("/p", before);
+    store.getState().select(["a", "b", "c"]);
+    store.getState().lineUpSelection();
+
+    const after = store.getState();
+    expect(after.undoStack).toHaveLength(1); // not one per object
+    // The two ends define the axis and must not have budged; the stray one moved its 12 m.
+    expect(after.project.objects[0].position).toEqual(before.objects[0].position);
+    expect(after.project.objects[2].position).toEqual(before.objects[2].position);
+    expect(haversine(after.project.objects[1].position, before.objects[1].position)).toBeCloseTo(12, 2);
+
+    store.getState().undo();
+    expect(store.getState().project.objects[1].position).toEqual(before.objects[1].position);
+  });
+
+  it("evens the gaps, keeping the ends put", () => {
+    const { store } = makeStore();
+    store.getState().openProject(
+      "/p",
+      baseProject([
+        xref("a", { position: rowPoint(0, 0) }),
+        xref("b", { position: rowPoint(20, 0) }), // bunched up against the first
+        xref("c", { position: rowPoint(200, 0) }),
+      ]),
+    );
+    store.getState().select(["a", "b", "c"]);
+    store.getState().spaceSelectionEvenly();
+
+    const o = store.getState().project.objects;
+    expect(haversine(o[0].position, o[1].position)).toBeCloseTo(100, 2);
+    expect(haversine(o[1].position, o[2].position)).toBeCloseTo(100, 2);
+    expect(store.getState().undoStack).toHaveLength(1);
+  });
+
+  // The point of returning identical references out of core/geo/arrange: an operation that changes
+  // nothing must not cost an undo entry, or "did that do anything?" becomes a history full of no-ops.
+  it("is a TRUE no-op on an already-straight, already-even row", () => {
+    const { store } = makeStore();
+    store.getState().openProject(
+      "/p",
+      baseProject([
+        xref("a", { position: rowPoint(0, 0) }),
+        xref("b", { position: rowPoint(100, 0) }),
+        xref("c", { position: rowPoint(200, 0) }),
+      ]),
+    );
+    store.getState().select(["a", "b", "c"]);
+    store.getState().lineUpSelection();
+    store.getState().spaceSelectionEvenly();
+    expect(store.getState().undoStack).toHaveLength(0);
+    expect(store.getState().dirty).toBe(false);
+  });
+
+  it("leaves a LOCKED object where it is, but still counts it in the row", () => {
+    const { store } = makeStore();
+    const before = strayRow();
+    before.objects[1].locked = true;
+    store.getState().openProject("/p", before);
+    store.getState().select(["a", "b", "c"]);
+    store.getState().lineUpSelection();
+    // Nothing else was off the line, so with the only stray one locked there is nothing left to do.
+    expect(store.getState().project.objects[1].position).toEqual(before.objects[1].position);
+    expect(store.getState().undoStack).toHaveLength(0);
+  });
+
+  it("needs three: two objects are a line already", () => {
+    const { store } = makeStore();
+    store.getState().openProject("/p", strayRow());
+    store.getState().select(["a", "b"]);
+    store.getState().lineUpSelection();
+    expect(store.getState().undoStack).toHaveLength(0);
+  });
+
+  it("drops the cached terrain elevation of everything it moved", () => {
+    const { store } = makeStore();
+    store.getState().openProject("/p", strayRow());
+    store.getState().setResolvedElev("a", 500);
+    store.getState().setResolvedElev("b", 500);
+    store.getState().select(["a", "b", "c"]);
+    store.getState().lineUpSelection();
+    expect(store.getState().resolvedElev.has("b")).toBe(false); // it moved
+    expect(store.getState().resolvedElev.has("a")).toBe(true); // it didn't
+  });
+});
+
+describe("setSelectionRotation", () => {
+  it("writes one raw rotation to every kind that has one, as a single undo entry", () => {
+    const { store } = makeStore();
+    store.getState().openProject(
+      "/p",
+      baseProject([xref("a", { direction: 10 }), xref("b", { direction: 250 })]),
+    );
+    store.getState().select(["a", "b"]);
+    store.getState().setSelectionRotation(315);
+    const o = store.getState().project.objects;
+    expect((o[0] as PlacedXref).direction).toBe(315);
+    expect((o[1] as PlacedXref).direction).toBe(315);
+    expect(store.getState().undoStack).toHaveLength(1);
+  });
+
+  it("skips a locked object — the lock reads 'ignore map drag & rotate'", () => {
+    const { store } = makeStore();
+    store.getState().openProject(
+      "/p",
+      baseProject([xref("a", { direction: 10 }), xref("b", { direction: 10, locked: true })]),
+    );
+    store.getState().select(["a", "b"]);
+    store.getState().setSelectionRotation(90);
+    const o = store.getState().project.objects;
+    expect((o[0] as PlacedXref).direction).toBe(90);
+    expect((o[1] as PlacedXref).direction).toBe(10);
   });
 });
