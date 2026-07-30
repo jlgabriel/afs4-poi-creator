@@ -581,7 +581,11 @@ direction_WAD = radians( (90 − heading) mod 360 )
   float64s from 47 binary IPACS `.wad` files: **the tangent wins 46 to 1** (the single "tie"
   falls right where both curves cross). ⇒ this projection **is** IPACS's.
 - The direction one is the same formula as §6, but the `.toc` wants it in **degrees** and the
-  `.wad` in **radians**.
+  `.wad` in **radians**. Which means `direction_WAD` is simply the raw `.toc` `direction`
+  converted to radians — not a second formula.
+- Since **v0.9.1**, PCT applies all three for you: the Inspector's collapsed **"FS4 internal
+  (.wad)"** block shows the selected object's projected position and its rotation in radians,
+  ready to copy. It is a **read-out only** — PCT still writes no `.wad`/`.tsc`.
 
 ### Useful facts
 

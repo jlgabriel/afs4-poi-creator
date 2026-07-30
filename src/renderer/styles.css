@@ -821,6 +821,44 @@ body {
   color: #334155;
 }
 
+/* FS4 internal (.wad) read-out — collapsed, at the very bottom of every kind's body. Nobody needs it to
+   place an object, so it must not cost a line of vertical space until it's opened (Inspector.tsx). */
+.pct-wad {
+  border-top: 1px solid #e2e8f0;
+  padding-top: 8px;
+}
+.pct-wad summary {
+  cursor: pointer;
+  color: #334155;
+  font-size: 12px;
+}
+.pct-wad-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+.pct-wad-row .pct-field-label {
+  flex: 0 0 66px;
+}
+.pct-wad-row code {
+  flex: 1 1 auto;
+  min-width: 0; /* same lesson as .pct-field-col: without it the 16-digit value refuses to shrink and
+                   pushes the Copy button out of the 300 px panel. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  padding: 3px 5px;
+  background: #eef2f7;
+  border-radius: 4px;
+  color: #334155;
+  font-variant-numeric: tabular-nums;
+}
+.pct-wad-pair {
+  margin-top: 8px;
+}
+
 /* Height control. */
 .pct-height {
   display: flex;

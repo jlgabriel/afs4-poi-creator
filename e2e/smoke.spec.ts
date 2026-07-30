@@ -142,8 +142,11 @@ test("the Inspector's Copy button really reaches the clipboard (deny-all permiss
     await page.locator(".pct-map").click({ position: { x: 200, y: 200 } });
     await expect(page.locator(".pct-inspector .pct-field-title")).toHaveText("E2E Tower");
 
-    // The button's accessible name is its CONTENT ("Copy"); the title is only a fallback.
-    await page.getByRole("button", { name: "Copy", exact: true }).click();
+    // The button's accessible name is its CONTENT ("Copy"); the title is only a fallback. Scoped to the
+    // object-name row: the FS4-internal block (v0.9.1) carries "Copy" buttons of its own, and though a
+    // closed <details> keeps them out of the a11y tree, an unscoped exact-name lookup would be one
+    // "open by default" away from a strict-mode violation in a test that is about something else.
+    await page.locator(".pct-xref").getByRole("button", { name: "Copy", exact: true }).click();
     await expect
       .poll(() => app.evaluate(({ clipboard }) => clipboard.readText()))
       .toBe(E2E_OBJECT);

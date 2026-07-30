@@ -19,6 +19,7 @@ import type {
 import { plantKey } from "../../core/catalog/plants";
 import { clampLonLat } from "../../core/project/schemas";
 import { directionToHeading, headingToDirection } from "../../core/geo/orientation";
+import { directionToWad, formatWad, latToWad, lonToWad } from "../../core/geo/wad";
 import { editorStore, useEditor } from "../state/editorStore";
 import { HeightControl } from "./HeightControl";
 import { NumberInput } from "./NumberInput";
@@ -82,6 +83,74 @@ function PositionRow({ obj }: { obj: PlacedObject }): React.ReactElement {
   );
 }
 
+/** One read-only value + its Copy button. */
+function WadRow({ label, value, title }: { label: string; value: string; title: string }): React.ReactElement {
+  return (
+    <div className="pct-wad-row">
+      <span className="pct-field-label" title={title}>
+        {label}
+      </span>
+      <code>{value}</code>
+      <button
+        type="button"
+        className="pct-copy"
+        title={`Copy ${label.toLowerCase()}`}
+        onClick={() => void navigator.clipboard?.writeText(value)}
+      >
+        Copy
+      </button>
+    </div>
+  );
+}
+
+/** Whether the FS4-internal block is open, kept OUTSIDE React because the Inspector is keyed by object
+ *  id: selecting the next object remounts the whole panel. Without this, someone reading these values
+ *  off a row of objects — the entire point of the feature — would re-open the block for every click. */
+let wadOpen = false;
+
+/** The same position/rotation in the units FS4 uses INSIDE its own world-airport database (`.wad`):
+ *  a 0–65536 projected grid and radians (see core/geo/wad.ts). Read-only, collapsed by default —
+ *  irrelevant to placing objects, and only wanted by the few people who hand-build heliport files and
+ *  were converting with a private spreadsheet (forum #150). Every kind gets it; the rotation row is
+ *  dropped for the two kinds that have none (a point light and a plant don't turn). */
+function Fs4Internal({ obj }: { obj: PlacedObject }): React.ReactElement {
+  const [open, setOpen] = useState(wadOpen);
+  // The RAW `.toc` rotation, which is what a `.wad` wants in radians — not the compass heading the
+  // xref panel shows. For an airport light the raw value is already what the Inspector edits.
+  const rotation =
+    obj.kind === "xref" ? obj.direction : obj.kind === "airport_light" ? obj.orientation : undefined;
+  const lon = formatWad(lonToWad(obj.position.lon));
+  const lat = formatWad(latToWad(obj.position.lat));
+  return (
+    <details
+      className="pct-wad"
+      open={open}
+      onToggle={(e) => setOpen((wadOpen = e.currentTarget.open))}
+    >
+      <summary title="The projected values FS4 stores internally. PCT does not write .wad files — this is a read-out.">
+        FS4 internal (.wad)
+      </summary>
+      <WadRow label="Longitude" value={lon} title="0 = 180° W · 32768 = Greenwich · 65536 = 180° E" />
+      <WadRow label="Latitude" value={lat} title="0 = 90° S · 32768 = Equator · 65536 = 90° N (tangent projection)" />
+      {rotation !== undefined && (
+        <WadRow
+          label="Direction"
+          value={formatWad(directionToWad(rotation))}
+          title="The raw .toc rotation in radians — the form a .wad stores it in"
+        />
+      )}
+      <button
+        type="button"
+        className="pct-copy pct-wad-pair"
+        title="Copy both as one line, the way a .wad position field carries them"
+        onClick={() => void navigator.clipboard?.writeText(`${lon} ${lat}`)}
+      >
+        Copy position pair
+      </button>
+    </details>
+  );
+}
+
 /** Height + label + lock — identical across kinds. Height resolves to absolute ASL at export for every
  *  kind (in-sim gate 2026-07-12), so the same HeightControl serves lights and xrefs. */
 function SharedTail({
@@ -104,6 +173,7 @@ function SharedTail({
         />
         <span>Lock — ignore map drag &amp; rotate</span>
       </label>
+      <Fs4Internal obj={obj} />
     </>
   );
 }
