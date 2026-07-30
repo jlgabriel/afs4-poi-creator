@@ -13,6 +13,12 @@ import { AirportSearch } from "./AirportSearch";
 
 const NO_PCT = "Not available in browser preview";
 
+/** The guide lives in the repo, never in the app: a copy shipped inside a build goes stale against the
+ *  next release, and `main` always carries the current one. main/index.ts denies the popup and hands the
+ *  URL to shell.openExternal, so this opens the OS browser when packaged — and a plain tab in the browser
+ *  preview. Nothing here needs the IPC bridge, so unlike its neighbours the button never disables. */
+const GUIDE_URL = "https://github.com/jlgabriel/afs4-poi-creator/blob/main/guide/GUIDE.md";
+
 /** Filename of the open project.json (main owns the real path; this is display-only, P0-2). */
 const basename = (p: string): string => p.split(/[\\/]/).pop() || p;
 
@@ -164,6 +170,16 @@ export function TopBar({ onExport, onRescan, onSettings }: TopBarProps): React.R
       </button>
       <button type="button" onClick={onSettings} disabled={!onSettings}>
         Settings
+      </button>
+      <button
+        type="button"
+        onClick={() => window.open(GUIDE_URL, "_blank", "noopener")}
+        title="Open the PCT guide in your browser — leaves the app"
+      >
+        Help{" "}
+        <span className="pct-external" aria-hidden="true">
+          ↗
+        </span>
       </button>
 
       <span className="pct-spacer" />

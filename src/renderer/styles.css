@@ -212,6 +212,12 @@ body {
   opacity: 0.4;
   cursor: default;
 }
+/* The ↗ on Help: this one button leaves the app for the OS browser, and the arrow is the only warning
+   the user gets before their window loses focus. Dimmed so it reads as a mark on the label, not a glyph
+   competing with it. */
+.pct-external {
+  opacity: 0.7;
+}
 .pct-divider {
   width: 1px;
   align-self: stretch;
