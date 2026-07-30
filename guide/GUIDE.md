@@ -274,20 +274,20 @@ in it is **to set down beside the objects and take the altitude with height-abov
 
 ![Shot 09.2 — the same outpost once the site figure is right](images/09_2_site_figure_fixed.jpg)
 
-That is the site correct, and almost everything sits.
+That is the site correct: the hangar sits, and the cars and the aircraft are back. Look at the
+shadows, though — the tanks, the cars and the palms are all hovering slightly off the ground. One
+figure can describe a site, but not its slope.
 
-**Pass three — the last half-metre, object by object.** One figure can describe a site but not its
-slope, so a few objects are still out. From a hundred metres up you can't see it. From close in you
-can:
+**Pass three — the last half-metre, object by object.** Select each object that's out and press
+**−0.5** or **+0.5** in the Inspector. *Terrain* becomes *Terrain + offset*, which is exactly what
+it's for, and negative values are perfectly normal. Export, restart, look, repeat. There is no shame
+in a pass 3.1, 3.2 and 3.3 — each round is a couple of minutes, and each one is smaller than the
+last.
 
-![Shot 09.3 — close in: the fuel tanks and a palm still off the ground](images/09_3_residual_close.jpg)
+![Shot 09.3 — the same outpost with every object on the ground](images/09_3_offsets_tuned.jpg)
 
-Select each one and press **−0.5** or **+0.5** in the Inspector. *Terrain* becomes *Terrain + offset*,
-which is exactly what it's for, and negative values are perfectly normal. Export, restart, look,
-repeat. There is no shame in a pass 3.1, 3.2 and 3.3 — each round is a couple of minutes, and each
-one is smaller than the last.
-
-![Shot 09.4 — the same objects after their per-object offsets](images/09_4_offsets_tuned.jpg)
+The palms here took −1.5 m, which had a second benefit: it tucked the plant anchor disc out of sight
+as well. Section 7 explains that one.
 
 Three things worth taking from this:
 
