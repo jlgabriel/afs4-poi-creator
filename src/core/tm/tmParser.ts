@@ -29,11 +29,18 @@ export function parseTm(text: string): TmNode {
   let i = 0;
   const n = text.length;
 
+  // Whitespace AND `//` line comments — the format has them and real files in the wild use them: the
+  // Hong Kong helipad pack installed on a user's disk annotates every line of its `.tsc`, and PCT's own
+  // heliport templates (heliportTemplate.ts) lead with a block of instructions. Comments are only
+  // recognised HERE, between tokens; a `//` inside brackets is part of the value, because `bracket()`
+  // reads verbatim to the first `]` and never calls this.
   const skip = (): void => {
     while (i < n) {
       const c = text[i];
       if (c === " " || c === "\t" || c === "\r" || c === "\n") i++;
-      else break;
+      else if (c === "/" && text[i + 1] === "/") {
+        while (i < n && text[i] !== "\n") i++;
+      } else break;
     }
   };
 

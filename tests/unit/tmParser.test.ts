@@ -21,6 +21,30 @@ describe("parseTm", () => {
     expect(root.children[0].children).toHaveLength(2);
   });
 
+  // Comments are part of the format: a community helipad pack found installed on a user's disk annotates
+  // every line of its `.tsc`, and PCT's own heliport templates lead with a block of instructions. Before
+  // this, parseTm threw `expected '<' at offset 0` on both.
+  it("skips // line comments between tags — leading, trailing and whole-line", () => {
+    const commented = `// what this file is
+<[file][][]
+    <[group][meta][]        // trailing note
+        // a whole line of its own
+        <[string8][title][Hello World]>
+    >
+>`;
+    const root = parseTm(commented);
+    expect(root.type).toBe("file");
+    expect(child(child(root, "meta")!, "title")!.value).toBe("Hello World");
+  });
+
+  it("does NOT treat a // inside brackets as a comment — it is part of the value", () => {
+    // Real case: a helipad is named `FATO/TLOF`, and a `geometry` can be a relative path.
+    expect(parseTm("<[string8][name][FATO//TLOF]>").value).toBe("FATO//TLOF");
+    expect(parseTm("<[string8][geometry][../xref_helipad_1/helipad1_obj]>").value).toBe(
+      "../xref_helipad_1/helipad1_obj",
+    );
+  });
+
   it("reads type/name/value left-to-right for a leaf", () => {
     const n = parseTm("<[string8][title][Hello World]>");
     expect(n).toMatchObject({ type: "string8", name: "title", value: "Hello World", children: [] });

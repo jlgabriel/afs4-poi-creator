@@ -217,11 +217,13 @@ export function formatExportSummary(i: {
   target: string;
   overwrite: boolean;
   baseElevation?: number;
+  heliport?: { objectId: string | null; radiusM: number };
 }): string {
   return (
     `export "${i.poiName}" — ${i.objects} objects, ${i.heightMode ?? "baked-asl"} mode, ` +
     `target ${i.target}${i.overwrite ? " (overwrite)" : ""}` +
-    `${i.baseElevation != null ? `, manual base ${i.baseElevation} m` : ""}`
+    `${i.baseElevation != null ? `, manual base ${i.baseElevation} m` : ""}` +
+    `${i.heliport ? `, heliport template (r=${i.heliport.radiusM} m, pad ${i.heliport.objectId ?? "at POI anchor"})` : ""}`
   );
 }
 

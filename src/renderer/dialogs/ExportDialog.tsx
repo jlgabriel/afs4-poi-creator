@@ -7,7 +7,7 @@
 // without the bridge — only the write actions need it.
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ExportOptions, InstallResult, InstalledPoi, PctError } from "../../shared/pctApi";
-import type { LonLat } from "../../core/project/types";
+import type { LonLat, PlacedObject } from "../../core/project/types";
 import { shiftEastNorth } from "../../core/geo/geo";
 import { centroid, poiFolderName } from "../../core/geo/poiName";
 import { unsupportedInAutoheight } from "../../core/export/heights";
@@ -104,6 +104,20 @@ function messageFor(error: PctError): string {
   }
 }
 
+/** How the helipad's source object is named back to the user — enough to recognise which one is selected. */
+function padLabel(o: PlacedObject): string {
+  switch (o.kind) {
+    case "xref":
+      return o.name;
+    case "plant":
+      return `${o.group} ${o.species}`;
+    case "airport_light":
+      return o.typeName;
+    default:
+      return "point light";
+  }
+}
+
 export function ExportDialog({ onClose }: { onClose: () => void }): React.ReactElement {
   const pct = getPct();
   const objects = useEditor((s) => s.project.objects);
@@ -116,6 +130,11 @@ export function ExportDialog({ onClose }: { onClose: () => void }): React.ReactE
   // inspector reacts immediately. (Unlike slug/shift, which stay local drafts until export.)
   const heightMode = useEditor((s) => s.project.heightMode) ?? "baked-asl";
   const mapView = useEditor((s) => s.mapView);
+  // The helipad copies its position and heading from ONE placed object — so the user aims it the way they
+  // already aim everything else, by putting an object where the pad goes (which is what ApfelFlieger does
+  // by hand: in his own heliports the VISIBLE pad is an airport-mast xref, lowered and scaled). Anything
+  // other than a single selection falls back to the POI's anchor point.
+  const selection = useEditor((s) => s.selection);
 
   const [slug, setSlug] = useState(storePoiName);
   const [refMode, setRefMode] = useState<"auto" | "map">(storeRef !== null ? "map" : "auto");
@@ -124,6 +143,8 @@ export function ExportDialog({ onClose }: { onClose: () => void }): React.ReactE
   const autoheight = heightMode === "autoheight";
   const [shiftEast, setShiftEast] = useState(storeShift?.east ?? 0);
   const [shiftNorth, setShiftNorth] = useState(storeShift?.north ?? 0);
+  const [heliport, setHeliport] = useState(false);
+  const [padRadius, setPadRadius] = useState(10);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<InstallResult | null>(null);
@@ -138,6 +159,13 @@ export function ExportDialog({ onClose }: { onClose: () => void }): React.ReactE
       ? { lon: mapView.lon, lat: mapView.lat }
       : centroid(objects.map((o) => shiftEastNorth(o.position, shiftEast, shiftNorth)));
   const folderName = validSlug ? poiFolderName(previewRef, slug) : null;
+
+  // The one selected object the pad will copy, or null → the anchor. Resolved against the live scene so a
+  // selection left over from a deleted object can't name a ghost.
+  const padObject = useMemo(
+    () => (selection.length === 1 ? (objects.find((o) => o.id === selection[0]) ?? null) : null),
+    [selection, objects],
+  );
 
   // Warn (don't block) if the scene places a user model that isn't registered — it won't render in the
   // sim. Unreachable by placing (unregistered cards are disabled); reachable via an opened project.json.
@@ -211,7 +239,13 @@ export function ExportDialog({ onClose }: { onClose: () => void }): React.ReactE
       return;
     }
 
+    if (heliport && !(Number.isFinite(padRadius) && padRadius > 0)) {
+      setError("Helipad radius must be a positive number of metres.");
+      return;
+    }
+
     const opts: ExportOptions = { target, overwrite: false };
+    if (heliport) opts.heliport = { objectId: padObject?.id ?? null, radiusM: padRadius };
     // Autoheight is fully offline: the sim resolves the terrain, so a base elevation has no meaning (main
     // ignores it too). Baked-asl passes it through as the offline/manual fallback.
     if (!autoheight && baseElevation !== undefined) opts.baseElevation = baseElevation;
@@ -343,6 +377,33 @@ export function ExportDialog({ onClose }: { onClose: () => void }): React.ReactE
                   <NumberInput value={shiftNorth} onCommit={setShiftNorth} ariaLabel="Shift north, metres" />
                 </label>
               </div>
+            </div>
+
+            {/* Two extra TEXT files, ignored by Aerofly as they are (they end in .txt), that the user can
+                turn into a real heliport by hand. PCT never picks an ICAO — see core/export/heliportTemplate.ts. */}
+            <div className="pct-field pct-field-col">
+              <span className="pct-field-label">Heliport template (advanced)</span>
+              <label className="pct-radio">
+                <input type="checkbox" checked={heliport} onChange={(e) => setHeliport(e.target.checked)} />
+                Also write heliport.tsc.txt + heliport.wad.txt
+              </label>
+              {heliport && (
+                <>
+                  <span className="pct-field-meta">
+                    {padObject !== null
+                      ? `Helipad on the selected object (${padLabel(padObject)}) — its position and heading.`
+                      : "Helipad at the POI anchor, facing true north. Select ONE object to put it there instead."}
+                  </span>
+                  <label className="pct-shift-cell">
+                    <span className="pct-field-meta">Pad radius — metres</span>
+                    <NumberInput value={padRadius} onCommit={setPadRadius} ariaLabel="Helipad radius, metres" />
+                  </label>
+                  <span className="pct-field-meta">
+                    Aerofly ignores both files until you move the folder to scenery/airports, fill in the
+                    airport code, name and country, and rename them. The steps are inside each file.
+                  </span>
+                </>
+              )}
             </div>
 
             <div className="pct-field pct-field-col">

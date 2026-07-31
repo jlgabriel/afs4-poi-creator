@@ -32,16 +32,35 @@ interface Args {
   out: string;
   baseElevation: number | null;
   baseElevationRaw?: string; // kept only to quote the bad value back in the error
+  // Heliport templates. `--heliport` alone = pad at the POI anchor, radius 10 m; the optional value is the
+  // radius in metres, and --helipad-object names the placed object the pad copies its position/heading from.
+  heliport: boolean;
+  heliportRadius: number;
+  heliportObjectId: string | null;
 }
 
 function parseArgs(argv: string[]): Args {
-  const args: Args = { install: false, out: "build", baseElevation: null };
+  const args: Args = {
+    install: false,
+    out: "build",
+    baseElevation: null,
+    heliport: false,
+    heliportRadius: 10,
+    heliportObjectId: null,
+  };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--install") args.install = true;
     else if (a === "--afs4-dir") args.afs4Dir = argv[++i];
     else if (a === "--out") args.out = argv[++i];
-    else if (a === "--base-elevation") {
+    else if (a === "--heliport") args.heliport = true;
+    else if (a === "--heliport-radius") {
+      args.heliport = true;
+      args.heliportRadius = Number(argv[++i]);
+    } else if (a === "--helipad-object") {
+      args.heliport = true;
+      args.heliportObjectId = argv[++i];
+    } else if (a === "--base-elevation") {
       args.baseElevationRaw = argv[++i];
       args.baseElevation = Number(args.baseElevationRaw);
     } else if (!a.startsWith("--") && !args.project) args.project = a;
@@ -89,8 +108,13 @@ function main(): number {
   const args = parseArgs(process.argv.slice(2));
   if (!args.project) {
     console.error(
-      "Usage: npm run export -- <project.json> [--install] [--afs4-dir <dir>] [--out <dir>] [--base-elevation <m>]",
+      "Usage: npm run export -- <project.json> [--install] [--afs4-dir <dir>] [--out <dir>] [--base-elevation <m>]\n" +
+        "                          [--heliport] [--heliport-radius <m>] [--helipad-object <object id>]",
     );
+    return 2;
+  }
+  if (args.heliport && !(Number.isFinite(args.heliportRadius) && args.heliportRadius > 0)) {
+    console.error(`ERROR: --heliport-radius expects a positive number in metres, got ${args.heliportRadius}.`);
     return 2;
   }
   // `Number("584m")` / a missing value → NaN, which sailed straight through resolveHeightsFlat and got
@@ -136,7 +160,11 @@ function main(): number {
     throw e;
   }
 
-  const plan = planExport(project, resolved);
+  const plan = planExport(project, resolved, {
+    heliport: args.heliport
+      ? { objectId: args.heliportObjectId, radiusM: args.heliportRadius }
+      : undefined,
+  });
   for (const w of plan.warnings) console.warn(`WARNING: ${w}`);
 
   // Guard the folder name before it is ever used as a path to write into or delete.

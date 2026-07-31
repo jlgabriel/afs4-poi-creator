@@ -215,6 +215,7 @@ async function runExport(project: Project, opts: ExportOptions): Promise<Install
       target: opts.target,
       overwrite: opts.overwrite,
       baseElevation: opts.baseElevation,
+      heliport: opts.heliport,
     }),
   );
   // Autoheight mode is fully OFFLINE — the sim resolves the terrain, so there is no elevation lookup and
@@ -229,7 +230,7 @@ async function runExport(project: Project, opts: ExportOptions): Promise<Install
             cacheDir: userData(),
             version: app.getVersion(),
           });
-  const plan = planExport(project, resolved);
+  const plan = planExport(project, resolved, { heliport: opts.heliport });
   // Where the bundled anchor mesh+texture live (anchorAsset.ts). writePoi copies them into any POI that
   // carries the anchor — plants (baked-asl) or every non-empty autoheight POI; others ship none.
   const assetsDir = anchorAssetsDir({

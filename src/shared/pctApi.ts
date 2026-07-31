@@ -93,6 +93,10 @@ export interface ExportOptions {
   // terrain-relative height against this one value; when absent, main uses the elevation provider
   // and may return a `needs-elevation` envelope the renderer answers by re-exporting WITH a base.
   baseElevation?: number;
+  // Opt-in heliport templates (forum #160). Absent = the POI is exported exactly as before. `objectId` is
+  // the placed object whose position + heading become the pad (null = the POI's anchor point); main hands
+  // this straight to planExport, which reads the SHIFTED object so the pad travels with the scene.
+  heliport?: { objectId: string | null; radiusM: number };
 }
 
 /** Async (IPC). Implemented in preload/index.ts, handled in main/ipc.ts. Fallible methods return a
