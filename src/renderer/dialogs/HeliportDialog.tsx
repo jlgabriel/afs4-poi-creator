@@ -186,9 +186,13 @@ export function HeliportDialog({ onClose }: { onClose: () => void }): React.Reac
                 ))}
               </ul>
             )}
+            {/* Deliberately does NOT say "search for the code": measured 2026-07-31 — the heliport loads
+                and flies, but typing its code into LOCATION's search box returns nothing. Sending someone
+                to the one place it does not appear is how a working install reads as a broken one. */}
             <p>
-              Restart Aerofly FS 4, then find it under LOCATION as{" "}
-              <strong>{identity.icao.toUpperCase()}</strong>. Pick a helicopter and you start on the pad.
+              Restart Aerofly FS 4, then open LOCATION and find{" "}
+              <strong>{name.trim()}</strong> on the map, where you built it. Aerofly&apos;s
+              search box may not list a new airport by its code. Pick a helicopter and you start on the pad.
             </p>
             <div className="pct-modal-actions">
               <button onClick={onClose}>Close</button>
