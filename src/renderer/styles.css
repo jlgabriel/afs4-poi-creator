@@ -129,6 +129,34 @@ body {
 .leaflet-tooltip.pct-rotate-tip::before {
   display: none;
 }
+/* The helicopter start pad (HelipadLayer): the whole circle is the drag target, so it wants the same
+   grab cursor the rotate grip has. */
+.pct-helipad {
+  cursor: grab;
+}
+/* The painted H at the pad's centre. It turns with the pad — a real helipad's H lies along the approach —
+   so the rotation is written inline by the layer and this only has to make it legible over satellite
+   imagery, which is what the dark shadow is for. pointer-events:none so the glyph never eats the drag on
+   the circle underneath it. */
+.pct-helipad-glyph {
+  background: none;
+  border: none;
+  pointer-events: none;
+}
+.pct-helipad-h {
+  width: 24px;
+  height: 24px;
+  line-height: 24px;
+  text-align: center;
+  color: #ffffff;
+  font-size: 17px;
+  font-weight: 700;
+  font-family: system-ui, sans-serif;
+  text-shadow:
+    0 0 3px #0f172a,
+    0 0 2px #0f172a;
+  user-select: none;
+}
 
 /* Side panels. */
 .pct-catalog,

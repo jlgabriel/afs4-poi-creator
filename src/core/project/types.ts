@@ -200,6 +200,41 @@ export interface PoiShift {
  *    `asl` height has no AGL meaning here, so the export guards against it (see resolveHeightsAgl). */
 export type HeightMode = "baked-asl" | "autoheight";
 
+/** The helicopter's functional START position: the pad the sim spawns you on.
+ *
+ *  It is its OWN point, deliberately — not a reference to a placed object. v1.1 derived the pad from
+ *  whichever object was selected, and ApfelFlieger's objection (forum #168) is decisive: "the functional
+ *  starting position for Helicopter should be independent of XREF objects because this will lead to
+ *  collisions too quickly". A pad that IS an object puts the helicopter inside the mast or the hangar
+ *  it borrowed its coordinates from. The user can still seed it from a selection — that is a one-shot
+ *  copy of two numbers, not a link. */
+export interface AirportPad {
+  position: LonLat; // pad centre
+  heading: number; // TRUE compass degrees (the sim's `heading` field is true — gate 2026-07-31)
+  radius: number; // metres; the sim shows the DIAMETER as "Size" (radius 10 → "66 ft / 20 m")
+}
+
+/** The AIRPORT half of a project: everything "Create heliport…" needs that the POI half does not carry.
+ *
+ *  Stored in project.json (forum #170, ApfelFlieger): before this, PCT wrote only POI data, so every
+ *  round of "create → test in FS4 → adjust → test again" meant re-typing the code, the name and the
+ *  country. He built SHJK — Arica Regional Hospital by hand five times over (SHJH, SHJI, SHJJ, SHJK,
+ *  SHJL) to raise one rooftop pad. His own summary of why this belongs in the file: the code needs
+ *  checking once rather than every time, the airport can be saved as often as a POI, and it can be
+ *  passed on like a POI. "A JSON file expanded in this way has the same function as the TAP file of
+ *  the ACT — and is at the same time more flexible."
+ *
+ *  Optional, and absent on every project that has never opened the heliport dialog, so schemaVersion
+ *  stays 1 and a POI-only project round-trips byte-identical. An older PCT opening a project WITH one
+ *  ignores the field and exports the same POI — a lossless degradation, since nothing here affects the
+ *  `.tsl`/`.toc`. */
+export interface ProjectAirport {
+  icao: string; // 4-6 chars; lowercase on disk, shown uppercase in the UI (forum #170 EDIT 2)
+  name: string; // shown in LOCATION; <= SNAME_MAX or the sim drops the whole airport
+  country: string; // two lowercase letters — ALSO a path segment under scenery/airports/
+  pad: AirportPad;
+}
+
 /** The editable working file (`project.json`). */
 export interface Project {
   schemaVersion: 1;
@@ -213,6 +248,7 @@ export interface Project {
   objects: PlacedObject[]; // xref + v0.2 airport_light / light, discriminated on `kind`
   shift?: PoiShift; // optional global export shift (forum #12); absent = none
   heightMode?: HeightMode; // how heights export (see HeightMode); absent ≡ "baked-asl"
+  airport?: ProjectAirport; // v1.2 — the heliport identity + pad, remembered (see ProjectAirport)
 }
 
 // ── Export (design §3.4) ────────────────────────────────────────────────────

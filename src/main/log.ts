@@ -21,6 +21,7 @@
 // No Electron import — the file path and the home dir are passed in — so this unit-tests directly.
 import { closeSync, mkdirSync, openSync, writeSync } from "node:fs";
 import path from "node:path";
+import type { LonLat } from "../core/project/types";
 
 export const LOG_FILE_NAME = "pct.log";
 
@@ -217,13 +218,19 @@ export function formatExportSummary(i: {
   target: string;
   overwrite: boolean;
   baseElevation?: number;
-  heliport?: { objectId: string | null; radiusM: number };
+  heliport?: { pad: { position: LonLat; heading: number; radius: number } | null; radiusM?: number };
 }): string {
+  const h = i.heliport;
+  const pad =
+    h === undefined
+      ? ""
+      : h.pad === null
+        ? `, heliport template (r=${h.radiusM ?? 10} m, pad at POI anchor)`
+        : `, heliport template (r=${h.pad.radius} m, pad ${h.pad.position.lon.toFixed(6)} ${h.pad.position.lat.toFixed(6)} hdg ${h.pad.heading})`;
   return (
     `export "${i.poiName}" — ${i.objects} objects, ${i.heightMode ?? "baked-asl"} mode, ` +
     `target ${i.target}${i.overwrite ? " (overwrite)" : ""}` +
-    `${i.baseElevation != null ? `, manual base ${i.baseElevation} m` : ""}` +
-    `${i.heliport ? `, heliport template (r=${i.heliport.radiusM} m, pad ${i.heliport.objectId ?? "at POI anchor"})` : ""}`
+    `${i.baseElevation != null ? `, manual base ${i.baseElevation} m` : ""}${pad}`
   );
 }
 

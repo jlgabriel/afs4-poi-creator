@@ -273,3 +273,49 @@ describe("CONFIGURATION_RE", () => {
     for (const s of ["wrg", "x", "R", "w r"]) expect(CONFIGURATION_RE.test(s)).toBe(false);
   });
 });
+
+// ── The airport block (v1.2, forum #170) ─────────────────────────────────────────────────────────
+// ApfelFlieger's ask: PCT wrote only POI data, so the code, the name and the country had to be typed
+// again on every lap of "create → test in FS4 → adjust → test again". His own reasoning for putting it
+// in the file: the code needs checking once, the airport can be saved as often as a POI, and it can be
+// passed on like one — "the same function as the TAP file of the ACT, and at the same time more flexible".
+describe("zProject — the airport block", () => {
+  const AIRPORT = {
+    icao: "shjl",
+    name: "Arica Regional Hospital",
+    country: "cl",
+    pad: { position: { lon: -70.3130659, lat: -18.4827329 }, heading: 90, radius: 10 },
+  };
+
+  it("round-trips a project that has one", () => {
+    const p = parseProject({ ...validProject(), airport: AIRPORT });
+    expect(p.airport).toEqual(AIRPORT);
+  });
+
+  it("stays optional — a POI-only project is unchanged", () => {
+    // schemaVersion stays 1 precisely because of this: a project that never opened the heliport dialog
+    // has no such key and must keep round-tripping byte-identical.
+    const p = parseProject(validProject());
+    expect(p.airport).toBeUndefined();
+    expect("airport" in p).toBe(false);
+  });
+
+  it("still OPENS a project whose identity is half-typed", () => {
+    // Permissive on load, constrained at the editor. If a code of "SH" made the file unopenable, the
+    // dialog that would let you finish typing it would be unreachable — you would be locked out of your
+    // own project by a draft. validateIdentity is what stands between these values and the disk.
+    const p = parseProject({ ...validProject(), airport: { ...AIRPORT, icao: "SH", country: "" } });
+    expect(p.airport?.icao).toBe("SH");
+  });
+
+  it("rejects a pad the map could not draw", () => {
+    for (const pad of [
+      { position: { lon: 999, lat: 0 }, heading: 0, radius: 10 }, // off the globe
+      { position: { lon: 0, lat: 0 }, heading: Number.NaN, radius: 10 },
+      { position: { lon: 0, lat: 0 }, heading: 0, radius: 0 }, // a zero-radius pad is not a pad
+      { position: { lon: 0, lat: 0 }, heading: 0, radius: -5 },
+    ]) {
+      expect(safeParseProject({ ...validProject(), airport: { ...AIRPORT, pad } }).success).toBe(false);
+    }
+  });
+});

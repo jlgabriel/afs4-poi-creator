@@ -9,6 +9,7 @@
 // accepts an override so tests stay deterministic.
 
 import type {
+  AirportPad,
   HeightMode,
   HeightSpec,
   LonLat,
@@ -19,6 +20,7 @@ import type {
   PlacedXref,
   PoiShift,
   Project,
+  ProjectAirport,
   Vec3,
 } from "./types";
 
@@ -362,4 +364,57 @@ export function setHeightMode(project: Project, mode: HeightMode, now = nowIso()
  *  the store decides whether a pan/zoom belongs on the undo stack (design §3.6). */
 export function setCamera(project: Project, camera: Project["camera"], now = nowIso()): Project {
   return { ...project, camera, modifiedAt: now };
+}
+
+// ── The airport block (v1.2, forum #170) ─────────────────────────────────────
+//
+// Four mutations rather than one setter because they have different sources: the DIALOG writes the whole
+// block, while the MAP drags the pad and turns it. Splitting them keeps the map from having to know an
+// identity it never shows, and keeps a drag from being able to clobber a code the user just typed.
+
+/** Adopt (or drop, with `null`) the whole airport block. The dialog's writer: identity plus pad in one
+ *  commit, because the user typed them together. Absent ≡ "this project is POI-only" — the same
+ *  absent-means-default rule `shift` and `heightMode` follow, so a project that never opened the
+ *  heliport dialog stays byte-identical on save. */
+export function setAirport(project: Project, airport: ProjectAirport | null, now = nowIso()): Project {
+  if (airport === null) {
+    if (project.airport === undefined) return project;
+    const next = { ...project, modifiedAt: now };
+    delete next.airport;
+    return next;
+  }
+  return { ...project, airport, modifiedAt: now };
+}
+
+/** Apply `patch` to the pad, if there is one. A project with no airport block has no pad to move, so
+ *  this returns the same reference and the map's drag is a silent no-op rather than an invented airport
+ *  — PCT never picks an identity (see heliportTemplate), and creating one from a drag would do exactly
+ *  that. */
+function updatePad(project: Project, patch: (pad: AirportPad) => AirportPad, now: string): Project {
+  const airport = project.airport;
+  if (airport === undefined) return project;
+  const pad = patch(airport.pad);
+  if (pad === airport.pad) return project;
+  return { ...project, airport: { ...airport, pad }, modifiedAt: now };
+}
+
+/** Drag the pad to a new centre. */
+export function moveAirportPad(project: Project, position: LonLat, now = nowIso()): Project {
+  return updatePad(project, (pad) => ({ ...pad, position }), now);
+}
+
+/** Turn the pad. `heading` is TRUE compass degrees, normalised into [0, 360) like every other facing
+ *  in the model — the sim's `heading` field is true (gate 2026-07-31), so it is written verbatim and
+ *  what the user sees on the map is what the file gets. */
+export function rotateAirportPad(project: Project, heading: number, now = nowIso()): Project {
+  const h = norm360(heading);
+  return updatePad(project, (pad) => (pad.heading === h ? pad : { ...pad, heading: h }), now);
+}
+
+/** Resize the pad. Metres — the sim shows the diameter, so radius 10 reads as "Size 66 ft / 20 m".
+ *  Non-positive is refused rather than clamped: it comes from a number field, and a silently corrected
+ *  value is how you end up not noticing you typed one. */
+export function setAirportPadRadius(project: Project, radius: number, now = nowIso()): Project {
+  if (!(Number.isFinite(radius) && radius > 0)) return project;
+  return updatePad(project, (pad) => (pad.radius === radius ? pad : { ...pad, radius }), now);
 }

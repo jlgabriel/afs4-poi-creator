@@ -22,9 +22,13 @@ import {
   setIntensity,
   setLabel,
   setLightColor,
+  setAirport,
+  setAirportPadRadius,
   setLocked,
   setPoiName,
   setReference,
+  moveAirportPad,
+  rotateAirportPad,
 } from "../../src/core/project/mutate";
 import type {
   PlacedAirportLight,
@@ -32,6 +36,7 @@ import type {
   PlacedObject,
   PlacedXref,
   Project,
+  ProjectAirport,
 } from "../../src/core/project/types";
 
 const CAMERA = { lon: 11.86, lat: 48.37, zoom: 15 };
@@ -251,5 +256,63 @@ describe("project-level mutations", () => {
     expect(setHeightMode(p0, "baked-asl")).toBe(p0);
     expect(setHeightMode(ah, "autoheight")).toBe(ah);
     expect(p0.heightMode).toBeUndefined(); // input untouched
+  });
+});
+
+// ── The airport block (v1.2, forum #170 / #168) ──────────────────────────────────────────────────
+describe("the airport block", () => {
+  const AIRPORT: ProjectAirport = {
+    icao: "shjl",
+    name: "Arica Regional Hospital",
+    country: "cl",
+    pad: { position: { lon: -70.3130659, lat: -18.4827329 }, heading: 90, radius: 10 },
+  };
+
+  it("is set, and absent means POI-only", () => {
+    const p0 = baseProject();
+    expect(p0.airport).toBeUndefined();
+    const p1 = setAirport(p0, AIRPORT, LATER);
+    expect(p1.airport).toEqual(AIRPORT);
+    expect(p1.modifiedAt).toBe(LATER);
+    expect(p0.airport).toBeUndefined(); // input untouched
+
+    // Clearing REMOVES the key, so a project that ends without an airport is byte-identical to one that
+    // never had one — the same absent-means-default rule shift and heightMode follow.
+    const p2 = setAirport(p1, null, LATER);
+    expect("airport" in p2).toBe(false);
+    expect(setAirport(p0, null)).toBe(p0); // no-op keeps the undo stack clean
+  });
+
+  it("moves and turns the pad, normalising the heading", () => {
+    const p = setAirport(baseProject(), AIRPORT, NOW);
+    const at = { lon: 5, lat: 45 };
+    expect(moveAirportPad(p, at, LATER).airport!.pad.position).toEqual(at);
+    expect(rotateAirportPad(p, 450, LATER).airport!.pad.heading).toBe(90); // 450 → 90
+    expect(rotateAirportPad(p, -10, LATER).airport!.pad.heading).toBe(350);
+    // The identity rides along untouched — a map drag must never be able to clobber a typed code.
+    expect(moveAirportPad(p, at, LATER).airport!.icao).toBe("shjl");
+  });
+
+  it("resizes the pad, and refuses a radius that is not a positive number", () => {
+    const p = setAirport(baseProject(), AIRPORT, NOW);
+    expect(setAirportPadRadius(p, 25, LATER).airport!.pad.radius).toBe(25);
+    for (const bad of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(setAirportPadRadius(p, bad)).toBe(p); // refused, not clamped — see the doc comment
+    }
+  });
+
+  it("does nothing at all to a project with no airport", () => {
+    // A drag on a map with no pad must not INVENT one: PCT never picks an identity, and a pad conjured
+    // from a gesture would be an airport nobody asked for.
+    const p = baseProject();
+    expect(moveAirportPad(p, { lon: 1, lat: 2 })).toBe(p);
+    expect(rotateAirportPad(p, 90)).toBe(p);
+    expect(setAirportPadRadius(p, 20)).toBe(p);
+  });
+
+  it("returns the same reference when nothing actually changes", () => {
+    const p = setAirport(baseProject(), AIRPORT, NOW);
+    expect(rotateAirportPad(p, 90)).toBe(p);
+    expect(setAirportPadRadius(p, 10)).toBe(p);
   });
 });

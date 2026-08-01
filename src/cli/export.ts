@@ -15,7 +15,8 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync, rmSync, cpSync, cop
 import os from "node:os";
 import path from "node:path";
 import type { ExportPlan, Project } from "../core/project/types";
-import { planExport } from "../core/export/planExport";
+import { DEFAULT_PAD_RADIUS_M, planExport } from "../core/export/planExport";
+import { directionToHeading } from "../core/geo/orientation";
 import {
   NeedsElevationError,
   UnsupportedInAutoheightError,
@@ -32,8 +33,9 @@ interface Args {
   out: string;
   baseElevation: number | null;
   baseElevationRaw?: string; // kept only to quote the bad value back in the error
-  // Heliport templates. `--heliport` alone = pad at the POI anchor, radius 10 m; the optional value is the
-  // radius in metres, and --helipad-object names the placed object the pad copies its position/heading from.
+  // Heliport templates. `--heliport` alone uses the project's own pad (v1.2's airport block) or, failing
+  // that, the POI anchor at radius 10 m; the optional value is the radius in metres, and --helipad-object
+  // names the placed object the pad COPIES its position/heading from (a copy, not a binding — #168).
   heliport: boolean;
   heliportRadius: number;
   heliportObjectId: string | null;
@@ -45,7 +47,7 @@ function parseArgs(argv: string[]): Args {
     out: "build",
     baseElevation: null,
     heliport: false,
-    heliportRadius: 10,
+    heliportRadius: DEFAULT_PAD_RADIUS_M,
     heliportObjectId: null,
   };
   for (let i = 0; i < argv.length; i++) {
@@ -160,10 +162,26 @@ function main(): number {
     throw e;
   }
 
+  // The pad. The project's own (v1.2's airport block) wins; `--helipad-object` is the older way of
+  // saying "put it where that object is", kept because the gate scripts use it — and it now COPIES the
+  // object's position and heading into a pad of its own rather than leaving the pad bound to the object
+  // (forum #168: a bound pad spawns the helicopter inside the XREF it borrowed its coordinates from).
+  let pad = project.airport?.pad ?? null;
+  if (args.heliportObjectId !== null) {
+    const o = project.objects.find((x) => x.id === args.heliportObjectId);
+    if (o === undefined) {
+      console.error(`ERROR: --helipad-object "${args.heliportObjectId}" is not an object in this project.`);
+      return 1;
+    }
+    const heading =
+      o.kind === "xref" ? directionToHeading(o.direction) : o.kind === "airport_light" ? o.orientation : 0;
+    pad = { position: o.position, heading, radius: args.heliportRadius };
+  } else if (pad !== null && args.heliportRadius !== DEFAULT_PAD_RADIUS_M) {
+    pad = { ...pad, radius: args.heliportRadius }; // an explicit --heliport-radius overrides the stored one
+  }
+
   const plan = planExport(project, resolved, {
-    heliport: args.heliport
-      ? { objectId: args.heliportObjectId, radiusM: args.heliportRadius }
-      : undefined,
+    heliport: args.heliport ? { pad, radiusM: args.heliportRadius } : undefined,
   });
   for (const w of plan.warnings) console.warn(`WARNING: ${w}`);
 

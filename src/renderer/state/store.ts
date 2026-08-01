@@ -29,6 +29,7 @@ import type {
   LonLat,
   PoiShift,
   Project,
+  ProjectAirport,
   Settings,
   Vec3,
 } from "../../core/project/types";
@@ -213,6 +214,12 @@ export interface EditorState {
   setPoiName: (poiName: string) => void;
   setShift: (shift: PoiShift) => void;
   setHeightMode: (mode: HeightMode) => void;
+  // ── the airport block (v1.2, forum #170) — the heliport identity + pad, remembered on the document.
+  //    `setAirport` is the dialog's writer (identity and pad together, as typed); the other two are the
+  //    MAP's, because the pad is a thing you drag and turn like a footprint.
+  setAirport: (airport: ProjectAirport | null) => void;
+  moveAirportPad: (position: LonLat) => void;
+  rotateAirportPad: (heading: number) => void;
   duplicateSelection: (offsetM?: number) => void;
   deleteSelection: () => void;
 
@@ -531,6 +538,17 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
         setPoiName: (poiName) => commit((proj) => mutate.setPoiName(proj, poiName)),
         setShift: (shift) => commit((proj) => mutate.setShift(proj, shift)),
         setHeightMode: (mode) => commit((proj) => mutate.setHeightMode(proj, mode)),
+        // Coalesced, because the dialog writes on every KEYSTROKE of the code / name / country: that is
+        // what makes the identity survive closing the dialog without installing, and typing "PCT001"
+        // must not cost six undo steps.
+        setAirport: (airport) =>
+          commitCoalesced("airport:identity", (proj) => mutate.setAirport(proj, airport)),
+        // Coalesced on one key each, like every other map gesture: a drag is dozens of commits and the
+        // undo stack should hold the gesture, not each frame of it.
+        moveAirportPad: (position) =>
+          commitCoalesced("airport:pad:pos", (proj) => mutate.moveAirportPad(proj, position)),
+        rotateAirportPad: (heading) =>
+          commitCoalesced("airport:pad:rot", (proj) => mutate.rotateAirportPad(proj, heading)),
 
         duplicateSelection: (offsetM = 5) => {
           const { selection } = get();

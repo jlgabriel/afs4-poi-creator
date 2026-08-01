@@ -13,6 +13,7 @@ import type { TilesConfig } from "../state/store";
 import { wrapLon } from "../../core/geo/geo";
 import { tileSourceFor } from "./tileProviders";
 import { FootprintLayer } from "./FootprintLayer";
+import { HelipadLayer } from "./HelipadLayer";
 
 /** The tile layer for the current provider (Esri satellite / OSM streets / custom XYZ). Overzoom
  *  (maxNativeZoom < maxZoom) keeps metre-precise placement usable past the source's native resolution.
@@ -55,6 +56,13 @@ export function MapView(): React.ReactElement {
       onRotate: (id, deg) => editorStore.getState().rotateObject(id, deg),
     });
 
+    // The helicopter's start pad (v1.2). Its own layer, not a footprint: one per project, never in the
+    // selection, and drawn whenever the project has an airport block. See HelipadLayer.
+    const helipad = new HelipadLayer(map, {
+      onMove: (p) => editorStore.getState().moveAirportPad(p),
+      onRotate: (deg) => editorStore.getState().rotateAirportPad(deg),
+    });
+
     // Paint now, then re-paint whenever objects / catalog / selection change — subscribed OUTSIDE
     // React so drag and undo never wait on a render.
     const paint = (): void => {
@@ -66,13 +74,22 @@ export function MapView(): React.ReactElement {
         s.plantIndex,
         new Set(s.selection),
       );
+      helipad.sync(s.project.airport);
     };
     paint();
     const unsub = editorStore.subscribe(
       // Every catalog index is watched, not just catalogIndex: each one decides some object's missing
       // (red) state, and a Rescan swaps them all in together — without watching one, an object whose
       // catalog entry appeared/vanished never repaints.
-      (s) => [s.project.objects, s.catalogIndex, s.airportLightIndex, s.plantIndex, s.selection] as const,
+      (s) =>
+        [
+          s.project.objects,
+          s.catalogIndex,
+          s.airportLightIndex,
+          s.plantIndex,
+          s.selection,
+          s.project.airport,
+        ] as const,
       paint,
       { equalityFn: shallow },
     );
@@ -117,6 +134,7 @@ export function MapView(): React.ReactElement {
       unsub();
       unsubCamera();
       unsubTiles();
+      helipad.destroy();
       layer.destroy();
       map.remove(); // frees the container so StrictMode's second mount can re-init it
     };

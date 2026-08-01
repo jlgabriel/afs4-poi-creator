@@ -142,6 +142,30 @@ export const zPlacedPlant = z.looseObject({
   locked: z.boolean().optional(),
 });
 
+/** The longest identity string the loader will carry. Not a format limit — the sim's own `sname` cut is
+ *  29 (heliportTemplate.SNAME_MAX) and the code is 4–6 — but a loader must not reject a project over a
+ *  rule the EDITOR enforces, so this is only a sanity bound on an untrusted file. */
+const IDENTITY_MAX = 200;
+
+/** The airport block (types.ts ProjectAirport). Permissive on load, constrained at the editor — the
+ *  same split `color` and `heightRange` already use, and here it is load-bearing: a project saved with a
+ *  half-typed code ("SH") must still OPEN, or the dialog that would let you finish it is unreachable.
+ *
+ *  So this validates SHAPE only. What makes the values safe to write is `validateIdentity`, which every
+ *  path to disk goes through (planHeliport throws without it) — and `country` gets checked twice more,
+ *  because it becomes a directory name under scenery/airports/ and a forum-shared project.json is
+ *  untrusted input: once by validateIdentity's two-letter rule, once by main's own path guard. */
+export const zAirport = z.looseObject({
+  icao: z.string().max(IDENTITY_MAX),
+  name: z.string().max(IDENTITY_MAX),
+  country: z.string().max(IDENTITY_MAX),
+  pad: z.looseObject({
+    position: zLonLat,
+    heading: z.number().finite(),
+    radius: z.number().finite().positive(),
+  }),
+});
+
 // loose (like the document top level) so a project written by a newer PCT that adds camera fields
 // round-trips without loss — zod v4 z.object would strip them (Fable review nit).
 export const zCamera = z.looseObject({
@@ -174,6 +198,10 @@ export const zProject = z.looseObject({
   // ignores the field and exports the same scene via baked ASL (a correct, lossless degradation — the
   // objects' HeightSpecs are unchanged, only the compile strategy differs).
   heightMode: z.enum(["baked-asl", "autoheight"]).optional(),
+  // v1.2 airport identity + pad (types.ts ProjectAirport). Optional, so schemaVersion stays 1: a
+  // POI-only project has no such key and round-trips unchanged, and an older PCT opening a project WITH
+  // one ignores it and exports the same POI — nothing here reaches the .tsl or the .toc.
+  airport: zAirport.optional(),
 });
 
 // ── Settings ─────────────────────────────────────────────────────────────────

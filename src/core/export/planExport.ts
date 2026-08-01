@@ -4,10 +4,9 @@
 // (main process, M1b) should write into `scenery/poi/<folderName>/`. Keeping this pure makes
 // the whole POI package golden-testable byte-for-byte, the way the Race App exporter was.
 
-import type { ExportPlan, LonLat, PoiFile, Project, ResolvedObject } from "../project/types";
+import type { AirportPad, ExportPlan, LonLat, PoiFile, Project, ResolvedObject } from "../project/types";
 import { centroid, poiFolderName } from "../geo/poiName";
 import { shiftEastNorth } from "../geo/geo";
-import { directionToHeading } from "../geo/orientation";
 import { buildToc } from "./tocWriter";
 import { buildTsl } from "./tslWriter";
 import { computeAnchor, computeAutoheightAnchor, ANCHOR_ASSETS } from "./plantAnchor";
@@ -48,32 +47,44 @@ function buildReadme(project: Project, resolved: ResolvedObject[], heliport: boo
   ].join("\n");
 }
 
-/** Opt-in heliport templates (forum #160). The user names the PAD, not an airport: `objectId` is the
- *  placed object whose position and heading it takes — null (or an id that isn't in the scene) falls back
- *  to the POI's own anchor point. Everything about identity stays a placeholder; see heliportTemplate.ts. */
+/** The pad radius PCT starts from when nobody has chosen one, metres. Michael's own heliports use 10
+ *  (the sim renders it as "Size 66 ft / 20 m"), which comfortably clears an EC135's 10.2 m rotor. */
+export const DEFAULT_PAD_RADIUS_M = 10;
+
+/** Opt-in heliport templates (forum #160) — and the pad for the real install too. Everything about
+ *  IDENTITY stays a placeholder here; see heliportTemplate.ts. */
 export interface HeliportOptions {
-  objectId: string | null;
-  radiusM: number; // metres
+  /** The pad, in the same UNSHIFTED map coordinates the placed objects use — planExport applies the
+   *  project's export shift to it below, so the pad travels with the scene instead of ending up `shift`
+   *  metres away from it (the trap the folder-name preview had to be fixed for).
+   *
+   *  `null` → a default pad at the POI's own anchor point, facing true north. */
+  pad: AirportPad | null;
+  /** Radius for the `pad: null` case only, metres. Ignored when `pad` is set — that pad carries its own.
+   *  Absent → DEFAULT_PAD_RADIUS_M. */
+  radiusM?: number;
 }
 
-/** The pad's position and TRUE heading. Reads them off the SHIFTED object so the pad lands with the
- *  scene, not `shift` metres away from it — the same trap the folder-name preview had to be fixed for.
- *  Only the kinds that HAVE a facing contribute one; a plant is a billboard and a point light has no
- *  front, so those (and the anchor fallback) give a pad pointing true north. */
+/** The pad as the two writers want it: a position already shifted with the scene, a TRUE heading and a
+ *  radius.
+ *
+ *  ★ v1.1 derived all three from a placed object (`objectId`). ApfelFlieger asked for that to stop
+ *  (forum #168): "the functional starting position for Helicopter should be independent of XREF objects
+ *  because this will lead to collisions too quickly" — a pad that borrows a mast's coordinates spawns the
+ *  helicopter in the mast. The pad is now its own point on the document (types.ts AirportPad); seeding it
+ *  from a selection is a copy the UI offers, not a link the exporter follows. */
 function heliportPad(
-  objects: ResolvedObject[],
+  pad: AirportPad | null,
   fallback: LonLat,
-  objectId: string | null,
-): { position: LonLat; headingDeg: number; found: boolean } {
-  const pick = objectId === null ? undefined : objects.find((o) => o.id === objectId);
-  if (pick === undefined) return { position: fallback, headingDeg: 0, found: objectId === null };
-  const headingDeg =
-    pick.kind === "xref"
-      ? directionToHeading(pick.direction)
-      : pick.kind === "airport_light"
-        ? pick.orientation // already a compass heading (see PlacedAirportLight)
-        : 0;
-  return { position: pick.position, headingDeg, found: true };
+  shift: Project["shift"],
+  radiusM: number,
+): { position: LonLat; headingDeg: number; radiusM: number } {
+  if (pad === null) return { position: fallback, headingDeg: 0, radiusM };
+  const position =
+    !shift || (shift.east === 0 && shift.north === 0)
+      ? pad.position
+      : shiftEastNorth(pad.position, shift.east, shift.north);
+  return { position, headingDeg: pad.heading, radiusM: pad.radius };
 }
 
 /** Plan the POI package. `project.reference` sets the folder-name anchor; when null it falls
@@ -115,12 +126,12 @@ export function planExport(
   ];
 
   if (opts.heliport !== undefined) {
-    const pad = heliportPad(objects, ref, opts.heliport.objectId);
-    if (!pad.found) {
-      warnings.push(
-        "The object chosen for the helipad is no longer in the scene — the pad was placed at the POI's anchor point instead.",
-      );
-    }
+    const pad = heliportPad(
+      opts.heliport.pad,
+      ref,
+      project.shift,
+      opts.heliport.radiusM ?? DEFAULT_PAD_RADIUS_M,
+    );
     if (autoheight) {
       // Emitted, not blocked: the templates were only ever FLOWN in baked-asl (2026-07-31), and the flag
       // they mirror onto the cultivation reference is untested in this container. Say so rather than
@@ -132,7 +143,7 @@ export function planExport(
     const spec = {
       position: pad.position,
       headingDeg: pad.headingDeg,
-      radiusM: opts.heliport.radiusM,
+      radiusM: pad.radiusM,
       cultivationFileName: tocFileName,
       anchor,
       autoheight,
@@ -184,12 +195,12 @@ export function planHeliport(
   const tocFileName = objects.length > 0 ? POI_BASENAME : null;
   const anchor = autoheight ? computeAutoheightAnchor(objects) : computeAnchor(objects);
 
-  const pad = heliportPad(objects, ref, opts.heliport.objectId);
-  if (!pad.found) {
-    warnings.push(
-      "The object chosen for the helipad is no longer in the scene — the pad was placed at the POI's anchor point instead.",
-    );
-  }
+  const pad = heliportPad(
+    opts.heliport.pad,
+    ref,
+    project.shift,
+    opts.heliport.radiusM ?? DEFAULT_PAD_RADIUS_M,
+  );
   if (autoheight) {
     warnings.push(
       "Heliports were only verified in-sim with baked-asl heights — in Sim-autoheight mode, check the objects' heights after the first flight.",
@@ -202,7 +213,7 @@ export function planHeliport(
   const spec = {
     position: pad.position,
     headingDeg: pad.headingDeg,
-    radiusM: opts.heliport.radiusM,
+    radiusM: pad.radiusM,
     cultivationFileName: tocFileName,
     anchor,
     autoheight,
