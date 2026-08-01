@@ -229,6 +229,17 @@ export function HeliportDialog({ onClose }: { onClose: () => void }): React.Reac
               {problem !== "icao-format" && !taken && icao.trim() !== "" && (
                 <span className="pct-field-meta">Free on this machine.</span>
               )}
+              {/* Why this is worth saying: Aerofly takes the text it shows in LOCATION's SEARCH from its
+                  own world database, and ignores yours when the code is in it — ApfelFlieger wrote "Hca
+                  Florida Mercy Hospital" into both files for FL25 and the sim displays "Mercy". A code
+                  that database knows therefore searches properly; an invented one comes up as a blank row
+                  (it still works, and the map shows your name). And it is SAFE: the check above counts
+                  .wad FILES, i.e. airports that would actually be replaced — FL25 has none. */}
+              <span className="pct-field-meta">
+                Tip: a real-world code (ourairports.com, metar-taf.com) that Aerofly already knows will
+                show up properly in LOCATION&apos;s search, under that database&apos;s own name. An invented
+                code works too, but its search row comes up blank.
+              </span>
             </label>
 
             <label className="pct-field pct-field-col">
