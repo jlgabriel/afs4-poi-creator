@@ -7,7 +7,7 @@
 // without the bridge — only the write actions need it.
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ExportOptions, InstallResult, InstalledPoi, PctError } from "../../shared/pctApi";
-import type { LonLat, PlacedObject } from "../../core/project/types";
+import type { LonLat } from "../../core/project/types";
 import { shiftEastNorth } from "../../core/geo/geo";
 import { centroid, poiFolderName } from "../../core/geo/poiName";
 import { unsupportedInAutoheight } from "../../core/export/heights";
@@ -16,6 +16,7 @@ import { editorStore, useEditor } from "../state/editorStore";
 import { getPct } from "../app/pct";
 import { unregisteredPlacedNames } from "../catalog/registration";
 import { NumberInput } from "../inspector/NumberInput";
+import { padLabel } from "./padLabel";
 
 function sameRef(a: LonLat | null, b: LonLat | null): boolean {
   if (a === null || b === null) return a === b;
@@ -101,20 +102,6 @@ function messageFor(error: PctError): string {
       return `A POI folder "${error.folderName}" already exists.`;
     default:
       return error.message;
-  }
-}
-
-/** How the helipad's source object is named back to the user — enough to recognise which one is selected. */
-function padLabel(o: PlacedObject): string {
-  switch (o.kind) {
-    case "xref":
-      return o.name;
-    case "plant":
-      return `${o.group} ${o.species}`;
-    case "airport_light":
-      return o.typeName;
-    default:
-      return "point light";
   }
 }
 

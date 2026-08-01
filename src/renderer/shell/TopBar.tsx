@@ -113,11 +113,12 @@ function ProjectNameField(): React.ReactElement {
 
 interface TopBarProps {
   onExport?: () => void; // wired in M1e-5f
+  onHeliport?: () => void; // forum #160
   onRescan?: () => void; // wired in M1e-5e
   onSettings?: () => void; // wired in M2h
 }
 
-export function TopBar({ onExport, onRescan, onSettings }: TopBarProps): React.ReactElement {
+export function TopBar({ onExport, onHeliport, onRescan, onSettings }: TopBarProps): React.ReactElement {
   const dirty = useEditor((s) => s.dirty);
   const objCount = useEditor((s) => s.project.objects.length);
   const projectPath = useEditor((s) => s.projectPath);
@@ -157,6 +158,16 @@ export function TopBar({ onExport, onRescan, onSettings }: TopBarProps): React.R
       <span className="pct-divider" />
       <button type="button" onClick={onExport} disabled={!onExport}>
         Export POI…
+      </button>
+      {/* The second thing a project can become (forum #160): an airport you can start a flight from,
+          installed into scenery/airports. Beside Export because it is a sibling output, not a step of it. */}
+      <button
+        type="button"
+        onClick={onHeliport}
+        disabled={!onHeliport || !pct}
+        title={pct ? "Install this project as a heliport you can fly from" : NO_PCT}
+      >
+        Create heliport…
       </button>
 
       <span className="pct-divider" />

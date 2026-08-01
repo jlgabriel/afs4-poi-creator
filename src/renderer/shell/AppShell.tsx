@@ -9,12 +9,14 @@ import { MapView } from "../map/MapView";
 import { Inspector } from "../inspector/Inspector";
 import { PlacedList } from "../placed/PlacedList";
 import { ExportDialog } from "../dialogs/ExportDialog";
+import { HeliportDialog } from "../dialogs/HeliportDialog";
 import { SettingsDialog } from "../dialogs/SettingsDialog";
 import { useKeyboardShortcuts } from "../app/useKeyboardShortcuts";
 
 export function AppShell({ onRescan }: { onRescan: () => void }): React.ReactElement {
   useKeyboardShortcuts();
   const [exportOpen, setExportOpen] = useState(false);
+  const [heliportOpen, setHeliportOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   // The photo menu (v0.7) fires this when the user has no photo folder yet and clicks "Open Settings" on
   // its inline error — the portalled menu can't set this state directly, so it asks via a window event.
@@ -28,6 +30,7 @@ export function AppShell({ onRescan }: { onRescan: () => void }): React.ReactEle
       <TopBar
         onRescan={onRescan}
         onExport={() => setExportOpen(true)}
+        onHeliport={() => setHeliportOpen(true)}
         onSettings={() => setSettingsOpen(true)}
       />
       <RecoveryBanner />
@@ -38,6 +41,7 @@ export function AppShell({ onRescan }: { onRescan: () => void }): React.ReactEle
         <PlacedList />
       </div>
       {exportOpen && <ExportDialog onClose={() => setExportOpen(false)} />}
+      {heliportOpen && <HeliportDialog onClose={() => setHeliportOpen(false)} />}
       {settingsOpen && (
         <SettingsDialog onClose={() => setSettingsOpen(false)} onRescan={onRescan} />
       )}

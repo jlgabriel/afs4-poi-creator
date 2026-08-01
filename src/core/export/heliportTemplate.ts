@@ -25,10 +25,7 @@
 //   spelling taken from the Hong Kong community pack, DOES reach the cultivation (the POI's palms did not blink).
 
 import type { LonLat } from "../project/types";
-// No sanitizeValue here on purpose: every value these templates write is either a PCT-formatted number or
-// one of our own literals (the `__PLACEHOLDER__` identity fields). Nothing user-typed reaches them — which
-// is exactly the property that keeps PCT out of the ICAO business.
-import { tag, block, fmtLonLat, fmtNum } from "../tm/tmEmit";
+import { tag, block, fmtLonLat, fmtNum, sanitizeValue } from "../tm/tmEmit";
 import { lonToWad, latToWad, directionToWad, formatWad } from "../geo/wad";
 import { headingToDirection } from "../geo/orientation";
 import { ANCHOR_GEOMETRY, type Anchor } from "./plantAnchor";
@@ -43,11 +40,58 @@ export const HELIPORT_WAD_FILE = "heliport.wad.txt";
  *  somewhere in [30, 34] (30 loads, 35 fails), so the templates tell the user 29 and stay clear of it. */
 export const SNAME_MAX = 29;
 
-/** Placeholders the user replaces. Michael's own blank templates mark fields with two underscores; same
+/** Placeholders the TEMPLATE writes. Michael's own blank templates mark fields with two underscores; same
  *  convention, so someone who has seen his files recognises these. */
 const ICAO = "__ICAO__";
 const AIRPORT_NAME = "__AIRPORT_NAME__";
 const COUNTRY = "__COUNTRY__";
+
+/** What makes a heliport an AIRPORT rather than a template: the identity a user types into "Create
+ *  heliport…". PCT still does not invent any of it — but it does refuse a bad one (validateIdentity) and,
+ *  at the write boundary, a code already present on the machine, which the hand-written route cannot do. */
+export interface HeliportIdentity {
+  icao: string; // 4-6 chars, lowercase [a-z0-9]
+  name: string; // shown in LOCATION; <= SNAME_MAX
+  country: string; // two lowercase letters — ALSO a path segment, so it is validated, not trusted
+}
+
+export type IdentityProblem =
+  | "icao-format"
+  | "name-empty"
+  | "name-too-long"
+  | "country-format";
+
+const ICAO_RE = /^[a-z0-9]{4,6}$/;
+const COUNTRY_RE = /^[a-z]{2}$/;
+
+/** The single source of truth for "is this identity writable", used by the dialog for live feedback AND
+ *  by main before it touches disk. Availability of the CODE is a separate, machine-dependent question —
+ *  see main/icaoIndex.ts — because it cannot be answered from the string alone.
+ *
+ *  `country` gets the strictest rule of the three and it is not cosmetic: it becomes a directory name
+ *  under scenery/airports/, so anything but two letters is a path-traversal question, not a typo. */
+export function validateIdentity(id: HeliportIdentity): IdentityProblem | null {
+  if (!ICAO_RE.test(id.icao)) return "icao-format";
+  const name = sanitizeValue(id.name).trim();
+  if (name.length === 0) return "name-empty";
+  if (name.length > SNAME_MAX) return "name-too-long";
+  if (!COUNTRY_RE.test(id.country)) return "country-format";
+  return null;
+}
+
+/** English, user-facing, one line — the dialog shows it and main returns it. */
+export function identityProblemText(p: IdentityProblem): string {
+  switch (p) {
+    case "icao-format":
+      return "The airport code must be 4 to 6 letters or digits.";
+    case "name-empty":
+      return "Enter a name for the heliport.";
+    case "name-too-long":
+      return `The name must be ${SNAME_MAX} characters or fewer — Aerofly drops the whole airport above its limit.`;
+    case "country-format":
+      return "The country code must be exactly two letters (us, de, cl…).";
+  }
+}
 
 /** Everything the two files need, all of it already resolved by planExport (positions SHIFTED, height
  *  resolved) so this module is pure formatting. */
@@ -65,16 +109,28 @@ export interface HeliportSpec {
   anchor: Anchor | null;
   /** The project's height mode, mirrored onto the cultivation reference. */
   autoheight: boolean;
+  /** null → the TEMPLATE: `__PLACEHOLDER__` identity and the four manual steps at the top. Set → a real
+   *  airport PCT is about to install itself. Same tags either way; only the values and the header differ,
+   *  so there is exactly one description of this format in the codebase. */
+  identity?: HeliportIdentity | null;
+}
+
+/** The three identity values as they go into the files: the real ones, or the placeholders. */
+function identityValues(spec: HeliportSpec): { icao: string; name: string; country: string } {
+  const id = spec.identity ?? null;
+  if (id === null) return { icao: ICAO, name: AIRPORT_NAME, country: COUNTRY };
+  return { icao: id.icao, name: sanitizeValue(id.name).trim(), country: id.country };
 }
 
 /** `heliport.tsc.txt` — the place: identity, the functional pad, and the pointer to the POI's own `poi.toc`. */
 export function buildHeliportTsc(spec: HeliportSpec): string {
   const pos = `${fmtLonLat(spec.position.lon)} ${fmtLonLat(spec.position.lat)}`;
+  const v = identityValues(spec);
   const body: string[] = [
-    `${tag("string8", "sname", AIRPORT_NAME)}\t\t// the name shown in LOCATION. MAX ${SNAME_MAX} CHARACTERS - longer and the sim drops the whole airport.`,
-    `${tag("string8", "lname", AIRPORT_NAME)}\t\t// long name; keep it the same unless you have a reason.`,
-    `${tag("string8u", "icao", ICAO)}\t\t// 4-6 characters, and it MUST NOT already exist on the machine that installs this. A repeat silently REPLACES that airport.`,
-    `${tag("string8u", "country", COUNTRY)}\t\t// two letters, lowercase: us, de, cl`,
+    `${tag("string8", "sname", v.name)}\t\t// the name shown in LOCATION. MAX ${SNAME_MAX} CHARACTERS - longer and the sim drops the whole airport.`,
+    `${tag("string8", "lname", v.name)}\t\t// long name; keep it the same unless you have a reason.`,
+    `${tag("string8u", "icao", v.icao)}\t\t// 4-6 characters, and it MUST NOT already exist on the machine that installs this. A repeat silently REPLACES that airport.`,
+    `${tag("string8u", "country", v.country)}\t\t// two letters, lowercase: us, de, cl`,
     tag("string8u", "coordinate_system", "flat"),
     `${tag("vector2_float64", "position", pos)}\t\t// degrees, lon lat - written by PCT`,
     tag("bool", "autoheight", "true"),
@@ -109,7 +165,7 @@ export function buildHeliportTsc(spec: HeliportSpec): string {
   }
 
   const place = block("tmsimulator_scenery_place", "", "", body);
-  return [...INSTRUCTIONS, ...block("file", "", "", place)].join("\n") + "\n";
+  return [...header(spec), ...block("file", "", "", place)].join("\n") + "\n";
 }
 
 /** `heliport.wad.txt` — the entry in FS4's world airport database: what puts the heliport on the map, in
@@ -124,12 +180,13 @@ export function buildHeliportWad(spec: HeliportSpec): string {
     // The .wad stores the same rotation as the .toc, in RADIANS — hence the trip through headingToDirection.
     `${tag("float64", "direction", formatWad(directionToWad(headingToDirection(spec.headingDeg))))}\t\t// RADIANS here, not degrees - written by PCT`,
   ];
+  const v = identityValues(spec);
   const body = [
     tag("uint64", "uid", "0"),
-    `${tag("stringt8c", "icao", ICAO)}\t\t// the SAME code as in the .tsc`,
+    `${tag("stringt8c", "icao", v.icao)}\t\t// the SAME code as in the .tsc`,
     tag("stringt8c", "iata", ""),
-    `${tag("stringt8c", "name", AIRPORT_NAME)}\t\t// max 32 characters here`,
-    tag("stringt8c", "country", COUNTRY),
+    `${tag("stringt8c", "name", v.name)}\t\t// max 32 characters here`,
+    tag("stringt8c", "country", v.country),
     `${tag("vector2_float64", "position", pos)}\t\t// FS4 grid units (0-65536), NOT degrees - written by PCT`,
     ...block(
       "list_tmworld_airport_detailed_helipad",
@@ -139,7 +196,7 @@ export function buildHeliportWad(spec: HeliportSpec): string {
     ),
   ];
   const airport = block("tmworld_airport_detailed", "", "", body);
-  return [...INSTRUCTIONS, ...block("file", "", "", airport)].join("\n") + "\n";
+  return [...header(spec), ...block("file", "", "", airport)].join("\n") + "\n";
 }
 
 /** The anchor object, repeated from the `.tsl` because the `.tsc` replaces it as the entry point. Written
@@ -163,9 +220,30 @@ function anchorObjects(anchor: Anchor): string[] {
   );
 }
 
-/** The four manual steps, repeated at the top of BOTH files — whichever one the user opens first tells
- *  them the whole procedure. `//` comments are part of the format (IPACS's own text files carry them). */
-const INSTRUCTIONS: string[] = [
+/** The comment block at the top of both files. `//` comments are part of the format (IPACS's own text
+ *  files carry them, and so does the community pack on a real user's disk).
+ *
+ *  TEMPLATE → the four manual steps, repeated in BOTH files so whichever one the user opens first tells
+ *  them the whole procedure. INSTALLED → what it is and how to undo it, because a file that quietly
+ *  shadows an airport is exactly the thing this feature has to be honest about. */
+function header(spec: HeliportSpec): string[] {
+  if ((spec.identity ?? null) === null) return TEMPLATE_INSTRUCTIONS;
+  return [
+    "// ---------------------------------------------------------------------------",
+    "// HELIPORT - installed by PCT (POI Creation Tool).",
+    "//",
+    "// Aerofly reads this as an airport. If another airport on this machine ever uses the same",
+    "// code, ONE of them wins and the loser vanishes with a single line in tm.log - so the code",
+    "// below was checked against every airport installed here at the moment it was written.",
+    "//",
+    "// To remove it: PCT's Export dialog lists installed heliports with an Uninstall button,",
+    "// or just delete this folder. Nothing else on your system was touched.",
+    "// ---------------------------------------------------------------------------",
+    "",
+  ];
+}
+
+const TEMPLATE_INSTRUCTIONS: string[] = [
   "// ---------------------------------------------------------------------------",
   "// HELIPORT TEMPLATE - written by PCT. Aerofly does NOT read this file as it is.",
   "//",
@@ -184,6 +262,25 @@ const INSTRUCTIONS: string[] = [
   "// ---------------------------------------------------------------------------",
   "",
 ];
+
+/** Marker in an installed heliport's README.txt. Same trick as POI_README_MARKER: it is what makes a
+ *  folder under scenery/airports/ safe to offer for Uninstall — PCT removes only what PCT wrote. */
+export const HELIPORT_README_MARKER = "Installed by PCT (POI Creation Tool) - heliport";
+
+/** README.txt for an INSTALLED heliport. */
+export function heliportInstalledReadme(id: HeliportIdentity, projectName: string): string {
+  return [
+    `${sanitizeValue(projectName).trim()} - heliport ${id.icao.toUpperCase()}`,
+    HELIPORT_README_MARKER,
+    "",
+    `Find it in Aerofly under LOCATION as "${sanitizeValue(id.name).trim()}" (${id.icao.toUpperCase()}).`,
+    "Restart Aerofly after installing - airports are read once, at startup.",
+    "",
+    "This folder holds the airport itself; the objects come from the poi.toc beside it, which is",
+    "the same cultivation the POI export writes. Delete the folder to remove the heliport.",
+    "",
+  ].join("\n");
+}
 
 /** The lines README.txt gains when the templates ship, so the POI folder explains itself. */
 export function heliportReadmeLines(): string[] {

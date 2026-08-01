@@ -33,6 +33,11 @@ const pct: PctApi = {
   exportPoi: (project, opts) => ipcRenderer.invoke("pct:exportPoi", project, opts),
   uninstallPoi: (folderName) => ipcRenderer.invoke("pct:uninstallPoi", folderName),
   listInstalledPois: () => ipcRenderer.invoke("pct:listInstalledPois"),
+  isIcaoTaken: (icao) => ipcRenderer.invoke("pct:isIcaoTaken", icao),
+  installHeliport: (project, opts) => ipcRenderer.invoke("pct:installHeliport", project, opts),
+  listInstalledHeliports: () => ipcRenderer.invoke("pct:listInstalledHeliports"),
+  uninstallHeliport: (country, folderName) =>
+    ipcRenderer.invoke("pct:uninstallHeliport", country, folderName),
   revealInFolder: (folderName) => ipcRenderer.invoke("pct:revealInFolder", folderName),
   log: (level, message) => ipcRenderer.invoke("pct:log", level, message),
   openLog: () => ipcRenderer.invoke("pct:openLog"),

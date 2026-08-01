@@ -11,7 +11,7 @@ import type { Catalog, CatalogObject, PlacedXref, Project, Settings } from "../.
 import { categorize, displayName } from "../../core/catalog/categorize";
 import { photoKey } from "../../core/catalog/photoKey";
 import { EMPTY_FOOTPRINTS, setFootprint, type FootprintOverrides } from "../../core/catalog/footprints";
-import type { InstalledPoi, PctApi } from "../../shared/pctApi";
+import type { InstalledHeliport, InstalledPoi, PctApi } from "../../shared/pctApi";
 
 // A spread of real-ish name stems across the catalog's categories, expanded with numeric suffixes to
 // ~900 entries so the list is production-scale.
@@ -236,6 +236,9 @@ export function installMockBridge(): void {
     { folderName: "e00698n4627_suiza", byPct: true },
     { folderName: "toulouse_city", byPct: false },
   ];
+  let installedHeliports: InstalledHeliport[] = [
+    { folderName: "e00367n4801_france", country: "fr", icao: "fr0001" },
+  ];
   // v0.7: a MUTABLE set of lowercased names that have a photo, seeded from PHOTO_STEMS. saveObjectPhoto
   // adds and deleteObjectPhoto removes, so the right-click menu's paste/remove flow is exercisable with no
   // disk (the preview has none). Respects settings.thumbnailsDir like main: none set → "no-photos-dir".
@@ -355,6 +358,45 @@ export function installMockBridge(): void {
       return { ok: true, value: undefined };
     },
     listInstalledPois: async () => installedPois,
+    // Heliports. `kdag` and `lowi` stand in for the ~8k codes a real install has, so the dialog's
+    // "already used on this machine" path is exercisable with no disk.
+    isIcaoTaken: async (icao) =>
+      ["kdag", "lowi", ...installedHeliports.map((h) => h.icao)].includes(icao.trim().toLowerCase()),
+    installHeliport: async (_project, opts) => {
+      const icao = opts.identity.icao.trim().toLowerCase();
+      if (["kdag", "lowi"].includes(icao)) {
+        return {
+          ok: false,
+          error: {
+            code: "icao-taken",
+            icao,
+            message: `The airport code "${icao.toUpperCase()}" is already used by an airport installed on this machine. Installing over it would make that airport disappear. Pick another code.`,
+          },
+        };
+      }
+      const folderName = "e00698n4627_recovered";
+      const country = opts.identity.country.trim().toLowerCase();
+      installedHeliports = [
+        ...installedHeliports.filter((h) => h.folderName !== folderName),
+        { folderName, country, icao },
+      ];
+      return {
+        ok: true,
+        value: {
+          folderName,
+          path: `C:/Mock/Aerofly FS 4/scenery/airports/${country}/${folderName}`,
+          installed: true,
+          warnings: [],
+        },
+      };
+    },
+    listInstalledHeliports: async () => installedHeliports,
+    uninstallHeliport: async (country, folderName) => {
+      installedHeliports = installedHeliports.filter(
+        (h) => !(h.folderName === folderName && h.country === country),
+      );
+      return { ok: true, value: undefined };
+    },
     revealInFolder: noop,
     // No file in the preview harness — send the log to the console the previewer already has open.
     log: async (level, message) => {

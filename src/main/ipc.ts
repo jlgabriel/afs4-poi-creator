@@ -14,7 +14,9 @@ import type {
   DetectResult,
   ExportOptions,
   FootprintImport,
+  HeliportInstallOptions,
   InstallResult,
+  InstalledHeliport,
   InstalledPoi,
   PctError,
   PctResult,
@@ -37,16 +39,22 @@ import {
   resolveHeightsAgl,
   resolveHeightsFlat,
 } from "../core/export/heights";
-import { planExport } from "../core/export/planExport";
+import { InvalidHeliportIdentityError, planExport, planHeliport } from "../core/export/planExport";
+import { identityProblemText } from "../core/export/heliportTemplate";
 import { UnsupportedSchemaVersionError } from "../core/project/schemas";
 import { detectInstallDirs, detectUserDir } from "./afs4Paths";
 import { resolveHeights } from "./elevation";
+import { IcaoTakenError, forgetTakenIcaos, takenIcaos } from "./icaoIndex";
 import {
   FolderExistsError,
+  UnsafeCountryError,
   UnsafeFolderNameError,
+  airportRoot,
+  listInstalledHeliports,
   listInstalledPois,
   poiRoot,
   resolvePoiPath,
+  uninstallHeliport,
   uninstallPoi,
   writePoi,
 } from "./installer";
@@ -134,6 +142,13 @@ function toPctError(e: unknown): PctError {
   }
   if (e instanceof NoPhotosDirError) return { code: "no-photos-dir", message: e.message };
   if (e instanceof ClipboardEmptyError) return { code: "clipboard-empty", message: e.message };
+  if (e instanceof InvalidHeliportIdentityError) {
+    return { code: "invalid-identity", message: identityProblemText(e.problem) };
+  }
+  if (e instanceof IcaoTakenError) {
+    return { code: "icao-taken", message: e.message, icao: e.icao };
+  }
+  if (e instanceof UnsafeCountryError) return { code: "invalid-identity", message: e.message };
   if (e instanceof UnsafeFolderNameError) return { code: "invalid-project", message: e.message };
   if (e instanceof ZodError) return { code: "invalid-project", message: e.message };
   return { code: "io", message: e instanceof Error ? e.message : String(e) };
@@ -261,6 +276,56 @@ async function runExport(project: Project, opts: ExportOptions): Promise<Install
   const w = writePoi(plan, chosen, { overwrite: opts.overwrite, assetsDir });
   writeProjectSidecar(w.path, project); // #89-3: re-openable copy beside the POI
   return done({ folderName: w.folderName, path: w.path, installed: false, warnings: plan.warnings });
+}
+
+/** Install the project as a heliport: an airport folder under scenery/airports/<country>/.
+ *
+ *  This is the only path that writes outside scenery/poi/, so the refusals come BEFORE the write and in
+ *  this order: the identity must be well-formed (planHeliport throws if it isn't), and the code must be
+ *  free on this machine RIGHT NOW — re-scanned here, not read from the memo the dialog warmed up, because
+ *  a dialog can sit open while another add-on is installed. */
+async function runHeliportInstall(project: Project, opts: HeliportInstallOptions): Promise<InstallResult> {
+  const settings = currentSettings();
+  const userDir = afs4UserDirOrThrow();
+  const icao = opts.identity.icao.trim().toLowerCase();
+  const identity = { ...opts.identity, icao, country: opts.identity.country.trim().toLowerCase() };
+
+  log.info(
+    `heliport install "${identity.icao}" (${identity.country}) — ${project.objects.length} objects, ` +
+      `pad ${opts.heliport.objectId ?? "at POI anchor"}, r=${opts.heliport.radiusM} m`,
+  );
+
+  if (takenIcaos(settings.installDir, userDir, { refresh: true }).has(icao)) {
+    log.warn(`heliport refused — code "${icao}" is already an airport on this machine`);
+    throw new IcaoTakenError(icao);
+  }
+
+  const resolved =
+    project.heightMode === "autoheight"
+      ? resolveHeightsAgl(project.objects)
+      : opts.baseElevation != null
+        ? resolveHeightsFlat(project.objects, opts.baseElevation)
+        : await resolveHeights(project.objects, settings.elevation.provider, {
+            cacheDir: userData(),
+            version: app.getVersion(),
+          });
+
+  const plan = planHeliport(project, resolved, { identity, heliport: opts.heliport });
+  const assetsDir = anchorAssetsDir({
+    env: process.env,
+    packaged: app.isPackaged,
+    resourcesPath: process.resourcesPath,
+    appPath: app.getAppPath(),
+  });
+  const w = writePoi(plan, airportRoot(userDir, plan.country), {
+    overwrite: opts.overwrite,
+    assetsDir,
+  });
+  writeProjectSidecar(w.path, project); // same as a POI: the folder can be reopened in PCT
+  forgetTakenIcaos(); // the code we just used is now taken
+  log.info(`heliport ok — installed to ${w.path}`);
+  for (const warn of plan.warnings) log.warn(`heliport warning: ${warn}`);
+  return { folderName: w.folderName, path: w.path, installed: true, warnings: plan.warnings };
 }
 
 /** Load the optional official overlay, scan, cache the catalog, and record lastScanAt. Shared by
@@ -531,6 +596,28 @@ export function registerIpc(): void {
     const dir = currentSettings().afs4UserDir ?? detectUserDir(documents());
     return dir ? listInstalledPois(dir) : [];
   });
+  // ── Heliports ──
+  // isIcaoTaken is a READ for live feedback while typing; it deliberately uses the memo, and it is NOT
+  // what protects the user — installHeliport re-scans before it writes.
+  ipcMain.handle("pct:isIcaoTaken", (_e, icao: string): boolean => {
+    const s = currentSettings();
+    const dir = s.afs4UserDir ?? detectUserDir(documents());
+    return takenIcaos(s.installDir, dir).has(String(icao).trim().toLowerCase());
+  });
+  ipcMain.handle("pct:installHeliport", (_e, project: Project, opts: HeliportInstallOptions) =>
+    guarded("installHeliport", () => runHeliportInstall(project, opts)),
+  );
+  ipcMain.handle("pct:listInstalledHeliports", (): InstalledHeliport[] => {
+    const dir = currentSettings().afs4UserDir ?? detectUserDir(documents());
+    return dir ? listInstalledHeliports(dir) : [];
+  });
+  ipcMain.handle("pct:uninstallHeliport", (_e, country: string, folderName: string) =>
+    guarded("uninstallHeliport", (): void => {
+      uninstallHeliport(afs4UserDirOrThrow(), country, folderName);
+      forgetTakenIcaos(); // its code is free again
+      log.info(`uninstalled heliport "${folderName}" (${country})`);
+    }),
+  );
   // ── The session log ──
   // The renderer can WRITE to it (its own uncaught errors — otherwise they die in a DevTools console
   // nobody has open) and ASK FOR IT to be opened. It cannot read it back or name a path: `log` takes a

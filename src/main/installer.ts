@@ -22,8 +22,9 @@ import {
 } from "node:fs";
 import path from "node:path";
 import type { ExportPlan } from "../core/project/types";
-import type { InstalledPoi } from "../shared/pctApi";
+import type { InstalledHeliport, InstalledPoi } from "../shared/pctApi";
 import { POI_README_MARKER } from "../core/export/planExport";
+import { HELIPORT_README_MARKER } from "../core/export/heliportTemplate";
 import { isSafePoiFolderName } from "../core/geo/poiName";
 
 /** Scratch folder built beside the destination and swapped in with a single rename (see writePoi).
@@ -187,10 +188,87 @@ export function listInstalledPois(afs4UserDir: string): InstalledPoi[] {
   return out;
 }
 
-function hasPctMarker(dir: string): boolean {
+function hasMarker(dir: string, marker: string): boolean {
   try {
-    return readFileSync(path.join(dir, "README.txt"), "utf8").includes(POI_README_MARKER);
+    return readFileSync(path.join(dir, "README.txt"), "utf8").includes(marker);
   } catch {
     return false;
+  }
+}
+
+function hasPctMarker(dir: string): boolean {
+  return hasMarker(dir, POI_README_MARKER);
+}
+
+// ── Heliports: the same folder, written under scenery/airports/ instead ───────────────────────────
+//
+// This is the ONE place PCT writes outside scenery/poi/, so the guard rails are the same ones and one
+// more: `country` becomes a DIRECTORY NAME, so it is matched against a two-letter pattern here, at the
+// boundary, and not merely validated in core. Everything PCT can create it can also remove.
+
+/** A country code that isn't exactly two letters reached a path — refuse it. */
+export class UnsafeCountryError extends Error {
+  constructor(readonly country: string) {
+    super(`Unsafe country code: ${JSON.stringify(country)}`);
+    this.name = "UnsafeCountryError";
+  }
+}
+
+const COUNTRY_DIR_RE = /^[a-z]{2}$/;
+
+/** `<afs4UserDir>/scenery/airports/<country>` — mirrors how IPACS itself lays them out
+ *  (`scenery/airports/de/de0451_steyerberg…/de0451.tsc`). */
+export function airportRoot(afs4UserDir: string, country: string): string {
+  if (!COUNTRY_DIR_RE.test(country)) throw new UnsafeCountryError(country);
+  return path.join(afs4UserDir, "scenery", "airports", country);
+}
+
+/** Delete an installed heliport: a safe-named folder inside scenery/airports/<country>/. No-ops if gone.
+ *  The country directory is left in place — other airports may live in it. */
+export function uninstallHeliport(afs4UserDir: string, country: string, folderName: string): void {
+  const dest = resolvePoiPath(airportRoot(afs4UserDir, country), folderName);
+  if (existsSync(dest)) rmSync(dest, { recursive: true, force: true });
+}
+
+/** List the heliports PCT installed under scenery/airports/. Only folders carrying PCT's heliport marker
+ *  are returned at all — unlike the POI list, which shows third-party folders greyed out. Someone else's
+ *  airport has no business appearing in a list whose only button is Uninstall. */
+export function listInstalledHeliports(afs4UserDir: string): InstalledHeliport[] {
+  const root = path.join(afs4UserDir, "scenery", "airports");
+  const out: InstalledHeliport[] = [];
+  let countries;
+  try {
+    countries = readdirSync(root, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  for (const c of countries) {
+    if (!c.isDirectory() || !COUNTRY_DIR_RE.test(c.name)) continue;
+    const countryDir = path.join(root, c.name);
+    let folders;
+    try {
+      folders = readdirSync(countryDir, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const f of folders) {
+      if (!f.isDirectory() || f.name.endsWith(STAGING_SUFFIX)) continue;
+      if (!isSafePoiFolderName(f.name)) continue;
+      const dir = path.join(countryDir, f.name);
+      if (!hasMarker(dir, HELIPORT_README_MARKER)) continue;
+      out.push({ folderName: f.name, country: c.name, icao: icaoOf(dir) });
+    }
+  }
+  return out;
+}
+
+/** The heliport's code, read from the `<icao>.tsc` FILENAME — no parsing, and it cannot disagree with
+ *  what the sim keys on, because the sim finds the file the same way. */
+function icaoOf(dir: string): string {
+  try {
+    const tsc = readdirSync(dir).find((n) => n.toLowerCase().endsWith(".tsc"));
+    return tsc === undefined ? "" : path.basename(tsc, path.extname(tsc));
+  } catch {
+    return "";
   }
 }

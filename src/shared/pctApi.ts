@@ -30,6 +30,11 @@ export type PctError =
   // v0.7 "Paste photo": the photo folder isn't chosen yet (Settings), or the clipboard holds no image.
   | { code: "no-photos-dir"; message: string }
   | { code: "clipboard-empty"; message: string }
+  // "Create heliport…": the identity is malformed, or its code is already an airport on THIS machine.
+  // `icao-taken` is a REFUSAL, not a warning — installing over a code that exists makes the other airport
+  // disappear with no trace but a line in tm.log, and the person who loses it is not necessarily this user.
+  | { code: "invalid-identity"; message: string }
+  | { code: "icao-taken"; message: string; icao: string }
   | { code: "io"; message: string };
 
 export type PctResult<T> = { ok: true; value: T } | { ok: false; error: PctError };
@@ -83,6 +88,24 @@ export interface FootprintImport {
 export interface InstalledPoi {
   folderName: string;
   byPct: boolean; // carries PCT's README marker → safe to offer Uninstall
+}
+
+/** A heliport PCT installed under scenery/airports/. Only PCT-written folders are ever listed, so every
+ *  row is safe to offer Uninstall — unlike POIs, where third-party folders appear greyed out. */
+export interface InstalledHeliport {
+  folderName: string;
+  country: string;
+  icao: string;
+}
+
+/** "Create heliport…": the POI becomes a real airport PCT writes into scenery/airports/<country>/.
+ *  Identity is user-typed and never invented by PCT; main validates it AND refuses a code already in use
+ *  on this machine before touching disk. */
+export interface HeliportInstallOptions {
+  identity: { icao: string; name: string; country: string };
+  heliport: { objectId: string | null; radiusM: number };
+  overwrite: boolean;
+  baseElevation?: number; // same offline fallback as ExportOptions
 }
 
 export interface ExportOptions {
@@ -160,6 +183,14 @@ export interface PctApi {
   exportPoi(project: Project, opts: ExportOptions): Promise<PctResult<InstallResult | null>>;
   uninstallPoi(folderName: string): Promise<PctResult<void>>;
   listInstalledPois(): Promise<InstalledPoi[]>;
+
+  // Heliports (forum #160). `isIcaoTaken` is for LIVE feedback while the user types; it is not the
+  // safety mechanism — installHeliport re-checks against a fresh scan at the moment it writes, because
+  // the dialog may have been open for a while and another add-on may have landed meanwhile.
+  isIcaoTaken(icao: string): Promise<boolean>;
+  installHeliport(project: Project, opts: HeliportInstallOptions): Promise<PctResult<InstallResult>>;
+  listInstalledHeliports(): Promise<InstalledHeliport[]>;
+  uninstallHeliport(country: string, folderName: string): Promise<PctResult<void>>;
   revealInFolder(folderName: string): Promise<void>; // main validates + resolves within known roots
 
   // The session log (main/log.ts): one plain-text file in userData, rewritten from scratch at every

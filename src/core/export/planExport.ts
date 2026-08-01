@@ -14,9 +14,13 @@ import { computeAnchor, computeAutoheightAnchor, ANCHOR_ASSETS } from "./plantAn
 import {
   buildHeliportTsc,
   buildHeliportWad,
+  heliportInstalledReadme,
   heliportReadmeLines,
+  validateIdentity,
   HELIPORT_TSC_FILE,
   HELIPORT_WAD_FILE,
+  type HeliportIdentity,
+  type IdentityProblem,
 } from "./heliportTemplate";
 
 // A POI's two payload files are named `poi.tsl` / `poi.toc` (format bible), and the .tsl
@@ -139,4 +143,83 @@ export function planExport(
   }
 
   return { folderName, files, assets: anchor ? [...ANCHOR_ASSETS] : [], warnings };
+}
+
+/** A heliport PCT installs itself, rather than the templates a user finishes by hand. Same folder, minus
+ *  the `poi.tsl` the `.tsc` replaces, with the identity filled in and the two files named after the code. */
+export interface HeliportPlan {
+  folderName: string; // the POI's own slug — already a safe name, so the installer's guard applies unchanged
+  country: string; // the directory under scenery/airports/ this goes in
+  icao: string;
+  files: PoiFile[];
+  assets: string[];
+  warnings: string[];
+}
+
+/** Thrown when an identity that never passed validateIdentity reaches the planner. Callers validate for
+ *  the MESSAGE; this exists so no path can skip it and write a broken airport. */
+export class InvalidHeliportIdentityError extends Error {
+  constructor(readonly problem: IdentityProblem) {
+    super(`Invalid heliport identity: ${problem}`);
+    this.name = "InvalidHeliportIdentityError";
+  }
+}
+
+export function planHeliport(
+  project: Project,
+  resolved: ResolvedObject[],
+  opts: { identity: HeliportIdentity; heliport: HeliportOptions },
+): HeliportPlan {
+  const problem = validateIdentity(opts.identity);
+  if (problem !== null) throw new InvalidHeliportIdentityError(problem);
+
+  const warnings: string[] = [];
+  const autoheight = project.heightMode === "autoheight";
+  const objects = applyShift(resolved, project.shift);
+  const ref = project.reference ?? centroid(objects.map((o) => o.position));
+  const folderName = poiFolderName(ref, project.poiName);
+  const tocFileName = objects.length > 0 ? POI_BASENAME : null;
+  const anchor = autoheight ? computeAutoheightAnchor(objects) : computeAnchor(objects);
+
+  const pad = heliportPad(objects, ref, opts.heliport.objectId);
+  if (!pad.found) {
+    warnings.push(
+      "The object chosen for the helipad is no longer in the scene — the pad was placed at the POI's anchor point instead.",
+    );
+  }
+  if (autoheight) {
+    warnings.push(
+      "Heliports were only verified in-sim with baked-asl heights — in Sim-autoheight mode, check the objects' heights after the first flight.",
+    );
+  }
+  if (objects.length === 0) {
+    warnings.push("The heliport has no objects around it — just the pad.");
+  }
+
+  const spec = {
+    position: pad.position,
+    headingDeg: pad.headingDeg,
+    radiusM: opts.heliport.radiusM,
+    cultivationFileName: tocFileName,
+    anchor,
+    autoheight,
+    identity: opts.identity,
+  };
+  const icao = opts.identity.icao;
+  const files: PoiFile[] = [
+    { relPath: `${icao}.tsc`, content: buildHeliportTsc(spec) },
+    { relPath: `${icao}.wad`, content: buildHeliportWad(spec) },
+    { relPath: "README.txt", content: heliportInstalledReadme(opts.identity, project.name) },
+  ];
+  // No `poi.tsl`: the `.tsc` IS the place. Shipping both would load the same cultivation twice.
+  if (tocFileName !== null) files.splice(2, 0, { relPath: `${POI_BASENAME}.toc`, content: buildToc(objects) });
+
+  return {
+    folderName,
+    country: opts.identity.country,
+    icao,
+    files,
+    assets: anchor ? [...ANCHOR_ASSETS] : [],
+    warnings,
+  };
 }
