@@ -8,8 +8,11 @@ import type { Project, ResolvedXref } from "../../src/core/project/types";
 import { InvalidHeliportIdentityError, planHeliport } from "../../src/core/export/planExport";
 import {
   HELIPORT_README_MARKER,
+  buildHeliportTsc,
+  buildHeliportWad,
   validateIdentity,
   SNAME_MAX,
+  type HeliportSpec,
 } from "../../src/core/export/heliportTemplate";
 import {
   UnsafeCountryError,
@@ -43,6 +46,16 @@ const PROJECT: Project = {
 };
 
 const ID = { icao: "pct001", name: "PCT Test Heliport", country: "us" };
+/** The by-hand template shape: no identity, so the files carry `__PLACEHOLDER__` values. */
+const TEMPLATE_SPEC: HeliportSpec = {
+  position: { lon: -116.7947, lat: 34.8536 },
+  headingDeg: 40,
+  radiusM: 10,
+  cultivationFileName: "poi",
+  anchor: null,
+  autoheight: false,
+  identity: null,
+};
 const OPTS = { identity: ID, heliport: { objectId: "hangar" as string | null, radiusM: 10 } };
 
 let tmp: string;
@@ -207,12 +220,37 @@ describe("installing under scenery/airports", () => {
   });
 });
 
-describe("the installed heliport's README", () => {
-  it("says how to undo it — a file that shadows an airport has to be honest about that", () => {
+describe("★ nothing may precede the root <[file] tag", () => {
+  // The failure this pins down: with a ten-line `//` banner above `<[file]`, the sim logs
+  // `ERROR: (error loading '…/pct002.tsc')` and NOTHING else. The `.wad` still loads, so the code is in
+  // the airport database while the place is missing — the airport half-exists and cannot be flown, and
+  // the LOCATION search shows nothing. Measured on 2026-07-31; the same file without the banner flew.
+  // Both known-good heliports agree (ApfelFlieger's de0869, the Hong Kong pack).
+  const startsClean = (text: string): boolean => text.startsWith("<[file][][]");
+
+  it("holds for an installed heliport", () => {
     const plan = planHeliport(PROJECT, [HANGAR], OPTS);
-    const w = writePoi(plan, airportRoot(tmp, plan.country), { overwrite: false });
-    const tsc = readFileSync(path.join(w.path, "pct001.tsc"), "utf8");
-    expect(tsc).toContain("To remove it");
-    expect(tsc).not.toContain("HELIPORT TEMPLATE"); // that header belongs to the by-hand files
+    for (const f of plan.files.filter((x) => /\.(tsc|wad)$/.test(x.relPath))) {
+      expect(startsClean(f.content), `${f.relPath} must start on <[file]`).toBe(true);
+    }
+  });
+
+  it("holds for the by-hand templates too — the user renames them INTO a .tsc", () => {
+    for (const text of [buildHeliportTsc(TEMPLATE_SPEC), buildHeliportWad(TEMPLATE_SPEC)]) {
+      expect(startsClean(text)).toBe(true);
+    }
+  });
+
+  it("still allows trailing // comments on a tag line — the file that flew is full of them", () => {
+    const tsc = planHeliport(PROJECT, [HANGAR], OPTS).files.find((f) => f.relPath === "pct001.tsc")!;
+    expect(tsc.content).toContain("]>\t\t// METRES");
+  });
+});
+
+describe("the installed heliport's README", () => {
+  it("carries the instructions the files may not — including how to undo it", () => {
+    const readme = planHeliport(PROJECT, [HANGAR], OPTS).files.find((f) => f.relPath === "README.txt")!;
+    expect(readme.content).toContain("To remove it");
+    expect(readme.content).toContain("cannot speak for"); // the honest limit of the check
   });
 });

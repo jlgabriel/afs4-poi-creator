@@ -295,11 +295,6 @@ async function runHeliportInstall(project: Project, opts: HeliportInstallOptions
       `pad ${opts.heliport.objectId ?? "at POI anchor"}, r=${opts.heliport.radiusM} m`,
   );
 
-  if (takenIcaos(settings.installDir, userDir, { refresh: true }).has(icao)) {
-    log.warn(`heliport refused — code "${icao}" is already an airport on this machine`);
-    throw new IcaoTakenError(icao);
-  }
-
   const resolved =
     project.heightMode === "autoheight"
       ? resolveHeightsAgl(project.objects)
@@ -311,6 +306,21 @@ async function runHeliportInstall(project: Project, opts: HeliportInstallOptions
           });
 
   const plan = planHeliport(project, resolved, { identity, heliport: opts.heliport });
+
+  // The collision check, AFTER planning because it needs the destination. Re-scanned rather than read
+  // from the dialog's memo: a dialog can sit open while another add-on lands.
+  //
+  // The one code that is NOT a collision is the one already sitting in the folder we are about to
+  // replace — our own, from a previous run. Without this, re-installing a heliport after editing the
+  // project refuses itself, which is both wrong and impossible to explain.
+  const replacing = listInstalledHeliports(userDir).find(
+    (h) => h.country === plan.country && h.folderName === plan.folderName && h.icao.toLowerCase() === icao,
+  );
+  if (replacing === undefined && takenIcaos(settings.installDir, userDir, { refresh: true }).has(icao)) {
+    log.warn(`heliport refused — code "${icao}" is already an airport on this machine`);
+    throw new IcaoTakenError(icao);
+  }
+
   const assetsDir = anchorAssetsDir({
     env: process.env,
     packaged: app.isPackaged,

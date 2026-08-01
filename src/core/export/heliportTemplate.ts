@@ -165,7 +165,7 @@ export function buildHeliportTsc(spec: HeliportSpec): string {
   }
 
   const place = block("tmsimulator_scenery_place", "", "", body);
-  return [...header(spec), ...block("file", "", "", place)].join("\n") + "\n";
+  return [...NO_HEADER, ...block("file", "", "", place)].join("\n") + "\n";
 }
 
 /** `heliport.wad.txt` — the entry in FS4's world airport database: what puts the heliport on the map, in
@@ -196,7 +196,7 @@ export function buildHeliportWad(spec: HeliportSpec): string {
     ),
   ];
   const airport = block("tmworld_airport_detailed", "", "", body);
-  return [...header(spec), ...block("file", "", "", airport)].join("\n") + "\n";
+  return [...NO_HEADER, ...block("file", "", "", airport)].join("\n") + "\n";
 }
 
 /** The anchor object, repeated from the `.tsl` because the `.tsc` replaces it as the entry point. Written
@@ -220,48 +220,19 @@ function anchorObjects(anchor: Anchor): string[] {
   );
 }
 
-/** The comment block at the top of both files. `//` comments are part of the format (IPACS's own text
- *  files carry them, and so does the community pack on a real user's disk).
+/** ★ NOTHING may precede the root `<[file]` tag. The sim's parser rejects the WHOLE file — the only
+ *  symptom is `ERROR: (error loading '…/<icao>.tsc')` in tm.log and an airport that is in the database
+ *  (its `.wad` loaded) but has no place, so it half-appears and cannot be flown.
  *
- *  TEMPLATE → the four manual steps, repeated in BOTH files so whichever one the user opens first tells
- *  them the whole procedure. INSTALLED → what it is and how to undo it, because a file that quietly
- *  shadows an airport is exactly the thing this feature has to be honest about. */
-function header(spec: HeliportSpec): string[] {
-  if ((spec.identity ?? null) === null) return TEMPLATE_INSTRUCTIONS;
-  return [
-    "// ---------------------------------------------------------------------------",
-    "// HELIPORT - installed by PCT (POI Creation Tool).",
-    "//",
-    "// Aerofly reads this as an airport. If another airport on this machine ever uses the same",
-    "// code, ONE of them wins and the loser vanishes with a single line in tm.log - so the code",
-    "// below was checked against every airport installed here at the moment it was written.",
-    "//",
-    "// To remove it: PCT's Export dialog lists installed heliports with an Uninstall button,",
-    "// or just delete this folder. Nothing else on your system was touched.",
-    "// ---------------------------------------------------------------------------",
-    "",
-  ];
-}
-
-const TEMPLATE_INSTRUCTIONS: string[] = [
-  "// ---------------------------------------------------------------------------",
-  "// HELIPORT TEMPLATE - written by PCT. Aerofly does NOT read this file as it is.",
-  "//",
-  "// To turn this POI into a heliport you can start a flight from:",
-  "//",
-  "//   1. Move this whole folder out of  scenery/poi/  and into  scenery/airports/",
-  "//      (a layout that works: scenery/airports/<continent>/<country>/<this folder>/ )",
-  `//   2. Replace ${ICAO}, ${AIRPORT_NAME} and ${COUNTRY} in BOTH files.`,
-  "//      Check the code is free FIRST: start Aerofly, open LOCATION and search for it.",
-  "//      An ICAO that already exists REPLACES that airport, and the only trace is one line in tm.log.",
-  "//   3. Rename both files to  <icao>.tsc  and  <icao>.wad  (drop the .txt).",
-  "//   4. Delete poi.tsl - this .tsc takes its place. Keep poi.toc and any pct_anchor files.",
-  "//",
-  "// Then restart Aerofly: the heliport is in the LOCATION menu, and every object you placed",
-  "// in PCT is around the pad.",
-  "// ---------------------------------------------------------------------------",
-  "",
-];
+ *  Measured 2026-07-31: the same file WITH a ten-line `//` banner above `<[file]` failed to load, and
+ *  without it flew. Both known-good heliports agree — ApfelFlieger's `de0869.tsc` and the Hong Kong
+ *  community pack both start on `<[file][][]`. TRAILING `//` comments on a tag line are fine: the file
+ *  that flew is full of them.
+ *
+ *  So the human instructions live in README.txt, which is a human file, and these stay pure format.
+ *  (PCT's own tmParser was taught to skip a leading banner while chasing this — do not read that as
+ *  permission: the parser that matters is the sim's, and it was never taught anything.) */
+const NO_HEADER: string[] = [];
 
 /** Marker in an installed heliport's README.txt. Same trick as POI_README_MARKER: it is what makes a
  *  folder under scenery/airports/ safe to offer for Uninstall — PCT removes only what PCT wrote. */
@@ -277,17 +248,42 @@ export function heliportInstalledReadme(id: HeliportIdentity, projectName: strin
     "Restart Aerofly after installing - airports are read once, at startup.",
     "",
     "This folder holds the airport itself; the objects come from the poi.toc beside it, which is",
-    "the same cultivation the POI export writes. Delete the folder to remove the heliport.",
+    "the same cultivation the POI export writes.",
+    "",
+    "About the airport code: if two airports on one machine share a code, ONE of them wins and the",
+    `other vanishes, leaving only a line in tm.log. "${id.icao.toUpperCase()}" was checked against every`,
+    "airport installed on this machine at the moment this was written. That check cannot speak for",
+    "anyone else's machine - if you pass this folder on, the code has to be free there too.",
+    "",
+    "To remove it: PCT's Create heliport dialog lists installed heliports with an Uninstall button,",
+    "or just delete this folder. Nothing outside it was touched.",
     "",
   ].join("\n");
 }
 
-/** The lines README.txt gains when the templates ship, so the POI folder explains itself. */
+/** The lines README.txt gains when the templates ship. The steps live HERE and not inside the two files
+ *  because nothing may precede the root tag of a `.tsc` (see NO_HEADER) — and these files become a `.tsc`
+ *  the moment the user finishes step 3. */
 export function heliportReadmeLines(): string[] {
   return [
-    "Heliport template (advanced):",
-    `  ${HELIPORT_TSC_FILE} + ${HELIPORT_WAD_FILE} turn this POI into a heliport you can`,
-    "  start a flight from. Aerofly ignores them as they are - open either one, the steps are at the top.",
+    "HELIPORT TEMPLATE (advanced)",
+    "",
+    `  ${HELIPORT_TSC_FILE} and ${HELIPORT_WAD_FILE} turn this POI into a heliport you`,
+    "  can start a flight from. Aerofly ignores them as they are. To finish them by hand:",
+    "",
+    "   1. Move this whole folder out of  scenery/poi/  and into  scenery/airports/",
+    "      A layout that works:  scenery/airports/<country>/<this folder>/",
+    `   2. Replace ${ICAO}, ${AIRPORT_NAME} and ${COUNTRY} in BOTH files.`,
+    "      The code must be 4-6 characters and FREE on the machine that installs this: an existing",
+    "      code REPLACES that airport, leaving only a line in tm.log. Check it in Aerofly's LOCATION",
+    `      menu first. The name must be ${SNAME_MAX} characters or fewer, or the airport is dropped whole.`,
+    "   3. Rename both files to  <code>.tsc  and  <code>.wad  - dropping the .txt.",
+    "   4. Delete poi.tsl. The .tsc takes its place. Keep poi.toc and any pct_anchor files.",
+    "",
+    "  Do not add anything above the first  <[file]  line of either file: Aerofly refuses to load a",
+    "  .tsc that does not start with it, and says so only in tm.log.",
+    "",
+    "  PCT can do all of this for you - see Create heliport in the app.",
     "",
   ];
 }
