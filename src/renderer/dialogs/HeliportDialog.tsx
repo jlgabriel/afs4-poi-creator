@@ -186,13 +186,16 @@ export function HeliportDialog({ onClose }: { onClose: () => void }): React.Reac
                 ))}
               </ul>
             )}
-            {/* Deliberately does NOT say "search for the code": measured 2026-07-31 — the heliport loads
-                and flies, but typing its code into LOCATION's search box returns nothing. Sending someone
-                to the one place it does not appear is how a working install reads as a broken one. */}
+            {/* Measured 2026-07-31, twice: LOCATION's search matches the NAME, never the code, and the
+                row it returns renders BLANK for an invented code — the airport is there (its distance is
+                right) with no text. The map panel shows it correctly. So: name, not code, and the map as
+                the answer to "is it really there". Saying "search for PCT002" made a working install look
+                broken. */}
             <p>
-              Restart Aerofly FS 4, then open LOCATION and find{" "}
-              <strong>{name.trim()}</strong> on the map, where you built it. Aerofly&apos;s
-              search box may not list a new airport by its code. Pick a helicopter and you start on the pad.
+              Restart Aerofly FS 4, then open LOCATION and search for{" "}
+              <strong>{name.trim()}</strong> — by name; the code does not match. The row may come up blank:
+              that is Aerofly, not you, and it shows properly on the map where you built it. Pick a
+              helicopter and you start on the pad.
             </p>
             <div className="pct-modal-actions">
               <button onClick={onClose}>Close</button>
