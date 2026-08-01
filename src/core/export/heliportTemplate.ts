@@ -147,25 +147,68 @@ function identityValues(spec: HeliportSpec): { icao: string; name: string; count
   return { icao: id.icao, name: sanitizeValue(id.name).trim(), country: id.country };
 }
 
+/** The `// Informations:` banner, sitting just INSIDE the place block (ApfelFlieger, forum #167 — the
+ *  shape IPACS uses in its own aircraft files, which he asked PCT to copy). It replaces the trailing
+ *  `//` comments v1.1 hung off each tag line, for two reasons he gave:
+ *
+ *    • TABS. v1.1 separated tag from comment with `\t\t`. Jan (IPACS) told him to prefer spaces —
+ *      "TAB characters could lead to interference" — so nothing here emits one.
+ *    • WIDTH. A 130-column line whose first 40 characters are the value is unreadable in the editor
+ *      people actually open these in.
+ *
+ *  GRAMMAR, checked rather than assumed. Nothing may precede the root `<[file]` (see NO_HEADER), so the
+ *  banner had to go inside something — and standalone `//` lines inside a block are not something the
+ *  2026-07-31 gate covered. IPACS's own shipped files settle it: 1776 files under `aircraft/` carry
+ *  standalone `//` lines, `base/system.tmd` has one four lines into a `pointer_list_tmuniverse` with a
+ *  blank line above it, and 1557 of the 1569 `.tsc` under `scenery/airports/` contain blank lines. So
+ *  both ingredients are load-bearing in files the sim reads every launch.
+ *
+ *  ★ The residual, stated because it is not zero: none of those 1569 `.tsc` uses a standalone comment —
+ *  the combination is inferred from one shared grammar, not observed in this file type. It reads out of
+ *  tm.log in seconds (a refused place logs `ERROR: (error loading '…/<icao>.tsc')` and the airport is in
+ *  the database but cannot be flown), so it wants that check on the first install after this change. */
+function informationsBanner(): string[] {
+  return [
+    "",
+    "//  Informations:",
+    `//  [icao]:     4-6 characters, and it MUST NOT already exist on the machine that installs`,
+    "//              this - a repeat silently REPLACES that airport",
+    `//  [sname]:    the name shown in LOCATION. MAX ${SNAME_MAX} CHARACTERS - longer and the sim`,
+    "//              drops the whole airport",
+    "//  [lname]:    long name; keep it the same unless you have a reason",
+    "//  [country]:  two letters, lowercase (the 2-digit internet country code is recommended)",
+    "//  [position]: lon lat in degrees - written by PCT",
+    "//  [filename]: the POI's own poi.toc, right beside this file",
+    "//  [radius]:   maximum rotor radius in metres - the sim shows the DIAMETER as \"Size\"",
+    "//  [heading]:  TRUE heading in degrees, the sim displays magnetic, so expect this minus",
+    "//              the local variation",
+    "",
+  ];
+}
+
 /** `heliport.tsc.txt` — the place: identity, the functional pad, and the pointer to the POI's own `poi.toc`. */
 export function buildHeliportTsc(spec: HeliportSpec): string {
   const pos = `${fmtLonLat(spec.position.lon)} ${fmtLonLat(spec.position.lat)}`;
   const v = identityValues(spec);
+  // `icao` first: ApfelFlieger's own standard, and the field a reader is looking for ("I put the line
+  // <[string8u][icao][....]> up, because that is more logical for me"). The sim does not care about tag
+  // order — its parser is name-keyed — and every field is described in the banner above.
   const body: string[] = [
-    `${tag("string8", "sname", v.name)}\t\t// the name shown in LOCATION. MAX ${SNAME_MAX} CHARACTERS - longer and the sim drops the whole airport.`,
-    `${tag("string8", "lname", v.name)}\t\t// long name; keep it the same unless you have a reason.`,
-    `${tag("string8u", "icao", v.icao)}\t\t// 4-6 characters, and it MUST NOT already exist on the machine that installs this. A repeat silently REPLACES that airport.`,
-    `${tag("string8u", "country", v.country)}\t\t// two letters, lowercase: us, de, cl`,
+    ...informationsBanner(),
+    tag("string8u", "icao", v.icao),
+    tag("string8", "sname", v.name),
+    tag("string8", "lname", v.name),
+    tag("string8u", "country", v.country),
     tag("string8u", "coordinate_system", "flat"),
-    `${tag("vector2_float64", "position", pos)}\t\t// degrees, lon lat - written by PCT`,
+    tag("vector2_float64", "position", pos),
     tag("bool", "autoheight", "true"),
   ];
 
   const pad = [
     tag("string8", "name", "FATO/TLOF"),
-    `${tag("vector2_float64", "position", pos)}\t\t// written by PCT`,
-    `${tag("float64", "radius", fmtNum(spec.radiusM))}\t\t// METRES`,
-    `${tag("float64", "heading", fmtNum(spec.headingDeg))}\t\t// TRUE degrees. The sim displays magnetic, so expect this minus the local variation.`,
+    tag("vector2_float64", "position", pos),
+    tag("float64", "radius", fmtNum(spec.radiusM)),
+    tag("float64", "heading", fmtNum(spec.headingDeg)),
   ];
   body.push(
     ...block("list_tmsimulator_helipad", "helipads", "", block("tmsimulator_helipad", "element", "0", pad)),
@@ -175,7 +218,7 @@ export function buildHeliportTsc(spec: HeliportSpec): string {
 
   if (spec.cultivationFileName !== null) {
     const cultivation = [
-      `${tag("string8", "filename", spec.cultivationFileName)}\t\t// the POI's own poi.toc, right beside this file`,
+      tag("string8", "filename", spec.cultivationFileName),
       tag("bool", "auto_height", spec.autoheight ? "true" : "false"),
       tag("bool", "use_height_offset", "true"),
     ];
@@ -190,8 +233,30 @@ export function buildHeliportTsc(spec: HeliportSpec): string {
   }
 
   const place = block("tmsimulator_scenery_place", "", "", body);
-  return [...NO_HEADER, ...block("file", "", "", place)].join("\n") + "\n";
+  return tidy([...NO_HEADER, ...block("file", "", "", place)]);
 }
+
+/** Join the lines and strip trailing spaces. `block` indents EVERY line it is given, including the empty
+ *  ones framing the banner — which would otherwise ship as eight spaces of invisible whitespace. Applied
+ *  only here, never in `block` itself: the `.tsl`/`.toc` byte-goldens depend on that helper unchanged. */
+function tidy(lines: string[]): string {
+  return lines.join("\n").replace(/[ \t]+$/gm, "") + "\n";
+}
+
+/** The `.wad`'s own banner. Same reasoning as the `.tsc`'s (spaces, not TABs; a block rather than
+ *  trailing comments) — and the two files are read side by side, so they should read alike. The one
+ *  thing worth saying twice is the position: it is the field a reader will assume is degrees. */
+const WAD_BANNER: string[] = [
+  "",
+  "//  Informations:",
+  "//  [icao]:      the SAME code as in the .tsc, or the database entry and the place do not meet",
+  "//  [name]:      max 32 characters here",
+  "//  [country]:   two letters, lowercase - as in the .tsc",
+  "//  [position]:  FS4 grid units (0-65536), NOT degrees - written by PCT",
+  "//  [radius]:    metres, as in the .tsc",
+  "//  [direction]: RADIANS here, not degrees - written by PCT",
+  "",
+];
 
 /** `heliport.wad.txt` — the entry in FS4's world airport database: what puts the heliport on the map, in
  *  the flight planner and in "nearest". Its coordinates are NOT degrees; they are the projected 0–65536
@@ -200,19 +265,20 @@ export function buildHeliportWad(spec: HeliportSpec): string {
   const pos = `${formatWad(lonToWad(spec.position.lon))} ${formatWad(latToWad(spec.position.lat))}`;
   const pad = [
     tag("string8", "name", "FATO/TLOF"),
-    `${tag("vector2_float64", "position", pos)}\t\t// written by PCT`,
-    `${tag("float64", "radius", fmtNum(spec.radiusM))}\t\t// METRES`,
+    tag("vector2_float64", "position", pos),
+    tag("float64", "radius", fmtNum(spec.radiusM)),
     // The .wad stores the same rotation as the .toc, in RADIANS — hence the trip through headingToDirection.
-    `${tag("float64", "direction", formatWad(directionToWad(headingToDirection(spec.headingDeg))))}\t\t// RADIANS here, not degrees - written by PCT`,
+    tag("float64", "direction", formatWad(directionToWad(headingToDirection(spec.headingDeg)))),
   ];
   const v = identityValues(spec);
   const body = [
+    ...WAD_BANNER,
     tag("uint64", "uid", "0"),
-    `${tag("stringt8c", "icao", v.icao)}\t\t// the SAME code as in the .tsc`,
+    tag("stringt8c", "icao", v.icao),
     tag("stringt8c", "iata", ""),
-    `${tag("stringt8c", "name", v.name)}\t\t// max 32 characters here`,
+    tag("stringt8c", "name", v.name),
     tag("stringt8c", "country", v.country),
-    `${tag("vector2_float64", "position", pos)}\t\t// FS4 grid units (0-65536), NOT degrees - written by PCT`,
+    tag("vector2_float64", "position", pos),
     ...block(
       "list_tmworld_airport_detailed_helipad",
       "helipads",
@@ -221,7 +287,7 @@ export function buildHeliportWad(spec: HeliportSpec): string {
     ),
   ];
   const airport = block("tmworld_airport_detailed", "", "", body);
-  return [...NO_HEADER, ...block("file", "", "", airport)].join("\n") + "\n";
+  return tidy([...NO_HEADER, ...block("file", "", "", airport)]);
 }
 
 /** The anchor object, repeated from the `.tsl` because the `.tsc` replaces it as the entry point. Written

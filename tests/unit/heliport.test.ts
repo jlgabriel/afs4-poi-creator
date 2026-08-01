@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import type { Project, ResolvedXref, ResolvedPlant } from "../../src/core/project/types";
+import type { AirportPad, Project, ResolvedXref, ResolvedPlant } from "../../src/core/project/types";
 import { planExport } from "../../src/core/export/planExport";
 import {
   buildHeliportTsc,
@@ -145,6 +145,9 @@ const PROJECT: Project = {
   objects: [],
 };
 
+/** A pad of its own, deliberately NOT on top of either placed object (forum #168). */
+const PAD: AirportPad = { position: { lon: -116.7962, lat: 34.8541 }, heading: 40, radius: 10 };
+
 const relPaths = (p: { files: { relPath: string }[] }): string[] => p.files.map((f) => f.relPath);
 
 describe("planExport — heliport option", () => {
@@ -155,45 +158,106 @@ describe("planExport — heliport option", () => {
   });
 
   it("adds exactly the two templates, and says so in the README", () => {
-    const plan = planExport(PROJECT, [HANGAR], { heliport: { objectId: null, radiusM: 10 } });
+    const plan = planExport(PROJECT, [HANGAR], { heliport: { pad: null } });
     expect(relPaths(plan)).toEqual(["poi.tsl", "poi.toc", "README.txt", HELIPORT_TSC_FILE, HELIPORT_WAD_FILE]);
     expect(plan.files.find((f) => f.relPath === "README.txt")!.content).toContain(HELIPORT_TSC_FILE);
   });
 
-  it("takes the pad's position AND heading from the chosen object", () => {
-    const plan = planExport(PROJECT, [HANGAR], { heliport: { objectId: "hangar", radiusM: 12 } });
+  it("writes the project's own pad — position, TRUE heading and radius", () => {
+    const plan = planExport(PROJECT, [HANGAR], { heliport: { pad: PAD } });
     const tsc = plan.files.find((f) => f.relPath === HELIPORT_TSC_FILE)!.content;
     const [lon, lat] = valuesOf(tsc, "position")[0].split(" ").map(Number);
-    expect(lon).toBeCloseTo(HANGAR.position.lon, 7);
-    expect(lat).toBeCloseTo(HANGAR.position.lat, 7);
-    expect(Number(valuesOf(tsc, "heading")[0])).toBe(40); // direction 50 → heading 40
-    expect(Number(valuesOf(tsc, "radius")[0])).toBe(12);
+    expect(lon).toBeCloseTo(PAD.position.lon, 7);
+    expect(lat).toBeCloseTo(PAD.position.lat, 7);
+    expect(Number(valuesOf(tsc, "heading")[0])).toBe(PAD.heading);
+    expect(Number(valuesOf(tsc, "radius")[0])).toBe(PAD.radius);
+  });
+
+  // ★ forum #168: "the functional starting position for Helicopter should be independent of XREF objects
+  // because this will lead to collisions too quickly". v1.1 copied a placed object's coordinates, so the
+  // helicopter spawned inside whatever the pad had been aimed at. The pad must be able to sit where no
+  // object is — and deleting every object must not move it.
+  it("is independent of the placed objects", () => {
+    const withPad = planExport(PROJECT, [HANGAR], { heliport: { pad: PAD } });
+    const empty = planExport(PROJECT, [], { heliport: { pad: PAD } });
+    const padOf = (p: typeof withPad): string =>
+      valuesOf(p.files.find((f) => f.relPath === HELIPORT_TSC_FILE)!.content, "position")[0];
+    expect(padOf(empty)).toBe(padOf(withPad));
+    // …and it is nowhere near the one object in the scene.
+    const [lon] = padOf(withPad).split(" ").map(Number);
+    expect(Math.abs(lon - HANGAR.position.lon)).toBeGreaterThan(0.0001);
   });
 
   it("moves the pad WITH the scene when the project has an export shift", () => {
-    // The pad reads the SHIFTED object. Reading the unshifted one would leave the helicopter parked
-    // `shift` metres away from the objects it is supposed to be standing among.
+    // Reading the pad unshifted would leave the helicopter parked `shift` metres away from the objects
+    // it is supposed to be standing among.
     const shifted = { ...PROJECT, shift: { east: 50, north: 0 } };
-    const plan = planExport(shifted, [HANGAR], { heliport: { objectId: "hangar", radiusM: 10 } });
+    const at = { position: HANGAR.position, heading: 40, radius: 10 };
+    const plan = planExport(shifted, [HANGAR], { heliport: { pad: at } });
     const tsc = plan.files.find((f) => f.relPath === HELIPORT_TSC_FILE)!.content;
     const [lon] = valuesOf(tsc, "position")[0].split(" ").map(Number);
     expect(lon).toBeGreaterThan(HANGAR.position.lon); // 50 m east
     const toc = plan.files.find((f) => f.relPath === "poi.toc")!.content;
     const [objLon] = valuesOf(toc, "position")[0].split(" ").map(Number);
-    expect(lon).toBeCloseTo(objLon, 7); // …and by exactly as much as the object it sits on
+    expect(lon).toBeCloseTo(objLon, 7); // …and by exactly as much as the object beside it
   });
 
-  it("falls back to the anchor with a warning when the chosen object is gone", () => {
-    const plan = planExport(PROJECT, [HANGAR], { heliport: { objectId: "deleted", radiusM: 10 } });
-    expect(plan.warnings.some((w) => w.includes("no longer in the scene"))).toBe(true);
+  it("falls back to the POI anchor, facing true north, when there is no pad", () => {
+    const plan = planExport(PROJECT, [HANGAR], { heliport: { pad: null, radiusM: 15 } });
     const tsc = plan.files.find((f) => f.relPath === HELIPORT_TSC_FILE)!.content;
-    expect(Number(valuesOf(tsc, "heading")[0])).toBe(0); // anchor has no facing
+    expect(Number(valuesOf(tsc, "heading")[0])).toBe(0);
+    expect(Number(valuesOf(tsc, "radius")[0])).toBe(15);
+    const [lon] = valuesOf(tsc, "position")[0].split(" ").map(Number);
+    expect(lon).toBeCloseTo(HANGAR.position.lon, 7); // the centroid of a one-object scene
   });
 
   it("warns that autoheight was never gated, but still writes the files", () => {
     const auto = { ...PROJECT, heightMode: "autoheight" as const };
-    const plan = planExport(auto, [PALM], { heliport: { objectId: null, radiusM: 10 } });
+    const plan = planExport(auto, [PALM], { heliport: { pad: null } });
     expect(plan.warnings.some((w) => w.includes("baked-asl"))).toBe(true);
     expect(relPaths(plan)).toContain(HELIPORT_TSC_FILE);
+  });
+});
+
+// ── The comment banner ApfelFlieger asked for (forum #167) ───────────────────────────────────────
+describe("heliport template — the Informations banner", () => {
+  const tsc = buildHeliportTsc(SPEC);
+  const wad = buildHeliportWad(SPEC);
+
+  it("puts nothing before the root <[file] tag", () => {
+    // The one thing that is not a preference: a .tsc whose first line is not `<[file]` is refused
+    // WHOLE, with only `ERROR: (error loading …)` in tm.log (measured 2026-07-31).
+    expect(tsc.startsWith("<[file][][]\n")).toBe(true);
+    expect(wad.startsWith("<[file][][]\n")).toBe(true);
+  });
+
+  it("uses spaces, never a TAB", () => {
+    // Jan (IPACS), relayed by ApfelFlieger: "TAB characters could lead to interference".
+    expect(tsc).not.toContain("\t");
+    expect(wad).not.toContain("\t");
+  });
+
+  it("describes every field once, above the values", () => {
+    expect(tsc).toContain("//  Informations:");
+    for (const field of ["[icao]", "[sname]", "[lname]", "[country]", "[position]", "[radius]", "[heading]"]) {
+      expect(tsc).toContain(`//  ${field}:`);
+    }
+    // The banner is INSIDE the place block, so the root tag still comes first.
+    expect(tsc.indexOf("<[tmsimulator_scenery_place]")).toBeLessThan(tsc.indexOf("//  Informations:"));
+  });
+
+  it("puts icao first among the values", () => {
+    // "I put the line <[string8u][icao][....]> up, because that is more logical for me and actually
+    // also my standard." — ApfelFlieger, #167.
+    expect(tsc.indexOf("<[string8u][icao]")).toBeLessThan(tsc.indexOf("<[string8][sname]"));
+  });
+
+  it("still parses to the same values it always did", () => {
+    // The banner must be commentary, not content: comments and blank lines are skipped by the reader,
+    // so every tag survives the reshuffle unchanged.
+    expect(valuesOf(tsc, "icao")).toEqual(["__ICAO__"]);
+    expect(Number(valuesOf(tsc, "heading")[0])).toBe(FLOWN.headingDeg);
+    expect(Number(valuesOf(tsc, "radius")[0])).toBe(FLOWN.radiusM);
+    expect(valuesOf(tsc, "coordinate_system")).toEqual(["flat"]);
   });
 });
