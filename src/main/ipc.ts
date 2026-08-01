@@ -40,7 +40,7 @@ import {
   resolveHeightsFlat,
 } from "../core/export/heights";
 import { InvalidHeliportIdentityError, planExport, planHeliport } from "../core/export/planExport";
-import { identityProblemText } from "../core/export/heliportTemplate";
+import { identityProblemText, isSafeAirportFolderName } from "../core/export/heliportTemplate";
 import { UnsupportedSchemaVersionError } from "../core/project/schemas";
 import { detectInstallDirs, detectUserDir } from "./afs4Paths";
 import { resolveHeights } from "./elevation";
@@ -330,6 +330,7 @@ async function runHeliportInstall(project: Project, opts: HeliportInstallOptions
   const w = writePoi(plan, airportRoot(userDir, plan.country), {
     overwrite: opts.overwrite,
     assetsDir,
+    isSafeName: isSafeAirportFolderName,
   });
   writeProjectSidecar(w.path, project); // same as a POI: the folder can be reopened in PCT
   forgetTakenIcaos(); // the code we just used is now taken

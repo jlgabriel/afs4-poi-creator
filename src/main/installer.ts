@@ -24,7 +24,7 @@ import path from "node:path";
 import type { ExportPlan } from "../core/project/types";
 import type { InstalledHeliport, InstalledPoi } from "../shared/pctApi";
 import { POI_README_MARKER } from "../core/export/planExport";
-import { HELIPORT_README_MARKER } from "../core/export/heliportTemplate";
+import { HELIPORT_README_MARKER, isSafeAirportFolderName } from "../core/export/heliportTemplate";
 import { isSafePoiFolderName } from "../core/geo/poiName";
 
 /** Scratch folder built beside the destination and swapped in with a single rename (see writePoi).
@@ -79,8 +79,15 @@ export function poiRoot(afs4UserDir: string): string {
 
 /** Resolve `<root>/<folderName>` only if `folderName` is a safe slug AND stays inside `root`. Guards
  *  every path that becomes a write/delete target. */
-export function resolvePoiPath(root: string, folderName: string): string {
-  if (!isSafePoiFolderName(folderName)) throw new UnsafeFolderNameError(folderName);
+export function resolvePoiPath(
+  root: string,
+  folderName: string,
+  // Heliports live under scenery/airports/<country>/ and are named `<code>_<name>`, which has no
+  // coordinate prefix — so the guard is a parameter rather than a constant. It is still a WHITELIST
+  // applied here, at the write boundary, whichever one is passed.
+  isSafe: (name: string) => boolean = isSafePoiFolderName,
+): string {
+  if (!isSafe(folderName)) throw new UnsafeFolderNameError(folderName);
   const rootAbs = path.resolve(root);
   const dest = path.resolve(rootAbs, folderName);
   if (dest !== path.join(rootAbs, folderName) || !dest.startsWith(rootAbs + path.sep)) {
@@ -96,9 +103,9 @@ export function resolvePoiPath(root: string, folderName: string): string {
 export function writePoi(
   plan: ExportPlan,
   root: string,
-  opts: { overwrite: boolean; assetsDir?: string },
+  opts: { overwrite: boolean; assetsDir?: string; isSafeName?: (name: string) => boolean },
 ): WriteResult {
-  const dest = resolvePoiPath(root, plan.folderName);
+  const dest = resolvePoiPath(root, plan.folderName, opts.isSafeName);
   const overwrote = existsSync(dest);
   if (overwrote && !opts.overwrite) throw new FolderExistsError(plan.folderName);
 
@@ -226,7 +233,7 @@ export function airportRoot(afs4UserDir: string, country: string): string {
 /** Delete an installed heliport: a safe-named folder inside scenery/airports/<country>/. No-ops if gone.
  *  The country directory is left in place — other airports may live in it. */
 export function uninstallHeliport(afs4UserDir: string, country: string, folderName: string): void {
-  const dest = resolvePoiPath(airportRoot(afs4UserDir, country), folderName);
+  const dest = resolvePoiPath(airportRoot(afs4UserDir, country), folderName, isSafeAirportFolderName);
   if (existsSync(dest)) rmSync(dest, { recursive: true, force: true });
 }
 
@@ -253,7 +260,7 @@ export function listInstalledHeliports(afs4UserDir: string): InstalledHeliport[]
     }
     for (const f of folders) {
       if (!f.isDirectory() || f.name.endsWith(STAGING_SUFFIX)) continue;
-      if (!isSafePoiFolderName(f.name)) continue;
+      if (!isSafeAirportFolderName(f.name)) continue;
       const dir = path.join(countryDir, f.name);
       if (!hasMarker(dir, HELIPORT_README_MARKER)) continue;
       out.push({ folderName: f.name, country: c.name, icao: icaoOf(dir) });

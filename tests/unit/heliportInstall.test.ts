@@ -10,6 +10,8 @@ import {
   HELIPORT_README_MARKER,
   buildHeliportTsc,
   buildHeliportWad,
+  heliportFolderName,
+  isSafeAirportFolderName,
   validateIdentity,
   SNAME_MAX,
   type HeliportSpec,
@@ -177,11 +179,55 @@ describe("icaoIndex", () => {
   });
 });
 
+describe("the folder name comes from the IDENTITY, not the POI slug", () => {
+  // The bug this pins down: a fresh project has no `poiName`, so the POI folder name came out as
+  // `w07055s3345_` — a coordinate prefix and nothing else — and the write boundary refused it with
+  // "Unsafe POI folder name", a message written for a programmer. A heliport lives under
+  // scenery/airports/, where a coordinate prefix means nothing anyway.
+  const UNNAMED: Project = { ...PROJECT, poiName: "", name: "" };
+
+  it("builds <code>_<name>, IPACS's own convention in that tree", () => {
+    expect(planHeliport(PROJECT, [HANGAR], OPTS).folderName).toBe("pct001_pct_test_heliport");
+  });
+
+  it("works for a project with no name at all", () => {
+    const plan = planHeliport(UNNAMED, [HANGAR], OPTS);
+    expect(plan.folderName).toBe("pct001_pct_test_heliport");
+    expect(isSafeAirportFolderName(plan.folderName)).toBe(true);
+  });
+
+  it("falls back to the bare code when the name slugs away to nothing", () => {
+    const plan = planHeliport(PROJECT, [HANGAR], { ...OPTS, identity: { ...ID, name: "!!! ???" } });
+    expect(plan.folderName).toBe("pct001");
+    expect(isSafeAirportFolderName(plan.folderName)).toBe(true);
+  });
+
+  it("produces a safe name from anything validateIdentity lets through", () => {
+    for (const name of ["A B", "x/y", "..", "Ünïcödé", "a".repeat(SNAME_MAX)]) {
+      const id = { ...ID, name };
+      if (validateIdentity(id) !== null) continue;
+      expect(isSafeAirportFolderName(heliportFolderName(id))).toBe(true);
+    }
+  });
+
+  it("rejects a name with a separator or a dot at the boundary", () => {
+    for (const bad of ["../etc", "a/b", "a\\b", "a.b", "", "A", "a".repeat(81)]) {
+      expect(isSafeAirportFolderName(bad)).toBe(false);
+    }
+  });
+});
+
 describe("installing under scenery/airports", () => {
+  const write = (plan: ReturnType<typeof planHeliport>) =>
+    writePoi(plan, airportRoot(tmp, plan.country), {
+      overwrite: false,
+      isSafeName: isSafeAirportFolderName,
+    });
+
   it("puts the folder in <userDir>/scenery/airports/<country>/", () => {
     const plan = planHeliport(PROJECT, [HANGAR], OPTS);
-    const w = writePoi(plan, airportRoot(tmp, plan.country), { overwrite: false });
-    expect(w.path).toBe(path.join(tmp, "scenery", "airports", "us", plan.folderName));
+    const w = write(plan);
+    expect(w.path).toBe(path.join(tmp, "scenery", "airports", "us", "pct001_pct_test_heliport"));
     expect(existsSync(path.join(w.path, "pct001.tsc"))).toBe(true);
     expect(existsSync(path.join(w.path, "poi.tsl"))).toBe(false);
   });
@@ -195,7 +241,7 @@ describe("installing under scenery/airports", () => {
 
   it("lists only folders carrying PCT's heliport marker, and uninstalls them", () => {
     const plan = planHeliport(PROJECT, [HANGAR], OPTS);
-    writePoi(plan, airportRoot(tmp, "us"), { overwrite: false });
+    writePoi(plan, airportRoot(tmp, "us"), { overwrite: false, isSafeName: isSafeAirportFolderName });
     // Somebody else's airport, in the same tree, with a valid-looking name.
     const other = path.join(tmp, "scenery", "airports", "de", "e01185n4838_someone_else");
     mkdirSync(other, { recursive: true });
@@ -211,7 +257,7 @@ describe("installing under scenery/airports", () => {
 
   it("reads the code off the .tsc filename, so it cannot disagree with what the sim keys on", () => {
     const plan = planHeliport(PROJECT, [HANGAR], { ...OPTS, identity: { ...ID, icao: "ab12" } });
-    writePoi(plan, airportRoot(tmp, "us"), { overwrite: false });
+    writePoi(plan, airportRoot(tmp, "us"), { overwrite: false, isSafeName: isSafeAirportFolderName });
     expect(listInstalledHeliports(tmp)[0].icao).toBe("ab12");
   });
 

@@ -79,6 +79,31 @@ export function validateIdentity(id: HeliportIdentity): IdentityProblem | null {
   return null;
 }
 
+/** The folder an installed heliport gets under `scenery/airports/<country>/`, derived from the identity
+ *  the user just typed: `<code>_<name>`, which is IPACS's own convention there
+ *  (`de0451_steyerberg_auxiliary_helicopter_base`).
+ *
+ *  It deliberately does NOT reuse the POI's folder name. That name carries a coordinate prefix, which
+ *  means nothing in an airports tree — and, more to the point, it needs `project.poiName`, which a fresh
+ *  project does not have: the first heliport built from an unnamed project produced `w07055s3345_` and was
+ *  refused at the write boundary with a message written for a programmer. The identity is validated
+ *  before we get here, so this is always a safe name (see isSafeAirportFolderName). */
+export function heliportFolderName(id: HeliportIdentity): string {
+  const slug = sanitizeValue(id.name)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 60);
+  return slug === "" ? id.icao : `${id.icao}_${slug}`;
+}
+
+/** True if `name` is a safe folder to create or delete inside `scenery/airports/<country>/`. Deliberately
+ *  simpler than the POI rule (which also pins the coordinate prefix): no dots at all, so no `..`, and no
+ *  separators — while still accepting a folder written by an earlier build, whose name was the POI slug. */
+export function isSafeAirportFolderName(name: string): boolean {
+  return /^[a-z0-9_]{1,80}$/.test(name);
+}
+
 /** English, user-facing, one line — the dialog shows it and main returns it. */
 export function identityProblemText(p: IdentityProblem): string {
   switch (p) {

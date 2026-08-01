@@ -14,6 +14,7 @@ import { computeAnchor, computeAutoheightAnchor, ANCHOR_ASSETS } from "./plantAn
 import {
   buildHeliportTsc,
   buildHeliportWad,
+  heliportFolderName,
   heliportInstalledReadme,
   heliportReadmeLines,
   validateIdentity,
@@ -177,7 +178,9 @@ export function planHeliport(
   const autoheight = project.heightMode === "autoheight";
   const objects = applyShift(resolved, project.shift);
   const ref = project.reference ?? centroid(objects.map((o) => o.position));
-  const folderName = poiFolderName(ref, project.poiName);
+  // NOT the POI folder name: that one needs project.poiName, which a fresh project has not got, and its
+  // coordinate prefix means nothing under scenery/airports/. See heliportFolderName.
+  const folderName = heliportFolderName(opts.identity);
   const tocFileName = objects.length > 0 ? POI_BASENAME : null;
   const anchor = autoheight ? computeAutoheightAnchor(objects) : computeAnchor(objects);
 
