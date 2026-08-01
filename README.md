@@ -104,7 +104,9 @@ The short version is below. For the whole thing walked through with pictures, se
    and **Plants** holds the trees and shrubs.
 4. **Export & install** — *Export POI → Install into Aerofly FS 4* writes the folder into your
    `scenery/poi/`. Restart Aerofly and fly to the spot. The same dialog can **uninstall** POIs that
-   PCT made, so nothing is permanent.
+   PCT made, so nothing is permanent. If you'd rather **start** a flight there than fly to it,
+   *Create heliport…* installs the same project as a small airport — see
+   [Heliports you can fly from](#heliports-you-can-fly-from).
 5. **Optional: photograph what you placed** — once you're out there looking at your objects,
    screenshot one to the clipboard and right-click its card in PCT to paste it in. From then on the
    catalog shows the real thing instead of a drawn icon. See
@@ -194,6 +196,45 @@ The measurements are yours, kept in your own `footprints.json` next to your sett
 install never clears them.** *Settings → Object footprints* has **Export** and **Import**, so one person
 can measure a family of fixtures once and post the file for everyone else — importing merges it into
 yours and tells you how many entries it added and how many of yours it replaced.
+
+### Heliports you can fly from
+
+*(v1.1)* A POI is scenery you fly **to**. **Create heliport…** turns the same project into a small
+**airport** you can start a flight **from** — Aerofly puts it in the LOCATION menu and on the map, and
+your objects come along around the pad. It doesn't replace the POI export; it's a second, separate copy,
+written into your user folder's `scenery/airports/`. Suggested and worked through on the forum by
+**@ApfelFlieger**, who builds these by hand.
+
+You give it three things — an **airport code**, a **name** and a two-letter **country code** — and place
+**the helipad**: a white circle with an **H** that you drag on the map, with a cyan grip to turn it and a
+radius in metres. The pad is **its own point**, deliberately not attached to any object you placed, so the
+helicopter never starts inside a building.
+
+- **The code has teeth.** If an airport already installed on your machine uses it, Aerofly quietly
+  **replaces that airport** and mentions it only in a log nobody reads. PCT counts the airports actually
+  on your disk and refuses a code that's taken — the one thing the by-hand route can't do for you. What it
+  **can't** promise is anyone else's machine: pass the folder on and the code has to be free there too.
+- **A real-world code searches better than an invented one.** Aerofly takes the text it shows in
+  LOCATION's *search* from its own world database, so a code that database knows appears under **its**
+  name, while an invented one comes up as a **blank row**. It still works, and the map panel shows your
+  name correctly — it just looks broken in the search list. Looking one up on ourairports.com or
+  metar-taf.com costs a minute.
+- **The name is capped at 29 characters.** Past Aerofly's own limit the sim drops the whole airport, so
+  PCT stops you there.
+- **Heading is TRUE degrees**; Aerofly's menu displays it magnetic, so expect it to read a few degrees
+  off. **Radius** is metres — the sim shows the diameter as "Size".
+- **Adjusting and trying again is the normal case** *(v1.2)*. The code, the name, the country and the pad
+  are saved **in your project**, so reopening the dialog has them filled in, and building the same
+  heliport again **replaces** the one you installed instead of demanding a fresh code. Rooftop pads in
+  particular take a few laps to get the height right.
+- **Nothing is permanent.** The dialog lists the heliports PCT installed, each with **Uninstall**, and it
+  only ever lists — or deletes — folders PCT wrote itself.
+
+Restart Aerofly after installing: airports are read once, at startup.
+
+If you'd rather finish the job by hand, the *Export POI* dialog can also drop **`heliport.tsc.txt`** and
+**`heliport.wad.txt`** into the POI folder — the same two files with the identity left blank and the
+steps written at the top of the README beside them. Aerofly ignores them until you rename them.
 
 ### Good to know
 

@@ -5,14 +5,34 @@
 // matters, so this dialog keeps the decision and does the rest: the user types a code, a name and a
 // country, and PCT writes scenery/airports/<country>/<folder>/ itself.
 //
-// The code is the only field with teeth — a duplicate silently REPLACES the airport that had it — so it
-// gets live feedback here AND a hard refusal in main, re-checked against a fresh scan at the moment of
-// the write. PCT still never invents one: it only stops you choosing a bad one, which is more than the
-// by-hand route can do.
+// ★ WHAT v1.1 GOT WRONG, and what this rewrite is (forum #170, ApfelFlieger). He built one rooftop
+// heliport — SHJK, Arica Regional Hospital — and had to do it FIVE times to get the pad height right,
+// because each lap cost him a fresh airport code: SHJH, SHJI, SHJJ, SHJK, SHJL. Two separate faults:
+//
+//   (1) "The airfield code must be changed every time." PCT refused any code already on disk, including
+//       the one PCT itself had just written — so re-installing your own heliport was impossible, and
+//       deleting the folder by hand did not release it either. Fixed in main (icaoIndex): a code held by
+//       one of OUR heliports is not a collision, it is the edit loop, and this dialog now offers Replace.
+//   (2) "Each time the heliport data must be re-entered." The identity lived nowhere but this dialog's
+//       useState. It now lives on the DOCUMENT (project.airport), so it survives Save/Open — his own
+//       argument for it: the code needs checking once rather than every time, the airport can be saved
+//       as often as a POI, and it can be passed on like one.
+//
+// And the pad is its own point on the map now, not a borrowed XREF (#168) — see HelipadLayer.
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { HeliportInstallOptions, InstallResult, InstalledHeliport, PctError } from "../../shared/pctApi";
+import type {
+  HeliportInstallOptions,
+  IcaoStatus,
+  InstallResult,
+  InstalledHeliport,
+  PctError,
+} from "../../shared/pctApi";
+import type { AirportPad, LonLat, PlacedObject, ProjectAirport } from "../../core/project/types";
 import { identityProblemText, validateIdentity, SNAME_MAX } from "../../core/export/heliportTemplate";
+import { DEFAULT_PAD_RADIUS_M } from "../../core/export/planExport";
 import { firstProjectError } from "../../core/project/schemas";
+import { centroid } from "../../core/geo/poiName";
+import { directionToHeading } from "../../core/geo/orientation";
 import { editorStore, useEditor } from "../state/editorStore";
 import { getPct } from "../app/pct";
 import { NumberInput } from "../inspector/NumberInput";
@@ -70,19 +90,43 @@ function messageFor(error: PctError): string {
     : error.message;
 }
 
+/** Where a brand-new pad goes: the middle of what the user has already placed, or — for an empty
+ *  project — the middle of the map they are looking at. Never an object's own position, so the
+ *  helicopter does not start inside one (forum #168). */
+function seedPad(objects: PlacedObject[], mapCenter: LonLat): AirportPad {
+  const at = objects.length > 0 ? centroid(objects.map((o) => o.position)) : mapCenter;
+  return { position: at, heading: 0, radius: DEFAULT_PAD_RADIUS_M };
+}
+
+/** The compass heading a placed object faces, for "take the selected object's heading". Only the kinds
+ *  that HAVE a facing contribute one — a plant is a billboard and a point light has no front. */
+function headingOf(o: PlacedObject): number {
+  if (o.kind === "xref") return directionToHeading(o.direction);
+  if (o.kind === "airport_light") return o.orientation; // already a compass heading
+  return 0;
+}
+
+/** Degrees, to the same 6 places the rest of the inspector shows. */
+const fmtDeg = (n: number): string => n.toFixed(6);
+
 export function HeliportDialog({ onClose }: { onClose: () => void }): React.ReactElement {
   const pct = getPct();
   const objects = useEditor((s) => s.project.objects);
   const selection = useEditor((s) => s.selection);
   const projectName = useEditor((s) => s.project.name);
+  const stored = useEditor((s) => s.project.airport);
+  const mapView = useEditor((s) => s.mapView);
   const heightMode = useEditor((s) => s.project.heightMode) ?? "baked-asl";
 
-  const [icao, setIcao] = useState("");
-  const [name, setName] = useState(projectName.slice(0, SNAME_MAX));
-  const [country, setCountry] = useState("");
-  const [padRadius, setPadRadius] = useState(10);
+  // The identity fields are LOCAL drafts (a half-typed code should not dirty the document on every
+  // keystroke) seeded from the document — which is the whole point of storing it. The PAD is the
+  // opposite: it lives on the document from the moment the dialog opens, because the map draws it and
+  // the user is meant to drag it while this is open.
+  const [icao, setIcao] = useState(stored?.icao ?? "");
+  const [name, setName] = useState(stored?.name ?? projectName.slice(0, SNAME_MAX));
+  const [country, setCountry] = useState(stored?.country ?? "");
   const [baseElev, setBaseElev] = useState("");
-  const [taken, setTaken] = useState<boolean>(false);
+  const [status, setStatus] = useState<IcaoStatus>({ taken: false, ours: [] });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<InstallResult | null>(null);
@@ -93,32 +137,64 @@ export function HeliportDialog({ onClose }: { onClose: () => void }): React.Reac
     [icao, name, country],
   );
   const problem = validateIdentity(identity);
+
+  const pad = stored?.pad ?? null;
   const padObject = useMemo(
     () => (selection.length === 1 ? (objects.find((o) => o.id === selection[0]) ?? null) : null),
     [selection, objects],
   );
 
+  // Write the whole block back, keeping whatever the map may have changed underneath us. Called on every
+  // identity edit, so closing the dialog without installing STILL remembers what was typed — which is
+  // what "the data must not be re-entered" actually asks for.
+  const writeAirport = useCallback(
+    (patch: Partial<ProjectAirport>): void => {
+      const s = editorStore.getState();
+      const current = s.project.airport;
+      const next: ProjectAirport = {
+        icao: patch.icao ?? current?.icao ?? "",
+        name: patch.name ?? current?.name ?? "",
+        country: patch.country ?? current?.country ?? "",
+        pad: patch.pad ?? current?.pad ?? seedPad(s.project.objects, s.mapView),
+      };
+      s.setAirport(next);
+    },
+    [],
+  );
+
+  // The pad exists as soon as the dialog is open, so the map has something to draw and drag. Seeded from
+  // the scene's centre — NOT from a selected object, which is the collision ApfelFlieger warned about.
+  useEffect(() => {
+    if (editorStore.getState().project.airport === undefined) {
+      writeAirport({ icao: identity.icao, name, country: identity.country });
+    }
+    // Only on open: later edits go through the field handlers.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Live availability, debounced by a well-formed code: asking main about "k" or "kd" answers a question
-  // nobody is holding. This is CONVENIENCE — the install re-checks — so a stale `false` costs nothing.
+  // nobody is holding. This is CONVENIENCE — the install re-checks — so a stale answer costs nothing.
   useEffect(() => {
     let cancelled = false;
     if (pct === null || problem === "icao-format") {
-      setTaken(false);
+      setStatus({ taken: false, ours: [] });
       return;
     }
-    void pct.isIcaoTaken(identity.icao).then((t) => {
-      if (!cancelled) setTaken(t);
+    void pct.icaoStatus(identity.icao).then((s) => {
+      if (!cancelled) setStatus(s);
     });
     return () => {
       cancelled = true;
     };
-  }, [pct, identity.icao, problem]);
+  }, [pct, identity.icao, problem, installedKey]);
+
+  const setPad = (next: AirportPad): void => writeAirport({ pad: next });
 
   const create = async (overwrite: boolean): Promise<void> => {
-    if (!pct || problem !== null) return;
+    if (!pct || problem !== null || pad === null) return;
     setError(null);
 
-    if (!(Number.isFinite(padRadius) && padRadius > 0)) {
+    if (!(Number.isFinite(pad.radius) && pad.radius > 0)) {
       setError("Helipad radius must be a positive number of metres.");
       return;
     }
@@ -127,6 +203,10 @@ export function HeliportDialog({ onClose }: { onClose: () => void }): React.Reac
       setError("Base elevation must be a number (metres ASL).");
       return;
     }
+    // Commit the identity to the document before writing, so what shipped and what the project says are
+    // the same thing even if the install then fails.
+    writeAirport({ icao: identity.icao, name: identity.name, country: identity.country });
+
     // The same save-net the POI export runs: never write a scene the loader would reject.
     const project = editorStore.getState().serialize();
     const bad = firstProjectError(project);
@@ -137,7 +217,7 @@ export function HeliportDialog({ onClose }: { onClose: () => void }): React.Reac
 
     const opts: HeliportInstallOptions = {
       identity,
-      heliport: { objectId: padObject?.id ?? null, radiusM: padRadius },
+      heliport: { pad },
       overwrite,
     };
     if (heightMode !== "autoheight" && baseElevation !== undefined) opts.baseElevation = baseElevation;
@@ -161,7 +241,10 @@ export function HeliportDialog({ onClose }: { onClose: () => void }): React.Reac
     setError(messageFor(res.error));
   };
 
-  const blocked = problem !== null || taken || busy || pct === null;
+  // `ours` is NOT a blocker — it is the "you already built this one" case, and creating again replaces
+  // it. Only someone else's airport blocks.
+  const replacing = status.ours.length > 0;
+  const blocked = problem !== null || status.taken || busy || pct === null || pad === null;
 
   return (
     <div className="pct-modal" role="dialog" aria-label="Create heliport" aria-modal="true">
@@ -197,6 +280,10 @@ export function HeliportDialog({ onClose }: { onClose: () => void }): React.Reac
               that is Aerofly, not you, and it shows properly on the map where you built it. Pick a
               helicopter and you start on the pad.
             </p>
+            <p className="pct-field-meta">
+              The code, the name and the pad are saved in this project — build it again after an
+              adjustment and PCT replaces this heliport instead of asking for a new code.
+            </p>
             <div className="pct-modal-actions">
               <button onClick={onClose}>Close</button>
             </div>
@@ -210,23 +297,38 @@ export function HeliportDialog({ onClose }: { onClose: () => void }): React.Reac
 
             <label className="pct-field pct-field-col">
               <span className="pct-field-label">Airport code</span>
+              {/* Shown in CAPITALS at ApfelFlieger's request (#170 EDIT 2). Lowercase is what goes to
+                  disk — the filenames and the tag values that flew on 2026-07-31 — so the uppercasing is
+                  presentation only and `identity` lowercases it straight back. */}
               <input
                 className="pct-num"
-                value={icao}
-                placeholder="4-6 letters or digits, e.g. pct001"
+                value={icao.toUpperCase()}
+                placeholder="4-6 letters or digits, e.g. PCT001"
                 aria-label="Airport code"
-                onChange={(e) => setIcao(e.target.value)}
+                onChange={(e) => {
+                  const v = e.target.value.toUpperCase();
+                  setIcao(v);
+                  writeAirport({ icao: v.trim().toLowerCase() });
+                }}
               />
               {icao.trim() !== "" && problem === "icao-format" && (
                 <span className="pct-warn">{identityProblemText("icao-format")}</span>
               )}
-              {problem !== "icao-format" && taken && (
+              {problem !== "icao-format" && status.taken && (
                 <span className="pct-warn">
                   {identity.icao.toUpperCase()} is already an airport on this machine. Using it would make
                   that airport disappear — pick another code.
                 </span>
               )}
-              {problem !== "icao-format" && !taken && icao.trim() !== "" && (
+              {/* The case that used to be a refusal. Naming the folder matters: rename the heliport and
+                  the folder name changes, so the one that goes is not the one that arrives. */}
+              {problem !== "icao-format" && !status.taken && replacing && (
+                <span className="pct-field-meta">
+                  You already installed {identity.icao.toUpperCase()} —{" "}
+                  {status.ours.map((h) => h.folderName).join(", ")}. Creating it again replaces it.
+                </span>
+              )}
+              {problem !== "icao-format" && !status.taken && !replacing && icao.trim() !== "" && (
                 <span className="pct-field-meta">Free on this machine.</span>
               )}
               {/* Why this is worth saying: Aerofly takes the text it shows in LOCATION's SEARCH from its
@@ -250,7 +352,10 @@ export function HeliportDialog({ onClose }: { onClose: () => void }): React.Reac
                 maxLength={SNAME_MAX}
                 placeholder="e.g. Daggett Helipad"
                 aria-label="Heliport name"
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  writeAirport({ name: e.target.value });
+                }}
               />
               <span className="pct-field-meta">
                 {name.trim().length}/{SNAME_MAX} — Aerofly drops the whole airport above its limit.
@@ -264,25 +369,111 @@ export function HeliportDialog({ onClose }: { onClose: () => void }): React.Reac
                 value={country}
                 placeholder="two letters, e.g. us"
                 aria-label="Country code"
-                onChange={(e) => setCountry(e.target.value)}
+                onChange={(e) => {
+                  setCountry(e.target.value);
+                  writeAirport({ country: e.target.value.trim().toLowerCase() });
+                }}
               />
               {country.trim() !== "" && problem === "country-format" && (
                 <span className="pct-warn">{identityProblemText("country-format")}</span>
               )}
             </label>
 
-            <div className="pct-field pct-field-col">
-              <span className="pct-field-label">Helipad</span>
-              <span className="pct-field-meta">
-                {padObject !== null
-                  ? `On the selected object (${padLabel(padObject)}) — its position and heading.`
-                  : "At the POI anchor, facing true north. Select ONE object to put it there instead."}
-              </span>
-              <label className="pct-shift-cell">
-                <span className="pct-field-meta">Pad radius — metres</span>
-                <NumberInput value={padRadius} onCommit={setPadRadius} ariaLabel="Helipad radius, metres" />
-              </label>
-            </div>
+            {/* The pad. It is on the map right now — white circle with an H — and dragging it there is the
+                intended way to aim it; these fields are for the times you know the numbers. */}
+            {pad === null ? (
+              <div className="pct-field pct-field-col">
+                <span className="pct-field-label">Helipad — where the helicopter starts</span>
+                <span className="pct-field-meta">
+                  No helipad on this project. A heliport needs one — put it in the middle of what you have
+                  placed, then drag it on the map.
+                </span>
+                <button type="button" onClick={() => writeAirport({})}>
+                  Place a helipad
+                </button>
+              </div>
+            ) : (
+              <div className="pct-field pct-field-col">
+                <span className="pct-field-label">Helipad — where the helicopter starts</span>
+                <span className="pct-field-meta">
+                  Drag the white circle on the map to move it, and its cyan grip to turn it. It is its own
+                  point, not one of your objects, so nothing spawns inside a building.
+                </span>
+                <div className="pct-shift-row">
+                  <label className="pct-shift-cell">
+                    <span className="pct-field-meta">Longitude</span>
+                    <NumberInput
+                      value={pad.position.lon}
+                      format={fmtDeg}
+                      onCommit={(lon) => setPad({ ...pad, position: { ...pad.position, lon } })}
+                      ariaLabel="Helipad longitude"
+                    />
+                  </label>
+                  <label className="pct-shift-cell">
+                    <span className="pct-field-meta">Latitude</span>
+                    <NumberInput
+                      value={pad.position.lat}
+                      format={fmtDeg}
+                      onCommit={(lat) => setPad({ ...pad, position: { ...pad.position, lat } })}
+                      ariaLabel="Helipad latitude"
+                    />
+                  </label>
+                </div>
+                <div className="pct-shift-row">
+                  <label className="pct-shift-cell">
+                    <span className="pct-field-meta">Heading — TRUE degrees</span>
+                    <NumberInput
+                      value={pad.heading}
+                      onCommit={(heading) => setPad({ ...pad, heading })}
+                      ariaLabel="Helipad heading, true degrees"
+                    />
+                  </label>
+                  <label className="pct-shift-cell">
+                    <span className="pct-field-meta">Radius — metres</span>
+                    <NumberInput
+                      value={pad.radius}
+                      onCommit={(radius) =>
+                        Number.isFinite(radius) && radius > 0 ? setPad({ ...pad, radius }) : undefined
+                      }
+                      ariaLabel="Helipad radius, metres"
+                    />
+                  </label>
+                </div>
+                {/* Measured in-sim 2026-07-31: we wrote heading 40 and the sim's menu showed 028 — 40
+                    minus the local magnetic variation. So the field is TRUE and the panel is magnetic. */}
+                <span className="pct-field-meta">
+                  Aerofly&apos;s menu shows this heading as MAGNETIC, so expect it to read a few degrees
+                  off. Radius {pad.radius} m shows there as a size of {Math.round(pad.radius * 2)} m.
+                </span>
+                <div className="pct-modal-actions">
+                  {padObject !== null && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setPad({ ...pad, position: padObject.position, heading: headingOf(padObject) })
+                      }
+                    >
+                      Move the pad onto {padLabel(padObject)}
+                    </button>
+                  )}
+                  <span className="pct-spacer" />
+                  {/* The way out. Opening this dialog puts a pad on the map so there is something to
+                      drag; without this, a look around would leave a white circle you could not get
+                      rid of. It clears the stored code and name too — the whole airport block. */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      editorStore.getState().setAirport(null);
+                      setIcao("");
+                      setName("");
+                      setCountry("");
+                    }}
+                  >
+                    Remove helipad
+                  </button>
+                </div>
+              </div>
+            )}
 
             {heightMode !== "autoheight" && (
               <label className="pct-field pct-field-col">
@@ -310,7 +501,7 @@ export function HeliportDialog({ onClose }: { onClose: () => void }): React.Reac
               </button>
               <span className="pct-spacer" />
               <button className="pct-primary" onClick={() => void create(false)} disabled={blocked}>
-                {busy ? "Creating…" : "Create heliport"}
+                {busy ? "Creating…" : replacing ? "Replace heliport" : "Create heliport"}
               </button>
             </div>
           </>

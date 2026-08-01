@@ -16,7 +16,6 @@ import { editorStore, useEditor } from "../state/editorStore";
 import { getPct } from "../app/pct";
 import { unregisteredPlacedNames } from "../catalog/registration";
 import { NumberInput } from "../inspector/NumberInput";
-import { padLabel } from "./padLabel";
 
 function sameRef(a: LonLat | null, b: LonLat | null): boolean {
   if (a === null || b === null) return a === b;
@@ -117,11 +116,9 @@ export function ExportDialog({ onClose }: { onClose: () => void }): React.ReactE
   // inspector reacts immediately. (Unlike slug/shift, which stay local drafts until export.)
   const heightMode = useEditor((s) => s.project.heightMode) ?? "baked-asl";
   const mapView = useEditor((s) => s.mapView);
-  // The helipad copies its position and heading from ONE placed object — so the user aims it the way they
-  // already aim everything else, by putting an object where the pad goes (which is what ApfelFlieger does
-  // by hand: in his own heliports the VISIBLE pad is an airport-mast xref, lowered and scaled). Anything
-  // other than a single selection falls back to the POI's anchor point.
-  const selection = useEditor((s) => s.selection);
+  // The project's helipad, if it has one — set in "Create heliport…" and drawn on the map. The templates
+  // describe THAT pad, so the two routes can never disagree about where the helicopter starts.
+  const storeAirport = useEditor((s) => s.project.airport);
 
   const [slug, setSlug] = useState(storePoiName);
   const [refMode, setRefMode] = useState<"auto" | "map">(storeRef !== null ? "map" : "auto");
@@ -146,13 +143,6 @@ export function ExportDialog({ onClose }: { onClose: () => void }): React.ReactE
       ? { lon: mapView.lon, lat: mapView.lat }
       : centroid(objects.map((o) => shiftEastNorth(o.position, shiftEast, shiftNorth)));
   const folderName = validSlug ? poiFolderName(previewRef, slug) : null;
-
-  // The one selected object the pad will copy, or null → the anchor. Resolved against the live scene so a
-  // selection left over from a deleted object can't name a ghost.
-  const padObject = useMemo(
-    () => (selection.length === 1 ? (objects.find((o) => o.id === selection[0]) ?? null) : null),
-    [selection, objects],
-  );
 
   // Warn (don't block) if the scene places a user model that isn't registered — it won't render in the
   // sim. Unreachable by placing (unregistered cards are disabled); reachable via an opened project.json.
@@ -232,7 +222,10 @@ export function ExportDialog({ onClose }: { onClose: () => void }): React.ReactE
     }
 
     const opts: ExportOptions = { target, overwrite: false };
-    if (heliport) opts.heliport = { objectId: padObject?.id ?? null, radiusM: padRadius };
+    // The project's own pad (v1.2) wins over anything typed here — it is the one the map draws and the
+    // one "Create heliport…" installs, so the template must not describe a different helipad from the
+    // real thing. Only a project that has never opened that dialog falls back to the radius field.
+    if (heliport) opts.heliport = { pad: storeAirport?.pad ?? null, radiusM: padRadius };
     // Autoheight is fully offline: the sim resolves the terrain, so a base elevation has no meaning (main
     // ignores it too). Baked-asl passes it through as the offline/manual fallback.
     if (!autoheight && baseElevation !== undefined) opts.baseElevation = baseElevation;
@@ -376,15 +369,28 @@ export function ExportDialog({ onClose }: { onClose: () => void }): React.ReactE
               </label>
               {heliport && (
                 <>
-                  <span className="pct-field-meta">
-                    {padObject !== null
-                      ? `Helipad on the selected object (${padLabel(padObject)}) — its position and heading.`
-                      : "Helipad at the POI anchor, facing true north. Select ONE object to put it there instead."}
-                  </span>
-                  <label className="pct-shift-cell">
-                    <span className="pct-field-meta">Pad radius — metres</span>
-                    <NumberInput value={padRadius} onCommit={setPadRadius} ariaLabel="Helipad radius, metres" />
-                  </label>
+                  {storeAirport !== undefined ? (
+                    <span className="pct-field-meta">
+                      Uses this project&apos;s helipad — the white circle on the map, radius{" "}
+                      {storeAirport.pad.radius} m, heading {Math.round(storeAirport.pad.heading)}° true.
+                      Move it in Create heliport…
+                    </span>
+                  ) : (
+                    <>
+                      <span className="pct-field-meta">
+                        Helipad at the POI anchor, facing true north. Open Create heliport… to place it on
+                        the map instead.
+                      </span>
+                      <label className="pct-shift-cell">
+                        <span className="pct-field-meta">Pad radius — metres</span>
+                        <NumberInput
+                          value={padRadius}
+                          onCommit={setPadRadius}
+                          ariaLabel="Helipad radius, metres"
+                        />
+                      </label>
+                    </>
+                  )}
                   <span className="pct-field-meta">
                     Aerofly ignores both files until you move the folder to scenery/airports, fill in the
                     airport code, name and country, and rename them. The steps are inside each file.

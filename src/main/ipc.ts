@@ -44,7 +44,7 @@ import { identityProblemText, isSafeAirportFolderName } from "../core/export/hel
 import { UnsupportedSchemaVersionError } from "../core/project/schemas";
 import { detectInstallDirs, detectUserDir } from "./afs4Paths";
 import { resolveHeights } from "./elevation";
-import { IcaoTakenError, forgetTakenIcaos, takenIcaos } from "./icaoIndex";
+import { IcaoTakenError, forgetTakenIcaos, icaoStatus, type IcaoStatus } from "./icaoIndex";
 import {
   FolderExistsError,
   UnsafeCountryError,
@@ -290,9 +290,11 @@ async function runHeliportInstall(project: Project, opts: HeliportInstallOptions
   const icao = opts.identity.icao.trim().toLowerCase();
   const identity = { ...opts.identity, icao, country: opts.identity.country.trim().toLowerCase() };
 
+  const pad = opts.heliport.pad;
   log.info(
     `heliport install "${identity.icao}" (${identity.country}) — ${project.objects.length} objects, ` +
-      `pad ${opts.heliport.objectId ?? "at POI anchor"}, r=${opts.heliport.radiusM} m`,
+      `pad ${pad === null ? "at POI anchor" : `${pad.position.lon.toFixed(6)} ${pad.position.lat.toFixed(6)} hdg ${pad.heading}`}, ` +
+      `r=${pad?.radius ?? opts.heliport.radiusM ?? "default"} m`,
   );
 
   const resolved =
@@ -310,16 +312,23 @@ async function runHeliportInstall(project: Project, opts: HeliportInstallOptions
   // The collision check, AFTER planning because it needs the destination. Re-scanned rather than read
   // from the dialog's memo: a dialog can sit open while another add-on lands.
   //
-  // The one code that is NOT a collision is the one already sitting in the folder we are about to
-  // replace — our own, from a previous run. Without this, re-installing a heliport after editing the
-  // project refuses itself, which is both wrong and impossible to explain.
-  const replacing = listInstalledHeliports(userDir).find(
-    (h) => h.country === plan.country && h.folderName === plan.folderName && h.icao.toLowerCase() === icao,
-  );
-  if (replacing === undefined && takenIcaos(settings.installDir, userDir, { refresh: true }).has(icao)) {
+  // `taken` already excludes PCT's own heliports (icaoIndex), so what is left is someone else's airport
+  // — the case that must still be refused, because installing over it makes it disappear.
+  const status = icaoStatus(settings.installDir, userDir, icao, { refresh: true });
+  if (status.taken) {
     log.warn(`heliport refused — code "${icao}" is already an airport on this machine`);
     throw new IcaoTakenError(icao);
   }
+
+  // Our own heliports holding this code are RETIRED rather than refused: "create → fly → adjust →
+  // create again" is the loop ApfelFlieger was stuck in (forum #170), and v1.1 made him burn a fresh
+  // code on every lap. The subtle one is a folder whose name no longer matches — rename the heliport
+  // and `heliportFolderName` produces a different directory, so the old one would sit there still
+  // holding the code and the sim would load whichever it saw last. Removing it is what keeps ONE
+  // airport per code on disk; the dialog says which folder goes before the user presses the button.
+  const stale = status.ours.filter(
+    (h) => !(h.country === plan.country && h.folderName === plan.folderName),
+  );
 
   const assetsDir = anchorAssetsDir({
     env: process.env,
@@ -333,10 +342,19 @@ async function runHeliportInstall(project: Project, opts: HeliportInstallOptions
     isSafeName: isSafeAirportFolderName,
   });
   writeProjectSidecar(w.path, project); // same as a POI: the folder can be reopened in PCT
+
+  // AFTER the write, never before: if writePoi throws, the user still has the heliport they had.
+  const warnings = [...plan.warnings];
+  for (const h of stale) {
+    uninstallHeliport(userDir, h.country, h.folderName);
+    log.info(`heliport — removed the earlier "${h.folderName}" (${h.country}), same code`);
+    warnings.push(`Removed the earlier heliport folder "${h.folderName}", which used the same code.`);
+  }
+
   forgetTakenIcaos(); // the code we just used is now taken
   log.info(`heliport ok — installed to ${w.path}`);
-  for (const warn of plan.warnings) log.warn(`heliport warning: ${warn}`);
-  return { folderName: w.folderName, path: w.path, installed: true, warnings: plan.warnings };
+  for (const warn of warnings) log.warn(`heliport warning: ${warn}`);
+  return { folderName: w.folderName, path: w.path, installed: true, warnings };
 }
 
 /** Load the optional official overlay, scan, cache the catalog, and record lastScanAt. Shared by
@@ -608,12 +626,12 @@ export function registerIpc(): void {
     return dir ? listInstalledPois(dir) : [];
   });
   // ── Heliports ──
-  // isIcaoTaken is a READ for live feedback while typing; it deliberately uses the memo, and it is NOT
+  // icaoStatus is a READ for live feedback while typing; it uses the memo (TTL-bounded), and it is NOT
   // what protects the user — installHeliport re-scans before it writes.
-  ipcMain.handle("pct:isIcaoTaken", (_e, icao: string): boolean => {
+  ipcMain.handle("pct:icaoStatus", (_e, icao: string): IcaoStatus => {
     const s = currentSettings();
     const dir = s.afs4UserDir ?? detectUserDir(documents());
-    return takenIcaos(s.installDir, dir).has(String(icao).trim().toLowerCase());
+    return icaoStatus(s.installDir, dir, String(icao));
   });
   ipcMain.handle("pct:installHeliport", (_e, project: Project, opts: HeliportInstallOptions) =>
     guarded("installHeliport", () => runHeliportInstall(project, opts)),

@@ -9,7 +9,14 @@
 //      every dialog; the renderer only says WHAT (save / save-as / install / choose-folder), never
 //      WHERE. (Paths flowing back OUT, for display, are fine — they are main-produced.)
 // Types only, no runtime code — safe to import from any target (main / preload / renderer).
-import type { Catalog, PlacedObject, Project, ResolvedObject, Settings } from "../core/project/types";
+import type {
+  AirportPad,
+  Catalog,
+  PlacedObject,
+  Project,
+  ResolvedObject,
+  Settings,
+} from "../core/project/types";
 import type { FootprintOverride, FootprintOverrides } from "../core/catalog/footprints";
 
 export interface DetectResult {
@@ -98,12 +105,23 @@ export interface InstalledHeliport {
   icao: string;
 }
 
+/** What stands between a code and using it, as the dialog needs to render it. Mirrors main's IcaoStatus
+ *  (main/icaoIndex.ts) — the two halves are deliberately separate, because only one of them is a refusal:
+ *  someone else's airport blocks, one of PCT's own is simply replaced. */
+export interface IcaoStatus {
+  taken: boolean; // held by an airport PCT does not own → cannot be used
+  ours: InstalledHeliport[]; // held by heliports PCT installed → creating again replaces them
+}
+
 /** "Create heliport…": the POI becomes a real airport PCT writes into scenery/airports/<country>/.
  *  Identity is user-typed and never invented by PCT; main validates it AND refuses a code already in use
  *  on this machine before touching disk. */
 export interface HeliportInstallOptions {
   identity: { icao: string; name: string; country: string };
-  heliport: { objectId: string | null; radiusM: number };
+  // The pad in unshifted map coordinates — its OWN point, never a reference to a placed object, so the
+  // helicopter cannot spawn inside the XREF it borrowed coordinates from (forum #168). `null` = a default
+  // pad at the POI's anchor, facing true north.
+  heliport: { pad: AirportPad | null; radiusM?: number };
   overwrite: boolean;
   baseElevation?: number; // same offline fallback as ExportOptions
 }
@@ -116,10 +134,11 @@ export interface ExportOptions {
   // terrain-relative height against this one value; when absent, main uses the elevation provider
   // and may return a `needs-elevation` envelope the renderer answers by re-exporting WITH a base.
   baseElevation?: number;
-  // Opt-in heliport templates (forum #160). Absent = the POI is exported exactly as before. `objectId` is
-  // the placed object whose position + heading become the pad (null = the POI's anchor point); main hands
-  // this straight to planExport, which reads the SHIFTED object so the pad travels with the scene.
-  heliport?: { objectId: string | null; radiusM: number };
+  // Opt-in heliport templates (forum #160). Absent = the POI is exported exactly as before. `pad` is the
+  // project's own helipad in unshifted map coordinates (null = the POI's anchor, facing true north, at
+  // `radiusM`); main hands this straight to planExport, which applies the export shift so the pad travels
+  // with the scene.
+  heliport?: { pad: AirportPad | null; radiusM?: number };
 }
 
 /** Async (IPC). Implemented in preload/index.ts, handled in main/ipc.ts. Fallible methods return a
@@ -184,10 +203,10 @@ export interface PctApi {
   uninstallPoi(folderName: string): Promise<PctResult<void>>;
   listInstalledPois(): Promise<InstalledPoi[]>;
 
-  // Heliports (forum #160). `isIcaoTaken` is for LIVE feedback while the user types; it is not the
+  // Heliports (forum #160). `icaoStatus` is for LIVE feedback while the user types; it is not the
   // safety mechanism — installHeliport re-checks against a fresh scan at the moment it writes, because
   // the dialog may have been open for a while and another add-on may have landed meanwhile.
-  isIcaoTaken(icao: string): Promise<boolean>;
+  icaoStatus(icao: string): Promise<IcaoStatus>;
   installHeliport(project: Project, opts: HeliportInstallOptions): Promise<PctResult<InstallResult>>;
   listInstalledHeliports(): Promise<InstalledHeliport[]>;
   uninstallHeliport(country: string, folderName: string): Promise<PctResult<void>>;

@@ -359,9 +359,15 @@ export function installMockBridge(): void {
     },
     listInstalledPois: async () => installedPois,
     // Heliports. `kdag` and `lowi` stand in for the ~8k codes a real install has, so the dialog's
-    // "already used on this machine" path is exercisable with no disk.
-    isIcaoTaken: async (icao) =>
-      ["kdag", "lowi", ...installedHeliports.map((h) => h.icao)].includes(icao.trim().toLowerCase()),
+    // "already used on this machine" path is exercisable with no disk. Codes held by an installed
+    // heliport are NOT `taken` — they come back as `ours`, which is the "replace it" path (forum #170).
+    icaoStatus: async (icao) => {
+      const code = icao.trim().toLowerCase();
+      return {
+        taken: ["kdag", "lowi"].includes(code),
+        ours: installedHeliports.filter((h) => h.icao.toLowerCase() === code),
+      };
+    },
     installHeliport: async (_project, opts) => {
       const icao = opts.identity.icao.trim().toLowerCase();
       if (["kdag", "lowi"].includes(icao)) {

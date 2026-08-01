@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import type { Project, ResolvedXref } from "../../src/core/project/types";
+import type { AirportPad, Project, ResolvedXref } from "../../src/core/project/types";
 import { InvalidHeliportIdentityError, planHeliport } from "../../src/core/export/planExport";
 import {
   HELIPORT_README_MARKER,
@@ -23,7 +23,7 @@ import {
   uninstallHeliport,
   writePoi,
 } from "../../src/main/installer";
-import { forgetTakenIcaos, scanTakenIcaos, takenIcaos } from "../../src/main/icaoIndex";
+import { forgetTakenIcaos, icaoStatus, scanTakenIcaos, takenIcaos } from "../../src/main/icaoIndex";
 
 const HANGAR: ResolvedXref = {
   id: "hangar",
@@ -58,7 +58,9 @@ const TEMPLATE_SPEC: HeliportSpec = {
   autoheight: false,
   identity: null,
 };
-const OPTS = { identity: ID, heliport: { objectId: "hangar" as string | null, radiusM: 10 } };
+/** The pad is its own point now, not a borrowed object (forum #168) — deliberately NOT on the hangar. */
+const PAD: AirportPad = { position: { lon: -116.7962, lat: 34.8541 }, heading: 40, radius: 10 };
+const OPTS = { identity: ID, heliport: { pad: PAD as AirportPad | null } };
 
 let tmp: string;
 beforeEach(() => {
@@ -179,6 +181,59 @@ describe("icaoIndex", () => {
   });
 });
 
+// ★ forum #170: "The airfield code must be changed every time." Two faults met here — PCT counted its
+// OWN heliport as a collision, so re-installing after an adjustment was impossible; and deleting the
+// folder by hand did not release the code either. His test zip is SHJH, SHJI, SHJJ, SHJK, SHJL: five
+// codes for one rooftop pad.
+describe("icaoStatus — your own heliport is not a collision", () => {
+  /** Install OPTS's heliport into `tmp` and return where it landed. */
+  const install = (opts = OPTS): string => {
+    const plan = planHeliport(PROJECT, [HANGAR], opts);
+    forgetTakenIcaos();
+    return writePoi(plan, airportRoot(tmp, plan.country), {
+      overwrite: true,
+      isSafeName: isSafeAirportFolderName,
+    }).path;
+  };
+
+  it("reports a code PCT installed as `ours`, NOT as taken", () => {
+    install();
+    const s = icaoStatus(null, tmp, "pct001", { refresh: true });
+    expect(s.taken).toBe(false); // ← v1.1 said true here, and blocked the button
+    expect(s.ours.map((h) => h.icao)).toEqual(["pct001"]);
+  });
+
+  it("still refuses a code held by somebody else's airport", () => {
+    const other = path.join(tmp, "scenery", "airports", "de", "de0869_albersthof");
+    mkdirSync(other, { recursive: true });
+    writeFileSync(path.join(other, "de0869.wad"), "");
+    const s = icaoStatus(null, tmp, "de0869", { refresh: true });
+    expect(s.taken).toBe(true);
+    expect(s.ours).toEqual([]);
+  });
+
+  it("releases the code as soon as the folder is deleted BY HAND, with no PCT involved", () => {
+    const at = install();
+    expect(icaoStatus(null, tmp, "pct001", { refresh: true }).ours).toHaveLength(1);
+    rmSync(at, { recursive: true, force: true }); // Finder / Explorer, not PCT
+    const s = icaoStatus(null, tmp, "pct001", { refresh: true });
+    expect(s.taken).toBe(false);
+    expect(s.ours).toEqual([]);
+  });
+
+  it("finds the earlier folder when the heliport has since been RENAMED", () => {
+    // The subtle half: heliportFolderName is <code>_<name>, so renaming produces a DIFFERENT directory.
+    // Without spotting the old one, two folders would claim pct001 and the sim would take whichever it
+    // saw last. runHeliportInstall removes the ones that are not the destination.
+    install();
+    const renamed = { ...OPTS, identity: { ...ID, name: "Rooftop Pad" } };
+    const plan = planHeliport(PROJECT, [HANGAR], renamed);
+    expect(plan.folderName).not.toBe("pct001_pct_test_heliport");
+    const s = icaoStatus(null, tmp, "pct001", { refresh: true });
+    expect(s.ours.map((h) => h.folderName)).toEqual(["pct001_pct_test_heliport"]);
+  });
+});
+
 describe("the folder name comes from the IDENTITY, not the POI slug", () => {
   // The bug this pins down: a fresh project has no `poiName`, so the POI folder name came out as
   // `w07055s3345_` — a coordinate prefix and nothing else — and the write boundary refused it with
@@ -287,9 +342,13 @@ describe("★ nothing may precede the root <[file] tag", () => {
     }
   });
 
-  it("still allows trailing // comments on a tag line — the file that flew is full of them", () => {
+  // v1.1 hung a trailing `// …` off each tag line, separated by TABs. Both are gone: the descriptions
+  // moved into a banner INSIDE the place block (ApfelFlieger #167, the shape IPACS uses in its aircraft
+  // files) and TABs went with them, on Jan's advice that they "could lead to interference".
+  it("carries the descriptions in a banner, with no TAB anywhere", () => {
     const tsc = planHeliport(PROJECT, [HANGAR], OPTS).files.find((f) => f.relPath === "pct001.tsc")!;
-    expect(tsc.content).toContain("]>\t\t// METRES");
+    expect(tsc.content).toContain("//  Informations:");
+    expect(tsc.content).not.toContain("\t");
   });
 });
 
