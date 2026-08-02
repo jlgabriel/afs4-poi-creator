@@ -128,10 +128,32 @@ describe("planHeliport", () => {
     expect(plan.files.map((f) => f.relPath)).toContain("pct001.wad");
     expect(plan.files.map((f) => f.relPath)).not.toContain("poi.tsl");
     const tsc = plan.files.find((f) => f.relPath === "pct001.tsc")!.content;
-    expect(tsc).toContain("[icao][pct001]");
+    expect(tsc).toContain("[icao][PCT001]");
     expect(tsc).toContain("[sname][PCT Test Heliport]");
     expect(tsc).not.toContain("__ICAO__");
     expect(plan.country).toBe("us");
+  });
+
+  // ApfelFlieger, forum #172: the icao ROW must be capitals for FS 4 to display the airport, while the
+  // file and folder names stay lowercase. IPACS agrees with itself on this — `de0025.wad` holds `DE0025`.
+  // v1.1 and v1.2 wrote the code lowercase in both files; the sim matched it anyway (codes are compared
+  // case-insensitively), so the only symptom was cosmetic, which is exactly why it shipped twice.
+  it("writes the code in CAPITALS inside both files, and in lowercase on disk", () => {
+    const plan = planHeliport(PROJECT, [HANGAR], { ...OPTS, identity: { ...ID, icao: "ab12" } });
+
+    expect(plan.folderName.startsWith("ab12_")).toBe(true);
+    expect(plan.files.map((f) => f.relPath)).toEqual(
+      expect.arrayContaining(["ab12.tsc", "ab12.wad"]),
+    );
+
+    for (const rel of ["ab12.tsc", "ab12.wad"]) {
+      const text = plan.files.find((f) => f.relPath === rel)!.content;
+      expect(text).toContain("[icao][AB12]");
+      expect(text).not.toContain("[icao][ab12]");
+      // Only the CODE goes up. `country` is a path segment under scenery/airports/ and IPACS writes it
+      // lowercase in its own files, so it must not be swept along.
+      expect(text).toContain("[country][us]");
+    }
   });
 
   it("marks its README so only PCT's own folders are ever offered for Uninstall", () => {

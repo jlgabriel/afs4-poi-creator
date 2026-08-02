@@ -140,11 +140,24 @@ export interface HeliportSpec {
   identity?: HeliportIdentity | null;
 }
 
-/** The three identity values as they go into the files: the real ones, or the placeholders. */
+/** The three identity values as they go into the files: the real ones, or the placeholders.
+ *
+ *  ★ THE CODE GOES IN CAPITALS, the disk stays lowercase. ApfelFlieger, forum #172: the
+ *  `<[…][icao][ABCD]>` rows in BOTH files "must be entered as capital letters in order to be displayed
+ *  correctly in FS 4", while "there are only lowercase letters in the file name and in the folder name".
+ *  IPACS's own files say the same thing without being asked — `de0025_osnabrueck_hospital_helipad`
+ *  carries `<[stringt8c][icao][DE0025]>` next to `<[stringt8c][country][de]>`, in a folder of lowercase
+ *  `de0025.*`. So: code up, country down, filenames down.
+ *
+ *  Why it survived v1.1 and v1.2. The sim matches codes CASE-INSENSITIVELY — that is how the heliport
+ *  flew on 2026-07-31 and how icaoIndex counts the same 8139 airports the sim does — so a lowercase code
+ *  costs nothing structural. What it costs is DISPLAY, which is the one symptom we had and filed under
+ *  "that is Aerofly, not you": the blank row in LOCATION's search. That is now the first suspect, and it
+ *  reads off one install without flying — see the note in the dialog. */
 function identityValues(spec: HeliportSpec): { icao: string; name: string; country: string } {
   const id = spec.identity ?? null;
   if (id === null) return { icao: ICAO, name: AIRPORT_NAME, country: COUNTRY };
-  return { icao: id.icao, name: sanitizeValue(id.name).trim(), country: id.country };
+  return { icao: id.icao.toUpperCase(), name: sanitizeValue(id.name).trim(), country: id.country };
 }
 
 /** The `// Informations:` banner, sitting just INSIDE the place block (ApfelFlieger, forum #167 — the
@@ -171,8 +184,9 @@ function informationsBanner(): string[] {
   return [
     "",
     "//  Informations:",
-    `//  [icao]:     4-6 characters, and it MUST NOT already exist on the machine that installs`,
-    "//              this - a repeat silently REPLACES that airport",
+    `//  [icao]:     4-6 characters, IN CAPITALS here - FS 4 displays the airport by this row. It`,
+    "//              MUST NOT already exist on the machine that installs this - a repeat silently",
+    "//              REPLACES that airport. The file and folder names stay lowercase",
     `//  [sname]:    the name shown in LOCATION. MAX ${SNAME_MAX} CHARACTERS - longer and the sim`,
     "//              drops the whole airport",
     "//  [lname]:    long name; keep it the same unless you have a reason",
@@ -249,7 +263,8 @@ function tidy(lines: string[]): string {
 const WAD_BANNER: string[] = [
   "",
   "//  Informations:",
-  "//  [icao]:      the SAME code as in the .tsc, or the database entry and the place do not meet",
+  "//  [icao]:      the SAME code as in the .tsc, IN CAPITALS - or the database entry and the place",
+  "//               do not meet. The file name stays lowercase",
   "//  [name]:      max 32 characters here",
   "//  [country]:   two letters, lowercase - as in the .tsc",
   "//  [position]:  FS4 grid units (0-65536), NOT degrees - written by PCT",
@@ -350,7 +365,7 @@ export function heliportInstalledReadme(id: HeliportIdentity, projectName: strin
     "airport installed on this machine at the moment this was written. That check cannot speak for",
     "anyone else's machine - if you pass this folder on, the code has to be free there too.",
     "",
-    "To remove it: PCT's Create heliport dialog lists installed heliports with an Uninstall button,",
+    "To remove it: PCT's Create HELIPORT dialog lists installed heliports with an Uninstall button,",
     "or just delete this folder. Nothing outside it was touched.",
     "",
   ].join("\n");
@@ -372,13 +387,15 @@ export function heliportReadmeLines(): string[] {
     "      The code must be 4-6 characters and FREE on the machine that installs this: an existing",
     "      code REPLACES that airport, leaving only a line in tm.log. Check it in Aerofly's LOCATION",
     `      menu first. The name must be ${SNAME_MAX} characters or fewer, or the airport is dropped whole.`,
-    "   3. Rename both files to  <code>.tsc  and  <code>.wad  - dropping the .txt.",
+    "      Type the code IN CAPITALS inside both files - FS 4 displays the airport by that row.",
+    "   3. Rename both files to  <code>.tsc  and  <code>.wad  - dropping the .txt. These two go in",
+    "      LOWERCASE, like every other file name under scenery/airports.",
     "   4. Delete poi.tsl. The .tsc takes its place. Keep poi.toc and any pct_anchor files.",
     "",
     "  Do not add anything above the first  <[file]  line of either file: Aerofly refuses to load a",
     "  .tsc that does not start with it, and says so only in tm.log.",
     "",
-    "  PCT can do all of this for you - see Create heliport in the app.",
+    "  PCT can do all of this for you - see Create HELIPORT in the app.",
     "",
   ];
 }
