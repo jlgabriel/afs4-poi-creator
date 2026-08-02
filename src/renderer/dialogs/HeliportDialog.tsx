@@ -1,4 +1,4 @@
-// HeliportDialog.tsx — "Create heliport…": turn the open project into a real AFS4 heliport, installed.
+// HeliportDialog.tsx — "Create HELIPORT…": turn the open project into a real AFS4 heliport, installed.
 //
 // The POI export's template files (ExportDialog's "Heliport template") ask the user to move a folder,
 // edit three fields and rename two files. That is four chances to get it wrong for one decision that
@@ -147,10 +147,23 @@ export function HeliportDialog({ onClose }: { onClose: () => void }): React.Reac
   // Write the whole block back, keeping whatever the map may have changed underneath us. Called on every
   // identity edit, so closing the dialog without installing STILL remembers what was typed — which is
   // what "the data must not be re-entered" actually asks for.
+  //
+  // ★ IT DOES NOT CREATE THE BLOCK. `create: true` is the caller saying "the user asked for a helipad",
+  // and only two do: the Place button and the install. Everything else patches a block that already
+  // exists, or does nothing and leaves the value in the local draft above.
+  //
+  // WHY (forum #173, ApfelFlieger, with a screenshot). v1.2 seeded the pad the moment the dialog OPENED,
+  // from the map centre — which on a project you have not navigated yet is DEFAULT_CAMERA, lon 0 lat 20.
+  // Three faults in one: the coordinate fields opened on 0.000000 / 20.000000 ("funny coordinates"), the
+  // pad's cyan rotate grip is a fixed 6px marker so at world zoom it survives as a dot in the Sahara
+  // after the circle and the H have shrunk away ("blue dot in nowhere"), and none of it was undone by
+  // Cancel — setAirport commits to the DOCUMENT, so merely looking at this dialog dirtied a clean
+  // project, pushed an undo entry and fed the autosave shadow. Opening a dialog is not a decision.
   const writeAirport = useCallback(
-    (patch: Partial<ProjectAirport>): void => {
+    (patch: Partial<ProjectAirport>, opts: { create?: boolean } = {}): void => {
       const s = editorStore.getState();
       const current = s.project.airport;
+      if (current === undefined && opts.create !== true) return;
       const next: ProjectAirport = {
         icao: patch.icao ?? current?.icao ?? "",
         name: patch.name ?? current?.name ?? "",
@@ -161,16 +174,6 @@ export function HeliportDialog({ onClose }: { onClose: () => void }): React.Reac
     },
     [],
   );
-
-  // The pad exists as soon as the dialog is open, so the map has something to draw and drag. Seeded from
-  // the scene's centre — NOT from a selected object, which is the collision ApfelFlieger warned about.
-  useEffect(() => {
-    if (editorStore.getState().project.airport === undefined) {
-      writeAirport({ icao: identity.icao, name, country: identity.country });
-    }
-    // Only on open: later edits go through the field handlers.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   // Live availability, debounced by a well-formed code: asking main about "k" or "kd" answers a question
   // nobody is holding. This is CONVENIENCE — the install re-checks — so a stale answer costs nothing.
@@ -204,8 +207,9 @@ export function HeliportDialog({ onClose }: { onClose: () => void }): React.Reac
       return;
     }
     // Commit the identity to the document before writing, so what shipped and what the project says are
-    // the same thing even if the install then fails.
-    writeAirport({ icao: identity.icao, name: identity.name, country: identity.country });
+    // the same thing even if the install then fails. This is the second of the two acts allowed to CREATE
+    // the block — installing is unambiguously the user asking for an airport.
+    writeAirport({ icao: identity.icao, name: identity.name, country: identity.country }, { create: true });
 
     // The same save-net the POI export runs: never write a scene the loader would reject.
     const project = editorStore.getState().serialize();
@@ -379,16 +383,35 @@ export function HeliportDialog({ onClose }: { onClose: () => void }): React.Reac
               )}
             </label>
 
-            {/* The pad. It is on the map right now — white circle with an H — and dragging it there is the
-                intended way to aim it; these fields are for the times you know the numbers. */}
+            {/* The pad. It is on the map — white circle with an H — but this dialog is a full-screen
+                overlay, so the map is behind it: dragging happens after you close, and the pad stays put
+                because it lives on the DOCUMENT, not in here. These fields are the way to aim it without
+                closing, and for the times you already know the numbers. */}
             {pad === null ? (
               <div className="pct-field pct-field-col">
                 <span className="pct-field-label">Helipad — where the helicopter starts</span>
                 <span className="pct-field-meta">
-                  No helipad on this project. A heliport needs one — put it in the middle of what you have
-                  placed, then drag it on the map.
+                  No helipad on this project. A heliport needs one:{" "}
+                  {objects.length > 0
+                    ? "this puts it in the middle of what you have placed"
+                    : "with nothing placed yet, this puts it in the middle of the map you are looking at"}
+                  , and it stays there for you to move — by the numbers below, or by dragging it on the map
+                  once this dialog is closed.
                 </span>
-                <button type="button" onClick={() => writeAirport({})}>
+                {/* Placing it also AIMS THE MAP AT IT. The pad lands at the centre of the scene, or —
+                    for an empty project — the centre of the current view, which on a project nobody has
+                    navigated is lon 0 lat 20 at zoom 2. That is honest but useless: close the dialog and
+                    the thing you just made is one pixel in the Sahara, which is the screenshot
+                    ApfelFlieger sent (#173). flyTo never zooms back out, so a user already framed on
+                    their site sees nothing move. */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    writeAirport({}, { create: true });
+                    const placed = editorStore.getState().project.airport;
+                    if (placed !== undefined) editorStore.getState().flyTo(placed.pad.position);
+                  }}
+                >
                   Place a helipad
                 </button>
               </div>
@@ -396,7 +419,8 @@ export function HeliportDialog({ onClose }: { onClose: () => void }): React.Reac
               <div className="pct-field pct-field-col">
                 <span className="pct-field-label">Helipad — where the helicopter starts</span>
                 <span className="pct-field-meta">
-                  Drag the white circle on the map to move it, and its cyan grip to turn it. It is its own
+                  It is drawn on the map as a white circle with an H — close this dialog and you can drag
+                  it to move it, or its cyan grip to turn it; it keeps whatever you set. It is its own
                   point, not one of your objects, so nothing spawns inside a building.
                 </span>
                 <div className="pct-shift-row">
@@ -457,9 +481,10 @@ export function HeliportDialog({ onClose }: { onClose: () => void }): React.Reac
                     </button>
                   )}
                   <span className="pct-spacer" />
-                  {/* The way out. Opening this dialog puts a pad on the map so there is something to
-                      drag; without this, a look around would leave a white circle you could not get
-                      rid of. It clears the stored code and name too — the whole airport block. */}
+                  {/* The way out, for a pad the user did place and no longer wants. Cancel deliberately
+                      does NOT do this: the only way to drag the pad is with this dialog closed, so a
+                      Cancel that swept the pad away would make dragging impossible. It clears the stored
+                      code and name too — the whole airport block. */}
                   <button
                     type="button"
                     onClick={() => {
@@ -500,8 +525,13 @@ export function HeliportDialog({ onClose }: { onClose: () => void }): React.Reac
                 Cancel
               </button>
               <span className="pct-spacer" />
+              {/* "Install into AFS4", the same words the POI export's second step uses (forum #172). His
+                  complaint was that both steps here said "Create heliport", where the POI route says
+                  "Export POI…" then "Install into AFS4" — so the pair that WRITES to Aerofly read
+                  differently on the two sides of the same app. The replace wording stays: it was the
+                  fix he asked for in #170 and signed off in #172. */}
               <button className="pct-primary" onClick={() => void create(false)} disabled={blocked}>
-                {busy ? "Creating…" : replacing ? "Replace heliport" : "Create heliport"}
+                {busy ? "Installing…" : replacing ? "Replace in AFS4" : "Install into AFS4"}
               </button>
             </div>
           </>
