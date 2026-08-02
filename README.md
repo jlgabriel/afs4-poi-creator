@@ -105,7 +105,7 @@ The short version is below. For the whole thing walked through with pictures, se
 4. **Export & install** — *Export POI → Install into Aerofly FS 4* writes the folder into your
    `scenery/poi/`. Restart Aerofly and fly to the spot. The same dialog can **uninstall** POIs that
    PCT made, so nothing is permanent. If you'd rather **start** a flight there than fly to it,
-   *Create heliport…* installs the same project as a small airport — see
+   *Create HELIPORT…* installs the same project as a small airport — see
    [Heliports you can fly from](#heliports-you-can-fly-from).
 5. **Optional: photograph what you placed** — once you're out there looking at your objects,
    screenshot one to the clipboard and right-click its card in PCT to paste it in. From then on the
@@ -199,7 +199,7 @@ yours and tells you how many entries it added and how many of yours it replaced.
 
 ### Heliports you can fly from
 
-*(v1.1)* A POI is scenery you fly **to**. **Create heliport…** turns the same project into a small
+*(v1.1)* A POI is scenery you fly **to**. **Create HELIPORT…** turns the same project into a small
 **airport** you can start a flight **from** — Aerofly puts it in the LOCATION menu and on the map, and
 your objects come along around the pad. It doesn't replace the POI export; it's a second, separate copy,
 written into your user folder's `scenery/airports/`. Suggested and worked through on the forum by

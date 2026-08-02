@@ -160,14 +160,17 @@ export function TopBar({ onExport, onHeliport, onRescan, onSettings }: TopBarPro
         Export POI…
       </button>
       {/* The second thing a project can become (forum #160): an airport you can start a flight from,
-          installed into scenery/airports. Beside Export because it is a sibling output, not a step of it. */}
+          installed into scenery/airports. Beside Export because it is a sibling output, not a step of it.
+          HELIPORT shouted, at ApfelFlieger's request (#172): he first wanted "Export AIRPORT…", then
+          argued himself out of it — "since only a heliport can be created at the moment, HELIPORT fits
+          better" — and the capitals are what separate this from Export POI… at a glance. */}
       <button
         type="button"
         onClick={onHeliport}
         disabled={!onHeliport || !pct}
         title={pct ? "Install this project as a heliport you can fly from" : NO_PCT}
       >
-        Create heliport…
+        Create HELIPORT…
       </button>
 
       <span className="pct-divider" />
