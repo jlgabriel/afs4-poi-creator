@@ -9,12 +9,49 @@
 import { useMemo } from "react";
 import { editorStore, useEditor } from "../state/editorStore";
 import { Thumbnail } from "../catalog/Thumbnail";
+import { HelipadIcon } from "../catalog/categoryIcon";
 import { photoKeyForPlaced as placedPhotoKey } from "../../core/catalog/photoKey";
 import { rowInfo } from "./rowInfo";
+
+/** The helipad's row, pinned above the objects (v1.3, forum #173: "which is then listed on the right for
+ *  editing"). It is NOT one of the objects and does not join their count — there is exactly one, it never
+ *  goes into the cultivation, and Duplicate means nothing for it — so it gets its own row above the list
+ *  rather than a place in it. Click selects, double-click flies, and the Inspector shows the heliport. */
+function HelipadRow(): React.ReactElement | null {
+  const airport = useEditor((s) => s.project.airport);
+  const selected = useEditor((s) => s.padSelected);
+  if (airport === undefined) return null;
+  const { pad, icao, name } = airport;
+  return (
+    <button
+      type="button"
+      className={selected ? "pct-placed-row pct-placed-pad sel" : "pct-placed-row pct-placed-pad"}
+      aria-pressed={selected}
+      title="The helicopter's start pad"
+      onClick={() => editorStore.getState().selectPad(true)}
+      onDoubleClick={() => editorStore.getState().flyTo(pad.position)}
+    >
+      <HelipadIcon />
+      <span className="pct-placed-text">
+        <span className="pct-placed-name">
+          <span className="pct-placed-label">
+            {name.trim() === "" ? "Start - Helicopter" : name.trim()}
+          </span>
+          {icao.trim() !== "" && <span className="pct-placed-code">{icao.toUpperCase()}</span>}
+        </span>
+        <span className="pct-placed-meta">
+          lon {pad.position.lon.toFixed(6)} · lat {pad.position.lat.toFixed(6)} ·{" "}
+          {Math.round(pad.heading)}°
+        </span>
+      </span>
+    </button>
+  );
+}
 
 export function PlacedList(): React.ReactElement {
   const objects = useEditor((s) => s.project.objects);
   const selection = useEditor((s) => s.selection);
+  const padSelected = useEditor((s) => s.padSelected);
   const catalogIndex = useEditor((s) => s.catalogIndex);
   const airportLightIndex = useEditor((s) => s.airportLightIndex);
   const plantIndex = useEditor((s) => s.plantIndex);
@@ -34,9 +71,12 @@ export function PlacedList(): React.ReactElement {
           >
             Duplicate
           </button>
+          {/* Delete also reaches the pad — deleteSelection removes the airport block when it is the
+              thing selected, so the button follows whatever the panel above is showing. Duplicate does
+              not: a project has one start position. */}
           <button
             type="button"
-            disabled={!hasSelection}
+            disabled={!hasSelection && !padSelected}
             title="Delete selection (Del)"
             onClick={() => editorStore.getState().deleteSelection()}
           >
@@ -46,6 +86,7 @@ export function PlacedList(): React.ReactElement {
       </div>
 
       <div className="pct-placed-list">
+        <HelipadRow />
         {objects.length === 0 ? (
           <p className="pct-empty">No objects yet — click the map to place one.</p>
         ) : (

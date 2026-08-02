@@ -1068,6 +1068,45 @@ body {
   height: 30px;
   padding: 3px;
 }
+/* v1.3: the install dialog's read-only summary of what is about to be written. Label left, value right,
+   so four rows of different lengths still read as a table. */
+.pct-summary {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 3px;
+}
+.pct-summary li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.pct-summary li > :last-child {
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+/* v1.3: the pad's pinned row. Its icon is a .pct-thumb like every other row's, so the 30px sizing above
+   already covers it; all this adds is a hairline under the row, so the one thing that is not an object
+   reads as a header rather than as list item zero. */
+.pct-placed-pad {
+  margin-bottom: 6px;
+  border-bottom-color: #cbd5e1;
+}
+/* The airport code beside the name — same slot and restraint as the `missing` badge, different job:
+   this one is information, not a warning, so it stays grey. */
+.pct-placed-code {
+  flex: 0 0 auto;
+  padding: 0 5px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #475569;
+  background: #f1f5f9;
+  border-radius: 4px;
+}
 .pct-placed-text {
   flex: 1 1 auto;
   min-width: 0;

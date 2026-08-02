@@ -163,14 +163,18 @@ export function TopBar({ onExport, onHeliport, onRescan, onSettings }: TopBarPro
           installed into scenery/airports. Beside Export because it is a sibling output, not a step of it.
           HELIPORT shouted, at ApfelFlieger's request (#172): he first wanted "Export AIRPORT…", then
           argued himself out of it — "since only a heliport can be created at the moment, HELIPORT fits
-          better" — and the capitals are what separate this from Export POI… at a glance. */}
+          better" — and the capitals are what separate this from Export POI… at a glance.
+
+          v1.3 changes the VERB, because the button's job changed: creating the heliport now starts at
+          the catalog's Start - Helicopter card (#173), so what is left behind this button is the install.
+          "Create" would now name something that happens somewhere else. */}
       <button
         type="button"
         onClick={onHeliport}
         disabled={!onHeliport || !pct}
         title={pct ? "Install this project as a heliport you can fly from" : NO_PCT}
       >
-        Create HELIPORT…
+        Install HELIPORT…
       </button>
 
       <span className="pct-divider" />

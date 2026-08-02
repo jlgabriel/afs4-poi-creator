@@ -23,6 +23,7 @@ import { directionToWad, formatWad, latToWad, lonToWad } from "../../core/geo/wa
 import { rowAxis } from "../../core/geo/arrange";
 import { editorStore, useEditor } from "../state/editorStore";
 import { HeightControl } from "./HeightControl";
+import { HeliportFields } from "./HeliportFields";
 import { NumberInput } from "./NumberInput";
 
 /** Object note — local draft committed on blur/Enter (one undo entry, not one per key; Escape reverts).
@@ -784,6 +785,10 @@ function ObjectFields({
 
 export function Inspector(): React.ReactElement {
   const selCount = useEditor((s) => s.selection.length);
+  // The helipad is not in `objects`, so it is not in `selection` either — it has its own flag. Guarded
+  // on the block still existing: undoing the placement leaves padSelected true for one render otherwise,
+  // and the panel would be editing an airport that is no longer there.
+  const airport = useEditor((s) => (s.padSelected ? s.project.airport : undefined));
   // Select the object REFERENCE directly — stable across unrelated store changes (no re-render on pan).
   const obj = useEditor((s) =>
     s.selection.length === 1 ? s.project.objects.find((o) => o.id === s.selection[0]) : undefined,
@@ -800,7 +805,9 @@ export function Inspector(): React.ReactElement {
   return (
     <aside className="pct-inspector">
       <h2 className="pct-panel-title">Inspector</h2>
-      {obj ? (
+      {airport !== undefined ? (
+        <HeliportFields airport={airport} />
+      ) : obj ? (
         // Key by id so every draft (numeric fields + the fetch spinner) resets on a selection change;
         // an EDIT to the same object keeps the id, so the panel is not torn down.
         <ObjectFields

@@ -25,6 +25,13 @@ export function AppShell({ onRescan }: { onRescan: () => void }): React.ReactEle
     window.addEventListener("pct:open-settings", open);
     return () => window.removeEventListener("pct:open-settings", open);
   }, []);
+  // Same channel for the install dialog (v1.3): the Inspector's heliport panel asks for it, and the
+  // Inspector is not this component's child in any way it could receive a prop through.
+  useEffect(() => {
+    const open = (): void => setHeliportOpen(true);
+    window.addEventListener("pct:open-heliport", open);
+    return () => window.removeEventListener("pct:open-heliport", open);
+  }, []);
   return (
     <div className="pct-app">
       <TopBar
