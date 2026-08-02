@@ -373,13 +373,14 @@ export function ExportDialog({ onClose }: { onClose: () => void }): React.ReactE
                     <span className="pct-field-meta">
                       Uses this project&apos;s helipad — the white circle on the map, radius{" "}
                       {storeAirport.pad.radius} m, heading {Math.round(storeAirport.pad.heading)}° true.
-                      Move it in Create HELIPORT…
+                      Drag it on the map, or select it to edit it in the Inspector.
                     </span>
                   ) : (
                     <>
                       <span className="pct-field-meta">
-                        Helipad at the POI anchor, facing true north. Open Create HELIPORT… to place it on
-                        the map instead.
+                        Helipad at the POI anchor, facing true north. Place one from{" "}
+                        <strong>Start - Helicopter</strong> in the catalog to put it where you want
+                        instead.
                       </span>
                       <label className="pct-shift-cell">
                         <span className="pct-field-meta">Pad radius — metres</span>

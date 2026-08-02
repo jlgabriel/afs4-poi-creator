@@ -365,7 +365,7 @@ export function heliportInstalledReadme(id: HeliportIdentity, projectName: strin
     "airport installed on this machine at the moment this was written. That check cannot speak for",
     "anyone else's machine - if you pass this folder on, the code has to be free there too.",
     "",
-    "To remove it: PCT's Create HELIPORT dialog lists installed heliports with an Uninstall button,",
+    "To remove it: PCT's Install HELIPORT dialog lists installed heliports with an Uninstall button,",
     "or just delete this folder. Nothing outside it was touched.",
     "",
   ].join("\n");
@@ -395,7 +395,7 @@ export function heliportReadmeLines(): string[] {
     "  Do not add anything above the first  <[file]  line of either file: Aerofly refuses to load a",
     "  .tsc that does not start with it, and says so only in tm.log.",
     "",
-    "  PCT can do all of this for you - see Create HELIPORT in the app.",
+    "  PCT can do all of this for you - see Install HELIPORT in the app.",
     "",
   ];
 }
