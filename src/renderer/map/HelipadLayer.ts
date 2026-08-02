@@ -26,6 +26,8 @@ import { snapAngle } from "./rotate";
 export interface HelipadCallbacks {
   onMove(p: LonLat): void; // fired once on drag END (undo-friendly), like FootprintLayer's
   onRotate(headingDeg: number): void; // TRUE compass degrees
+  /** A click that was not a drag — the pad becomes the Inspector's subject (v1.3, forum #173). */
+  onSelect(): void;
 }
 
 /** White, because a helipad IS white — and because every other colour on this map is spoken for
@@ -33,6 +35,9 @@ export interface HelipadCallbacks {
  *  readable on pale satellite imagery. */
 const PAD_STROKE = "#ffffff";
 const PAD_CASING = "#0f172a";
+/** Selected: the same amber every other selected thing on this map wears (FootprintLayer's
+ *  COLOR_SELECTED). v1.3 — before it, the pad could not be selected at all. */
+const PAD_SELECTED = "#f59e0b";
 const COLOR_HANDLE = "#06b6d4"; // the same cyan grip the footprints use — it is the same control
 const SNAP_DEG = 5; // Shift-snap, as everywhere else
 
@@ -50,6 +55,7 @@ type Drag =
 export class HelipadLayer {
   private readonly group: L.LayerGroup;
   private airport: ProjectAirport | null = null;
+  private selected = false;
   private drag: Drag | null = null;
 
   private casing: L.Circle | null = null;
@@ -81,13 +87,16 @@ export class HelipadLayer {
   }
 
   /** Reconcile with the document. `undefined` (a project with no airport block) clears the pad. */
-  sync(airport: ProjectAirport | undefined): void {
+  sync(airport: ProjectAirport | undefined, selected = false): void {
     const next = airport ?? null;
     if (next === null) {
       if (this.airport !== null) this.clear();
       this.airport = null;
+      this.selected = false;
       return;
     }
+    const selectionChanged = this.selected !== selected;
+    this.selected = selected;
     // Mid-drag the shapes hold a PREVIEW the store hasn't been told about yet; rebuilding from the
     // stored (pre-drag) values would snap the pad back under the cursor on every unrelated repaint.
     if (this.drag !== null) {
@@ -101,6 +110,7 @@ export class HelipadLayer {
       this.airport.pad.radius !== next.pad.radius;
     this.airport = next;
     if (changed) this.rebuild();
+    else if (selectionChanged) this.restyle();
   }
 
   private clear(): void {
@@ -129,10 +139,7 @@ export class HelipadLayer {
     }).addTo(this.group);
     this.ring = L.circle(toLatLng(position), {
       radius,
-      color: PAD_STROKE,
-      weight: 2,
-      fillColor: PAD_STROKE,
-      fillOpacity: 0.12,
+      ...this.ringStyle(),
       className: "pct-helipad",
       bubblingMouseEvents: false, // grabbing the pad never starts a map pan or a place-click
     }).addTo(this.group);
@@ -157,6 +164,19 @@ export class HelipadLayer {
     this.grip.on("mousedown", this.onGrabHandle);
 
     this.layoutGlyph();
+  }
+
+  /** The ring's paint, which is the only thing selection changes. Kept in one place so `rebuild` and
+   *  `restyle` cannot drift apart. */
+  private ringStyle(): L.PathOptions {
+    const color = this.selected ? PAD_SELECTED : PAD_STROKE;
+    return { color, weight: this.selected ? 3 : 2, fillColor: color, fillOpacity: 0.12 };
+  }
+
+  /** Selection changed but the geometry did not — repaint without tearing down the shapes (the same
+   *  cheap path FootprintLayer takes; a rebuild here would drop a tooltip mid-gesture). */
+  private restyle(): void {
+    this.ring?.setStyle(this.ringStyle());
   }
 
   // ── geometry (the optional `heading` previews an un-committed angle mid-drag) ──
@@ -280,6 +300,7 @@ export class HelipadLayer {
     if (d.mode === "rotate") this.grip?.unbindTooltip();
     if (!d.moved) {
       this.rebuild(); // a click, not a drag — drop any half-applied preview
+      this.cb.onSelect(); // …and a click on the pad SELECTS it (v1.3), like a click on a footprint
       return;
     }
     if (d.mode === "move") {

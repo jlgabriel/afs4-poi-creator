@@ -212,3 +212,29 @@ export const CategoryIcon = memo(function CategoryIcon({
     </svg>
   );
 });
+
+/** The helipad (v1.3). It gets its own export rather than an ICONS entry because it is keyed by nothing
+ *  — there is no catalog category behind it; the pad is PCT's own idea of a start position, not an
+ *  object from the install. Same 0 0 24 24 line style as every glyph above, deliberately: the first cut
+ *  drew it as a solid dark disc with a white H, which was the shape the MAP uses and read as a much
+ *  heavier thing than the rows around it. On the map the pad is white-on-satellite and needs the weight;
+ *  in a list of line icons it just needs to say "H in a circle". */
+export const HelipadIcon = memo(function HelipadIcon(): React.ReactElement {
+  return (
+    <svg
+      className="pct-thumb"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="9" />
+      <line x1="9" y1="8" x2="9" y2="16" />
+      <line x1="15" y1="8" x2="15" y2="16" />
+      <line x1="9" y1="12" x2="15" y2="12" />
+    </svg>
+  );
+});

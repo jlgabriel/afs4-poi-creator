@@ -42,6 +42,7 @@ import {
 } from "../../core/catalog/footprints";
 import { destination } from "../../core/geo/geo";
 import { lineUp, spaceEvenly } from "../../core/geo/arrange";
+import { DEFAULT_PAD_RADIUS_M } from "../../core/export/planExport";
 import * as mutate from "../../core/project/mutate";
 
 export type Camera = Project["camera"];
@@ -61,6 +62,10 @@ export type PlacingSpec =
   | { kind: "xref"; name: string }
   | { kind: "airport_light"; name: string }
   | { kind: "light" }
+  // v1.3 (forum #173): the helicopter's start pad, armed from the catalog's Airport section and dropped
+  // by clicking the map — the same three gestures every other card uses. It is NOT a placed object (see
+  // placeAt), so this is the one spec that writes the airport block instead of adding to `objects`.
+  | { kind: "helipad" }
   // `naturalHeight` rides along rather than being looked up at place time. The palette has the
   // CatalogPlant in hand when it arms, so carrying it removes the only path where a plant could be
   // created with height 0 — the one value that may mean "invisible" (see mutate.createPlant).
@@ -160,7 +165,12 @@ export interface EditorState {
 
   // ── EPHEMERAL (never undo, never autosaved) ──
   selection: string[]; // placed-object ids (multi-select ready)
-  placing: PlacingSpec | null; // what click-to-place is armed for (xref / airport_light / point light)
+  // v1.3: the helipad is selected, so the Inspector shows the heliport instead of an object. A separate
+  // flag rather than a sentinel id in `selection`, because a dozen call sites do
+  // `objects.find(o => o.id === selection[0])` and every one of them would have to learn about a
+  // non-object id. Mutually exclusive with `selection` — selecting either clears the other.
+  padSelected: boolean;
+  placing: PlacingSpec | null; // what click-to-place is armed for (xref / airport_light / light / helipad)
   filter: Filter;
   mapView: Camera; // the LIVE camera; stamped into the document only at save
   cameraEpoch: number; // bumps on document load (open/new) → MapView re-centers; pan never bumps it
@@ -187,6 +197,8 @@ export interface EditorState {
   // ── selection / placement / filter (ephemeral) ──
   select: (ids: string[], additive?: boolean) => void;
   clearSelection: () => void;
+  /** Select (or deselect) the helipad. Clears any object selection — the Inspector shows one thing. */
+  selectPad: (on: boolean) => void;
   armPlacement: (spec: PlacingSpec | null) => void;
   setFilter: (patch: Partial<Filter>) => void;
   placeAt: (p: LonLat) => void;
@@ -220,6 +232,10 @@ export interface EditorState {
   setAirport: (airport: ProjectAirport | null) => void;
   moveAirportPad: (position: LonLat) => void;
   rotateAirportPad: (heading: number) => void;
+  //    v1.3: the INSPECTOR edits the heliport now (forum #173), so the two fields the dialog used to own
+  //    get their own writers rather than going through setAirport with a whole reconstructed block.
+  setAirportPadRadius: (radius: number) => void;
+  setAirportIdentity: (patch: Partial<Pick<ProjectAirport, "icao" | "name" | "country">>) => void;
   duplicateSelection: (offsetM?: number) => void;
   deleteSelection: () => void;
 
@@ -380,6 +396,7 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
           undoStack: [],
           redoStack: [],
           selection: [],
+          padSelected: false,
           placing: null,
           resolvedElev: new Map(),
           pendingRecovery: null, // a fresh document clears any recovery banner
@@ -405,6 +422,7 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
         undoStack: [],
         redoStack: [],
         selection: [],
+        padSelected: false,
         placing: null,
         filter: { query: "", category: null },
         mapView: deps.initialProject.camera,
@@ -455,14 +473,27 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
         },
 
         select: (ids, additive = false) =>
-          set((s) => ({ selection: additive ? [...new Set([...s.selection, ...ids])] : [...ids] })),
-        clearSelection: () => set({ selection: [] }),
+          set((s) => ({
+            selection: additive ? [...new Set([...s.selection, ...ids])] : [...ids],
+            padSelected: false,
+          })),
+        clearSelection: () => set({ selection: [], padSelected: false }),
+        selectPad: (on) => set({ padSelected: on, selection: [] }),
         armPlacement: (name) => set({ placing: name }),
         setFilter: (patch) => set((s) => ({ filter: { ...s.filter, ...patch } })),
 
         placeAt: (p) => {
           const spec = get().placing;
           if (spec === null) return;
+          // The pad is not an object: one per project, no catalog entry, no height, never exported into
+          // the cultivation. So it takes the same gesture and a different write, and — unlike the other
+          // kinds — placement DISARMS afterwards, because dropping a second one is not a thing you can
+          // do. Selecting it puts the heliport in the Inspector, which is where the rest of it is set.
+          if (spec.kind === "helipad") {
+            commit((proj) => mutate.placeAirportPad(proj, p, DEFAULT_PAD_RADIUS_M));
+            set({ placing: null, selection: [], padSelected: true });
+            return;
+          }
           const id = deps.newId();
           const obj =
             spec.kind === "xref"
@@ -473,7 +504,11 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
                   ? mutate.createPlant(spec.group, spec.species, spec.naturalHeight, p, { id })
                   : mutate.createLight(p, { id });
           commit((proj) => mutate.addObject(proj, obj));
-          set({ selection: [id] }); // select the fresh object; placement stays armed (multi-drop)
+          // Select the fresh object; placement stays armed (multi-drop). `padSelected` has to be cleared
+          // by hand here — this is the one selection write that does not go through `select()`, and
+          // without it, dropping an object while the pad was selected left the Inspector showing the
+          // heliport while `selection` pointed at the new object. Caught in the preview harness.
+          set({ selection: [id], padSelected: false });
         },
 
         moveObject: (id, p) => {
@@ -549,6 +584,23 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
           commitCoalesced("airport:pad:pos", (proj) => mutate.moveAirportPad(proj, position)),
         rotateAirportPad: (heading) =>
           commitCoalesced("airport:pad:rot", (proj) => mutate.rotateAirportPad(proj, heading)),
+        setAirportPadRadius: (radius) =>
+          commitCoalesced("airport:pad:radius", (proj) => mutate.setAirportPadRadius(proj, radius)),
+        // Coalesced on ONE key for all three fields, like the dialog's writer was: typing a six-character
+        // code must not cost six undo steps, and tabbing from the code to the name is one edit of one
+        // thing. A no-op when there is no block — the identity has nowhere to live without a pad, and
+        // the Inspector only shows these fields when there is one.
+        setAirportIdentity: (patch) =>
+          commitCoalesced("airport:identity", (proj) => {
+            const a = proj.airport;
+            if (a === undefined) return proj;
+            return mutate.setAirport(proj, {
+              ...a,
+              icao: patch.icao ?? a.icao,
+              name: patch.name ?? a.name,
+              country: patch.country ?? a.country,
+            });
+          }),
 
         duplicateSelection: (offsetM = 5) => {
           const { selection } = get();
@@ -585,7 +637,15 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
         },
 
         deleteSelection: () => {
-          const { selection } = get();
+          const { selection, padSelected } = get();
+          // Del on the pad removes the whole airport block, identity included — the same thing v1.2's
+          // "Remove helipad" button did, now reachable the way you remove anything else. Undo brings the
+          // code and the name back with it, because they went in one commit.
+          if (padSelected) {
+            commit((proj) => mutate.setAirport(proj, null));
+            set({ padSelected: false });
+            return;
+          }
           if (selection.length === 0) return;
           commit((proj) => {
             let next = proj;

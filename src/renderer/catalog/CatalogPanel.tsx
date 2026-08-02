@@ -22,6 +22,7 @@ import { CategoryTree } from "./CategoryTree";
 import { Thumbnail } from "./Thumbnail";
 import { HoverPreview } from "./HoverPreview";
 import { ObjectContextMenu } from "./ObjectContextMenu";
+import { AirportSection } from "./AirportSection";
 import { LightsSection } from "./LightsSection";
 import { PlantsSection } from "./PlantsSection";
 import { anchorRectOf, xrefCardPhoto, type CardPhoto, type CardPopovers } from "./cardPhoto";
@@ -279,6 +280,8 @@ export function CatalogPanel(): React.ReactElement {
       </details>
       <LightsSection popovers={popovers} />
       <PlantsSection popovers={popovers} />
+      {/* Last, and open by default: it holds one card, and it is the one people cannot find (#173). */}
+      <AirportSection />
       {/* Suppress the hover-preview while the menu is open so the two popups never stack. */}
       {hovered !== null && menu === null && <HoverPreview card={hovered.card} anchor={hovered.anchor} />}
       {menu !== null && (

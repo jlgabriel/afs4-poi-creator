@@ -386,6 +386,34 @@ export function setAirport(project: Project, airport: ProjectAirport | null, now
   return { ...project, airport, modifiedAt: now };
 }
 
+/** Put the pad AT `position`, creating the airport block if the project has none. The one mutation
+ *  allowed to bring the block into being from a map gesture, and it is deliberate: in v1.3 the pad is
+ *  placed from the catalog like any other object (forum #173), so "click the map" is the user asking
+ *  for it in as many words.
+ *
+ *  It still invents no IDENTITY — icao, name and country come in empty and the install refuses until
+ *  they are filled, which is the rule heliportTemplate exists to keep. `updatePad` below stays a no-op
+ *  on a padless project on purpose: a DRAG is not a request for an airport.
+ *
+ *  Placing again MOVES the pad rather than adding a second. A project has exactly one start position;
+ *  that is the whole reason the pad is not a PlacedObject. */
+export function placeAirportPad(
+  project: Project,
+  position: LonLat,
+  defaultRadius: number,
+  now = nowIso(),
+): Project {
+  const airport = project.airport;
+  if (airport === undefined) {
+    return {
+      ...project,
+      airport: { icao: "", name: "", country: "", pad: { position, heading: 0, radius: defaultRadius } },
+      modifiedAt: now,
+    };
+  }
+  return moveAirportPad(project, position, now);
+}
+
 /** Apply `patch` to the pad, if there is one. A project with no airport block has no pad to move, so
  *  this returns the same reference and the map's drag is a silent no-op rather than an invented airport
  *  — PCT never picks an identity (see heliportTemplate), and creating one from a drag would do exactly

@@ -142,6 +142,98 @@ describe("placeAt", () => {
   });
 });
 
+// v1.3, forum #173: the pad is placed from the catalog like any other card. It is NOT an object, so
+// this is the one spec that writes the airport block — everything below is about that difference.
+describe("placeAt — the helipad (v1.3)", () => {
+  it("writes the airport block instead of an object, and invents no identity", () => {
+    const { store } = makeStore();
+    store.getState().armPlacement({ kind: "helipad" });
+    store.getState().placeAt({ lon: 10, lat: 48 });
+    const st = store.getState();
+    expect(st.project.objects).toHaveLength(0);
+    expect(st.project.airport).toEqual({
+      icao: "",
+      name: "",
+      country: "",
+      pad: { position: { lon: 10, lat: 48 }, heading: 0, radius: 10 },
+    });
+  });
+
+  it("disarms and selects the pad — there is only one, so multi-drop is meaningless", () => {
+    const { store } = makeStore();
+    store.getState().armPlacement({ kind: "helipad" });
+    store.getState().placeAt({ lon: 10, lat: 48 });
+    const st = store.getState();
+    expect(st.placing).toBeNull();
+    expect(st.padSelected).toBe(true);
+    expect(st.selection).toEqual([]);
+  });
+
+  it("placing again MOVES the pad and keeps the identity typed in between", () => {
+    const { store } = makeStore();
+    store.getState().armPlacement({ kind: "helipad" });
+    store.getState().placeAt({ lon: 10, lat: 48 });
+    store.getState().setAirportIdentity({ icao: "pct001", name: "Roof", country: "cl" });
+    store.getState().armPlacement({ kind: "helipad" });
+    store.getState().placeAt({ lon: 11, lat: 49 });
+    const a = store.getState().project.airport;
+    expect(store.getState().project.objects).toHaveLength(0); // never a second pad
+    expect(a?.pad.position).toEqual({ lon: 11, lat: 49 });
+    expect(a).toMatchObject({ icao: "pct001", name: "Roof", country: "cl" });
+  });
+
+  // The bug the preview harness caught: this is the one selection write that does not go through
+  // select(), so it was leaving padSelected true while `selection` pointed at the new object — the
+  // Inspector showed the heliport for an object you had just placed.
+  it("dropping an OBJECT lets the pad go", () => {
+    const { store } = makeStore();
+    store.getState().armPlacement({ kind: "helipad" });
+    store.getState().placeAt({ lon: 10, lat: 48 });
+    store.getState().armPlacement({ kind: "xref", name: "tower" });
+    store.getState().placeAt({ lon: 10.1, lat: 48.1 });
+    const st = store.getState();
+    expect(st.padSelected).toBe(false);
+    expect(st.selection).toEqual(["id0"]);
+  });
+
+  it("selecting an object and selecting the pad are mutually exclusive", () => {
+    const { store } = makeStore({ initialProject: baseProject([xref("a")]) });
+    store.getState().armPlacement({ kind: "helipad" });
+    store.getState().placeAt({ lon: 10, lat: 48 });
+
+    store.getState().select(["a"]);
+    expect(store.getState().padSelected).toBe(false);
+    expect(store.getState().selection).toEqual(["a"]);
+
+    store.getState().selectPad(true);
+    expect(store.getState().selection).toEqual([]);
+    expect(store.getState().padSelected).toBe(true);
+
+    store.getState().clearSelection();
+    expect(store.getState().padSelected).toBe(false);
+  });
+
+  it("Delete on the pad removes the whole airport block, and undo brings the identity back with it", () => {
+    const { store } = makeStore();
+    store.getState().armPlacement({ kind: "helipad" });
+    store.getState().placeAt({ lon: 10, lat: 48 });
+    store.getState().setAirportIdentity({ icao: "pct001", name: "Roof", country: "cl" });
+
+    store.getState().deleteSelection();
+    expect(store.getState().project.airport).toBeUndefined();
+    expect(store.getState().padSelected).toBe(false);
+
+    store.getState().undo();
+    expect(store.getState().project.airport).toMatchObject({ icao: "pct001", name: "Roof" });
+  });
+
+  it("setAirportIdentity is a no-op without a pad — the identity has nowhere to live", () => {
+    const { store } = makeStore();
+    store.getState().setAirportIdentity({ icao: "pct001" });
+    expect(store.getState().project.airport).toBeUndefined();
+  });
+});
+
 describe("nudgeHeight — promotion + coalescing", () => {
   it("promotes terrain → terrain-offset and coalesces a rapid run into one undo entry", () => {
     const { store, clock } = makeStore({ coalesceMs: 800 });
