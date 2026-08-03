@@ -280,7 +280,10 @@ export function CatalogPanel(): React.ReactElement {
       </details>
       <LightsSection popovers={popovers} />
       <PlantsSection popovers={popovers} />
-      {/* Last, and open by default: it holds one card, and it is the one people cannot find (#173). */}
+      {/* Last, and collapsed like the other three (#184): 1.3.0 left it open to advertise the one card
+          people could not find, and ApfelFlieger — who asked for the card in the first place — said he
+          would rather have the four headers line up. A section that is the only one hanging open reads
+          as a state, not as an invitation. */}
       <AirportSection />
       {/* Suppress the hover-preview while the menu is open so the two popups never stack. */}
       {hovered !== null && menu === null && <HoverPreview card={hovered.card} anchor={hovered.anchor} />}

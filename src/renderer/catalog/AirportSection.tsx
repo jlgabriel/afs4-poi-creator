@@ -39,7 +39,7 @@ export function AirportSection(): React.ReactElement {
   }, []);
 
   return (
-    <details className="pct-lights" open>
+    <details className="pct-lights">
       <summary className="pct-lights-summary">Airport ({matches ? 1 : 0})</summary>
       <div className="pct-lights-list">
         {matches ? (
