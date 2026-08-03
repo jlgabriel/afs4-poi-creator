@@ -847,6 +847,17 @@ body {
   color: #0f172a;
   min-width: 0;
 }
+/* Placeholders are HINTS, and they were reading as answers: the browser default is rgb(117,117,117),
+   which sits at 4.6:1 on white — the same weight as the .pct-field-label above the box (4.8:1). Measured,
+   not guessed. ApfelFlieger filled in a heliport and "had to take a closer look several times to realize
+   I had not entered anything yet" (#187), and asked for writing paler than the field names. #94a3b8 is
+   the ink this app already uses for text that is present but switched off (.pct-num-off).
+   NOT applied to .pct-search: that box has no visible label, so its placeholder is the only thing naming
+   it and has to stay legible. */
+.pct-num::placeholder,
+.pct-text::placeholder {
+  color: #94a3b8;
+}
 .pct-lock {
   display: flex;
   align-items: center;
