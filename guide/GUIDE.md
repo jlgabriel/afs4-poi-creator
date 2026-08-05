@@ -17,14 +17,15 @@ section stands on its own.
 | 6 | [Heights](#6-heights--the-one-thing-that-isnt-obvious) | The one genuinely fiddly part, with a worked example flown at KDAG. |
 | 7 | [Lights and plants](#7-lights-and-plants) | Why a light shows nothing at noon, and the two fields both called "height". |
 | 8 | [Exporting and installing](#8-exporting-and-installing) | The Export dialog field by field. Uninstalling, and sharing what you made. |
-| 9 | [Cookbook](#9-cookbook--six-things-worth-building) | Six scenes worth building, and a starter project to take apart. |
-| 10 | [Making the catalog yours](#10-making-the-catalog-yours--photos-and-footprints) | Your own photos on the cards, and sizes for the objects the sim doesn't measure. |
-| 11 | [Your own models](#11-your-own-models) | Placing custom XREF objects you've added to the sim. |
-| 12 | [When something goes wrong](#12-when-something-goes-wrong) | Symptom by symptom — and where the log file is. |
-| 13 | [Where to go next](#13-where-to-go-next) | The forum, the technical reference, the source, and who built what. |
+| 9 | [Heliports](#9-heliports--somewhere-to-fly-from) | Turning the same project into a place Aerofly will let you start a flight from. |
+| 10 | [Cookbook](#10-cookbook--seven-things-worth-building) | Seven scenes worth building, and a starter project to take apart. |
+| 11 | [Making the catalog yours](#11-making-the-catalog-yours--photos-and-footprints) | Your own photos on the cards, and sizes for the objects the sim doesn't measure. |
+| 12 | [Your own models](#12-your-own-models) | Placing custom XREF objects you've added to the sim. |
+| 13 | [When something goes wrong](#13-when-something-goes-wrong) | Symptom by symptom — and where the log file is. |
+| 14 | [Where to go next](#14-where-to-go-next) | The forum, the technical reference, the source, and who built what. |
 
 **In a hurry?** Section 3 puts one object into the sim in five minutes. If it doesn't turn up, the
-answer is almost always the first line of section 12.
+answer is almost always the first line of section 13.
 
 ---
 
@@ -45,6 +46,11 @@ Placed in PCT, on a satellite map. And then the same spot, flown:
 
 That is the whole idea: what you arrange on the map is what you fly through in the sim.
 
+PCT can write that same scene out a second way, as a **heliport** — a small airport of your own that
+Aerofly lists among the places you can start a flight from, with a pad you sit on and everything you
+placed around you. That's [section 9](#9-heliports--somewhere-to-fly-from), and the rest of the guide
+applies to it unchanged: it is the same map, the same objects and the same heights.
+
 Three things are worth knowing up front:
 
 - **PCT ships no Aerofly content.** It reads the object catalog out of *your* installed copy of the
@@ -52,7 +58,7 @@ Three things are worth knowing up front:
   *names* of the objects you chose — never the objects themselves.
 - **The POIs you make are yours.** They're the program's output, not covered by PCT's license.
   Share them, post them, sell them.
-- **Nothing is permanent.** PCT installs POI folders and can uninstall the ones it made.
+- **Nothing is permanent.** PCT installs POI and heliport folders, and can uninstall the ones it made.
 
 A stock install gives PCT about **911 objects**, **41 plants** and **22 airport light fixtures** to
 work with, plus a parametric point light of PCT's own.
@@ -94,11 +100,11 @@ you're in.
 ![Shot 2.3 — the catalog PCT found, bundle by bundle](images/02_3_wizard_catalog_ready.jpg)
 
 Bundles you added yourself are listed here too, tagged `user` instead of `install` — that's the
-`xref_air_race_pylons` line above, and section 11 covers how to register your own.
+`xref_air_race_pylons` line above, and section 12 covers how to register your own.
 
 You can change the install folder later in **Settings**, and you can re-run this same scan at any
 time with **Rescan** — which is how PCT picks up anything you add to the sim afterwards. Settings is
-also where the photo and footprint folders live (section 10) and where the log file is (section 12).
+also where the photo and footprint folders live (section 11) and where the log file is (section 13).
 
 ![Shot 13 — Settings: the install and user folders, the photos folder, map tiles, the elevation provider, Rescan, the footprints Import / Export, and Diagnostics](images/13_settings.jpg)
 
@@ -131,14 +137,14 @@ and nothing around to hide what you place.
 **A restart is required.** Aerofly reads `scenery/poi/` at startup; it will not pick up a new POI
 mid-session. This catches everybody once.
 
-If you don't see it, jump to section 12 — but the overwhelmingly common cause is simply not having
+If you don't see it, jump to section 13 — but the overwhelmingly common cause is simply not having
 restarted the sim.
 
 To take it out again: **Export POI…** → the **Installed POIs** list at the bottom → **Uninstall**.
 
 That loop — place, export, restart, look — is the whole of PCT. Everything after this section refines
 it: [section 6](#6-heights--the-one-thing-that-isnt-obvious) for getting things properly onto the
-ground, and [section 9](#9-cookbook--six-things-worth-building) for ideas about what to build.
+ground, and [section 10](#10-cookbook--seven-things-worth-building) for ideas about what to build.
 
 ---
 
@@ -149,26 +155,29 @@ Four areas, and that's the whole app.
 ![Shot 05 — the whole editor: top bar, catalog, map, inspector](images/05_editor_overview.jpg)
 
 **The top bar** holds the project (name, New / Open / Save / Save As…), **Export POI…**,
-**Rescan**, **Settings**, the airport search, the **Heights** mode switch, the map style switch
-(Satellite / Streets / Custom), and a running count of what you've placed.
+**Install HELIPORT…**, **Rescan**, **Settings**, **Help ↗**, the airport search, the **Heights** mode
+switch, the map style switch (Satellite / Streets / Custom), and a running count of what you've
+placed.
 
-![Shot 14 — the top bar: project, New / Open / Save / Save As…, Export POI…, Rescan, Settings, the airport search, the Heights switch, the map style switch, and the object count](images/14_topbar.jpg)
+![Shot 14 — the top bar: project, New / Open / Save / Save As…, Export POI…, Install HELIPORT…, Rescan, Settings, Help, the airport search, the Heights switch, the map style switch, and the object count](images/14_topbar.jpg)
 
-**The Catalog panel**, on the left, is everything you can place, in three collapsible sections:
+**The Catalog panel**, on the left, is everything you can place, in four collapsible sections:
 
 - **Objects** — the built-in XREF models, with a category tree (buildings, aircraft, vehicles, items,
   jetways, construction, furniture, people, churches, comm-towers…) and a search box.
 - **Lights** — the sim's 22 airport light fixtures plus a fully parametric point light.
 - **Plants** — 41 trees and shrubs.
+- **Airport** — one card, **Start - Helicopter**: the pad a heliport is built around
+  ([section 9](#9-heliports--somewhere-to-fly-from)).
 
-![Shot 18 — the Catalog panel as it opens: three sections shut, and their counts](images/18_catalog_collapsed.jpg)
+![Shot 18 — the Catalog panel as it opens: four sections shut, and their counts](images/18_catalog_collapsed.jpg)
 
-All three start collapsed, so you can see the three families and their counts at a glance; open the
+All four start collapsed, so you can see the families and their counts at a glance; open the
 ones you're working with. Each card shows the object's name, its real footprint in metres, and its
 category. **Rest the mouse on a card** for a second and a preview pops up with the object's exact id
 spelled out.
 
-![Shot 15 — the Catalog panel with all three sections open: the search box, the category tree, and cards carrying each object's name, footprint and category](images/15_catalog_objects.jpg)
+![Shot 15 — the Catalog panel with its first three sections open: the search box, the category tree, and cards carrying each object's name, footprint and category](images/15_catalog_objects.jpg)
 
 The Objects count reads about **850**, not the 911 the scan reported. The difference is the flexible
 jetways: some 60 of those parts are bends and passenger bridges that only line up when an airport's own
@@ -183,16 +192,18 @@ features.
 
 **The Inspector**, on the right, edits whatever is selected: exact coordinates, heading, scale,
 height, a free-text label, and a lock. Select more than one object and it turns into the arrange
-panel instead — section 5. Collapsed at the bottom, **FS4 internal (.wad)** reads the same position
-back in the projected units the sim uses inside its own airport database; it changes nothing and is
-there for the few people who hand-build heliport files (section 13 says where that's documented).
+panel instead — section 5; select the helipad and it shows the whole heliport — section 9. Collapsed
+at the bottom, **FS4 internal (.wad)** reads the same position back in the projected units the sim
+uses inside its own airport database; it changes nothing and is there for the few people who
+hand-build heliport files (section 14 says where that's documented).
 
 ![Shot 16 — the Inspector with one object selected: the object's name and category, Lon/Lat, Heading °, Scale ×, the Height control, Label, Lock, and the FS4 internal (.wad) row shut at the bottom](images/16_inspector_object.jpg)
 
 Below the Inspector, **the placed list** is everything in the project. Click a row to select it,
 shift-click to add to the selection, **double-click to send the map to it** — handy once a project has
 grown past what fits on screen — and **Duplicate** / **Delete** at the top of the list act on whatever
-is selected.
+is selected. If the project has a helipad, it gets a row of its own pinned above the objects, and
+stays out of their count.
 
 ![Shot 17 — the placed list: every object in the project, one row selected, with Duplicate and Delete above](images/17_placed_list.jpg)
 
@@ -529,15 +540,144 @@ There are two different things you can hand someone, and they're worth keeping s
 | **The POI folder** | What **Export** writes: the scenery Aerofly reads. | Drop it into `scenery/poi/` and fly. Needs nothing but the sim. |
 
 Post both and you've given people something to fly *and* something to learn from — which is exactly
-what the starter project in section 9 is.
+what the starter project in section 10 is.
+
+A POI is not the only thing PCT can install. The next section turns the same project into somewhere
+you can start a flight.
 
 ---
 
-## 9. Cookbook — six things worth building
+## 9. Heliports — somewhere to fly from
 
-A map and 850 names is a blank canvas, and a blank canvas is the hardest place to start. Here are six
-scenes that take minutes and teach the tool. The first three are all rows, because rows are most of
-what anyone builds — and the three of them together are a tour of section 5.
+A POI is scenery you fly **to**. It appears in the world and that is all it does: Aerofly's
+start-location list never hears about it, so you always begin somewhere else and fly over.
+
+**Install HELIPORT…** writes the same project a second way, as a small airport of your own. It turns
+up in Aerofly's **LOCATION** list, and when you choose it you are sitting on the pad you placed, with
+everything else in the project around you.
+
+![Shot 26 — a project with a heliport in it: the Airport section in the catalog, the pad drawn on the map, the whole heliport in the Inspector, and its row at the top of the placed list](images/26_heliport_editor.jpg)
+
+It's the same scene either way — same objects, same headings, same heights. What changes is where it
+gets written (`scenery/airports/` rather than `scenery/poi/`) and that it carries the three things
+Aerofly needs in order to list a place: a code, a name and a country.
+
+**Install one or the other, not both.** The heliport takes its own copy of everything you placed, so a
+project installed as a POI *and* as a heliport puts every object into the world twice.
+
+### 1. Place the pad
+
+Open **Airport** in the catalog, click **Start - Helicopter**, then click the map. It's the same
+gesture as placing a tree or a light, and **Esc** cancels it the same way.
+
+![Shot 27 — the Airport section: one card, Start - Helicopter, armed and waiting for a map click](images/27_airport_section.jpg)
+
+**There is one pad per project.** Click the card again and the next map click *moves* the pad rather
+than adding a second one. That's the file format's rule and not a simplification: a heliport has
+exactly one master pad — its FATO/TLOF, if you've read the real-world documents.
+
+### 2. It's a point of its own
+
+The pad is drawn as a white circle at its true radius, with a tick showing which way it faces and a
+cyan grip to turn it. Drag the circle to move it, drag the grip to turn it, hold **Shift** to snap to
+5° — the same gestures an object has, because it is the same control.
+
+![Shot 28 — the pad on the map beside the example outpost: the white circle at its real size, the heading tick, and the cyan grip](images/28_helipad_on_map.jpg)
+
+It is **not** one of your objects: it never joins the object count, and it takes no height of its own.
+That separation is the reason it exists at all — a start position that was one of the placed objects
+would sooner or later spawn the helicopter inside a building.
+
+### 3. Its geometry, in the Inspector
+
+Click the pad on the map, or its row at the top of the placed list, and the whole heliport is in the
+Inspector.
+
+![Shot 29 — the Inspector on the pad: Lon and Lat, Heading — true, and Radius — m](images/29_heliport_geometry.jpg)
+
+**Lon / Lat** can be typed, and often that is the quicker way round: if you are copying a real
+heliport's published coordinates, click roughly on the map to make the pad exist, then paste the
+numbers in and watch the circle jump to where it belongs.
+
+**Heading — true** is a true compass heading, like everything else in PCT. Aerofly's own panel reports
+a heading as **magnetic**, so expect the sim to show yours a few degrees off. That gap is the local
+magnetic variation; nothing has gone wrong.
+
+**Radius — m** is the pad's radius, and it's what the circle on the map is drawn at. Aerofly reports
+the **diameter** as the pad's *Size*, so a radius of 10 m turns up in the sim as 20 m.
+
+### 4. Its identity
+
+![Shot 30 — the same panel, scrolled down: Code, Name — shown in LOCATION, Country code, and the Install into AFS4… button](images/30_heliport_identity.jpg)
+
+**Code** — four to six letters or digits. This is an airport code, and it has to be one your Aerofly
+isn't already using. PCT checks every airport in your install as you type and answers either
+**Free on this machine** or a warning. Take the warning seriously: installing over an existing code
+does not merge with that airport, it makes it disappear. Invented codes are completely normal here —
+`PCT001` is as good as anything.
+
+**Name — shown in LOCATION** is what you will search for inside the sim, so make it something you
+would type. **Twenty-nine characters maximum**: above that Aerofly drops the entire airport without
+saying so, which is why PCT counts them for you.
+
+**Country code** is two letters — `us`, `de`, `cl`. All it decides is which folder the heliport is
+filed under.
+
+None of the three is needed to move the pad around. All three are needed to install it.
+
+### 5. Install it
+
+**Install into AFS4…** at the foot of the Inspector opens the dialog. So does **Install HELIPORT…** in
+the top bar, which is the way in when nothing is selected.
+
+![Shot 31 — the Install heliport dialog: what is about to be written, and the base elevation](images/31_install_heliport_dialog.jpg)
+
+The dialog only writes. Everything under **About to install** is read back from the Inspector rather
+than typed here, so there's exactly one place to correct anything. **Base elevation — m ASL** behaves
+as it does in the Export dialog: blank asks the elevation service, a number of your own wins over it,
+and [section 6](#6-heights--the-one-thing-that-isnt-obvious) is the argument for measuring one. On a
+project set to **Sim autoheight** the field disappears, because the pad follows the sim's terrain.
+
+![Shot 32 — installed, with the folder it went into and what to do next](images/32_heliport_installed.jpg)
+
+Then **restart Aerofly FS 4**, open **LOCATION**, and **search for the name — not the code.**
+
+Aerofly's location search matches airport *names* only. And the row it hands back can come up
+**blank**: the heliport really is there — its distance is right, and the map panel draws it under your
+own name and code — but that particular list renders nothing for a code the sim's own database has
+never heard of. That one is Aerofly, not you. Pick a helicopter, and you start on the pad.
+
+### Changing it, and taking it out
+
+Change anything, install again, and PCT **replaces** what it wrote — the button reads **Replace in
+AFS4** as soon as it recognises the code as one of yours. There's no need to burn a fresh code on
+every attempt: build, fly, come back, adjust, install again.
+
+![Shot 33 — the heliports PCT has installed, each with its own Uninstall](images/33_installed_heliports.jpg)
+
+The dialog lists what PCT has installed, with **Uninstall** on each. As with POIs, PCT only lists —
+and only removes — folders it made itself, so somebody else's airport can never appear there.
+
+Heliports go into your **Documents** folder rather than the sim's install directory:
+`Aerofly FS 4/scenery/airports/<country>/<code>_<name>/`. You can zip that folder and hand it over the
+same way you would a POI, as long as its code is not already an airport on the other machine.
+
+### Doing it by hand
+
+The **Export POI…** dialog carries a checkbox, **Heliport template (advanced)**, that drops two extra
+text files into the POI folder — `heliport.tsc.txt` and `heliport.wad.txt` — with the same projection
+worked out and the identity left blank. They're inert where they land, because they end in `.txt`,
+and the steps for turning them into a working heliport are written inside each file. It predates the
+button above and it's still there, for anyone who'd rather see and edit what gets written.
+[Section 14](#14-where-to-go-next) says where that file format is documented.
+
+---
+
+## 10. Cookbook — seven things worth building
+
+A map and 850 names is a blank canvas, and a blank canvas is the hardest place to start. Here are
+seven scenes that take minutes and teach the tool. The first three are all rows, because rows are most
+of what anyone builds — and the three of them together are a tour of section 5.
 
 **A row of trees along a road.** Place one plant at each end of the stretch and a handful in between:
 the catalog card stays armed, so that's just clicking. Then shift-click the lot and press **Space
@@ -572,6 +712,13 @@ people actually want, and it's the one nobody thinks of first.
 always end up looking for one on approach. Set *Terrain*, let PCT find the ground, and you've built
 yourself a visual reference.
 
+**Somewhere to start the helicopter.** The hospital roof, the oil platform, the ridge-top clearing,
+the pad at the field you fly out of — anywhere Aerofly won't currently let you begin. Drop a
+**Start - Helicopter** pad, put a windsock and a hangar beside it so it looks lived-in, give it a
+name you'd recognise in a list, and install it as a heliport
+([section 9](#9-heliports--somewhere-to-fly-from)). This is the one that changes how you fly rather
+than what you fly past.
+
 **A starter project to open and take apart:** `guide/example/kdag_starter.json` in this repository.
 It's a small desert outpost beside the runway at Barstow-Daggett — a hangar, a windsock, two parked
 Cessnas, a fuel installation, palms and a couple of point lights. Open it in PCT, export it, fly
@@ -580,7 +727,7 @@ starting from an empty map.
 
 ---
 
-## 10. Making the catalog yours — photos and footprints
+## 11. Making the catalog yours — photos and footprints
 
 Two features that cost nothing to skip, and pay off if you use PCT a lot.
 
@@ -642,7 +789,7 @@ fixtures once and post the file for everyone else.
 
 ---
 
-## 11. Your own models
+## 12. Your own models
 
 Beyond the built-in catalog, PCT can place custom XREF objects you've added to Aerofly yourself —
 `.tmb` model files that you, or a scenery add-on, put in your `Aerofly FS 4/scenery/xref/` folder.
@@ -665,7 +812,7 @@ next to them.
 
 ---
 
-## 12. When something goes wrong
+## 13. When something goes wrong
 
 **I placed things, but the sim shows nothing.**
 
@@ -710,6 +857,23 @@ want it included.
 list browses about 850. The gap is the flexible-jetway parts, which PCT hides because they only line
 up assembled inside an airport's own scenery. Section 4 has the detail.
 
+**I installed a heliport and can't find it in LOCATION.** Restart the sim first — an airport is read
+at startup just like a POI. Then search for the **name**, not the code: Aerofly's location search
+matches names only. If the row that comes back is blank, that is expected for an invented code and the
+heliport is still there — the map panel draws it under your own name and code. Section 9.
+
+**PCT says my airport code is already an airport on this machine.** Then it is, and installing over it
+would make that airport disappear, so PCT won't. Pick another code — they're free to invent.
+
+**Install HELIPORT… says the project has no helipad.** Place one first: **Airport → Start -
+Helicopter** in the catalog, then click the map.
+
+**The heading the sim shows isn't the one I typed.** PCT's **Heading — true** is true; Aerofly
+reports pad headings as magnetic. The difference is the local magnetic variation.
+
+**Everything I built is in the world twice.** The project is installed both as a POI and as a
+heliport, and the heliport carries its own copy of every object. Uninstall one of them.
+
 **Something else.** PCT keeps a plain-text log of the session: which folders it used, what the scan
 found, and anything that failed. **Settings → Diagnostics → Open log file**. It's rewritten from
 scratch every time PCT starts, so it never grows, and nothing in it is sent anywhere. Pasting it
@@ -717,7 +881,7 @@ into a forum post saves a round of questions.
 
 ---
 
-## 13. Where to go next
+## 14. Where to go next
 
 **The forum.** PCT was born on the Aerofly forum and most of what's in it came from people there.
 Questions, bug reports and scenes you've built are all welcome:
@@ -732,9 +896,10 @@ your own `.tmb` objects, heliports, the UDP flight-data stream, the Blender pipe
 anyone building things for AFS4, whether or not they ever touch PCT.
 
 That reference is also where the Inspector's **FS4 internal (.wad)** read-out is explained: the
-projected 0–65536 grid and the radians the sim keeps inside its own world-airport database. PCT never
-writes those files. It shows you the numbers in that form because a handful of people build heliports
-by hand and were converting them in a spreadsheet.
+projected 0–65536 grid and the radians the sim keeps inside its own world-airport database. It is the
+same projection PCT works out for you when it installs a heliport (section 9); the read-out exists
+because a handful of people build those entries by hand and were converting the coordinates in a
+spreadsheet.
 
 ![Shot 25 — the FS4 internal (.wad) block expanded: the projected longitude and latitude, and the rotation in radians](images/25_wad_readout.jpg)
 

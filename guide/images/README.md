@@ -80,6 +80,38 @@ Dialogs:
 - `24_installed_pois.jpg` — the foot of the Export dialog: installed POIs, each with its Uninstall.
   (`07_export_dialog.jpg` covers the top of the same dialog.)
 
+Heliports, section 9 — the 2026-08-05 pass, and the first frames in this folder **nobody framed by
+hand**. `docs/shoot_heliport.mjs` drives the real built app through Playwright/Electron: a throwaway
+userData seeded from the real one (so the catalog, the install paths and the airport-code check are
+genuine), `guide/example/kdag_starter.json` opened through the real Open path, a `PCT001` helipad
+placed the way a user places one, installed, shot, and uninstalled again. Nothing here is from the
+sim. Re-running the script reproduces all of them; the crops are in the script's companion step.
+
+- `26_heliport_editor.jpg` — the whole editor with a heliport in it: the Airport section, the pad
+  selected on the map, the heliport in the Inspector, its row atop the placed list. The section's
+  opening frame, and the one image that shows the four places the feature lives at once.
+- `27_airport_section.jpg` — the Airport section open, its single card armed (blue outline).
+- `28_helipad_on_map.jpg` — the pad beside the example outpost: white ring at its real radius, the
+  heading tick, the cyan grip. Shot **unselected** on purpose — selected it is amber, and the text
+  right beside it says "white circle".
+- `29_heliport_geometry.jpg` / `30_heliport_identity.jpg` — the Inspector's heliport panel, top and
+  bottom. It is taller than the panel, so it is two frames rather than one squeezed one; they overlap
+  at Heading/Radius, which is what makes the pair read as one panel.
+- `31_install_heliport_dialog.jpg` — the dialog with **Base elevation** filled in, on a machine where
+  the code is still free (so the button reads *Install into AFS4*).
+- `32_heliport_installed.jpg` — the result screen: the folder it went to, and the "search LOCATION by
+  name, the row may be blank" instruction that saves the first support question.
+- `33_installed_heliports.jpg` — the same dialog after the install: the installed list with
+  **Uninstall**, and the button now reading *Replace in AFS4*. 31 and 33 are deliberately the same
+  dialog before and after, because that difference is the whole replace story.
+
+**Re-shot in the same pass, because v1.3 made them wrong:**
+
+- `14_topbar.jpg` — the old one had no **Install HELIPORT…** and no **Help ↗**. Same framing (one
+  row, full window width).
+- `18_catalog_collapsed.jpg` — the old one showed three sections; there are four since the **Airport**
+  section arrived.
+
 ## Optional, never shot
 
 - **Re-shoot `05_editor_overview.jpg`.** The current one is from 0.9.0 — the title bar says so, and
