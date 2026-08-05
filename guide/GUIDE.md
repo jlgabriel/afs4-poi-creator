@@ -644,8 +644,14 @@ Then **restart Aerofly FS 4**, open **LOCATION**, and **search for the name — 
 
 Aerofly's location search matches airport *names* only. And the row it hands back can come up
 **blank**: the heliport really is there — its distance is right, and the map panel draws it under your
-own name and code — but that particular list renders nothing for a code the sim's own database has
-never heard of. That one is Aerofly, not you. Pick a helicopter, and you start on the pad.
+own name and code — but that particular list takes its text from the sim's own world database, which
+has never heard of a code you invented. That one is Aerofly, not you. Pick a helicopter, and you start
+on the pad.
+
+If the blank row bothers you, there's a way around it: use the **real** code of the place you're
+building, looked up on ourairports.com or metar-taf.com. The sim's database knows that one, so the
+search row comes back filled in — under *its* name rather than yours. It costs a minute, and it is the
+only difference an invented code makes.
 
 ### Changing it, and taking it out
 

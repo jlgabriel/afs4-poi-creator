@@ -8,7 +8,7 @@ terminals, vehicles, parked aircraft, street lamps and more — **and light it u
 them on a real satellite map, and PCT hands you a scenery folder you drop straight into the sim.
 No modelling, no file editing.
 
-**New here? → [Read the guide](guide/GUIDE.md).** Thirteen sections and thirty-one pictures, from a
+**New here? → [Read the guide](guide/GUIDE.md).** Fourteen sections and thirty-nine pictures, from a
 [five-minute quickstart](guide/GUIDE.md#3-quickstart--one-object-five-minutes) to the one part that
 isn't obvious — getting what you place onto the ground. A twelve-object
 [starter project](guide/example/kdag_starter.json) comes with it, ready to install and then take
@@ -26,7 +26,8 @@ POI-folder conventions.
 > search, per-object height, export / install / uninstall) are built and tested — unit + golden
 > tests, typecheck, and Electron end-to-end tests, all green in [CI](.github/workflows/ci.yml).
 > Lights, plants, your own custom XREF objects, an optional "Sim autoheight" export mode, real
-> object photos, hand-measured footprints and one-click straightening of a whole row are all in —
+> object photos, hand-measured footprints, one-click straightening of a whole row, and installing a
+> project as a **heliport you can start a flight from** are all in —
 > each feature below is tagged with the version it arrived in, and the
 > release notes carry the full history. The export format is **confirmed working in the sim**. Builds
 > are currently **unsigned**, so your OS will warn you once on first launch — see
@@ -78,6 +79,12 @@ every gap the same length, and **Match row** turns them all to face along it, wh
 aircraft nose-to-tail in one click. There's no "align left" here on purpose — left is *west*, and a
 real apron is hardly ever north-south. All three work along the row itself, at whatever angle it runs.
 
+**Somewhere to fly *from*, too.** A POI is scenery you fly **to** — Aerofly's start-location list never
+hears about it. Since **v1.1** the same project can also be installed as a **heliport**: a small airport
+of your own that turns up in the sim's LOCATION menu, with a pad you start on and everything you placed
+around you. Since **v1.3** the pad is placed from the catalog like any other object and edited in the
+inspector like any other object. See [Heliports you can fly from](#heliports-you-can-fly-from).
+
 **It ships no Aerofly content.** PCT reads the object catalog from *your* installed copy of the sim,
 so you only ever place objects you already own. Nothing from the sim is copied into this project or
 into your finished POIs — just the *names* of the objects you chose.
@@ -101,7 +108,7 @@ The short version is below. For the whole thing walked through with pictures, se
    **light or a plant** a size too, by measuring it yourself: see
    [Footprints you measure yourself](#footprints-you-measure-yourself).
    Below the catalog, the **Lights** section holds the airport-light fixtures and the custom point light,
-   and **Plants** holds the trees and shrubs.
+   **Plants** holds the trees and shrubs, and **Airport** holds the helicopter start pad.
 4. **Export & install** — *Export POI → Install into Aerofly FS 4* writes the folder into your
    `scenery/poi/`. Restart Aerofly and fly to the spot. The same dialog can **uninstall** POIs that
    PCT made, so nothing is permanent. If you'd rather **start** a flight there than fly to it,
@@ -199,15 +206,29 @@ yours and tells you how many entries it added and how many of yours it replaced.
 
 ### Heliports you can fly from
 
-*(v1.1)* A POI is scenery you fly **to**. **Install HELIPORT…** turns the same project into a small
-**airport** you can start a flight **from** — Aerofly puts it in the LOCATION menu and on the map, and
-your objects come along around the pad. It doesn't replace the POI export; it's a second, separate copy,
-written into your user folder's `scenery/airports/`. Suggested and worked through on the forum by
-**@ApfelFlieger**, who builds these by hand.
+*(v1.1, reshaped in v1.3)* A POI is scenery you fly **to**. **Install HELIPORT…** turns the same project
+into a small **airport** you can start a flight **from** — Aerofly puts it in the LOCATION menu and on the
+map, and your objects come along around the pad. It doesn't replace the POI export; it's a second,
+separate copy, written into your user folder's `scenery/airports/`. Suggested and worked through on the
+forum by **@ApfelFlieger**, who builds these by hand.
+[Section 9 of the guide](guide/GUIDE.md#9-heliports--somewhere-to-fly-from) walks the whole thing through
+with pictures.
 
-You give it three things — an **airport code**, a **name** and a two-letter **country code** — and place
-**the helipad**: a white circle with an **H** that you drag on the map, with a cyan grip to turn it and a
-radius in metres. The pad is **its own point**, deliberately not attached to any object you placed, so the
+Since **v1.3** it is built the same way as everything else in PCT — nothing about it lives in a dialog
+you have to open first:
+
+1. **Place the pad.** The catalog's **Airport** section holds one card, **Start - Helicopter**. Click
+   it, then click the map, exactly as you would place a tree or a light. There is **one pad per
+   project**, so clicking the map again *moves* it rather than adding a second.
+2. **Edit it in the inspector.** Select the pad — on the map, or from its own row at the top of the
+   placed list — and the whole heliport is there: the pad's **Lon/Lat**, **Heading** and **Radius**, and
+   the airport's **code**, **name** and two-letter **country code**.
+3. **Install it.** **Install into AFS4…** at the foot of the inspector, or **Install HELIPORT…** in the
+   top bar when nothing is selected. The dialog is only about writing now — the base elevation, the
+   overwrite confirmation, the result, and the list of what PCT has already installed.
+
+On the map the pad is a white circle drawn at its real radius, with a tick showing which way it faces and
+a cyan grip to turn it. It is **its own point**, deliberately not one of the objects you placed, so the
 helicopter never starts inside a building.
 
 - **The code has teeth.** If an airport already installed on your machine uses it, Aerofly quietly
@@ -224,8 +245,9 @@ helicopter never starts inside a building.
 - **Heading is TRUE degrees**; Aerofly's menu displays it magnetic, so expect it to read a few degrees
   off. **Radius** is metres — the sim shows the diameter as "Size".
 - **Adjusting and trying again is the normal case** *(v1.2)*. The code, the name, the country and the pad
-  are saved **in your project**, so reopening the dialog has them filled in, and building the same
-  heliport again **replaces** the one you installed instead of demanding a fresh code. Rooftop pads in
+  are saved **in your project**, so they're waiting in the inspector where you left them, and installing
+  the same heliport again **replaces** the one already on disk instead of demanding a fresh code — the
+  button reads *Replace in AFS4* once PCT recognises the code as one of yours. Rooftop pads in
   particular take a few laps to get the height right.
 - **Nothing is permanent.** The dialog lists the heliports PCT installed, each with **Uninstall**, and it
   only ever lists — or deletes — folders PCT wrote itself.
@@ -264,9 +286,9 @@ A couple of things worth knowing about the editor:
     Suggested and worked out on the forum by **@chrispriv**, with **@ApfelFlieger**.
 - **FS4 internal (.wad)** *(v0.9.1)* — a read-out, collapsed at the foot of the inspector, giving the
   selected object's position in the projected units Aerofly keeps inside its own **world-airport
-  database**, and its rotation in radians. It changes nothing and PCT never writes those files; it's
-  there because a handful of people hand-build heliport entries and were converting coordinates in a
-  spreadsheet. The projection is documented in the
+  database**, and its rotation in radians. It changes nothing: it's the same projection PCT works out
+  for itself when it installs a heliport, surfaced here because a handful of people hand-build those
+  entries and were converting the coordinates in a spreadsheet. The projection is documented in the
   [technical reference](reference/AFS4_KNOWLEDGE_BASE_EN.md).
 - **If something goes wrong**, PCT keeps a plain-text log of the session — the folders it used, what
   the scan found, and anything that failed. **Settings → Diagnostics → Open log file**. It's
@@ -354,12 +376,13 @@ from a real session at Barstow-Daggett:
 
 **→ [guide/GUIDE.md](guide/GUIDE.md)**
 
-Thirteen sections and thirty-one pictures: a five-minute quickstart that puts one unmissable object
+Fourteen sections and thirty-nine pictures: a five-minute quickstart that puts one unmissable object
 beside a runway, the editor panel by panel, placing and rotating, straightening and spacing a whole
 row at once, **heights** — the part that repays reading, worked through as the three passes it
 actually takes rather than the one you would hope for — lights and plants, exporting and installing,
-a cookbook of six scenes worth building, photos and footprints of your own, your own models, and
-what to look at when something doesn't show up in the sim.
+**heliports** end to end from the catalog card to the LOCATION menu, a cookbook of seven scenes worth
+building, photos and footprints of your own, your own models, and what to look at when something
+doesn't show up in the sim.
 
 A twelve-object starter project comes with it, ready to install and then take apart:
 [guide/example/kdag_starter.json](guide/example/kdag_starter.json).
