@@ -39,3 +39,4 @@ docs/
 # Local reference material — never published. Kept on disk, root-anchored
 # so nothing here is ever `git add`-ed.
 /_local_reference/
+/_act-airport_creation_tool/
