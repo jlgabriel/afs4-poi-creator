@@ -151,12 +151,13 @@ describe("placeAt — the helipad (v1.3)", () => {
     store.getState().placeAt({ lon: 10, lat: 48 });
     const st = store.getState();
     expect(st.project.objects).toHaveLength(0);
-    expect(st.project.airport).toEqual({
-      icao: "",
-      name: "",
-      country: "",
-      pad: { position: { lon: 10, lat: 48 }, heading: 0, radius: 10 },
-    });
+    // The id is minted, so it is asserted as "present" rather than by value.
+    const pad = st.project.airport?.pads[0];
+    expect(st.project.airport).toMatchObject({ icao: "", name: "", country: "" });
+    expect(st.project.airport?.pads).toHaveLength(1);
+    expect(pad).toMatchObject({ name: "", position: { lon: 10, lat: 48 }, heading: 0, radius: 10 });
+    expect(pad?.id).toBeTruthy();
+    expect(st.project.airport?.pad).toEqual(pad); // the compat mirror rides along
   });
 
   it("disarms and selects the pad — there is only one, so multi-drop is meaningless", () => {
@@ -178,7 +179,8 @@ describe("placeAt — the helipad (v1.3)", () => {
     store.getState().placeAt({ lon: 11, lat: 49 });
     const a = store.getState().project.airport;
     expect(store.getState().project.objects).toHaveLength(0); // never a second pad
-    expect(a?.pad.position).toEqual({ lon: 11, lat: 49 });
+    expect(a?.pads[0]?.position).toEqual({ lon: 11, lat: 49 });
+    expect(a?.pads).toHaveLength(1); // moved, not appended
     expect(a).toMatchObject({ icao: "pct001", name: "Roof", country: "cl" });
   });
 

@@ -12,6 +12,7 @@ import { shiftEastNorth } from "../../core/geo/geo";
 import { centroid, poiFolderName } from "../../core/geo/poiName";
 import { unsupportedInAutoheight } from "../../core/export/heights";
 import { firstProjectError, isExportablePoiName } from "../../core/project/schemas";
+import { firstPad } from "../../core/project/airport";
 import { editorStore, useEditor } from "../state/editorStore";
 import { getPct } from "../app/pct";
 import { unregisteredPlacedNames } from "../catalog/registration";
@@ -225,7 +226,11 @@ export function ExportDialog({ onClose }: { onClose: () => void }): React.ReactE
     // The project's own pad (v1.2) wins over anything typed here — it is the one the map draws and the
     // one "Create heliport…" installs, so the template must not describe a different helipad from the
     // real thing. Only a project that has never opened that dialog falls back to the radius field.
-    if (heliport) opts.heliport = { pad: storeAirport?.pad ?? null, radiusM: padRadius };
+    if (heliport) {
+      opts.heliport = { pads: storeAirport?.pads ?? [], radiusM: padRadius };
+      if (storeAirport?.position !== undefined) opts.heliport.position = storeAirport.position;
+      if (storeAirport?.iata !== undefined) opts.heliport.iata = storeAirport.iata;
+    }
     // Autoheight is fully offline: the sim resolves the terrain, so a base elevation has no meaning (main
     // ignores it too). Baked-asl passes it through as the offline/manual fallback.
     if (!autoheight && baseElevation !== undefined) opts.baseElevation = baseElevation;
@@ -369,11 +374,12 @@ export function ExportDialog({ onClose }: { onClose: () => void }): React.ReactE
               </label>
               {heliport && (
                 <>
-                  {storeAirport !== undefined ? (
+                  {firstPad(storeAirport) !== undefined ? (
                     <span className="pct-field-meta">
                       Uses this project&apos;s helipad — the white circle on the map, radius{" "}
-                      {storeAirport.pad.radius} m, heading {Math.round(storeAirport.pad.heading)}° true.
-                      Drag it on the map, or select it to edit it in the Inspector.
+                      {firstPad(storeAirport)?.radius} m, heading{" "}
+                      {Math.round(firstPad(storeAirport)?.heading ?? 0)}° true. Drag it on the map, or
+                      select it to edit it in the Inspector.
                     </span>
                   ) : (
                     <>

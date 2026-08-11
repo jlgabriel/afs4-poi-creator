@@ -372,7 +372,21 @@ export function setCamera(project: Project, camera: Project["camera"], now = now
 // block, while the MAP drags the pad and turns it. Splitting them keeps the map from having to know an
 // identity it never shows, and keeps a drag from being able to clobber a code the user just typed.
 
-/** Adopt (or drop, with `null`) the whole airport block. The dialog's writer: identity plus pad in one
+/** Keep `airport.pad` equal to `pads[0]` (types.ts explains why the mirror exists). EVERY writer below
+ *  funnels through here, so no path can produce a block whose mirror has drifted — an older PCT reading
+ *  a stale mirror would put the helipad somewhere the user moved it away from. */
+function withPadMirror(airport: ProjectAirport): ProjectAirport {
+  const first = airport.pads[0];
+  if (first === undefined) {
+    if (airport.pad === undefined) return airport;
+    const next = { ...airport };
+    delete next.pad;
+    return next;
+  }
+  return airport.pad === first ? airport : { ...airport, pad: first };
+}
+
+/** Adopt (or drop, with `null`) the whole airport block. The dialog's writer: identity plus pads in one
  *  commit, because the user typed them together. Absent ≡ "this project is POI-only" — the same
  *  absent-means-default rule `shift` and `heightMode` follow, so a project that never opened the
  *  heliport dialog stays byte-identical on save. */
@@ -383,10 +397,43 @@ export function setAirport(project: Project, airport: ProjectAirport | null, now
     delete next.airport;
     return next;
   }
-  return { ...project, airport, modifiedAt: now };
+  return { ...project, airport: withPadMirror(airport), modifiedAt: now };
 }
 
-/** Put the pad AT `position`, creating the airport block if the project has none. The one mutation
+/** The airport's OWN point (types.ts ProjectAirport.position), independent of any pad. `null` clears it,
+ *  which puts the block back on "follow the first pad" — the v1.2/v1.3 behaviour. */
+export function setAirportPosition(project: Project, position: LonLat | null, now = nowIso()): Project {
+  const airport = project.airport;
+  if (airport === undefined) return project;
+  if (position === null) {
+    if (airport.position === undefined) return project;
+    const next = { ...airport };
+    delete next.position;
+    return { ...project, airport: next, modifiedAt: now };
+  }
+  return { ...project, airport: { ...airport, position }, modifiedAt: now };
+}
+
+/** IATA code (forum #220). Empty string clears it — the `.wad` row is written either way, just blank. */
+export function setAirportIata(project: Project, iata: string, now = nowIso()): Project {
+  const airport = project.airport;
+  if (airport === undefined) return project;
+  if ((airport.iata ?? "") === iata) return project;
+  if (iata === "") {
+    const next = { ...airport };
+    delete next.iata;
+    return { ...project, airport: next, modifiedAt: now };
+  }
+  return { ...project, airport: { ...airport, iata }, modifiedAt: now };
+}
+
+/** A fresh pad, unnamed and facing true north. Unnamed is not a placeholder: the writer renders it as
+ *  "FATO/TLOF", the literal v1.2/v1.3 always emitted, so a one-pad project's files do not move. */
+function newPad(position: LonLat, radius: number, id = randomId()): AirportPad {
+  return { id, name: "", position, heading: 0, radius };
+}
+
+/** Put the FIRST pad AT `position`, creating the airport block if the project has none. The one mutation
  *  allowed to bring the block into being from a map gesture, and it is deliberate: in v1.3 the pad is
  *  placed from the catalog like any other object (forum #173), so "click the map" is the user asking
  *  for it in as many words.
@@ -395,8 +442,10 @@ export function setAirport(project: Project, airport: ProjectAirport | null, now
  *  they are filled, which is the rule heliportTemplate exists to keep. `updatePad` below stays a no-op
  *  on a padless project on purpose: a DRAG is not a request for an airport.
  *
- *  Placing again MOVES the pad rather than adding a second. A project has exactly one start position;
- *  that is the whole reason the pad is not a PlacedObject. */
+ *  ⚠️ Placing again MOVES the first pad rather than adding a second — the v1.3 behaviour, kept because
+ *  the v1.3 UI is still the one calling this and it has exactly one pad card. `addAirportPad` is the
+ *  mutation that grows the list, and it is what the reworked AIRPORT menu (forum #219/#221, where
+ *  HELICOPTER is repeatable) will call instead. */
 export function placeAirportPad(
   project: Project,
   position: LonLat,
@@ -405,44 +454,96 @@ export function placeAirportPad(
 ): Project {
   const airport = project.airport;
   if (airport === undefined) {
+    const pad = newPad(position, defaultRadius);
     return {
       ...project,
-      airport: { icao: "", name: "", country: "", pad: { position, heading: 0, radius: defaultRadius } },
+      airport: { icao: "", name: "", country: "", pads: [pad], pad },
       modifiedAt: now,
     };
   }
+  if (airport.pads.length === 0) return addAirportPad(project, position, defaultRadius, now);
   return moveAirportPad(project, position, now);
 }
 
-/** Apply `patch` to the pad, if there is one. A project with no airport block has no pad to move, so
- *  this returns the same reference and the map's drag is a silent no-op rather than an invented airport
- *  — PCT never picks an identity (see heliportTemplate), and creating one from a drag would do exactly
- *  that. */
-function updatePad(project: Project, patch: (pad: AirportPad) => AirportPad, now: string): Project {
+/** APPEND a pad (forum #221 — "this element can now be used as often as desired"; his SCLC ships three).
+ *  Creates the airport block when there is none, same rule as placeAirportPad. */
+export function addAirportPad(
+  project: Project,
+  position: LonLat,
+  defaultRadius: number,
+  now = nowIso(),
+  id?: string,
+): Project {
+  const pad = newPad(position, defaultRadius, id);
+  const airport = project.airport;
+  const next: ProjectAirport =
+    airport === undefined
+      ? { icao: "", name: "", country: "", pads: [pad] }
+      : { ...airport, pads: [...airport.pads, pad] };
+  return { ...project, airport: withPadMirror(next), modifiedAt: now };
+}
+
+/** Drop a pad by id. A pad-less airport stays a valid block — his "(1) DATA" example is an airport with
+ *  no pads — so this never deletes the airport itself. */
+export function removeAirportPad(project: Project, padId: string, now = nowIso()): Project {
   const airport = project.airport;
   if (airport === undefined) return project;
-  const pad = patch(airport.pad);
-  if (pad === airport.pad) return project;
-  return { ...project, airport: { ...airport, pad }, modifiedAt: now };
+  const pads = airport.pads.filter((p) => p.id !== padId);
+  if (pads.length === airport.pads.length) return project;
+  return { ...project, airport: withPadMirror({ ...airport, pads }), modifiedAt: now };
 }
 
-/** Drag the pad to a new centre. */
-export function moveAirportPad(project: Project, position: LonLat, now = nowIso()): Project {
-  return updatePad(project, (pad) => ({ ...pad, position }), now);
+/** Apply `patch` to one pad. A project with no airport block has no pad to move, so this returns the
+ *  same reference and the map's drag is a silent no-op rather than an invented airport — PCT never picks
+ *  an identity (see heliportTemplate), and creating one from a drag would do exactly that.
+ *
+ *  `padId` undefined targets the FIRST pad, which is what every v1.3 caller means: that UI knows one. */
+function updatePad(
+  project: Project,
+  patch: (pad: AirportPad) => AirportPad,
+  now: string,
+  padId?: string,
+): Project {
+  const airport = project.airport;
+  if (airport === undefined) return project;
+  const i = padId === undefined ? 0 : airport.pads.findIndex((p) => p.id === padId);
+  const current = i < 0 ? undefined : airport.pads[i];
+  if (current === undefined) return project;
+  const pad = patch(current);
+  if (pad === current) return project;
+  const pads = [...airport.pads];
+  pads[i] = pad;
+  return { ...project, airport: withPadMirror({ ...airport, pads }), modifiedAt: now };
 }
 
-/** Turn the pad. `heading` is TRUE compass degrees, normalised into [0, 360) like every other facing
+/** Drag a pad to a new centre. */
+export function moveAirportPad(project: Project, position: LonLat, now = nowIso(), padId?: string): Project {
+  return updatePad(project, (pad) => ({ ...pad, position }), now, padId);
+}
+
+/** Turn a pad. `heading` is TRUE compass degrees, normalised into [0, 360) like every other facing
  *  in the model — the sim's `heading` field is true (gate 2026-07-31), so it is written verbatim and
  *  what the user sees on the map is what the file gets. */
-export function rotateAirportPad(project: Project, heading: number, now = nowIso()): Project {
+export function rotateAirportPad(project: Project, heading: number, now = nowIso(), padId?: string): Project {
   const h = norm360(heading);
-  return updatePad(project, (pad) => (pad.heading === h ? pad : { ...pad, heading: h }), now);
+  return updatePad(project, (pad) => (pad.heading === h ? pad : { ...pad, heading: h }), now, padId);
 }
 
-/** Resize the pad. Metres — the sim shows the diameter, so radius 10 reads as "Size 66 ft / 20 m".
+/** Resize a pad. Metres — the sim shows the diameter, so radius 10 reads as "Size 66 ft / 20 m".
  *  Non-positive is refused rather than clamped: it comes from a number field, and a silently corrected
  *  value is how you end up not noticing you typed one. */
-export function setAirportPadRadius(project: Project, radius: number, now = nowIso()): Project {
+export function setAirportPadRadius(
+  project: Project,
+  radius: number,
+  now = nowIso(),
+  padId?: string,
+): Project {
   if (!(Number.isFinite(radius) && radius > 0)) return project;
-  return updatePad(project, (pad) => (pad.radius === radius ? pad : { ...pad, radius }), now);
+  return updatePad(project, (pad) => (pad.radius === radius ? pad : { ...pad, radius }), now, padId);
+}
+
+/** Name a pad (forum #221 — "the name can be freely assigned"; it is what LOCATION shows). Empty is
+ *  legal and means unnamed, which the writer renders as "FATO/TLOF". */
+export function setAirportPadName(project: Project, name: string, now = nowIso(), padId?: string): Project {
+  return updatePad(project, (pad) => (pad.name === name ? pad : { ...pad, name }), now, padId);
 }

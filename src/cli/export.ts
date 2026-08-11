@@ -16,6 +16,7 @@ import os from "node:os";
 import path from "node:path";
 import type { ExportPlan, Project } from "../core/project/types";
 import { DEFAULT_PAD_RADIUS_M, planExport } from "../core/export/planExport";
+import { firstPad } from "../core/project/airport";
 import { directionToHeading } from "../core/geo/orientation";
 import {
   NeedsElevationError,
@@ -166,7 +167,7 @@ function main(): number {
   // saying "put it where that object is", kept because the gate scripts use it — and it now COPIES the
   // object's position and heading into a pad of its own rather than leaving the pad bound to the object
   // (forum #168: a bound pad spawns the helicopter inside the XREF it borrowed its coordinates from).
-  let pad = project.airport?.pad ?? null;
+  let pad = firstPad(project.airport) ?? null;
   if (args.heliportObjectId !== null) {
     const o = project.objects.find((x) => x.id === args.heliportObjectId);
     if (o === undefined) {
@@ -175,13 +176,15 @@ function main(): number {
     }
     const heading =
       o.kind === "xref" ? directionToHeading(o.direction) : o.kind === "airport_light" ? o.orientation : 0;
-    pad = { position: o.position, heading, radius: args.heliportRadius };
+    // Built here and thrown away — it is never stored, so the id only has to be non-empty, and a fixed
+    // one keeps two runs of the same command byte-identical.
+    pad = { id: "cli-pad", name: "", position: o.position, heading, radius: args.heliportRadius };
   } else if (pad !== null && args.heliportRadius !== DEFAULT_PAD_RADIUS_M) {
     pad = { ...pad, radius: args.heliportRadius }; // an explicit --heliport-radius overrides the stored one
   }
 
   const plan = planExport(project, resolved, {
-    heliport: args.heliport ? { pad, radiusM: args.heliportRadius } : undefined,
+    heliport: args.heliport ? { pads: pad === null ? [] : [pad], radiusM: args.heliportRadius } : undefined,
   });
   for (const w of plan.warnings) console.warn(`WARNING: ${w}`);
 

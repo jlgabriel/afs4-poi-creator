@@ -207,8 +207,18 @@ export type HeightMode = "baked-asl" | "autoheight";
  *  starting position for Helicopter should be independent of XREF objects because this will lead to
  *  collisions too quickly". A pad that IS an object puts the helicopter inside the mast or the hangar
  *  it borrowed its coordinates from. The user can still seed it from a selection — that is a one-shot
- *  copy of two numbers, not a link. */
+ *  copy of two numbers, not a link.
+ *
+ *  ★ v1.4: a project may carry SEVERAL. ApfelFlieger's submenu split (forum #221) makes HELICOPTER a
+ *  repeatable element — his own SCLC ships three — and gives each pad a free NAME, shown in LOCATION.
+ *  Until then there was exactly one, unnamed, always written as the literal "FATO/TLOF". */
 export interface AirportPad {
+  /** Stable across reorder and delete, so a map drag can name its target without an index. Same reason
+   *  PlacedObject carries one; pads are minted with the same `randomId`. */
+  id: string;
+  /** Shown in LOCATION (forum #221). Free text. EMPTY means "unnamed", and the writer then emits
+   *  "FATO/TLOF" — which is what v1.2/v1.3 hard-coded, so a migrated project's files do not move. */
+  name: string;
   position: LonLat; // pad centre
   heading: number; // TRUE compass degrees (the sim's `heading` field is true — gate 2026-07-31)
   radius: number; // metres; the sim shows the DIAMETER as "Size" (radius 10 → "66 ft / 20 m")
@@ -232,7 +242,33 @@ export interface ProjectAirport {
   icao: string; // 4-6 chars; lowercase on disk, shown uppercase in the UI (forum #170 EDIT 2)
   name: string; // shown in LOCATION; <= SNAME_MAX or the sim drops the whole airport
   country: string; // two lowercase letters — ALSO a path segment under scenery/airports/
-  pad: AirportPad;
+  /** IATA code, v1.4 (forum #220): "if airports have a IATA code, it is also displayed in FS 4". Its
+   *  own row in the `.wad` and empty in every file PCT has written so far, hence optional. */
+  iata?: string;
+  /** The AIRPORT's own point, v1.4 — independent of any pad.
+   *
+   *  ApfelFlieger asked for the split in #15 and then SHIPPED it: his older hand-built `.wad` carried
+   *  the FIRST HELIPAD's projected position (verified exact — it was an unexplained oddity in our notes
+   *  for days), while the #220/#221 files carry the airport's own `-70.582247 -33.380724` even though
+   *  that project has three pads. So the coupling was an artefact of his manual method, not a rule.
+   *
+   *  ABSENT ≡ the first pad's position, which is exactly how v1.2/v1.3 behaved — so a migrated project
+   *  keeps writing the same coordinates until someone moves this point on purpose. */
+  position?: LonLat;
+  /** Every helipad, in document order. May be EMPTY: his "(1) DATA" example is a complete airport with
+   *  no pads at all — identity plus a database entry. */
+  pads: AirportPad[];
+  /** ⚠️ COMPATIBILITY MIRROR of `pads[0]` — written, never read by this version.
+   *
+   *  `zProject.parse` THROWS, and `zAirport` before v1.4 required `pad`, so a project that carries only
+   *  `pads` does not merely lose its airport in PCT <= 1.3 — it fails to OPEN AT ALL. Projects get
+   *  shared (that is the whole point of the block: "it can be passed on like a POI"), and Michael tests
+   *  every release, so the common case has to keep working. Mirroring the first pad costs one line and
+   *  buys that: one pad → older PCT opens it and sees exactly what it saw before.
+   *
+   *  Absent when `pads` is empty — an older PCT cannot represent a pad-less airport anyway, and inventing
+   *  a fake pad to keep it loading would put a helipad in the sim that the user never placed. */
+  pad?: AirportPad;
 }
 
 /** The editable working file (`project.json`). */

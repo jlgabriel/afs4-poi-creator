@@ -4,6 +4,7 @@ import {
   CONFIGURATION_RE,
   firstProjectError,
   isExportablePoiName,
+  LEGACY_PAD_ID,
   migrateProject,
   parseProject,
   parseSettings,
@@ -287,9 +288,45 @@ describe("zProject — the airport block", () => {
     pad: { position: { lon: -70.3130659, lat: -18.4827329 }, heading: 90, radius: 10 },
   };
 
-  it("round-trips a project that has one", () => {
+  // v1.4 (forum #221) made HELICOPTER repeatable, so the single `pad` became a `pads` list. AIRPORT above
+  // is the v1.2/v1.3 shape on purpose: it is what is sitting in users' files today.
+  it("lifts a v1.3 single pad into the pads list, keeping the mirror", () => {
     const p = parseProject({ ...validProject(), airport: AIRPORT });
-    expect(p.airport).toEqual(AIRPORT);
+    expect(p.airport?.pads).toHaveLength(1);
+    expect(p.airport?.pads[0]).toEqual({ id: LEGACY_PAD_ID, name: "", ...AIRPORT.pad });
+    // The mirror is what lets PCT <= 1.3 still open the file after we save it back.
+    expect(p.airport?.pad).toEqual(p.airport?.pads[0]);
+    expect(p.airport?.icao).toBe("shjl");
+  });
+
+  // The migrated id must be FIXED, not minted: migration runs on every open, so a random one would make
+  // the file differ from itself on the next save.
+  it("gives the migrated pad a stable id across repeated opens", () => {
+    const once = parseProject({ ...validProject(), airport: AIRPORT });
+    const twice = parseProject({ ...validProject(), airport: AIRPORT });
+    expect(once.airport?.pads[0]?.id).toBe(twice.airport?.pads[0]?.id);
+    // …and re-opening what we just wrote is a no-op, not a second migration.
+    const again = parseProject({ ...validProject(), airport: once.airport });
+    expect(again.airport).toEqual(once.airport);
+  });
+
+  it("round-trips a project already in the v1.4 shape", () => {
+    const pads = [
+      { id: "pad-1", name: "FATO/TLOF", position: { lon: -70.58, lat: -33.38 }, heading: 70, radius: 5 },
+      { id: "pad-2", name: "Helipad_W1", position: { lon: -70.59, lat: -33.39 }, heading: 250, radius: 5 },
+    ];
+    const airport = { icao: "sclc", name: "Vitacura", country: "cl", iata: "CLC", pads, pad: pads[0] };
+    const p = parseProject({ ...validProject(), airport });
+    expect(p.airport).toEqual(airport);
+  });
+
+  it("accepts an airport with no pads at all", () => {
+    // His "(1) DATA" example is exactly that: identity plus a database entry, no helipad.
+    const p = parseProject({
+      ...validProject(),
+      airport: { icao: "sclc", name: "Vitacura", country: "cl", pads: [] },
+    });
+    expect(p.airport?.pads).toEqual([]);
   });
 
   it("stays optional — a POI-only project is unchanged", () => {

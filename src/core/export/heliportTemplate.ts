@@ -120,13 +120,32 @@ export function identityProblemText(p: IdentityProblem): string {
 
 /** Everything the two files need, all of it already resolved by planExport (positions SHIFTED, height
  *  resolved) so this module is pure formatting. */
-export interface HeliportSpec {
-  /** Pad centre, degrees — the placed object the user picked, or the POI's anchor. */
+/** One helipad as the two writers want it. Positions are already shifted with the scene. */
+export interface HeliportPadSpec {
+  /** Shown in LOCATION (forum #221). EMPTY → "FATO/TLOF", the literal v1.2/v1.3 always wrote, so a
+   *  project that predates named pads keeps producing the same bytes. */
+  name: string;
+  /** Pad centre, degrees. */
   position: LonLat;
   /** TRUE compass degrees. Written verbatim: the sim's `heading` field is true (gate 2026-07-31). */
   headingDeg: number;
   /** Pad radius in METRES (the sim shows the diameter as "Size"). */
   radiusM: number;
+}
+
+export interface HeliportSpec {
+  /** The AIRPORT's own point, degrees — the place's `position` and the `.wad`'s projected one.
+   *
+   *  ⚠️ NOT a pad. Through v1.3 these were one number, and ApfelFlieger's own hand-built files carried
+   *  the first helipad's position here; his #220/#221 files carry the airport's own even with three pads
+   *  on the field. planExport falls back to the first pad when the project has not set one, so nothing
+   *  moves for a project written before the split. */
+  position: LonLat;
+  /** Every helipad. May be EMPTY — his "(1) DATA" example is an airport with none, and the sim is happy
+   *  with an empty `helipads` list. */
+  pads: HeliportPadSpec[];
+  /** IATA code (forum #220). Its row is written either way; empty is the normal case. */
+  iata?: string;
   /** The POI's cultivation basename ("poi"), or null for an empty POI — then no cultivation is referenced. */
   cultivationFileName: string | null;
   /** The plant anchor, when the POI carries one — it must be repeated here, because the `.tsc` REPLACES
@@ -200,7 +219,19 @@ function informationsBanner(): string[] {
   ];
 }
 
-/** `heliport.tsc.txt` — the place: identity, the functional pad, and the pointer to the POI's own `poi.toc`. */
+/** What an unnamed pad is called in the files: the aviation term for the two circles a helipad is made
+ *  of — Final Approach and Take-Off area, Touchdown and Lift-Off area. v1.2/v1.3 hard-coded this string
+ *  for the one pad they could write, and ApfelFlieger's own SCLC uses it for the primary pad with the
+ *  extra two named Helipad_W1/W2. Keeping it as the empty-name fallback is what makes a pre-v1.4 project
+ *  export byte-for-byte what it exported before. */
+const DEFAULT_PAD_NAME = "FATO/TLOF";
+
+function padName(p: HeliportPadSpec): string {
+  const n = sanitizeValue(p.name).trim();
+  return n === "" ? DEFAULT_PAD_NAME : n;
+}
+
+/** `heliport.tsc.txt` — the place: identity, the functional pads, and the pointer to the POI's own `poi.toc`. */
 export function buildHeliportTsc(spec: HeliportSpec): string {
   const pos = `${fmtLonLat(spec.position.lon)} ${fmtLonLat(spec.position.lat)}`;
   const v = identityValues(spec);
@@ -218,15 +249,15 @@ export function buildHeliportTsc(spec: HeliportSpec): string {
     tag("bool", "autoheight", "true"),
   ];
 
-  const pad = [
-    tag("string8", "name", "FATO/TLOF"),
-    tag("vector2_float64", "position", pos),
-    tag("float64", "radius", fmtNum(spec.radiusM)),
-    tag("float64", "heading", fmtNum(spec.headingDeg)),
-  ];
-  body.push(
-    ...block("list_tmsimulator_helipad", "helipads", "", block("tmsimulator_helipad", "element", "0", pad)),
+  const pads = spec.pads.flatMap((p, i) =>
+    block("tmsimulator_helipad", "element", String(i), [
+      tag("string8", "name", padName(p)),
+      tag("vector2_float64", "position", `${fmtLonLat(p.position.lon)} ${fmtLonLat(p.position.lat)}`),
+      tag("float64", "radius", fmtNum(p.radiusM)),
+      tag("float64", "heading", fmtNum(p.headingDeg)),
+    ]),
   );
+  body.push(...block("list_tmsimulator_helipad", "helipads", "", pads));
 
   if (spec.anchor !== null) body.push(...anchorObjects(spec.anchor));
 
@@ -278,28 +309,29 @@ const WAD_BANNER: string[] = [
  *  grid (core/geo/wad.ts), which is the tedious part PCT is here to do. */
 export function buildHeliportWad(spec: HeliportSpec): string {
   const pos = `${formatWad(lonToWad(spec.position.lon))} ${formatWad(latToWad(spec.position.lat))}`;
-  const pad = [
-    tag("string8", "name", "FATO/TLOF"),
-    tag("vector2_float64", "position", pos),
-    tag("float64", "radius", fmtNum(spec.radiusM)),
-    // The .wad stores the same rotation as the .toc, in RADIANS — hence the trip through headingToDirection.
-    tag("float64", "direction", formatWad(directionToWad(headingToDirection(spec.headingDeg)))),
-  ];
+  const pads = spec.pads.flatMap((p, i) =>
+    block("tmworld_airport_detailed_helipad", "element", String(i), [
+      tag("string8", "name", padName(p)),
+      tag(
+        "vector2_float64",
+        "position",
+        `${formatWad(lonToWad(p.position.lon))} ${formatWad(latToWad(p.position.lat))}`,
+      ),
+      tag("float64", "radius", fmtNum(p.radiusM)),
+      // The .wad stores the same rotation as the .toc, in RADIANS — hence the trip through headingToDirection.
+      tag("float64", "direction", formatWad(directionToWad(headingToDirection(p.headingDeg)))),
+    ]),
+  );
   const v = identityValues(spec);
   const body = [
     ...WAD_BANNER,
     tag("uint64", "uid", "0"),
     tag("stringt8c", "icao", v.icao),
-    tag("stringt8c", "iata", ""),
+    tag("stringt8c", "iata", (spec.iata ?? "").trim().toUpperCase()),
     tag("stringt8c", "name", v.name),
     tag("stringt8c", "country", v.country),
     tag("vector2_float64", "position", pos),
-    ...block(
-      "list_tmworld_airport_detailed_helipad",
-      "helipads",
-      "",
-      block("tmworld_airport_detailed_helipad", "element", "0", pad),
-    ),
+    ...block("list_tmworld_airport_detailed_helipad", "helipads", "", pads),
   ];
   const airport = block("tmworld_airport_detailed", "", "", body);
   return tidy([...NO_HEADER, ...block("file", "", "", airport)]);

@@ -12,6 +12,7 @@
 import type {
   AirportPad,
   Catalog,
+  LonLat,
   PlacedObject,
   Project,
   ResolvedObject,
@@ -118,10 +119,11 @@ export interface IcaoStatus {
  *  on this machine before touching disk. */
 export interface HeliportInstallOptions {
   identity: { icao: string; name: string; country: string };
-  // The pad in unshifted map coordinates — its OWN point, never a reference to a placed object, so the
-  // helicopter cannot spawn inside the XREF it borrowed coordinates from (forum #168). `null` = a default
-  // pad at the POI's anchor, facing true north.
-  heliport: { pad: AirportPad | null; radiusM?: number };
+  // The pads in unshifted map coordinates — each its OWN point, never a reference to a placed object, so
+  // the helicopter cannot spawn inside the XREF it borrowed coordinates from (forum #168). EMPTY = one
+  // default pad at the POI's anchor, facing true north. `position` is the airport's own point (forum
+  // #15/#220), absent = the first pad's.
+  heliport: { pads: AirportPad[]; position?: LonLat; iata?: string; radiusM?: number };
   overwrite: boolean;
   baseElevation?: number; // same offline fallback as ExportOptions
 }
@@ -134,11 +136,11 @@ export interface ExportOptions {
   // terrain-relative height against this one value; when absent, main uses the elevation provider
   // and may return a `needs-elevation` envelope the renderer answers by re-exporting WITH a base.
   baseElevation?: number;
-  // Opt-in heliport templates (forum #160). Absent = the POI is exported exactly as before. `pad` is the
-  // project's own helipad in unshifted map coordinates (null = the POI's anchor, facing true north, at
-  // `radiusM`); main hands this straight to planExport, which applies the export shift so the pad travels
-  // with the scene.
-  heliport?: { pad: AirportPad | null; radiusM?: number };
+  // Opt-in heliport templates (forum #160). Absent = the POI is exported exactly as before. `pads` are
+  // the project's own helipads in unshifted map coordinates (EMPTY = one at the POI's anchor, facing true
+  // north, at `radiusM`); main hands this straight to planExport, which applies the export shift so they
+  // travel with the scene.
+  heliport?: { pads: AirportPad[]; position?: LonLat; iata?: string; radiusM?: number };
 }
 
 /** Async (IPC). Implemented in preload/index.ts, handled in main/ipc.ts. Fallible methods return a

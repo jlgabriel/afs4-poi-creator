@@ -155,15 +155,26 @@ const IDENTITY_MAX = 200;
  *  path to disk goes through (planHeliport throws without it) — and `country` gets checked twice more,
  *  because it becomes a directory name under scenery/airports/ and a forum-shared project.json is
  *  untrusted input: once by validateIdentity's two-letter rule, once by main's own path guard. */
+const zPad = z.looseObject({
+  id: z.string().min(1),
+  name: z.string().max(IDENTITY_MAX),
+  position: zLonLat,
+  heading: z.number().finite(),
+  radius: z.number().finite().positive(),
+});
+
 export const zAirport = z.looseObject({
   icao: z.string().max(IDENTITY_MAX),
   name: z.string().max(IDENTITY_MAX),
   country: z.string().max(IDENTITY_MAX),
-  pad: z.looseObject({
-    position: zLonLat,
-    heading: z.number().finite(),
-    radius: z.number().finite().positive(),
-  }),
+  iata: z.string().max(IDENTITY_MAX).optional(),
+  position: zLonLat.optional(),
+  // Defaulted rather than required: an airport with no pads is legal (his "(1) DATA" example is exactly
+  // that), and a hand-edited file missing the key should land on the empty list, not fail to open.
+  pads: z.array(zPad).default([]),
+  // The compatibility mirror (types.ts ProjectAirport.pad). Validated so a malformed one is caught here
+  // rather than silently shipped to an older PCT, and normalised by migrateAirport before it gets here.
+  pad: zPad.optional(),
 });
 
 // loose (like the document top level) so a project written by a newer PCT that adds camera fields
@@ -280,13 +291,47 @@ function readVersion(raw: unknown): unknown {
     : undefined;
 }
 
-/** Normalise an older/other project shape up to the current version. Identity for v1; anything
- *  other than the current version is refused explicitly (real step-migrations arrive in M3). A
- *  missing version falls through to zod, which reports the precise validation error. */
+function isRecord(x: unknown): x is Record<string, unknown> {
+  return typeof x === "object" && x !== null && !Array.isArray(x);
+}
+
+/** The id given to the single pad of a pre-v1.4 project.
+ *
+ *  FIXED, not minted: migration runs on every open, and a fresh random id each time would make the file
+ *  differ from itself on the next save — breaking the round-trip-identical property the whole airport
+ *  block was designed around. One legacy pad per project, so one constant is enough. */
+export const LEGACY_PAD_ID = "pad-1";
+
+/** v1.2/v1.3 stored ONE pad under `airport.pad`; v1.4 stores a list under `airport.pads` (forum #221 —
+ *  HELICOPTER became a repeatable element). Lift the old shape into the new one, in place, so everything
+ *  downstream only ever sees `pads`.
+ *
+ *  The migrated pad gets an EMPTY name on purpose: the writer renders an unnamed pad as "FATO/TLOF",
+ *  which is the literal v1.2/v1.3 hard-coded, so an existing project keeps producing the same files. */
+function migrateAirport(airport: unknown): unknown {
+  if (!isRecord(airport)) return airport;
+  if (Array.isArray(airport.pads)) return airport;
+  const legacy = airport.pad;
+  if (!isRecord(legacy)) return { ...airport, pads: [] };
+  const pad = { id: LEGACY_PAD_ID, name: "", ...legacy };
+  return { ...airport, pads: [pad], pad };
+}
+
+/** Normalise an older/other project shape up to the current version. Anything other than the current
+ *  version is refused explicitly (real step-migrations arrive in M3). A missing version falls through
+ *  to zod, which reports the precise validation error.
+ *
+ *  Within v1 this is no longer the identity: the airport block gained `pads` (see migrateAirport). That
+ *  stays a v1 shape change rather than a version bump because it is LOSSLESS IN BOTH DIRECTIONS for the
+ *  one-pad case — the mirror keeps older PCTs opening the file — and bumping the version would lock
+ *  those PCTs out of every project, POI-only ones included. */
 export function migrateProject(raw: unknown): unknown {
   const v = readVersion(raw);
-  if (v === undefined || v === CURRENT_PROJECT_VERSION) return raw;
-  throw new UnsupportedSchemaVersionError("project", v);
+  if (v !== undefined && v !== CURRENT_PROJECT_VERSION) {
+    throw new UnsupportedSchemaVersionError("project", v);
+  }
+  if (!isRecord(raw) || raw.airport === undefined) return raw;
+  return { ...raw, airport: migrateAirport(raw.airport) };
 }
 
 export function migrateSettings(raw: unknown): unknown {

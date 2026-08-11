@@ -19,7 +19,8 @@
 // is a pixel, and a fixed-size glyph over it reads as a label pinned to the ocean.
 
 import * as L from "leaflet";
-import type { LonLat, ProjectAirport } from "../../core/project/types";
+import type { AirportPad, LonLat, ProjectAirport } from "../../core/project/types";
+import { firstPad } from "../../core/project/airport";
 import { destination, initialBearing, wrapLon } from "../../core/geo/geo";
 import { snapAngle } from "./rotate";
 
@@ -55,6 +56,11 @@ type Drag =
 export class HelipadLayer {
   private readonly group: L.LayerGroup;
   private airport: ProjectAirport | null = null;
+  /** The pad being drawn, derived from `airport.pads[0]` in sync() and the only thing the geometry below
+   *  reads. Null for no airport OR for an airport with no pads — which is legal (see airport.ts) and
+   *  means there is simply nothing to draw. Kept as a field so every method has the null-check for free
+   *  instead of re-deriving it eight times. */
+  private pad: AirportPad | null = null;
   private selected = false;
   private drag: Drag | null = null;
 
@@ -86,12 +92,15 @@ export class HelipadLayer {
     this.group.remove();
   }
 
-  /** Reconcile with the document. `undefined` (a project with no airport block) clears the pad. */
+  /** Reconcile with the document. `undefined` (a project with no airport block) clears the pad, and so
+   *  does an airport whose `pads` is empty — there is no geometry to draw for one. */
   sync(airport: ProjectAirport | undefined, selected = false): void {
     const next = airport ?? null;
-    if (next === null) {
-      if (this.airport !== null) this.clear();
-      this.airport = null;
+    const nextPad = firstPad(airport) ?? null;
+    if (next === null || nextPad === null) {
+      if (this.pad !== null) this.clear();
+      this.airport = next;
+      this.pad = null;
       this.selected = false;
       return;
     }
@@ -101,14 +110,16 @@ export class HelipadLayer {
     // stored (pre-drag) values would snap the pad back under the cursor on every unrelated repaint.
     if (this.drag !== null) {
       this.airport = next;
+      this.pad = nextPad;
       return;
     }
     const changed =
-      this.airport === null ||
-      this.airport.pad.position !== next.pad.position ||
-      this.airport.pad.heading !== next.pad.heading ||
-      this.airport.pad.radius !== next.pad.radius;
+      this.pad === null ||
+      this.pad.position !== nextPad.position ||
+      this.pad.heading !== nextPad.heading ||
+      this.pad.radius !== nextPad.radius;
     this.airport = next;
+    this.pad = nextPad;
     if (changed) this.rebuild();
     else if (selectionChanged) this.restyle();
   }
@@ -122,10 +133,10 @@ export class HelipadLayer {
   }
 
   private rebuild(): void {
-    const a = this.airport;
+    const a = this.pad;
     if (a === null) return;
     this.clear();
-    const { position, radius } = a.pad;
+    const { position, radius } = a;
 
     // Two concentric circles rather than one: Leaflet strokes a single path in one colour, and a white
     // rim alone vanishes over concrete or snow. The casing is the same circle, one step wider and dark.
@@ -182,31 +193,31 @@ export class HelipadLayer {
   // ── geometry (the optional `heading` previews an un-committed angle mid-drag) ──
 
   /** Where the heading tick ends: on the rim. */
-  private tipAt(at: LonLat, heading = this.airport?.pad.heading ?? 0): LonLat {
-    return destination(at, this.airport?.pad.radius ?? 0, heading);
+  private tipAt(at: LonLat, heading = this.pad?.heading ?? 0): LonLat {
+    return destination(at, this.pad?.radius ?? 0, heading);
   }
 
   /** Where the rotate grip sits: just past the rim, so it never overlaps the pad it turns. */
-  private gripAt(at: LonLat, heading = this.airport?.pad.heading ?? 0): LonLat {
-    return destination(at, (this.airport?.pad.radius ?? 0) + HANDLE_MARGIN_M, heading);
+  private gripAt(at: LonLat, heading = this.pad?.heading ?? 0): LonLat {
+    return destination(at, (this.pad?.radius ?? 0) + HANDLE_MARGIN_M, heading);
   }
 
   /** The pad's on-screen radius in pixels — how the H decides whether it fits. */
   private radiusPx(): number {
-    const a = this.airport;
+    const a = this.pad;
     if (a === null) return 0;
-    const c = this.map.latLngToLayerPoint(toLatLng(a.pad.position));
-    const edge = this.map.latLngToLayerPoint(toLatLng(destination(a.pad.position, a.pad.radius, 90)));
+    const c = this.map.latLngToLayerPoint(toLatLng(a.position));
+    const edge = this.map.latLngToLayerPoint(toLatLng(destination(a.position, a.radius, 90)));
     return Math.abs(edge.x - c.x);
   }
 
   /** Create, move or drop the H. Called on rebuild and on every zoom, because whether it fits is a
    *  function of the zoom and nothing else. */
   private layoutGlyph(at?: LonLat, heading?: number): void {
-    const a = this.airport;
+    const a = this.pad;
     if (a === null) return;
-    const where = at ?? a.pad.position;
-    const rot = heading ?? a.pad.heading;
+    const where = at ?? a.position;
+    const rot = heading ?? a.heading;
     if (this.radiusPx() < H_MIN_PX) {
       if (this.glyph !== null) {
         this.group.removeLayer(this.glyph);
@@ -231,7 +242,7 @@ export class HelipadLayer {
   }
 
   private onZoomEnd = (): void => {
-    if (this.airport !== null) this.layoutGlyph();
+    if (this.pad !== null) this.layoutGlyph();
   };
 
   // ── drag: layer-local preview, one commit on release (the same contract FootprintLayer keeps) ──
@@ -241,16 +252,16 @@ export class HelipadLayer {
   }
 
   private onGrab = (e: L.LeafletMouseEvent): void => {
-    if (!HelipadLayer.isPrimary(e) || this.airport === null) return;
+    if (!HelipadLayer.isPrimary(e) || this.pad === null) return;
     this.map.dragging.disable();
-    const at = this.airport.pad.position;
+    const at = this.pad.position;
     this.drag = { mode: "move", startPad: at, startMouse: e.latlng, at, moved: false };
   };
 
   private onGrabHandle = (e: L.LeafletMouseEvent): void => {
-    if (!HelipadLayer.isPrimary(e) || this.airport === null) return;
+    if (!HelipadLayer.isPrimary(e) || this.pad === null) return;
     this.map.dragging.disable();
-    const { position, heading } = this.airport.pad;
+    const { position, heading } = this.pad;
     this.drag = { mode: "rotate", at: position, startHeading: heading, heading, moved: false };
     // The store isn't touched until release, so without a live readout the angle being dragged to is
     // invisible. Degrees here are TRUE — the sim shows magnetic, which is why the dialog says so too.
@@ -274,14 +285,14 @@ export class HelipadLayer {
 
   private onMouseMove = (e: L.LeafletMouseEvent): void => {
     const d = this.drag;
-    if (d === null || this.airport === null) return;
+    if (d === null || this.pad === null) return;
     d.moved = true;
     if (d.mode === "move") {
       d.at = {
         lon: d.startPad.lon + (e.latlng.lng - d.startMouse.lng),
         lat: d.startPad.lat + (e.latlng.lat - d.startMouse.lat),
       };
-      this.preview(d.at, this.airport.pad.heading);
+      this.preview(d.at, this.pad.heading);
     } else {
       let heading = initialBearing(d.at, { lon: e.latlng.lng, lat: e.latlng.lat });
       if (e.originalEvent.shiftKey) heading = snapAngle(heading, SNAP_DEG);

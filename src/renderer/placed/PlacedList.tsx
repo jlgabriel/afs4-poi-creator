@@ -11,6 +11,7 @@ import { editorStore, useEditor } from "../state/editorStore";
 import { Thumbnail } from "../catalog/Thumbnail";
 import { HelipadIcon } from "../catalog/categoryIcon";
 import { photoKeyForPlaced as placedPhotoKey } from "../../core/catalog/photoKey";
+import { firstPad } from "../../core/project/airport";
 import { rowInfo } from "./rowInfo";
 
 /** The helipad's row, pinned above the objects (v1.3, forum #173: "which is then listed on the right for
@@ -21,7 +22,11 @@ function HelipadRow(): React.ReactElement | null {
   const airport = useEditor((s) => s.project.airport);
   const selected = useEditor((s) => s.padSelected);
   if (airport === undefined) return null;
-  const { pad, icao, name } = airport;
+  const { icao, name } = airport;
+  // One row for one pad — the v1.3 shape. A pad-less airport has no row to draw (airport.ts), and the
+  // repeatable HELICOPTER menu (forum #219/#221) is what turns this into one row per pad.
+  const pad = firstPad(airport);
+  if (pad === undefined) return null;
   return (
     <button
       type="button"

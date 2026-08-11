@@ -27,8 +27,14 @@ const FLOWN = {
 
 const SPEC: HeliportSpec = {
   position: { lon: FLOWN.lon, lat: FLOWN.lat },
-  headingDeg: FLOWN.headingDeg,
-  radiusM: FLOWN.radiusM,
+  pads: [
+    {
+      name: "",
+      position: { lon: FLOWN.lon, lat: FLOWN.lat },
+      headingDeg: FLOWN.headingDeg,
+      radiusM: FLOWN.radiusM,
+    },
+  ],
   cultivationFileName: "poi",
   anchor: null,
   autoheight: false,
@@ -72,6 +78,75 @@ describe("heliport template — the flown control", () => {
     const [tscLon] = valuesOf(buildHeliportTsc(SPEC), "position")[0].split(" ").map(Number);
     expect(tscLon).toBeCloseTo(FLOWN.lon, 7);
     expect(tscLon).not.toBeCloseTo(FLOWN.wadLon, 0);
+  });
+});
+
+// v1.4, forum #219/#221: HELICOPTER became a repeatable element with a free name, and the airport's own
+// point was split off from the pad's. SCLC ships three pads — FATO/TLOF, Helipad_W1, Helipad_W2.
+describe("heliport template — several pads (v1.4)", () => {
+  const THREE: HeliportSpec = {
+    ...SPEC,
+    position: { lon: -70.582247, lat: -33.380724 },
+    pads: [
+      { name: "", position: { lon: -70.5865018835, lat: -33.3813575871 }, headingDeg: -110, radiusM: 5 },
+      { name: "Helipad_W1", position: { lon: -70.5866098424, lat: -33.3811688908 }, headingDeg: 70, radiusM: 5 },
+      { name: "Helipad_W2", position: { lon: -70.5869062265, lat: -33.3812517605 }, headingDeg: 70, radiusM: 5 },
+    ],
+  };
+
+  it("writes one helipad element per pad, in order, in BOTH files", () => {
+    for (const text of [buildHeliportTsc(THREE), buildHeliportWad(THREE)]) {
+      const names = nodesByName(parseTm(text), "name").map((n) => n.value);
+      // The airport's own name is a `name` tag too in the .wad, so the pads are the tail of the list.
+      expect(names.slice(-3)).toEqual(["FATO/TLOF", "Helipad_W1", "Helipad_W2"]);
+      expect(valuesOf(text, "radius")).toEqual(["5", "5", "5"]);
+    }
+  });
+
+  it("renders an unnamed pad as FATO/TLOF — the literal v1.2/v1.3 hard-coded", () => {
+    // The bytes of an existing one-pad project must not move just because pads can now be named.
+    expect(nodesByName(parseTm(buildHeliportTsc(SPEC)), "name").map((n) => n.value)).toEqual(["FATO/TLOF"]);
+  });
+
+  it("converts each pad's heading independently, negative ones included", () => {
+    // ApfelFlieger's own SCLC carries heading -110, which our norm360 turns into 200° = 3.4906585 rad.
+    // Verified against his file: -110 → 3.49065850398866 and 70 → 0.349065850398866.
+    //
+    // Nine decimals, not his fourteen: formatWad prints ten and the tenth rounds. That is not a loss
+    // worth chasing — 1e-10 rad across a 10 m pad is 1e-9 m.
+    const dirs = valuesOf(buildHeliportWad(THREE), "direction").map(Number);
+    expect(dirs[0]).toBeCloseTo(3.49065850398866, 9);
+    expect(dirs[1]).toBeCloseTo(0.349065850398866, 9);
+    expect(dirs[2]).toBeCloseTo(0.349065850398866, 9);
+    // The negative heading is not merely "close" — it must be the OPPOSITE of the other two, which is
+    // the thing a sign bug would break while still landing near the right magnitude.
+    expect(dirs[0]! - dirs[1]!).toBeCloseTo(Math.PI, 9);
+  });
+
+  it("puts the AIRPORT's point in the place and the .wad, not the first pad's", () => {
+    // The whole point of the #15 split: his #220/#221 files carry -70.582247 -33.380724 even though the
+    // field has three pads elsewhere. Reading a pad here would silently move the airport.
+    const [tscLon, tscLat] = valuesOf(buildHeliportTsc(THREE), "position")[0].split(" ").map(Number);
+    expect(tscLon).toBeCloseTo(-70.582247, 9);
+    expect(tscLat).toBeCloseTo(-33.380724, 9);
+    // …and the .wad's own position is that same point, projected — his exact printed values.
+    const [wadLon, wadLat] = valuesOf(buildHeliportWad(THREE), "position")[0].split(" ").map(Number);
+    expect(wadLon).toBeCloseTo(19918.89405724, 7);
+    expect(wadLat).toBeCloseTo(26282.05536889, 7);
+  });
+
+  it("writes the IATA code, and leaves the row empty when there is none", () => {
+    expect(valuesOf(buildHeliportWad({ ...THREE, iata: "clc" }), "iata")).toEqual(["CLC"]);
+    expect(valuesOf(buildHeliportWad(THREE), "iata")).toEqual([""]);
+  });
+
+  it("accepts an airport with no pads at all", () => {
+    // His "(1) DATA" example: identity plus a database entry, an empty `helipads` list and nothing else.
+    const none = { ...THREE, pads: [] };
+    for (const text of [buildHeliportTsc(none), buildHeliportWad(none)]) {
+      expect(nodesByName(parseTm(text), "helipads")).toHaveLength(1); // the list is still there…
+      expect(valuesOf(text, "radius")).toEqual([]); // …and empty
+    }
   });
 });
 
@@ -146,7 +221,13 @@ const PROJECT: Project = {
 };
 
 /** A pad of its own, deliberately NOT on top of either placed object (forum #168). */
-const PAD: AirportPad = { position: { lon: -116.7962, lat: 34.8541 }, heading: 40, radius: 10 };
+const PAD: AirportPad = {
+  id: "pad-1",
+  name: "",
+  position: { lon: -116.7962, lat: 34.8541 },
+  heading: 40,
+  radius: 10,
+};
 
 const relPaths = (p: { files: { relPath: string }[] }): string[] => p.files.map((f) => f.relPath);
 
@@ -158,13 +239,13 @@ describe("planExport — heliport option", () => {
   });
 
   it("adds exactly the two templates, and says so in the README", () => {
-    const plan = planExport(PROJECT, [HANGAR], { heliport: { pad: null } });
+    const plan = planExport(PROJECT, [HANGAR], { heliport: { pads: [] } });
     expect(relPaths(plan)).toEqual(["poi.tsl", "poi.toc", "README.txt", HELIPORT_TSC_FILE, HELIPORT_WAD_FILE]);
     expect(plan.files.find((f) => f.relPath === "README.txt")!.content).toContain(HELIPORT_TSC_FILE);
   });
 
   it("writes the project's own pad — position, TRUE heading and radius", () => {
-    const plan = planExport(PROJECT, [HANGAR], { heliport: { pad: PAD } });
+    const plan = planExport(PROJECT, [HANGAR], { heliport: { pads: [PAD] } });
     const tsc = plan.files.find((f) => f.relPath === HELIPORT_TSC_FILE)!.content;
     const [lon, lat] = valuesOf(tsc, "position")[0].split(" ").map(Number);
     expect(lon).toBeCloseTo(PAD.position.lon, 7);
@@ -178,8 +259,8 @@ describe("planExport — heliport option", () => {
   // helicopter spawned inside whatever the pad had been aimed at. The pad must be able to sit where no
   // object is — and deleting every object must not move it.
   it("is independent of the placed objects", () => {
-    const withPad = planExport(PROJECT, [HANGAR], { heliport: { pad: PAD } });
-    const empty = planExport(PROJECT, [], { heliport: { pad: PAD } });
+    const withPad = planExport(PROJECT, [HANGAR], { heliport: { pads: [PAD] } });
+    const empty = planExport(PROJECT, [], { heliport: { pads: [PAD] } });
     const padOf = (p: typeof withPad): string =>
       valuesOf(p.files.find((f) => f.relPath === HELIPORT_TSC_FILE)!.content, "position")[0];
     expect(padOf(empty)).toBe(padOf(withPad));
@@ -192,8 +273,8 @@ describe("planExport — heliport option", () => {
     // Reading the pad unshifted would leave the helicopter parked `shift` metres away from the objects
     // it is supposed to be standing among.
     const shifted = { ...PROJECT, shift: { east: 50, north: 0 } };
-    const at = { position: HANGAR.position, heading: 40, radius: 10 };
-    const plan = planExport(shifted, [HANGAR], { heliport: { pad: at } });
+    const at: AirportPad = { id: "pad-1", name: "", position: HANGAR.position, heading: 40, radius: 10 };
+    const plan = planExport(shifted, [HANGAR], { heliport: { pads: [at] } });
     const tsc = plan.files.find((f) => f.relPath === HELIPORT_TSC_FILE)!.content;
     const [lon] = valuesOf(tsc, "position")[0].split(" ").map(Number);
     expect(lon).toBeGreaterThan(HANGAR.position.lon); // 50 m east
@@ -203,7 +284,7 @@ describe("planExport — heliport option", () => {
   });
 
   it("falls back to the POI anchor, facing true north, when there is no pad", () => {
-    const plan = planExport(PROJECT, [HANGAR], { heliport: { pad: null, radiusM: 15 } });
+    const plan = planExport(PROJECT, [HANGAR], { heliport: { pads: [], radiusM: 15 } });
     const tsc = plan.files.find((f) => f.relPath === HELIPORT_TSC_FILE)!.content;
     expect(Number(valuesOf(tsc, "heading")[0])).toBe(0);
     expect(Number(valuesOf(tsc, "radius")[0])).toBe(15);
@@ -213,7 +294,7 @@ describe("planExport — heliport option", () => {
 
   it("warns that autoheight was never gated, but still writes the files", () => {
     const auto = { ...PROJECT, heightMode: "autoheight" as const };
-    const plan = planExport(auto, [PALM], { heliport: { pad: null } });
+    const plan = planExport(auto, [PALM], { heliport: { pads: [] } });
     expect(plan.warnings.some((w) => w.includes("baked-asl"))).toBe(true);
     expect(relPaths(plan)).toContain(HELIPORT_TSC_FILE);
   });

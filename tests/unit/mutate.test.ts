@@ -23,14 +23,21 @@ import {
   setLabel,
   setLightColor,
   setAirport,
+  setAirportIata,
+  setAirportPadName,
   setAirportPadRadius,
+  setAirportPosition,
   setLocked,
   setPoiName,
   setReference,
+  addAirportPad,
   moveAirportPad,
+  placeAirportPad,
+  removeAirportPad,
   rotateAirportPad,
 } from "../../src/core/project/mutate";
 import type {
+  AirportPad,
   PlacedAirportLight,
   PlacedLight,
   PlacedObject,
@@ -261,18 +268,28 @@ describe("project-level mutations", () => {
 
 // ── The airport block (v1.2, forum #170 / #168) ──────────────────────────────────────────────────
 describe("the airport block", () => {
+  const PAD: AirportPad = {
+    id: "pad-1",
+    name: "",
+    position: { lon: -70.3130659, lat: -18.4827329 },
+    heading: 90,
+    radius: 10,
+  };
   const AIRPORT: ProjectAirport = {
     icao: "shjl",
     name: "Arica Regional Hospital",
     country: "cl",
-    pad: { position: { lon: -70.3130659, lat: -18.4827329 }, heading: 90, radius: 10 },
+    pads: [PAD],
   };
+  /** What every writer must actually produce: the block plus its compatibility mirror. */
+  const MIRRORED: ProjectAirport = { ...AIRPORT, pad: PAD };
+  const padOf = (p: Project): AirportPad => p.airport!.pads[0]!;
 
   it("is set, and absent means POI-only", () => {
     const p0 = baseProject();
     expect(p0.airport).toBeUndefined();
     const p1 = setAirport(p0, AIRPORT, LATER);
-    expect(p1.airport).toEqual(AIRPORT);
+    expect(p1.airport).toEqual(MIRRORED);
     expect(p1.modifiedAt).toBe(LATER);
     expect(p0.airport).toBeUndefined(); // input untouched
 
@@ -286,19 +303,109 @@ describe("the airport block", () => {
   it("moves and turns the pad, normalising the heading", () => {
     const p = setAirport(baseProject(), AIRPORT, NOW);
     const at = { lon: 5, lat: 45 };
-    expect(moveAirportPad(p, at, LATER).airport!.pad.position).toEqual(at);
-    expect(rotateAirportPad(p, 450, LATER).airport!.pad.heading).toBe(90); // 450 → 90
-    expect(rotateAirportPad(p, -10, LATER).airport!.pad.heading).toBe(350);
+    expect(padOf(moveAirportPad(p, at, LATER)).position).toEqual(at);
+    expect(padOf(rotateAirportPad(p, 450, LATER)).heading).toBe(90); // 450 → 90
+    expect(padOf(rotateAirportPad(p, -10, LATER)).heading).toBe(350);
     // The identity rides along untouched — a map drag must never be able to clobber a typed code.
     expect(moveAirportPad(p, at, LATER).airport!.icao).toBe("shjl");
   });
 
   it("resizes the pad, and refuses a radius that is not a positive number", () => {
     const p = setAirport(baseProject(), AIRPORT, NOW);
-    expect(setAirportPadRadius(p, 25, LATER).airport!.pad.radius).toBe(25);
+    expect(padOf(setAirportPadRadius(p, 25, LATER)).radius).toBe(25);
     for (const bad of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
       expect(setAirportPadRadius(p, bad)).toBe(p); // refused, not clamped — see the doc comment
     }
+  });
+
+  // ★ The mirror is what lets PCT <= 1.3 OPEN a v1.4 file at all (types.ts ProjectAirport.pad), and a
+  // stale one would put its helipad where the user no longer has it. So it is not enough that setAirport
+  // writes it — EVERY pad mutation has to keep it in step.
+  it("keeps airport.pad mirroring pads[0] through every mutation", () => {
+    let p = setAirport(baseProject(), AIRPORT, NOW);
+    expect(p.airport!.pad).toEqual(p.airport!.pads[0]);
+
+    p = moveAirportPad(p, { lon: 5, lat: 45 }, LATER);
+    expect(p.airport!.pad).toEqual(p.airport!.pads[0]);
+    p = rotateAirportPad(p, 123, LATER);
+    expect(p.airport!.pad).toEqual(p.airport!.pads[0]);
+    p = setAirportPadRadius(p, 25, LATER);
+    expect(p.airport!.pad).toEqual(p.airport!.pads[0]);
+    p = setAirportPadName(p, "FATO/TLOF", LATER);
+    expect(p.airport!.pad).toEqual(p.airport!.pads[0]);
+
+    // A SECOND pad must not disturb the mirror: an older PCT still sees the first one.
+    const first = p.airport!.pads[0];
+    p = addAirportPad(p, { lon: 6, lat: 46 }, 12, LATER, "pad-2");
+    expect(p.airport!.pads).toHaveLength(2);
+    expect(p.airport!.pad).toEqual(first);
+
+    // Dropping the first promotes the second INTO the mirror…
+    p = removeAirportPad(p, "pad-1", LATER);
+    expect(p.airport!.pads).toHaveLength(1);
+    expect(p.airport!.pad).toEqual(p.airport!.pads[0]);
+    expect(p.airport!.pad!.id).toBe("pad-2");
+
+    // …and dropping the last removes the key rather than leaving a pad an older PCT would still draw.
+    p = removeAirportPad(p, "pad-2", LATER);
+    expect(p.airport!.pads).toEqual([]);
+    expect("pad" in p.airport!).toBe(false);
+  });
+
+  it("targets a pad by id, and the first one when no id is given", () => {
+    let p = setAirport(baseProject(), AIRPORT, NOW);
+    p = addAirportPad(p, { lon: 6, lat: 46 }, 12, LATER, "pad-2");
+
+    // No id → the first pad, which is what every v1.3 caller means.
+    p = setAirportPadName(p, "primary", LATER);
+    expect(p.airport!.pads[0]!.name).toBe("primary");
+    expect(p.airport!.pads[1]!.name).toBe("");
+
+    p = setAirportPadName(p, "secondary", LATER, "pad-2");
+    expect(p.airport!.pads[0]!.name).toBe("primary");
+    expect(p.airport!.pads[1]!.name).toBe("secondary");
+
+    // An id nothing matches is a no-op, not a write to pad 0.
+    expect(setAirportPadName(p, "ghost", LATER, "nope")).toBe(p);
+  });
+
+  it("adds pads rather than moving the first one, and keeps a pad-less airport valid", () => {
+    // placeAirportPad MOVES (the v1.3 gesture: one pad card, click again to reposition)…
+    let p = setAirport(baseProject(), AIRPORT, NOW);
+    p = placeAirportPad(p, { lon: 1, lat: 2 }, 10, LATER);
+    expect(p.airport!.pads).toHaveLength(1);
+    expect(padOf(p).position).toEqual({ lon: 1, lat: 2 });
+
+    // …addAirportPad APPENDS (forum #221: "can now be used as often as desired").
+    p = addAirportPad(p, { lon: 3, lat: 4 }, 10, LATER, "pad-2");
+    expect(p.airport!.pads).toHaveLength(2);
+
+    // An airport with no pads is legal — his "(1) DATA" example is exactly that — so removing them all
+    // leaves the identity standing rather than deleting the airport.
+    p = removeAirportPad(removeAirportPad(p, "pad-1", LATER), "pad-2", LATER);
+    expect(p.airport!.icao).toBe("shjl");
+    expect(p.airport!.pads).toEqual([]);
+    // …and placing again onto that empty airport adds one instead of no-oping.
+    p = placeAirportPad(p, { lon: 7, lat: 8 }, 10, LATER);
+    expect(p.airport!.pads).toHaveLength(1);
+  });
+
+  it("carries the v1.4 identity fields", () => {
+    let p = setAirport(baseProject(), AIRPORT, NOW);
+    p = setAirportIata(p, "CLC", LATER);
+    expect(p.airport!.iata).toBe("CLC");
+    expect(setAirportIata(p, "CLC", LATER)).toBe(p); // no-op keeps the undo stack clean
+    p = setAirportIata(p, "", LATER);
+    expect("iata" in p.airport!).toBe(false); // cleared, not left as ""
+
+    // The airport's own point is independent of the pad (forum #15/#220) — moving the pad must not move
+    // it once it has been set on purpose.
+    p = setAirportPosition(p, { lon: 10, lat: 20 }, LATER);
+    p = moveAirportPad(p, { lon: 30, lat: 40 }, LATER);
+    expect(p.airport!.position).toEqual({ lon: 10, lat: 20 });
+    // Cleared → the block follows the first pad again, which is how v1.2/v1.3 behaved.
+    p = setAirportPosition(p, null, LATER);
+    expect("position" in p.airport!).toBe(false);
   });
 
   it("does nothing at all to a project with no airport", () => {

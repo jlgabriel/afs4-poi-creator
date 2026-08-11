@@ -17,6 +17,7 @@ import { useEffect, useState } from "react";
 import type { ProjectAirport } from "../../core/project/types";
 import type { IcaoStatus } from "../../shared/pctApi";
 import { clampLonLat } from "../../core/project/schemas";
+import { firstPad } from "../../core/project/airport";
 import { identityProblemText, validateIdentity, SNAME_MAX } from "../../core/export/heliportTemplate";
 import { editorStore, useEditor } from "../state/editorStore";
 import { getPct } from "../app/pct";
@@ -52,9 +53,13 @@ function useIcaoStatus(icao: string, wellFormed: boolean): IcaoStatus {
 
 const fmtDeg = (n: number): string => n.toFixed(6);
 
-export function HeliportFields({ airport }: { airport: ProjectAirport }): React.ReactElement {
+export function HeliportFields({ airport }: { airport: ProjectAirport }): React.ReactElement | null {
   const store = editorStore.getState;
-  const { pad } = airport;
+  // This panel edits ONE pad, and every route into it goes through placing one, so a pad-less airport
+  // cannot be reached from this UI — the model allows it (airport.ts) but nothing here creates it. Render
+  // nothing rather than invent a pad; the repeatable HELICOPTER menu (forum #219/#221) is what turns this
+  // into a list and gives a pad-less airport its own empty state.
+  const pad = firstPad(airport);
   const heightMode = useEditor((s) => s.project.heightMode) ?? "baked-asl";
 
   const identity = {
@@ -65,6 +70,10 @@ export function HeliportFields({ airport }: { airport: ProjectAirport }): React.
   const problem = validateIdentity(identity);
   const status = useIcaoStatus(identity.icao, problem !== "icao-format");
   const replacing = status.ours.length > 0;
+
+  // AFTER every hook, never before one: an early return above `useIcaoStatus` would call a different
+  // number of hooks on different renders, which is the one thing React does not allow.
+  if (pad === undefined) return null;
 
   return (
     // .pct-inspector-body is what every other kind's panel opens with, and it is not decoration: the

@@ -51,16 +51,21 @@ const ID = { icao: "pct001", name: "PCT Test Heliport", country: "us" };
 /** The by-hand template shape: no identity, so the files carry `__PLACEHOLDER__` values. */
 const TEMPLATE_SPEC: HeliportSpec = {
   position: { lon: -116.7947, lat: 34.8536 },
-  headingDeg: 40,
-  radiusM: 10,
+  pads: [{ name: "", position: { lon: -116.7947, lat: 34.8536 }, headingDeg: 40, radiusM: 10 }],
   cultivationFileName: "poi",
   anchor: null,
   autoheight: false,
   identity: null,
 };
 /** The pad is its own point now, not a borrowed object (forum #168) — deliberately NOT on the hangar. */
-const PAD: AirportPad = { position: { lon: -116.7962, lat: 34.8541 }, heading: 40, radius: 10 };
-const OPTS = { identity: ID, heliport: { pad: PAD as AirportPad | null } };
+const PAD: AirportPad = {
+  id: "pad-1",
+  name: "",
+  position: { lon: -116.7962, lat: 34.8541 },
+  heading: 40,
+  radius: 10,
+};
+const OPTS = { identity: ID, heliport: { pads: [PAD] as AirportPad[] } };
 
 let tmp: string;
 beforeEach(() => {

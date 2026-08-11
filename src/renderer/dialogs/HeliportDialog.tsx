@@ -19,6 +19,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { HeliportInstallOptions, InstallResult, InstalledHeliport, PctError } from "../../shared/pctApi";
 import { identityProblemText, validateIdentity } from "../../core/export/heliportTemplate";
 import { firstProjectError } from "../../core/project/schemas";
+import { firstPad } from "../../core/project/airport";
 import { editorStore, useEditor } from "../state/editorStore";
 import { getPct } from "../app/pct";
 
@@ -121,8 +122,13 @@ export function HeliportDialog({ onClose }: { onClose: () => void }): React.Reac
     if (!pct || airport === undefined || identity === null || problem !== null) return;
     setError(null);
 
-    const { pad } = airport;
-    if (!(Number.isFinite(pad.radius) && pad.radius > 0)) {
+    if (firstPad(airport) === undefined) {
+      setError("This airport has no helipad yet. Place one from the catalog first.");
+      return;
+    }
+    // Every pad, not just the first: a bad radius anywhere writes a helipad the sim will not render, and
+    // the count is small enough that checking all of them costs nothing.
+    if (airport.pads.some((p) => !(Number.isFinite(p.radius) && p.radius > 0))) {
       setError("Helipad radius must be a positive number of metres. Fix it in the Inspector.");
       return;
     }
@@ -140,7 +146,13 @@ export function HeliportDialog({ onClose }: { onClose: () => void }): React.Reac
       return;
     }
 
-    const opts: HeliportInstallOptions = { identity, heliport: { pad }, overwrite };
+    const opts: HeliportInstallOptions = {
+      identity,
+      heliport: { pads: airport.pads },
+      overwrite,
+    };
+    if (airport.position !== undefined) opts.heliport.position = airport.position;
+    if (airport.iata !== undefined) opts.heliport.iata = airport.iata;
     if (heightMode !== "autoheight" && baseElevation !== undefined) opts.baseElevation = baseElevation;
 
     setBusy(true);
@@ -162,6 +174,9 @@ export function HeliportDialog({ onClose }: { onClose: () => void }): React.Reac
     setError(messageFor(res.error));
   };
 
+  /** The pad the summary below describes. Undefined for an airport with none — legal in the model
+   *  (airport.ts), unreachable from this UI, and shown as an em dash rather than crashing the dialog. */
+  const summaryPad = firstPad(airport);
   const blocked = airport === undefined || problem !== null || busy || pct === null;
 
   return (
@@ -249,8 +264,9 @@ export function HeliportDialog({ onClose }: { onClose: () => void }): React.Reac
                     <li>
                       <span className="pct-field-meta">Pad</span>
                       <span>
-                        {airport.pad.position.lon.toFixed(6)}, {airport.pad.position.lat.toFixed(6)} ·{" "}
-                        {Math.round(airport.pad.heading)}° · {airport.pad.radius} m
+                        {summaryPad === undefined
+                          ? "—"
+                          : `${summaryPad.position.lon.toFixed(6)}, ${summaryPad.position.lat.toFixed(6)} · ${Math.round(summaryPad.heading)}° · ${summaryPad.radius} m`}
                       </span>
                     </li>
                   </ul>
