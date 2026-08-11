@@ -10,6 +10,7 @@
 
 import { z } from "zod";
 import type { LonLat, Project, Settings } from "./types";
+import { PARKING_TYPES } from "./airport";
 import type { FootprintOverrides } from "../catalog/footprints";
 import { isValidPhotoKey } from "../catalog/photoKey";
 
@@ -163,6 +164,20 @@ const zPad = z.looseObject({
   radius: z.number().finite().positive(),
 });
 
+/** A parking position (types.ts AirportParking). `type` is validated as an ENUM, not a free string, and
+ *  that is deliberate even though everything around it is permissive: the row is hashed by the sim, so a
+ *  typo produces a stand that silently does nothing rather than an error anyone can read. A hand-edited or
+ *  forum-shared project.json is exactly where such a typo comes from, and here is the only place it can
+ *  still be caught. `size` follows `radius`: finite and positive, refused rather than clamped. */
+const zParking = z.looseObject({
+  id: z.string().min(1),
+  name: z.string().max(IDENTITY_MAX),
+  position: zLonLat,
+  heading: z.number().finite(),
+  size: z.number().finite().positive(),
+  type: z.enum(PARKING_TYPES),
+});
+
 export const zAirport = z.looseObject({
   icao: z.string().max(IDENTITY_MAX),
   name: z.string().max(IDENTITY_MAX),
@@ -172,6 +187,10 @@ export const zAirport = z.looseObject({
   // Defaulted rather than required: an airport with no pads is legal (his "(1) DATA" example is exactly
   // that), and a hand-edited file missing the key should land on the empty list, not fail to open.
   pads: z.array(zPad).default([]),
+  // OPTIONAL rather than defaulted, unlike `pads`: a default would write `"parkings": []` into every
+  // project.json that has an airport and no stands, and "absent means none" costs nothing to read
+  // (see parkingsOf in airport.ts).
+  parkings: z.array(zParking).optional(),
   // The compatibility mirror (types.ts ProjectAirport.pad). Validated so a malformed one is caught here
   // rather than silently shipped to an older PCT, and normalised by migrateAirport before it gets here.
   pad: zPad.optional(),

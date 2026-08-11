@@ -9,7 +9,7 @@
 // becomes repeatable) is what turns these into list rendering. Until then `firstPad` is the honest name
 // for what that UI means, and it is greppable when the time comes.
 
-import type { AirportPad, LonLat, ProjectAirport } from "./types";
+import type { AirportPad, AirportParking, LonLat, ParkingType, ProjectAirport } from "./types";
 
 /** The pad a single-pad UI means: the first one, or undefined for an airport with none (legal — his
  *  "(1) DATA" example is identity plus a database entry and no pads at all). */
@@ -25,3 +25,34 @@ export function firstPad(airport: ProjectAirport | undefined): AirportPad | unde
 export function airportPosition(airport: ProjectAirport): LonLat | null {
   return airport.position ?? airport.pads[0]?.position ?? null;
 }
+
+/** The parking positions, with "absent" and "empty" collapsed into one thing. `parkings` is optional in
+ *  the document so a project without stands does not carry an empty array (types.ts); every reader wants
+ *  a list, and this is the only place that `?? []` should appear. */
+export function parkingsOf(airport: ProjectAirport | undefined): AirportParking[] {
+  return airport?.parkings ?? [];
+}
+
+/** The `tags` vocabulary, in the order a menu should offer it. Also the zod enum (schemas.ts) — one list,
+ *  so a value the UI can produce is by construction a value the loader accepts. See types.ts ParkingType
+ *  for why the spelling is `parked_`, and why a wrong one cannot be detected in-sim. */
+export const PARKING_TYPES = ["parked_ga", "parked_jet", "pushback"] as const;
+
+/** English, user-facing (the UI is English — the labels ApfelFlieger used in #232). */
+export const PARKING_TYPE_LABELS: Record<ParkingType, string> = {
+  parked_ga: "General Aviation",
+  parked_jet: "Jet",
+  pushback: "Pushback",
+};
+
+/** The stand radius each type starts at, metres.
+ *
+ *  ⚠️ Two of these three are HIS numbers and one is OURS. His margin note in the original SCLC gives
+ *  "[parked_ga] = 7.5 M / [parked_jet] = 40 M" and says nothing at all about a size for `pushback`. 40 is
+ *  our choice for it, on the grounds that a coupled pushback truck means an airliner stand — it is a
+ *  starting value in a field the user can edit, not something measured. */
+export const DEFAULT_PARKING_SIZE_M: Record<ParkingType, number> = {
+  parked_ga: 7.5,
+  parked_jet: 40,
+  pushback: 40,
+};

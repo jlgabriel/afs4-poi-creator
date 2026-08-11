@@ -35,9 +35,18 @@ import {
   placeAirportPad,
   removeAirportPad,
   rotateAirportPad,
+  addAirportParking,
+  moveAirportParking,
+  removeAirportParking,
+  rotateAirportParking,
+  setAirportParkingName,
+  setAirportParkingSize,
+  setAirportParkingType,
 } from "../../src/core/project/mutate";
+import { parkingsOf } from "../../src/core/project/airport";
 import type {
   AirportPad,
+  ParkingType,
   PlacedAirportLight,
   PlacedLight,
   PlacedObject,
@@ -421,5 +430,87 @@ describe("the airport block", () => {
     const p = setAirport(baseProject(), AIRPORT, NOW);
     expect(rotateAirportPad(p, 90)).toBe(p);
     expect(setAirportPadRadius(p, 10)).toBe(p);
+  });
+
+  // ── Parking positions (v1.4, forum #232) ───────────────────────────────────────────────────────
+  describe("parking positions", () => {
+    const HERE = { lon: -70.5842423, lat: -33.3806032 };
+    const withStand = (type: ParkingType = "parked_ga"): Project =>
+      addAirportParking(setAirport(baseProject(), AIRPORT, NOW), HERE, type, LATER, "prk-1");
+
+    it("appends, and sizes the stand from its type", () => {
+      const p = withStand();
+      expect(parkingsOf(p.airport)).toEqual([
+        { id: "prk-1", name: "", position: HERE, heading: 0, size: 7.5, type: "parked_ga" },
+      ]);
+      // His margin note: parked_ga = 7.5 m, parked_jet = 40 m.
+      expect(parkingsOf(withStand("parked_jet").airport)[0]!.size).toBe(40);
+      // Appends rather than replaces — "any number of parking positions can be created".
+      const two = addAirportParking(p, { lon: 1, lat: 2 }, "pushback", LATER, "prk-2");
+      expect(parkingsOf(two.airport).map((s) => s.id)).toEqual(["prk-1", "prk-2"]);
+    });
+
+    it("creates the airport block from a placement, but still invents no identity", () => {
+      const p = addAirportParking(baseProject(), HERE, "parked_ga", LATER, "prk-1");
+      expect(p.airport).toEqual({
+        icao: "",
+        name: "",
+        country: "",
+        pads: [],
+        parkings: [{ id: "prk-1", name: "", position: HERE, heading: 0, size: 7.5, type: "parked_ga" }],
+      });
+    });
+
+    it("moves, turns, resizes and names one stand by id", () => {
+      let p = withStand();
+      p = moveAirportParking(p, "prk-1", { lon: 1, lat: 2 }, LATER);
+      p = rotateAirportParking(p, "prk-1", -195, LATER); // his own files carry negative headings
+      p = setAirportParkingSize(p, "prk-1", 12, LATER);
+      p = setAirportParkingName(p, "prk-1", "Parking_W", LATER);
+      expect(parkingsOf(p.airport)[0]).toEqual({
+        id: "prk-1",
+        name: "Parking_W",
+        position: { lon: 1, lat: 2 },
+        heading: 165, // normalised into [0,360); -195 + 360. Same rotation, readable number.
+        size: 12,
+        type: "parked_ga",
+      });
+      // A non-positive size is refused, not clamped — it comes from a number field.
+      expect(setAirportParkingSize(p, "prk-1", 0, LATER)).toBe(p);
+      expect(setAirportParkingSize(p, "prk-1", -3, LATER)).toBe(p);
+    });
+
+    it("moves the size with the type ONLY while the user has not chosen one", () => {
+      const p = withStand();
+      expect(parkingsOf(setAirportParkingType(p, "prk-1", "parked_jet", LATER).airport)[0]!.size).toBe(40);
+      // A size someone typed is theirs and survives the switch.
+      const sized = setAirportParkingSize(p, "prk-1", 12, LATER);
+      const switched = setAirportParkingType(sized, "prk-1", "parked_jet", LATER);
+      expect(parkingsOf(switched.airport)[0]!.size).toBe(12);
+      expect(parkingsOf(switched.airport)[0]!.type).toBe("parked_jet");
+    });
+
+    it("removes by id, and an empty list is not the same as no airport", () => {
+      const p = removeAirportParking(withStand(), "prk-1", LATER);
+      expect(parkingsOf(p.airport)).toEqual([]);
+      expect(p.airport).toBeDefined(); // the airport survives losing its last stand
+      expect(removeAirportParking(p, "nope")).toBe(p);
+    });
+
+    it("does nothing to a project with no airport, and no-ops keep the undo stack clean", () => {
+      const empty = baseProject();
+      expect(moveAirportParking(empty, "prk-1", { lon: 1, lat: 2 })).toBe(empty);
+      expect(rotateAirportParking(empty, "prk-1", 90)).toBe(empty);
+      const p = withStand();
+      expect(moveAirportParking(p, "missing", { lon: 1, lat: 2 })).toBe(p);
+      expect(rotateAirportParking(p, "prk-1", 0)).toBe(p);
+      expect(setAirportParkingName(p, "prk-1", "")).toBe(p);
+      expect(setAirportParkingType(p, "prk-1", "parked_ga")).toBe(p);
+    });
+
+    it("leaves the pad mirror alone — stands are not mirrored and must not disturb it", () => {
+      const p = withStand();
+      expect(p.airport!.pad).toEqual(PAD);
+    });
   });
 });

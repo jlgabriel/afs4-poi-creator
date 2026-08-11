@@ -4,7 +4,15 @@
 // (main process, M1b) should write into `scenery/poi/<folderName>/`. Keeping this pure makes
 // the whole POI package golden-testable byte-for-byte, the way the Race App exporter was.
 
-import type { AirportPad, ExportPlan, LonLat, PoiFile, Project, ResolvedObject } from "../project/types";
+import type {
+  AirportPad,
+  AirportParking,
+  ExportPlan,
+  LonLat,
+  PoiFile,
+  Project,
+  ResolvedObject,
+} from "../project/types";
 import { centroid, poiFolderName } from "../geo/poiName";
 import { shiftEastNorth } from "../geo/geo";
 import { buildToc } from "./tocWriter";
@@ -21,6 +29,7 @@ import {
   HELIPORT_WAD_FILE,
   type HeliportIdentity,
   type HeliportPadSpec,
+  type HeliportParkingSpec,
   type HeliportSpec,
   type IdentityProblem,
 } from "./heliportTemplate";
@@ -65,6 +74,13 @@ export interface HeliportOptions {
    *  helipad has nowhere to spawn the helicopter. An airport with deliberately zero pads is a different
    *  thing and belongs to the AIRPORT menu (forum #219), not to this option. */
   pads: AirportPad[];
+  /** The parking positions, unshifted like the pads (forum #232). Absent or EMPTY → the writers emit no
+   *  `parking_positions` block, so a project without stands exports the same bytes it always did.
+   *
+   *  Unlike `pads` there is no "empty means one default" rule here, and there must not be: a heliport with
+   *  no helipad has nowhere to spawn the helicopter, whereas an airport with no stand is simply an airport
+   *  with no stand — his own "(1) DATA" and "(2) HELIPADS" examples are exactly that. */
+  parkings?: AirportParking[];
   /** The AIRPORT's own point, unshifted (forum #15/#220 — it is independent of any pad). Absent → the
    *  first pad's position, which is exactly how v1.2/v1.3 behaved. */
   position?: LonLat;
@@ -103,6 +119,20 @@ function heliportPads(
     position: shiftPoint(p.position, shift),
     headingDeg: p.heading,
     radiusM: p.radius,
+  }));
+}
+
+/** The stands, shifted with the scene. No empty-list fallback on purpose (see HeliportOptions.parkings). */
+function heliportParkings(
+  parkings: AirportParking[] | undefined,
+  shift: Project["shift"],
+): HeliportParkingSpec[] {
+  return (parkings ?? []).map((p) => ({
+    name: p.name,
+    position: shiftPoint(p.position, shift),
+    headingDeg: p.heading,
+    sizeM: p.size,
+    type: p.type,
   }));
 }
 
@@ -174,6 +204,7 @@ export function planExport(
     const spec: HeliportSpec = {
       position: heliportPosition(opts.heliport, pads, ref, project.shift),
       pads,
+      parkings: heliportParkings(opts.heliport.parkings, project.shift),
       iata: opts.heliport.iata,
       cultivationFileName: tocFileName,
       anchor,

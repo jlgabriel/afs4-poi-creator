@@ -224,6 +224,43 @@ export interface AirportPad {
   radius: number; // metres; the sim shows the DIAMETER as "Size" (radius 10 → "66 ft / 20 m")
 }
 
+/** What a parking position is FOR, written verbatim into the `tags` row of both files.
+ *
+ *  ★ THESE THREE LITERALS ARE THE VOCABULARY, and they are spelled `parked_`, not `parking_`.
+ *  ApfelFlieger's post announcing the submenu (forum #232) writes them as `[parking_ga]` / `[parking_jet]`
+ *  in prose, but every FILE he has sent — his original SCLC, the three flight-test variants, the ACT's own
+ *  output and the new #232 pair — writes `parked_ga`, and his own margin note in the original spells the
+ *  set out: "[parked_ga] = 7.5 M / [parked_jet] = 40 M / [pushback] = PUSH BACK". The files win.
+ *
+ *  ⚠️ Getting one wrong FAILS SILENTLY. The row is a `string8u`, and the sim's binary carries no
+ *  `parked_ga` literal (it does carry `parking_positions`), so these are almost certainly hashed at load —
+ *  the same shape as an XREF name that does not resolve. There is no error to read in tm.log.
+ *
+ *  What the user gets out of each (forum #232): `parked_ga`/`parked_jet` let a COLD & DARK–capable
+ *  aircraft or helicopter be started in a chosen state; `pushback` lets the pushback truck be coupled at
+ *  start. Helicopters may use any of them — that is why the submenu stopped being called "Aircraft"
+ *  (forum #227). */
+export type ParkingType = "parked_ga" | "parked_jet" | "pushback";
+
+/** One parking position: where an aircraft (or helicopter) is parked and can start a flight from.
+ *
+ *  Its own point, exactly like AirportPad and for the same reason (forum #168) — a stand that borrowed an
+ *  XREF's coordinates parks the aircraft inside the building. Repeatable: "any number of parking positions
+ *  can be created" (forum #232; his own SCLC ships three). */
+export interface AirportParking {
+  /** Stable across reorder and delete — same contract as AirportPad.id. */
+  id: string;
+  /** Shown in LOCATION, free text ("Parking_W", "FuelStation"). EMPTY means unnamed and the writer emits
+   *  "Parking", so the sim never shows a blank row. */
+  name: string;
+  position: LonLat; // stand centre
+  heading: number; // TRUE compass degrees, like a pad's
+  /** Metres, and it is a RADIUS: the sim shows the diameter, so 7.5 reads as "15 m". His margin note ties
+   *  the number to the type — 7.5 for GA, 40 for a jet. */
+  size: number;
+  type: ParkingType;
+}
+
 /** The AIRPORT half of a project: everything "Create heliport…" needs that the POI half does not carry.
  *
  *  Stored in project.json (forum #170, ApfelFlieger): before this, PCT wrote only POI data, so every
@@ -258,6 +295,14 @@ export interface ProjectAirport {
   /** Every helipad, in document order. May be EMPTY: his "(1) DATA" example is a complete airport with
    *  no pads at all — identity plus a database entry. */
   pads: AirportPad[];
+  /** Every parking position, in document order (forum #232). Absent ≡ none, which is what every project
+   *  written before v1.4 has — and the writers emit no `parking_positions` block at all in that case, so
+   *  those projects keep exporting the same bytes.
+   *
+   *  Unlike `pads` there is no compatibility mirror and none is needed: PCT <= 1.3 parses the airport
+   *  block with a LOOSE schema (verified against the v1.3.2 tag), so it carries this key through a
+   *  load/save round-trip untouched instead of dropping it. */
+  parkings?: AirportParking[];
   /** ⚠️ COMPATIBILITY MIRROR of `pads[0]` — written, never read by this version.
    *
    *  `zProject.parse` THROWS, and `zAirport` before v1.4 required `pad`, so a project that carries only

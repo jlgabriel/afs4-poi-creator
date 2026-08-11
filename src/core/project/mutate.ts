@@ -10,9 +10,11 @@
 
 import type {
   AirportPad,
+  AirportParking,
   HeightMode,
   HeightSpec,
   LonLat,
+  ParkingType,
   PlacedAirportLight,
   PlacedLight,
   PlacedObject,
@@ -23,6 +25,7 @@ import type {
   ProjectAirport,
   Vec3,
 } from "./types";
+import { DEFAULT_PARKING_SIZE_M, parkingsOf } from "./airport";
 
 const nowIso = (): string => new Date().toISOString();
 
@@ -546,4 +549,141 @@ export function setAirportPadRadius(
  *  legal and means unnamed, which the writer renders as "FATO/TLOF". */
 export function setAirportPadName(project: Project, name: string, now = nowIso(), padId?: string): Project {
   return updatePad(project, (pad) => (pad.name === name ? pad : { ...pad, name }), now, padId);
+}
+
+// ── Parking positions (v1.4, forum #232) ───────────────────────────────────────────────────────────
+//
+// The same shape as the pad mutations above, with two deliberate differences:
+//
+//   • NO MIRROR. `parkings` has no compatibility twin to keep in step (types.ts), so these write the
+//     field directly instead of funnelling through withPadMirror.
+//   • THE ID IS REQUIRED. `updatePad` lets it default to the first pad because the v1.3 UI knows exactly
+//     one; there has never been a one-parking UI, so defaulting here would only hide a caller that forgot
+//     which stand it meant.
+
+/** A fresh stand: unnamed, facing true north, sized from its type (airport.ts DEFAULT_PARKING_SIZE_M). */
+function newParking(position: LonLat, type: ParkingType, id = randomId()): AirportParking {
+  return { id, name: "", position, heading: 0, size: DEFAULT_PARKING_SIZE_M[type], type };
+}
+
+/** APPEND a parking position ("any number of parking positions can be created" — forum #232). Creates the
+ *  airport block when the project has none, the same rule placeAirportPad follows and for the same reason:
+ *  placing one from the catalog is the user asking for the airport in as many words. It still invents no
+ *  identity — icao/name/country come in empty and the install refuses until they are filled. */
+export function addAirportParking(
+  project: Project,
+  position: LonLat,
+  type: ParkingType,
+  now = nowIso(),
+  id?: string,
+): Project {
+  const parking = newParking(position, type, id);
+  const airport = project.airport;
+  const next: ProjectAirport =
+    airport === undefined
+      ? { icao: "", name: "", country: "", pads: [], parkings: [parking] }
+      : { ...airport, parkings: [...parkingsOf(airport), parking] };
+  return { ...project, airport: next, modifiedAt: now };
+}
+
+/** Drop a stand by id. Removing the last one leaves `parkings: []` rather than deleting the key: the
+ *  difference is invisible to the writers (both emit no block) and keeping it avoids a save that silently
+ *  reverts the file to its pre-v1.4 shape. */
+export function removeAirportParking(project: Project, parkingId: string, now = nowIso()): Project {
+  const airport = project.airport;
+  if (airport === undefined) return project;
+  const current = parkingsOf(airport);
+  const parkings = current.filter((p) => p.id !== parkingId);
+  if (parkings.length === current.length) return project;
+  return { ...project, airport: { ...airport, parkings }, modifiedAt: now };
+}
+
+/** Apply `patch` to one stand. No airport, or no stand with that id → the same project reference, so a
+ *  drag on something that is no longer there is a no-op rather than an invented block. */
+function updateParking(
+  project: Project,
+  parkingId: string,
+  patch: (parking: AirportParking) => AirportParking,
+  now: string,
+): Project {
+  const airport = project.airport;
+  if (airport === undefined) return project;
+  const current = parkingsOf(airport);
+  const i = current.findIndex((p) => p.id === parkingId);
+  const found = i < 0 ? undefined : current[i];
+  if (found === undefined) return project;
+  const parking = patch(found);
+  if (parking === found) return project;
+  const parkings = [...current];
+  parkings[i] = parking;
+  return { ...project, airport: { ...airport, parkings }, modifiedAt: now };
+}
+
+/** Drag a stand to a new centre. */
+export function moveAirportParking(
+  project: Project,
+  parkingId: string,
+  position: LonLat,
+  now = nowIso(),
+): Project {
+  return updateParking(project, parkingId, (p) => ({ ...p, position }), now);
+}
+
+/** Turn a stand. TRUE compass degrees, normalised into [0, 360) like every other facing in the model —
+ *  ApfelFlieger's own files carry NEGATIVE headings (-195, -100, -200) and the `.wad` conversion takes
+ *  them unchanged, so this normalisation changes the number the user sees, never the rotation written. */
+export function rotateAirportParking(
+  project: Project,
+  parkingId: string,
+  heading: number,
+  now = nowIso(),
+): Project {
+  const h = norm360(heading);
+  return updateParking(project, parkingId, (p) => (p.heading === h ? p : { ...p, heading: h }), now);
+}
+
+/** Resize a stand. Metres, and a RADIUS — the sim shows the diameter, so 7.5 reads as "15 m". Non-positive
+ *  is refused rather than clamped, exactly as for a pad radius. */
+export function setAirportParkingSize(
+  project: Project,
+  parkingId: string,
+  size: number,
+  now = nowIso(),
+): Project {
+  if (!(Number.isFinite(size) && size > 0)) return project;
+  return updateParking(project, parkingId, (p) => (p.size === size ? p : { ...p, size }), now);
+}
+
+/** Name a stand. Shown in LOCATION; empty means unnamed and the writer emits "Parking". */
+export function setAirportParkingName(
+  project: Project,
+  parkingId: string,
+  name: string,
+  now = nowIso(),
+): Project {
+  return updateParking(project, parkingId, (p) => (p.name === name ? p : { ...p, name }), now);
+}
+
+/** Change what a stand is for. The SIZE follows only when the user had left it on the previous type's
+ *  default: switching GA → Jet on an untouched 7.5 m stand should give the 40 m one his note documents,
+ *  but a size someone typed is theirs and survives the switch. */
+export function setAirportParkingType(
+  project: Project,
+  parkingId: string,
+  type: ParkingType,
+  now = nowIso(),
+): Project {
+  return updateParking(
+    project,
+    parkingId,
+    (p) =>
+      p.type === type
+        ? p
+        : {
+            ...p,
+            type,
+            size: p.size === DEFAULT_PARKING_SIZE_M[p.type] ? DEFAULT_PARKING_SIZE_M[type] : p.size,
+          },
+    now,
+  );
 }

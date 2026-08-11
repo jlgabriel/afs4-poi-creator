@@ -329,6 +329,45 @@ describe("zProject — the airport block", () => {
     expect(p.airport?.pads).toEqual([]);
   });
 
+  // ── Parking positions (v1.4, forum #232) ───────────────────────────────────────────────────────
+  const STAND = {
+    id: "prk-1",
+    name: "Parking_W",
+    position: { lon: -70.5842423, lat: -33.3806032 },
+    heading: 165,
+    size: 7.5,
+    type: "parked_ga",
+  };
+  const withStands = (parkings: unknown[]): unknown => ({
+    ...validProject(),
+    airport: { icao: "sclc", name: "Vitacura", country: "cl", pads: [], parkings },
+  });
+
+  it("round-trips parking positions", () => {
+    const p = parseProject(withStands([STAND]));
+    expect(p.airport?.parkings).toEqual([STAND]);
+  });
+
+  it("stays ABSENT when the project has none — no empty array written into old files", () => {
+    const p = parseProject({
+      ...validProject(),
+      airport: { icao: "sclc", name: "Vitacura", country: "cl", pads: [] },
+    });
+    expect(p.airport?.parkings).toBeUndefined();
+    expect("parkings" in p.airport!).toBe(false);
+  });
+
+  it("REJECTS a tag the sim would hash into nothing", () => {
+    // ★ The one place a typo here can still be caught. `parking_ga` is not a strawman: it is the spelling
+    // ApfelFlieger himself used in the prose of #232, while all of his files say `parked_ga`. In the sim
+    // the wrong literal makes a stand that silently does nothing — there is no error to read anywhere.
+    expect(() => parseProject(withStands([{ ...STAND, type: "parking_ga" }]))).toThrow();
+    expect(() => parseProject(withStands([{ ...STAND, type: "" }]))).toThrow();
+    // …and the same refusals the pad radius gets, for the same reason.
+    expect(() => parseProject(withStands([{ ...STAND, size: 0 }]))).toThrow();
+    expect(() => parseProject(withStands([{ ...STAND, id: "" }]))).toThrow();
+  });
+
   it("stays optional — a POI-only project is unchanged", () => {
     // schemaVersion stays 1 precisely because of this: a project that never opened the heliport dialog
     // has no such key and must keep round-tripping byte-identical.

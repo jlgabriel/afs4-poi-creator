@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import type { AirportPad, Project, ResolvedXref, ResolvedPlant } from "../../src/core/project/types";
+import type {
+  AirportPad,
+  AirportParking,
+  Project,
+  ResolvedXref,
+  ResolvedPlant,
+} from "../../src/core/project/types";
 import { planExport } from "../../src/core/export/planExport";
 import {
   buildHeliportTsc,
@@ -150,6 +156,131 @@ describe("heliport template — several pads (v1.4)", () => {
   });
 });
 
+// ── Parking positions (v1.4, forum #232) ─────────────────────────────────────────────────────────
+//
+// THE CONTROL here is ApfelFlieger's own sclc_apt_hpd_prk pair: the three stands he published with the
+// submenu, with the values his `.tsc` and `.wad` print side by side. Same role as FLOWN above — if a
+// change moves any of these, it moves away from a file the author of the format wrote by hand.
+const HIS_PARKINGS = [
+  {
+    name: "Parking_W",
+    lon: -70.5842423116,
+    lat: -33.3806032182,
+    headingDeg: -195,
+    sizeM: 7.5,
+    wadLon: 19918.53082185,
+    wadLat: 26282.0820377,
+    wadDirection: 4.97418836818384,
+  },
+  {
+    name: "FuelStation",
+    lon: -70.580823299765,
+    lat: -33.379805648495,
+    headingDeg: -100,
+    sizeM: 7.5,
+    wadLon: 19919.15323396,
+    wadLat: 26282.25814144,
+    wadDirection: 3.31612557878923,
+  },
+  {
+    name: "Parking_E",
+    lon: -70.574176907502,
+    lat: -33.378642836087,
+    headingDeg: -200,
+    sizeM: 7.5,
+    wadLon: 19920.36317275,
+    wadLat: 26282.51488792,
+    wadDirection: 5.06145483078356,
+  },
+] as const;
+
+describe("heliport template — parking positions (v1.4)", () => {
+  const STANDS: HeliportSpec = {
+    ...SPEC,
+    position: { lon: -70.582247, lat: -33.380724 },
+    parkings: HIS_PARKINGS.map((p) => ({
+      name: p.name,
+      position: { lon: p.lon, lat: p.lat },
+      headingDeg: p.headingDeg,
+      sizeM: p.sizeM,
+      type: "parked_ga" as const,
+    })),
+  };
+
+  it("writes NOTHING when there are no stands — the reason this needed no flight", () => {
+    // Every project that predates v1.4 exports the files it always did, byte for byte. His own DATA
+    // example carries the empty `parking_positions` list marked DEFAULT; that belongs with the rest of
+    // the #217 compliance rows, which move bytes in files that have already flown.
+    for (const text of [buildHeliportTsc(SPEC), buildHeliportWad(SPEC)]) {
+      expect(nodesByName(parseTm(text), "parking_positions")).toEqual([]);
+      expect(text).not.toContain("parking");
+    }
+  });
+
+  it("reproduces his three stands in the .tsc — degrees, his headings, his names", () => {
+    const tsc = buildHeliportTsc(STANDS);
+    const list = nodesByName(parseTm(tsc), "parking_positions");
+    expect(list).toHaveLength(1);
+    expect(list[0]!.children).toHaveLength(3);
+    // The airport's own position is a `position` tag too, so the stands are the tail.
+    const positions = valuesOf(tsc, "position").slice(-3);
+    // The pad has a `heading` too (SPEC's 40), and it is written first — stands are the tail.
+    const headings = valuesOf(tsc, "heading").slice(-3);
+    HIS_PARKINGS.forEach((p, i) => {
+      const [lon, lat] = positions[i]!.split(" ").map(Number);
+      // SEVEN decimals, where his file prints ten: fmtLonLat is fixed at 7 for every coordinate PCT
+      // writes anywhere (~1 cm here), and widening it for stands alone would move the bytes of every
+      // `.toc` and `.tsl` already in the wild. A centimetre on a 7.5 m stand is not the constraint.
+      expect(lon).toBeCloseTo(p.lon, 6);
+      expect(lat).toBeCloseTo(p.lat, 6);
+      // Written VERBATIM, negative and all: the .tsc's heading is degrees and the sim reads it as true.
+      expect(Number(headings[i])).toBe(p.headingDeg);
+    });
+    expect(valuesOf(tsc, "size")).toEqual(["7.5", "7.5", "7.5"]);
+    expect(valuesOf(tsc, "name").slice(-3)).toEqual(["Parking_W", "FuelStation", "Parking_E"]);
+  });
+
+  it("reproduces his projected positions and radian directions in the .wad", () => {
+    const wad = buildHeliportWad(STANDS);
+    const positions = valuesOf(wad, "position").slice(-3);
+    // The pad carries a `direction` too, and it comes first — the stands are the tail here as well.
+    const directions = valuesOf(wad, "direction").slice(-3).map(Number);
+    HIS_PARKINGS.forEach((p, i) => {
+      const [lon, lat] = positions[i]!.split(" ").map(Number);
+      expect(lon).toBeCloseTo(p.wadLon, 7);
+      expect(lat).toBeCloseTo(p.wadLat, 7);
+      expect(directions[i]).toBeCloseTo(p.wadDirection, 9);
+    });
+    // -195 and -200 are five degrees apart; a sign or wrap bug lands near the right magnitude and would
+    // survive the closeTo above, so pin the RELATION too.
+    expect(directions[2]! - directions[0]!).toBeCloseTo((5 * Math.PI) / 180, 9);
+  });
+
+  it("writes the type into `tags` as a string8u, spelled `parked_`, never `parking_`", () => {
+    // ★ The row is hashed by the sim (types.ts ParkingType): a wrong literal produces a stand that does
+    // nothing, with no error anywhere. His prose in #232 says `parking_ga`; all five of his FILES say
+    // `parked_ga`. This test is what stops the prose from winning later.
+    for (const text of [buildHeliportTsc(STANDS), buildHeliportWad(STANDS)]) {
+      const tags = nodesByName(parseTm(text), "tags");
+      expect(tags.map((n) => n.value)).toEqual(["parked_ga", "parked_ga", "parked_ga"]);
+      expect(tags.map((n) => n.type)).toEqual(["string8u", "string8u", "string8u"]);
+    }
+    const mixed = buildHeliportTsc({
+      ...STANDS,
+      parkings: [
+        { ...STANDS.parkings![0]!, type: "parked_jet" },
+        { ...STANDS.parkings![1]!, type: "pushback" },
+      ],
+    });
+    expect(valuesOf(mixed, "tags")).toEqual(["parked_jet", "pushback"]);
+  });
+
+  it("renders an unnamed stand as `Parking`, so LOCATION never shows a blank row", () => {
+    const anon = buildHeliportTsc({ ...STANDS, parkings: [{ ...STANDS.parkings![0]!, name: "" }] });
+    expect(valuesOf(anon, "name").slice(-1)).toEqual(["Parking"]);
+  });
+});
+
 describe("heliport template — structure", () => {
   it("names no airport: every identity field is a placeholder", () => {
     for (const text of [buildHeliportTsc(SPEC), buildHeliportWad(SPEC)]) {
@@ -290,6 +421,32 @@ describe("planExport — heliport option", () => {
     expect(Number(valuesOf(tsc, "radius")[0])).toBe(15);
     const [lon] = valuesOf(tsc, "position")[0].split(" ").map(Number);
     expect(lon).toBeCloseTo(HANGAR.position.lon, 7); // the centroid of a one-object scene
+  });
+
+  it("moves the STANDS with the scene too, and writes no block without them", () => {
+    // Same trap as the pad: a stand read unshifted parks the aircraft `shift` metres from the apron it
+    // belongs to. And the no-stands case must stay silent, which is what keeps old exports byte-identical.
+    const shifted = { ...PROJECT, shift: { east: 50, north: 0 } };
+    const stand: AirportParking = {
+      id: "prk-1",
+      name: "Parking_W",
+      position: HANGAR.position,
+      heading: 165,
+      size: 7.5,
+      type: "parked_ga",
+    };
+    const plan = planExport(shifted, [HANGAR], { heliport: { pads: [PAD], parkings: [stand] } });
+    const tsc = plan.files.find((f) => f.relPath === HELIPORT_TSC_FILE)!.content;
+    const [standLon] = valuesOf(tsc, "position").slice(-1)[0]!.split(" ").map(Number);
+    const toc = plan.files.find((f) => f.relPath === "poi.toc")!.content;
+    const [objLon] = valuesOf(toc, "position")[0].split(" ").map(Number);
+    expect(standLon).toBeCloseTo(objLon, 7);
+    expect(valuesOf(tsc, "tags")).toEqual(["parked_ga"]);
+
+    const none = planExport(PROJECT, [HANGAR], { heliport: { pads: [PAD] } });
+    for (const f of [HELIPORT_TSC_FILE, HELIPORT_WAD_FILE]) {
+      expect(none.files.find((x) => x.relPath === f)!.content).not.toContain("parking");
+    }
   });
 
   it("warns that autoheight was never gated, but still writes the files", () => {

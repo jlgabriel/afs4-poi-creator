@@ -24,7 +24,7 @@
 //   heading goes in verbatim, no conversion · the `objects` block below, in the `tmsimulator_scenery_objecttmslist`
 //   spelling taken from the Hong Kong community pack, DOES reach the cultivation (the POI's palms did not blink).
 
-import type { LonLat } from "../project/types";
+import type { LonLat, ParkingType } from "../project/types";
 import { tag, block, fmtLonLat, fmtNum, sanitizeValue } from "../tm/tmEmit";
 import { lonToWad, latToWad, directionToWad, formatWad } from "../geo/wad";
 import { headingToDirection } from "../geo/orientation";
@@ -133,6 +133,21 @@ export interface HeliportPadSpec {
   radiusM: number;
 }
 
+/** One parking position as the two writers want it. Position already shifted with the scene, like a pad's.
+ *
+ *  `type` is the `tags` literal, passed through untouched — see types.ts ParkingType for why the spelling
+ *  is `parked_` and why a wrong one is undetectable in-sim. */
+export interface HeliportParkingSpec {
+  /** Shown in LOCATION. EMPTY → "Parking" (see DEFAULT_PARKING_NAME). */
+  name: string;
+  position: LonLat;
+  /** TRUE compass degrees, written verbatim into the `.tsc` — his own files carry negative ones. */
+  headingDeg: number;
+  /** Stand radius in metres (the sim shows the diameter). */
+  sizeM: number;
+  type: ParkingType;
+}
+
 export interface HeliportSpec {
   /** The AIRPORT's own point, degrees — the place's `position` and the `.wad`'s projected one.
    *
@@ -144,6 +159,12 @@ export interface HeliportSpec {
   /** Every helipad. May be EMPTY — his "(1) DATA" example is an airport with none, and the sim is happy
    *  with an empty `helipads` list. */
   pads: HeliportPadSpec[];
+  /** Every parking position (forum #232). EMPTY → NO `parking_positions` block is emitted at all, which is
+   *  what makes this feature free of a flight: a project without stands exports byte-for-byte what it
+   *  exported before. (His own files DO carry the empty list, marked `DEFAULT` — that belongs with the
+   *  other compliance rows of #217, which move bytes in files that have already flown and are gated
+   *  separately.) Absent ≡ empty, so a caller that predates stands needs no change. */
+  parkings?: HeliportParkingSpec[];
   /** IATA code (forum #220). Its row is written either way; empty is the normal case. */
   iata?: string;
   /** The POI's cultivation basename ("poi"), or null for an empty POI — then no cultivation is referenced. */
@@ -231,6 +252,49 @@ function padName(p: HeliportPadSpec): string {
   return n === "" ? DEFAULT_PAD_NAME : n;
 }
 
+/** What an unnamed STAND is called. Unlike the pad's "FATO/TLOF" this preserves no legacy bytes — parking
+ *  positions are new in v1.4 — it exists because the row is what LOCATION displays, and an empty one puts
+ *  a blank entry in the sim's menu. */
+const DEFAULT_PARKING_NAME = "Parking";
+
+function parkingName(p: HeliportParkingSpec): string {
+  const n = sanitizeValue(p.name).trim();
+  return n === "" ? DEFAULT_PARKING_NAME : n;
+}
+
+/** The `parking_positions` list, or NOTHING when there are no stands (see HeliportSpec.parkings).
+ *
+ *  The two files differ only in the element type and in the two converted fields, so they share this: the
+ *  `.tsc` keeps degrees and a `heading` in degrees, the `.wad` gets the projected grid and a `direction` in
+ *  radians. Field ORDER is his (position, heading/direction, size, name, tags), which the sim does not care
+ *  about — its parser is name-keyed — but a reader comparing our file against his does. */
+function parkingBlock(parkings: HeliportParkingSpec[], wad: boolean): string[] {
+  if (parkings.length === 0) return [];
+  const elementType = wad ? "tmworld_airport_detailed_parking_position" : "tmsimulator_parking_position";
+  const listType = wad
+    ? "list_tmworld_airport_detailed_parking_position"
+    : "list_tmsimulator_parking_position";
+  const elements = parkings.flatMap((p, i) =>
+    block(elementType, "element", String(i), [
+      tag(
+        "vector2_float64",
+        "position",
+        wad
+          ? `${formatWad(lonToWad(p.position.lon))} ${formatWad(latToWad(p.position.lat))}`
+          : `${fmtLonLat(p.position.lon)} ${fmtLonLat(p.position.lat)}`,
+      ),
+      wad
+        ? tag("float64", "direction", formatWad(directionToWad(headingToDirection(p.headingDeg))))
+        : tag("float64", "heading", fmtNum(p.headingDeg)),
+      tag("float64", "size", fmtNum(p.sizeM)),
+      tag("string8", "name", parkingName(p)),
+      // `string8u`, not `string8` — the same hashed-string type as `icao` and `coordinate_system`.
+      tag("string8u", "tags", p.type),
+    ]),
+  );
+  return block(listType, "parking_positions", "", elements);
+}
+
 /** `heliport.tsc.txt` — the place: identity, the functional pads, and the pointer to the POI's own `poi.toc`. */
 export function buildHeliportTsc(spec: HeliportSpec): string {
   const pos = `${fmtLonLat(spec.position.lon)} ${fmtLonLat(spec.position.lat)}`;
@@ -260,6 +324,8 @@ export function buildHeliportTsc(spec: HeliportSpec): string {
   body.push(...block("list_tmsimulator_helipad", "helipads", "", pads));
 
   if (spec.anchor !== null) body.push(...anchorObjects(spec.anchor));
+
+  body.push(...parkingBlock(spec.parkings ?? [], false));
 
   if (spec.cultivationFileName !== null) {
     const cultivation = [
@@ -332,6 +398,7 @@ export function buildHeliportWad(spec: HeliportSpec): string {
     tag("stringt8c", "country", v.country),
     tag("vector2_float64", "position", pos),
     ...block("list_tmworld_airport_detailed_helipad", "helipads", "", pads),
+    ...parkingBlock(spec.parkings ?? [], true),
   ];
   const airport = block("tmworld_airport_detailed", "", "", body);
   return tidy([...NO_HEADER, ...block("file", "", "", airport)]);

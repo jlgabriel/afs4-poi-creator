@@ -151,6 +151,9 @@ export function HeliportDialog({ onClose }: { onClose: () => void }): React.Reac
       heliport: { pads: airport.pads },
       overwrite,
     };
+    // Absent rather than `[]` when there are none: the writers key "emit no block at all" off an empty
+    // list either way, and this keeps the IPC payload of a stand-less project identical to before.
+    if (airport.parkings !== undefined) opts.heliport.parkings = airport.parkings;
     if (airport.position !== undefined) opts.heliport.position = airport.position;
     if (airport.iata !== undefined) opts.heliport.iata = airport.iata;
     if (heightMode !== "autoheight" && baseElevation !== undefined) opts.baseElevation = baseElevation;

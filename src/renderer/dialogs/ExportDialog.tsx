@@ -228,6 +228,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }): React.ReactE
     // real thing. Only a project that has never opened that dialog falls back to the radius field.
     if (heliport) {
       opts.heliport = { pads: storeAirport?.pads ?? [], radiusM: padRadius };
+      if (storeAirport?.parkings !== undefined) opts.heliport.parkings = storeAirport.parkings;
       if (storeAirport?.position !== undefined) opts.heliport.position = storeAirport.position;
       if (storeAirport?.iata !== undefined) opts.heliport.iata = storeAirport.iata;
     }

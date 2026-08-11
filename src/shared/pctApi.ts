@@ -11,6 +11,7 @@
 // Types only, no runtime code — safe to import from any target (main / preload / renderer).
 import type {
   AirportPad,
+  AirportParking,
   Catalog,
   LonLat,
   PlacedObject,
@@ -114,16 +115,31 @@ export interface IcaoStatus {
   ours: InstalledHeliport[]; // held by heliports PCT installed → creating again replaces them
 }
 
+/** Everything the `.tsc`/`.wad` pair needs that is not identity, in UNSHIFTED map coordinates — main hands
+ *  it straight to planExport, which applies the export shift so all of it travels with the scene.
+ *
+ *  ★ One type, used by BOTH the install path and the export-templates path. They were two identical inline
+ *  shapes until `parkings` had to be added to each, which is the standing invitation to add the next field
+ *  to only one of them.
+ *
+ *  `pads` — each its OWN point, never a reference to a placed object, so the helicopter cannot spawn inside
+ *  the XREF it borrowed coordinates from (forum #168). EMPTY = one default pad at the POI's anchor, facing
+ *  true north, at `radiusM`. `parkings` — EMPTY/absent writes no block at all (forum #232). `position` —
+ *  the airport's own point (forum #15/#220), absent = the first pad's. */
+export interface HeliportFileOptions {
+  pads: AirportPad[];
+  parkings?: AirportParking[];
+  position?: LonLat;
+  iata?: string;
+  radiusM?: number;
+}
+
 /** "Create heliport…": the POI becomes a real airport PCT writes into scenery/airports/<country>/.
  *  Identity is user-typed and never invented by PCT; main validates it AND refuses a code already in use
  *  on this machine before touching disk. */
 export interface HeliportInstallOptions {
   identity: { icao: string; name: string; country: string };
-  // The pads in unshifted map coordinates — each its OWN point, never a reference to a placed object, so
-  // the helicopter cannot spawn inside the XREF it borrowed coordinates from (forum #168). EMPTY = one
-  // default pad at the POI's anchor, facing true north. `position` is the airport's own point (forum
-  // #15/#220), absent = the first pad's.
-  heliport: { pads: AirportPad[]; position?: LonLat; iata?: string; radiusM?: number };
+  heliport: HeliportFileOptions;
   overwrite: boolean;
   baseElevation?: number; // same offline fallback as ExportOptions
 }
@@ -136,11 +152,8 @@ export interface ExportOptions {
   // terrain-relative height against this one value; when absent, main uses the elevation provider
   // and may return a `needs-elevation` envelope the renderer answers by re-exporting WITH a base.
   baseElevation?: number;
-  // Opt-in heliport templates (forum #160). Absent = the POI is exported exactly as before. `pads` are
-  // the project's own helipads in unshifted map coordinates (EMPTY = one at the POI's anchor, facing true
-  // north, at `radiusM`); main hands this straight to planExport, which applies the export shift so they
-  // travel with the scene.
-  heliport?: { pads: AirportPad[]; position?: LonLat; iata?: string; radiusM?: number };
+  // Opt-in heliport templates (forum #160). Absent = the POI is exported exactly as before.
+  heliport?: HeliportFileOptions;
 }
 
 /** Async (IPC). Implemented in preload/index.ts, handled in main/ipc.ts. Fallible methods return a
