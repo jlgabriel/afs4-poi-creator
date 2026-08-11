@@ -10,7 +10,7 @@
 
 import { z } from "zod";
 import type { LonLat, Project, Settings } from "./types";
-import { PARKING_TYPES } from "./airport";
+import { APPROACH_LIGHT_SYSTEMS, PAPI_SIDES, PARKING_TYPES, REIL_KINDS } from "./airport";
 import type { FootprintOverrides } from "../catalog/footprints";
 import { isValidPhotoKey } from "../catalog/photoKey";
 
@@ -164,6 +164,28 @@ const zPad = z.looseObject({
   radius: z.number().finite().positive(),
 });
 
+/** One runway end (types.ts AirportRunwayEnd). The three lighting rows are ENUMS for the same reason the
+ *  parking `type` is: they are compared against literals, so a typo is a row the sim ignores rather than an
+ *  error anyone can read — and the values here were taken from the simulator's own binary. */
+const zRunwayEnd = z.looseObject({
+  endpoint: zLonLat,
+  threshold: zLonLat,
+  identifier: z.string().max(IDENTITY_MAX),
+  appltsys: z.enum(APPROACH_LIGHT_SYSTEMS),
+  papi: z.enum(PAPI_SIDES),
+  reil: z.enum(REIL_KINDS),
+  approach: z.boolean(),
+  takeoff: z.boolean(),
+});
+
+/** A runway (types.ts AirportRunway). `ends` is a TUPLE of exactly two — the format has no other shape,
+ *  and a list that could hold one or three would push that check into every writer. */
+const zRunway = z.looseObject({
+  id: z.string().min(1),
+  ends: z.tuple([zRunwayEnd, zRunwayEnd]),
+  width: z.number().finite().positive(),
+});
+
 /** A parking position (types.ts AirportParking). `type` is validated as an ENUM, not a free string, and
  *  that is deliberate even though everything around it is permissive: the row is hashed by the sim, so a
  *  typo produces a stand that silently does nothing rather than an error anyone can read. A hand-edited or
@@ -187,9 +209,10 @@ export const zAirport = z.looseObject({
   // Defaulted rather than required: an airport with no pads is legal (his "(1) DATA" example is exactly
   // that), and a hand-edited file missing the key should land on the empty list, not fail to open.
   pads: z.array(zPad).default([]),
-  // OPTIONAL rather than defaulted, unlike `pads`: a default would write `"parkings": []` into every
-  // project.json that has an airport and no stands, and "absent means none" costs nothing to read
-  // (see parkingsOf in airport.ts).
+  // OPTIONAL rather than defaulted, unlike `pads`: a default would write `"runways": []` / `"parkings": []`
+  // into every project.json that has an airport and neither, and "absent means none" costs nothing to read
+  // (see runwaysOf / parkingsOf in airport.ts).
+  runways: z.array(zRunway).optional(),
   parkings: z.array(zParking).optional(),
   // The compatibility mirror (types.ts ProjectAirport.pad). Validated so a malformed one is caught here
   // rather than silently shipped to an older PCT, and normalised by migrateAirport before it gets here.

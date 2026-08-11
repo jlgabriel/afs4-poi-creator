@@ -7,6 +7,7 @@
 import type {
   AirportPad,
   AirportParking,
+  AirportRunway,
   ExportPlan,
   LonLat,
   PoiFile,
@@ -30,6 +31,8 @@ import {
   type HeliportIdentity,
   type HeliportPadSpec,
   type HeliportParkingSpec,
+  type HeliportRunwayEndSpec,
+  type HeliportRunwaySpec,
   type HeliportSpec,
   type IdentityProblem,
 } from "./heliportTemplate";
@@ -81,6 +84,8 @@ export interface HeliportOptions {
    *  no helipad has nowhere to spawn the helicopter, whereas an airport with no stand is simply an airport
    *  with no stand — his own "(1) DATA" and "(2) HELIPADS" examples are exactly that. */
   parkings?: AirportParking[];
+  /** The runways, unshifted (forum #217 submenu (4)). Absent or EMPTY → no block in either file. */
+  runways?: AirportRunway[];
   /** The AIRPORT's own point, unshifted (forum #15/#220 — it is independent of any pad). Absent → the
    *  first pad's position, which is exactly how v1.2/v1.3 behaved. */
   position?: LonLat;
@@ -119,6 +124,27 @@ function heliportPads(
     position: shiftPoint(p.position, shift),
     headingDeg: p.heading,
     radiusM: p.radius,
+  }));
+}
+
+/** The runways, shifted with the scene — BOTH points of each end, or a displaced threshold would stay
+ *  behind while the pavement moved. */
+function heliportRunways(
+  runways: AirportRunway[] | undefined,
+  shift: Project["shift"],
+): HeliportRunwaySpec[] {
+  return (runways ?? []).map((r) => ({
+    widthM: r.width,
+    ends: r.ends.map((e) => ({
+      endpoint: shiftPoint(e.endpoint, shift),
+      threshold: shiftPoint(e.threshold, shift),
+      identifier: e.identifier,
+      appltsys: e.appltsys,
+      papi: e.papi,
+      reil: e.reil,
+      approach: e.approach,
+      takeoff: e.takeoff,
+    })) as [HeliportRunwayEndSpec, HeliportRunwayEndSpec],
   }));
 }
 
@@ -204,6 +230,7 @@ export function planExport(
     const spec: HeliportSpec = {
       position: heliportPosition(opts.heliport, pads, ref, project.shift),
       pads,
+      runways: heliportRunways(opts.heliport.runways, project.shift),
       parkings: heliportParkings(opts.heliport.parkings, project.shift),
       iata: opts.heliport.iata,
       cultivationFileName: tocFileName,
@@ -275,6 +302,8 @@ export function planHeliport(
   const spec: HeliportSpec = {
     position: heliportPosition(opts.heliport, pads, ref, project.shift),
     pads,
+    runways: heliportRunways(opts.heliport.runways, project.shift),
+    parkings: heliportParkings(opts.heliport.parkings, project.shift),
     iata: opts.heliport.iata,
     cultivationFileName: tocFileName,
     anchor,

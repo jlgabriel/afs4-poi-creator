@@ -12,6 +12,7 @@ import {
   buildHeliportWad,
   HELIPORT_TSC_FILE,
   HELIPORT_WAD_FILE,
+  type HeliportRunwayEndSpec,
   type HeliportSpec,
 } from "../../src/core/export/heliportTemplate";
 import { parseTm, type TmNode } from "../../src/core/tm/tmParser";
@@ -153,6 +154,183 @@ describe("heliport template — several pads (v1.4)", () => {
       expect(nodesByName(parseTm(text), "helipads")).toHaveLength(1); // the list is still there…
       expect(valuesOf(text, "radius")).toEqual([]); // …and empty
     }
+  });
+});
+
+// ── Runways (v1.4, forum #217 submenu (4)) ───────────────────────────────────────────────────────
+//
+// TWO controls, both his: the runway he wrote BY HAND for SCLC (thresholds undisplaced, "ENDPOINT =
+// THRESHOLD = NO EXTENSION" in his own margin), and the same runway as his ACT COMPILED it, where the 26
+// end has a displaced threshold. The second is the one that matters — it is the only file in evidence
+// where endpoint and threshold differ, so it is the only thing that can catch us collapsing the two.
+const HIS_RUNWAY = {
+  width: 10,
+  end1: { lon: -70.58515, lat: -33.38115, id: "08", wadLon: 19918.3655822, wadLat: 26281.9613071 },
+  end2: { lon: -70.57934, lat: -33.38024, id: "26", wadLon: 19919.4232604, wadLat: 26282.1622367 },
+};
+const HIS_DISPLACED = {
+  // …ACT output: endpoint2 is 170 m beyond threshold2.
+  endpointLon: -70.577225758912,
+  endpointLat: -33.3799059672464,
+  thresholdLon: -70.57933859379,
+  thresholdLat: -33.380237038701,
+  wadEndpointLon: 19919.8081462887,
+  wadThresholdLon: 19919.4235164372,
+};
+
+function end(
+  lon: number,
+  lat: number,
+  identifier: string,
+  over: Partial<HeliportRunwayEndSpec> = {},
+): HeliportRunwayEndSpec {
+  return {
+    endpoint: { lon, lat },
+    threshold: { lon, lat },
+    identifier,
+    appltsys: "none",
+    papi: "none",
+    reil: "none",
+    approach: true,
+    takeoff: true,
+    ...over,
+  };
+}
+
+describe("heliport template — runways (v1.4)", () => {
+  const RWY: HeliportSpec = {
+    ...SPEC,
+    position: { lon: -70.582247, lat: -33.380724 },
+    runways: [
+      {
+        widthM: HIS_RUNWAY.width,
+        ends: [
+          end(HIS_RUNWAY.end1.lon, HIS_RUNWAY.end1.lat, "08"),
+          end(HIS_RUNWAY.end2.lon, HIS_RUNWAY.end2.lat, "26"),
+        ],
+      },
+    ],
+  };
+
+  it("writes NOTHING when there are no runways", () => {
+    for (const text of [buildHeliportTsc(SPEC), buildHeliportWad(SPEC)]) {
+      expect(nodesByName(parseTm(text), "runways")).toEqual([]);
+      expect(nodesByName(parseTm(text), "runway_pairs")).toEqual([]);
+    }
+  });
+
+  it("reproduces his hand-written SCLC runway in the .tsc — one element for the PAIR", () => {
+    const tsc = buildHeliportTsc(RWY);
+    const list = nodesByName(parseTm(tsc), "runways");
+    expect(list).toHaveLength(1);
+    expect(list[0]!.children).toHaveLength(1); // ONE element, two ends inside it
+    const [e1lon, e1lat] = valuesOf(tsc, "endpoint1")[0].split(" ").map(Number);
+    const [e2lon] = valuesOf(tsc, "endpoint2")[0].split(" ").map(Number);
+    expect(e1lon).toBeCloseTo(HIS_RUNWAY.end1.lon, 6);
+    expect(e1lat).toBeCloseTo(HIS_RUNWAY.end1.lat, 6);
+    expect(e2lon).toBeCloseTo(HIS_RUNWAY.end2.lon, 6);
+    // Undisplaced: the threshold rows repeat the endpoints exactly.
+    expect(valuesOf(tsc, "threshold1")).toEqual(valuesOf(tsc, "endpoint1"));
+    expect(valuesOf(tsc, "threshold2")).toEqual(valuesOf(tsc, "endpoint2"));
+    expect(valuesOf(tsc, "name1")).toEqual(["08"]);
+    expect(valuesOf(tsc, "name2")).toEqual(["26"]);
+    expect(valuesOf(tsc, "width")).toEqual(["10"]);
+  });
+
+  it("reproduces his projected endpoints in the .wad, and the pair's shared width", () => {
+    const wad = buildHeliportWad(RWY);
+    const pair = nodesByName(parseTm(wad), "runway_pair");
+    expect(pair).toHaveLength(1);
+    expect(pair[0]!.children).toHaveLength(2); // exactly two ends, always
+    const endpoints = valuesOf(wad, "endpoint");
+    const [a] = [endpoints[0]!.split(" ").map(Number)];
+    const [b] = [endpoints[1]!.split(" ").map(Number)];
+    expect(a[0]).toBeCloseTo(HIS_RUNWAY.end1.wadLon, 6);
+    expect(a[1]).toBeCloseTo(HIS_RUNWAY.end1.wadLat, 6);
+    expect(b[0]).toBeCloseTo(HIS_RUNWAY.end2.wadLon, 6);
+    expect(b[1]).toBeCloseTo(HIS_RUNWAY.end2.wadLat, 6);
+    expect(valuesOf(wad, "identifier")).toEqual(["08", "26"]);
+    expect(valuesOf(wad, "width")).toEqual(["10"]);
+    expect(valuesOf(wad, "approach")).toEqual(["true", "true"]);
+    expect(valuesOf(wad, "takeoff")).toEqual(["true", "true"]);
+    // The .wad is the navigation database, not the scenery: no PAPI and no REIL rows live here.
+    expect(nodesByName(parseTm(wad), "papi1")).toEqual([]);
+    expect(nodesByName(parseTm(wad), "reil")).toEqual([]);
+  });
+
+  it("keeps a DISPLACED threshold separate from the endpoint, in both files", () => {
+    // The one case that distinguishes "we store both points" from "we store one and repeat it".
+    const displaced: HeliportSpec = {
+      ...RWY,
+      runways: [
+        {
+          widthM: 10,
+          ends: [
+            end(HIS_RUNWAY.end1.lon, HIS_RUNWAY.end1.lat, "08"),
+            end(HIS_DISPLACED.endpointLon, HIS_DISPLACED.endpointLat, "26", {
+              threshold: { lon: HIS_DISPLACED.thresholdLon, lat: HIS_DISPLACED.thresholdLat },
+            }),
+          ],
+        },
+      ],
+    };
+    const tsc = buildHeliportTsc(displaced);
+    expect(valuesOf(tsc, "endpoint2")[0]).not.toBe(valuesOf(tsc, "threshold2")[0]);
+    expect(Number(valuesOf(tsc, "threshold2")[0].split(" ")[0])).toBeCloseTo(HIS_DISPLACED.thresholdLon, 6);
+
+    const wad = buildHeliportWad(displaced);
+    expect(Number(valuesOf(wad, "endpoint")[1]!.split(" ")[0])).toBeCloseTo(HIS_DISPLACED.wadEndpointLon, 6);
+    expect(Number(valuesOf(wad, "threshold")[1]!.split(" ")[0])).toBeCloseTo(
+      HIS_DISPLACED.wadThresholdLon,
+      6,
+    );
+  });
+
+  it("writes the lighting vocabulary verbatim, including the FS2 systems his ACT will not offer", () => {
+    // ★ Every value here is a literal in aerofly_fs_4.exe (types.ts ApproachLightSystem) — that is the
+    // authority, not a forum post. And REIL is `omni`/`uni`: IPACS's own .tap files say `reil_omni`, but a
+    // .tap is the AUTHORING file and those spellings appear nowhere in the binary.
+    const lit: HeliportSpec = {
+      ...RWY,
+      runways: [
+        {
+          widthM: 40,
+          ends: [
+            end(-70.58, -33.38, "08", { appltsys: "alsf-2", papi: "both", reil: "omni", approach: true }),
+            end(-70.57, -33.38, "26", { appltsys: "calvert-2", papi: "left", reil: "uni", takeoff: false }),
+          ],
+        },
+      ],
+    };
+    const tsc = buildHeliportTsc(lit);
+    expect(valuesOf(tsc, "appltsys1")).toEqual(["alsf-2"]);
+    expect(valuesOf(tsc, "appltsys2")).toEqual(["calvert-2"]);
+    expect(valuesOf(tsc, "papi1")).toEqual(["both"]);
+    expect(valuesOf(tsc, "papi2")).toEqual(["left"]);
+    expect(valuesOf(tsc, "reil1")).toEqual(["omni"]);
+    expect(valuesOf(tsc, "reil2")).toEqual(["uni"]);
+    // The four PAPI rows per end that his ACT always writes, at its own defaults.
+    expect(valuesOf(tsc, "papi1_glide_slope")).toEqual(["3"]);
+    expect(valuesOf(tsc, "papi2_spacing")).toEqual(["6"]);
+    expect(valuesOf(tsc, "papi1_has_custom_position")).toEqual(["false"]);
+    expect(valuesOf(tsc, "papi2_custom_position")).toEqual(["0 0"]);
+    // approach/takeoff reach the .wad, which is the half that decides what the navigation menu offers.
+    const wad = buildHeliportWad(lit);
+    expect(valuesOf(wad, "appltsys")).toEqual(["alsf-2", "calvert-2"]);
+    expect(valuesOf(wad, "takeoff")).toEqual(["true", "false"]);
+  });
+
+  it("writes several runways, in order", () => {
+    const two: HeliportSpec = {
+      ...RWY,
+      runways: [
+        RWY.runways![0]!,
+        { widthM: 40, ends: [end(-70.6, -33.4, "18"), end(-70.6, -33.39, "36")] },
+      ],
+    };
+    expect(valuesOf(buildHeliportTsc(two), "name1")).toEqual(["08", "18"]);
+    expect(valuesOf(buildHeliportWad(two), "identifier")).toEqual(["08", "26", "18", "36"]);
+    expect(valuesOf(buildHeliportWad(two), "width")).toEqual(["10", "40"]);
   });
 });
 

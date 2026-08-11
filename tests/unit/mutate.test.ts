@@ -42,8 +42,13 @@ import {
   setAirportParkingName,
   setAirportParkingSize,
   setAirportParkingType,
+  addAirportRunway,
+  moveAirportRunwayEnd,
+  removeAirportRunway,
+  setAirportRunwayWidth,
+  updateAirportRunwayEnd,
 } from "../../src/core/project/mutate";
-import { parkingsOf } from "../../src/core/project/airport";
+import { parkingsOf, runwaysOf } from "../../src/core/project/airport";
 import type {
   AirportPad,
   ParkingType,
@@ -430,6 +435,80 @@ describe("the airport block", () => {
     const p = setAirport(baseProject(), AIRPORT, NOW);
     expect(rotateAirportPad(p, 90)).toBe(p);
     expect(setAirportPadRadius(p, 10)).toBe(p);
+  });
+
+  // ── Runways (v1.4, forum #217 submenu (4)) ─────────────────────────────────────────────────────
+  describe("runways", () => {
+    const A = { lon: -70.58515, lat: -33.38115 };
+    const B = { lon: -70.57934, lat: -33.38024 };
+    const withRunway = (): Project =>
+      addAirportRunway(setAirport(baseProject(), AIRPORT, NOW), A, B, { identifiers: ["08", "26"], id: "rwy-1" }, LATER);
+
+    it("creates a pair with the thresholds ON the endpoints and no lights", () => {
+      const r = runwaysOf(withRunway().airport)[0]!;
+      expect(r.id).toBe("rwy-1");
+      expect(r.width).toBe(40); // every runway in his reference airports
+      expect(r.ends).toHaveLength(2);
+      expect(r.ends[0]).toEqual({
+        endpoint: A,
+        threshold: A, // "ENDPOINT = THRESHOLD = NO EXTENSION"
+        identifier: "08",
+        appltsys: "none",
+        papi: "none",
+        reil: "none",
+        approach: true,
+        takeoff: true,
+      });
+      expect(r.ends[1]!.identifier).toBe("26");
+    });
+
+    it("drags the threshold along with an UNDISPLACED endpoint, and leaves a displaced one alone", () => {
+      // ★ The rule that matters. Equal points mean "nothing is displaced here", so moving the pavement end
+      // must not silently invent a displacement — but a threshold the user has moved is theirs.
+      const moved = moveAirportRunwayEnd(withRunway(), "rwy-1", 0, { lon: -70.586, lat: -33.3815 }, LATER);
+      expect(runwaysOf(moved.airport)[0]!.ends[0]!.threshold).toEqual({ lon: -70.586, lat: -33.3815 });
+
+      const displaced = updateAirportRunwayEnd(withRunway(), "rwy-1", 1, { threshold: { lon: -70.5793, lat: -33.3802 } }, LATER);
+      const then = moveAirportRunwayEnd(displaced, "rwy-1", 1, { lon: -70.5772, lat: -33.3799 }, LATER);
+      const e = runwaysOf(then.airport)[0]!.ends[1]!;
+      expect(e.endpoint).toEqual({ lon: -70.5772, lat: -33.3799 });
+      expect(e.threshold).toEqual({ lon: -70.5793, lat: -33.3802 }); // stayed put
+    });
+
+    it("patches one end's identifier, lights and usability without touching the other", () => {
+      const p = updateAirportRunwayEnd(
+        withRunway(),
+        "rwy-1",
+        0,
+        { appltsys: "alsf-2", papi: "both", reil: "omni", takeoff: false, identifier: "08L" },
+        LATER,
+      );
+      const [a, b] = runwaysOf(p.airport)[0]!.ends;
+      expect(a).toMatchObject({ appltsys: "alsf-2", papi: "both", reil: "omni", takeoff: false, identifier: "08L" });
+      expect(b).toMatchObject({ appltsys: "none", papi: "none", reil: "none", takeoff: true, identifier: "26" });
+      // A patch that changes nothing keeps the reference, like every other mutation here.
+      expect(updateAirportRunwayEnd(p, "rwy-1", 0, { papi: "both" }, LATER)).toBe(p);
+      expect(updateAirportRunwayEnd(p, "rwy-1", 0, {}, LATER)).toBe(p);
+    });
+
+    it("widens, removes, and stays out of the way when there is nothing to touch", () => {
+      const p = withRunway();
+      expect(runwaysOf(setAirportRunwayWidth(p, "rwy-1", 18, LATER).airport)[0]!.width).toBe(18);
+      expect(setAirportRunwayWidth(p, "rwy-1", 0, LATER)).toBe(p); // refused, not clamped
+      expect(setAirportRunwayWidth(p, "rwy-1", 40, LATER)).toBe(p); // already 40
+      expect(runwaysOf(removeAirportRunway(p, "rwy-1", LATER).airport)).toEqual([]);
+      expect(removeAirportRunway(p, "nope")).toBe(p);
+      const empty = baseProject();
+      expect(setAirportRunwayWidth(empty, "rwy-1", 18)).toBe(empty);
+      expect(moveAirportRunwayEnd(empty, "rwy-1", 0, A)).toBe(empty);
+    });
+
+    it("creates the airport block from a placement, and leaves the pad mirror alone", () => {
+      const fresh = addAirportRunway(baseProject(), A, B, { id: "rwy-1" }, LATER);
+      expect(fresh.airport).toMatchObject({ icao: "", name: "", country: "", pads: [] });
+      expect(runwaysOf(fresh.airport)).toHaveLength(1);
+      expect(withRunway().airport!.pad).toEqual(PAD);
+    });
   });
 
   // ── Parking positions (v1.4, forum #232) ───────────────────────────────────────────────────────

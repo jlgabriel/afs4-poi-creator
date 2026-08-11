@@ -24,7 +24,7 @@
 //   heading goes in verbatim, no conversion · the `objects` block below, in the `tmsimulator_scenery_objecttmslist`
 //   spelling taken from the Hong Kong community pack, DOES reach the cultivation (the POI's palms did not blink).
 
-import type { LonLat, ParkingType } from "../project/types";
+import type { ApproachLightSystem, LonLat, PapiSide, ParkingType, ReilKind } from "../project/types";
 import { tag, block, fmtLonLat, fmtNum, sanitizeValue } from "../tm/tmEmit";
 import { lonToWad, latToWad, directionToWad, formatWad } from "../geo/wad";
 import { headingToDirection } from "../geo/orientation";
@@ -133,6 +133,24 @@ export interface HeliportPadSpec {
   radiusM: number;
 }
 
+/** One runway end as the two writers want it. Both points already shifted with the scene. */
+export interface HeliportRunwayEndSpec {
+  endpoint: LonLat;
+  threshold: LonLat;
+  identifier: string;
+  appltsys: ApproachLightSystem;
+  papi: PapiSide;
+  reil: ReilKind;
+  approach: boolean;
+  takeoff: boolean;
+}
+
+/** A runway: the pair, plus the width they share. */
+export interface HeliportRunwaySpec {
+  ends: [HeliportRunwayEndSpec, HeliportRunwayEndSpec];
+  widthM: number;
+}
+
 /** One parking position as the two writers want it. Position already shifted with the scene, like a pad's.
  *
  *  `type` is the `tags` literal, passed through untouched — see types.ts ParkingType for why the spelling
@@ -159,6 +177,9 @@ export interface HeliportSpec {
   /** Every helipad. May be EMPTY — his "(1) DATA" example is an airport with none, and the sim is happy
    *  with an empty `helipads` list. */
   pads: HeliportPadSpec[];
+  /** Every runway (forum #217 submenu (4)). EMPTY/absent → no `runways` / `runway_pairs` block at all,
+   *  same rule and same reason as `parkings`. */
+  runways?: HeliportRunwaySpec[];
   /** Every parking position (forum #232). EMPTY → NO `parking_positions` block is emitted at all, which is
    *  what makes this feature free of a flight: a project without stands exports byte-for-byte what it
    *  exported before. (His own files DO carry the empty list, marked `DEFAULT` — that belongs with the
@@ -262,6 +283,85 @@ function parkingName(p: HeliportParkingSpec): string {
   return n === "" ? DEFAULT_PARKING_NAME : n;
 }
 
+/** Defaults for the four PAPI rows PCT does not (yet) expose. They are the ones his ACT writes on every
+ *  runway end — 3° glide slope, 6 m spacing, no custom position — and they are written rather than omitted
+ *  on purpose: his hand-made SCLC leaves them out and works, but every runway in evidence that has a PAPI
+ *  at all carries them, and a default we can see beats one we are guessing at. They become user fields
+ *  when his RUNWAY post says what the menu should offer. */
+const PAPI_GLIDE_SLOPE_DEG = 3;
+const PAPI_SPACING_M = 6;
+
+/** The `.tsc`'s `runways` list, or NOTHING when there are none (see HeliportSpec.runways).
+ *
+ *  One element per PAIR, with every field suffixed `1`/`2` — that is the shape, not a convenience: the
+ *  format has no single-ended runway. Field order is his, and so is the choice of which rows exist; both
+ *  were checked against the sim's own binary, which carries `endpoint1`, `threshold1`, `name1`,
+ *  `appltsys1`, `papi1_has_custom_position`, `papi1_glide_slope`, `papi1_spacing` and `reil1` as literals. */
+function runwayTscBlock(runways: HeliportRunwaySpec[]): string[] {
+  if (runways.length === 0) return [];
+  const deg = (p: LonLat): string => `${fmtLonLat(p.lon)} ${fmtLonLat(p.lat)}`;
+  const elements = runways.flatMap((r, i) => {
+    const [a, b] = r.ends;
+    // Both ends get the same four rows; nothing per-end feeds them yet, hence the index-only map.
+    // Grouped by FIELD (papi1_x, papi2_x, then the next field), which is his ACT's order — the sim's
+    // parser is name-keyed and does not care, but he reads these files side by side with his own.
+    const papiRows = [
+      ["bool", "has_custom_position", "false"],
+      ["vector2_float64", "custom_position", "0 0"],
+      ["float64", "glide_slope", fmtNum(PAPI_GLIDE_SLOPE_DEG)],
+      ["float64", "spacing", fmtNum(PAPI_SPACING_M)],
+    ].flatMap(([type, field, value]) => [
+      tag(type!, `papi1_${field}`, value!),
+      tag(type!, `papi2_${field}`, value!),
+    ]);
+    return block("tmsimulator_runway", "element", String(i), [
+      tag("vector2_float64", "endpoint1", deg(a.endpoint)),
+      tag("vector2_float64", "endpoint2", deg(b.endpoint)),
+      tag("vector2_float64", "threshold1", deg(a.threshold)),
+      tag("vector2_float64", "threshold2", deg(b.threshold)),
+      tag("float64", "width", fmtNum(r.widthM)),
+      tag("string8u", "name1", sanitizeValue(a.identifier).trim()),
+      tag("string8u", "name2", sanitizeValue(b.identifier).trim()),
+      tag("string8u", "appltsys1", a.appltsys),
+      tag("string8u", "appltsys2", b.appltsys),
+      tag("string8u", "papi1", a.papi),
+      tag("string8u", "papi2", b.papi),
+      ...papiRows,
+      tag("string8u", "reil1", a.reil),
+      tag("string8u", "reil2", b.reil),
+    ]);
+  });
+  return block("list_tmsimulator_runway", "runways", "", elements);
+}
+
+/** The `.wad`'s `runway_pairs`, or NOTHING when there are none.
+ *
+ *  A level deeper than the `.tsc`'s: the pair holds an ARRAY of exactly two ends, and the shared `width`
+ *  sits beside it rather than inside. This is the half the navigation menu reads — `approach` and
+ *  `takeoff` live only here, and `elevation` is a row his own file annotates "FS4: CURRENTLY UNUSED". */
+function runwayWadBlock(runways: HeliportRunwaySpec[]): string[] {
+  if (runways.length === 0) return [];
+  const wad = (p: LonLat): string => `${formatWad(lonToWad(p.lon))} ${formatWad(latToWad(p.lat))}`;
+  const elements = runways.flatMap((r, i) => {
+    const ends = r.ends.flatMap((e, n) =>
+      block("tmworld_airport_detailed_rwy", "element", String(n), [
+        tag("vector2_float64", "endpoint", wad(e.endpoint)),
+        tag("vector2_float64", "threshold", wad(e.threshold)),
+        tag("string8u", "identifier", sanitizeValue(e.identifier).trim()),
+        tag("string8u", "appltsys", e.appltsys),
+        tag("float64", "elevation", "0"),
+        tag("bool", "approach", e.approach ? "true" : "false"),
+        tag("bool", "takeoff", e.takeoff ? "true" : "false"),
+      ]),
+    );
+    return block("tmworld_airport_detailed_rwy_pair", "element", String(i), [
+      ...block("array_tmworld_airport_detailed_rwy", "runway_pair", "", ends),
+      tag("float64", "width", fmtNum(r.widthM)),
+    ]);
+  });
+  return block("list_tmworld_airport_detailed_rwy_pair", "runway_pairs", "", elements);
+}
+
 /** The `parking_positions` list, or NOTHING when there are no stands (see HeliportSpec.parkings).
  *
  *  The two files differ only in the element type and in the two converted fields, so they share this: the
@@ -321,6 +421,9 @@ export function buildHeliportTsc(spec: HeliportSpec): string {
       tag("float64", "heading", fmtNum(p.headingDeg)),
     ]),
   );
+  // Runways BEFORE helipads, which is his order. Inserting here rather than reordering what is already
+  // there keeps a project with no runways emitting the exact bytes it emitted before.
+  body.push(...runwayTscBlock(spec.runways ?? []));
   body.push(...block("list_tmsimulator_helipad", "helipads", "", pads));
 
   if (spec.anchor !== null) body.push(...anchorObjects(spec.anchor));
@@ -397,6 +500,7 @@ export function buildHeliportWad(spec: HeliportSpec): string {
     tag("stringt8c", "name", v.name),
     tag("stringt8c", "country", v.country),
     tag("vector2_float64", "position", pos),
+    ...runwayWadBlock(spec.runways ?? []),
     ...block("list_tmworld_airport_detailed_helipad", "helipads", "", pads),
     ...parkingBlock(spec.parkings ?? [], true),
   ];

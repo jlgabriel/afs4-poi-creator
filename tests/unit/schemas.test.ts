@@ -357,10 +357,60 @@ describe("zProject — the airport block", () => {
     expect("parkings" in p.airport!).toBe(false);
   });
 
-  it("REJECTS a tag the sim would hash into nothing", () => {
+  // ── Runways (v1.4, forum #217 submenu (4)) ─────────────────────────────────────────────────────
+  const RWY_END = {
+    endpoint: { lon: -70.58515, lat: -33.38115 },
+    threshold: { lon: -70.58515, lat: -33.38115 },
+    identifier: "08",
+    appltsys: "none",
+    papi: "none",
+    reil: "none",
+    approach: true,
+    takeoff: true,
+  };
+  const RUNWAY = { id: "rwy-1", ends: [RWY_END, { ...RWY_END, identifier: "26" }], width: 40 };
+  const withRunways = (runways: unknown[]): unknown => ({
+    ...validProject(),
+    airport: { icao: "sclc", name: "Vitacura", country: "cl", pads: [], runways },
+  });
+
+  it("round-trips a runway, and stays absent when there are none", () => {
+    expect(parseProject(withRunways([RUNWAY])).airport?.runways).toEqual([RUNWAY]);
+    const none = parseProject({
+      ...validProject(),
+      airport: { icao: "sclc", name: "Vitacura", country: "cl", pads: [] },
+    });
+    expect("runways" in none.airport!).toBe(false);
+  });
+
+  it("REFUSES a runway that is not a PAIR — the format has no other shape", () => {
+    expect(() => parseProject(withRunways([{ ...RUNWAY, ends: [RWY_END] }]))).toThrow();
+    expect(() => parseProject(withRunways([{ ...RUNWAY, ends: [RWY_END, RWY_END, RWY_END] }]))).toThrow();
+    expect(() => parseProject(withRunways([{ ...RUNWAY, width: 0 }]))).toThrow();
+  });
+
+  it("REFUSES a lighting value the sim does not know", () => {
+    // Same reasoning as the parking tag, with a sharper edge: `reil_omni` is what IPACS's OWN .tap files
+    // say — but a .tap is the authoring format, and that spelling is in none of the sim's binary. Writing
+    // it into a .tsc gives a runway end whose REIL quietly does not exist.
+    for (const bad of [
+      { ...RWY_END, reil: "reil_omni" },
+      { ...RWY_END, appltsys: "ALSF-2" },
+      { ...RWY_END, papi: "center" },
+    ]) {
+      expect(() => parseProject(withRunways([{ ...RUNWAY, ends: [bad, RWY_END] }]))).toThrow();
+    }
+    // …while every value the binary does carry is accepted, FS2 legacy systems included.
+    for (const good of ["std", "alsf-1", "alsf-2", "malsf", "malsr", "calvert", "calvert-2", "odals", "rail", "sals"]) {
+      const ends = [{ ...RWY_END, appltsys: good }, RWY_END];
+      expect(parseProject(withRunways([{ ...RUNWAY, ends }])).airport?.runways?.[0]?.ends[0]?.appltsys).toBe(good);
+    }
+  });
+
+  it("REJECTS a parking tag the sim would never match", () => {
     // ★ The one place a typo here can still be caught. `parking_ga` is not a strawman: it is the spelling
-    // ApfelFlieger himself used in the prose of #232, while all of his files say `parked_ga`. In the sim
-    // the wrong literal makes a stand that silently does nothing — there is no error to read anywhere.
+    // ApfelFlieger himself used in the prose of #232, while all of his files — and all of IPACS's — say
+    // `parked_ga`. In the sim the wrong value makes a stand that silently does nothing: no error anywhere.
     expect(() => parseProject(withStands([{ ...STAND, type: "parking_ga" }]))).toThrow();
     expect(() => parseProject(withStands([{ ...STAND, type: "" }]))).toThrow();
     // …and the same refusals the pad radius gets, for the same reason.

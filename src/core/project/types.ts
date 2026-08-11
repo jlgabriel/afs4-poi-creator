@@ -224,17 +224,96 @@ export interface AirportPad {
   radius: number; // metres; the sim shows the DIAMETER as "Size" (radius 10 → "66 ft / 20 m")
 }
 
+/** The approach lighting system at ONE runway end, written verbatim into `appltsys`.
+ *
+ *  ★ EVERY ONE OF THESE IS A LITERAL IN THE SIMULATOR'S OWN BINARY, checked rather than assumed: a strings
+ *  pass over `aerofly_fs_4.exe` finds `std`, `alsf-1`, `alsf-2`, `malsf`, `malsr`, `calvert`, `calvert-2`,
+ *  `odals`, `rail`, `sals` and `none`, next to the field names `appltsys1`/`appltsys2` themselves. So this
+ *  list is the sim's, not a transcription of a forum post.
+ *
+ *  The split ApfelFlieger drew (his two sample airports, 0001 and 0002): the first six are what his ACT
+ *  offers; the last five are FS2 systems it does NOT offer but FS4 still loads. PCT can write both — there
+ *  is no reason to be narrower than the sim. */
+export type ApproachLightSystem =
+  | "none"
+  | "std"
+  | "alsf-1"
+  | "alsf-2"
+  | "malsf"
+  | "malsr"
+  | "calvert"
+  | "calvert-2"
+  | "odals"
+  | "rail"
+  | "sals";
+
+/** Which side of the runway the PAPI sits on, and the REIL kind — both verbatim rows, both literals in
+ *  the sim's binary.
+ *
+ *  ★★ THE REIL VALUES ARE THE REASON NOT TO CROSS-READ THE TWO FORMATS. IPACS ships 146 `.tap` files
+ *  under scenery/airports/, and they spell these `reil_omni` / `reil_uni`. Those spellings appear NOWHERE
+ *  in the executable, while `omni` and `uni` do — because a `.tap` is the AUTHORING project file, and the
+ *  simulator reads the `.tsc` it was compiled into. Michael's own `.tsc` files agree: `omni` / `uni`.
+ *  Copying the vocabulary out of the richer, more official-looking file would have written a row the sim
+ *  quietly ignores. (Same trap in miniature elsewhere in the `.tap`: `radius` for what the `.tsc` calls
+ *  `size`, and a parking type declared `<[float64][type]>` while holding a string.) */
+export type PapiSide = "none" | "left" | "right" | "both";
+export type ReilKind = "none" | "uni" | "omni";
+
+/** ONE END of a runway. A runway is always a pair of these — the format has no single-ended runway: the
+ *  `.tsc` suffixes every field `1`/`2` and the `.wad` nests an array of exactly two.
+ *
+ *  ★ ENDPOINT vs THRESHOLD, in his own words: "ENDPOINT = THRESHOLD = NO EXTENSION". The endpoint is where
+ *  the pavement stops; the threshold is where landing distance starts. They are equal unless the threshold
+ *  is displaced — his ACT's output for SCLC has them equal at the 08 end and 24 m apart at the 26 end.
+ *  Both are stored, because the pair is what the file wants and deriving one from the other would need a
+ *  displacement convention the format does not state. */
+export interface AirportRunwayEnd {
+  /** Physical end of the pavement, degrees. */
+  endpoint: LonLat;
+  /** Landing threshold, degrees. Equal to `endpoint` when nothing is displaced. */
+  threshold: LonLat;
+  /** "08", "26", "ALSF2"… May be EMPTY: his 0001 leaves the second end's identifier blank. */
+  identifier: string;
+  appltsys: ApproachLightSystem;
+  papi: PapiSide;
+  reil: ReilKind;
+  /** Whether this end may be used to land on / take off from. Both true in every file he has sent, and
+   *  both are their own row in the `.wad`, which is the half the navigation menu reads. */
+  approach: boolean;
+  takeoff: boolean;
+}
+
+/** A runway, i.e. the PAIR (forum #217's submenu (4), "RUNWAY").
+ *
+ *  There is no heading here on purpose: the `.tsc`/`.wad` carry none, and the direction is whatever the two
+ *  endpoints say. His ACT's own project file (`.tap`) does keep a `direction`, because that is an authoring
+ *  input it turns into endpoints — a different thing from what the simulator reads. */
+export interface AirportRunway {
+  /** Stable across reorder and delete — same contract as AirportPad.id. */
+  id: string;
+  /** Exactly two, in the order they are written as end 1 and end 2. */
+  ends: [AirportRunwayEnd, AirportRunwayEnd];
+  /** Metres, and here it really is the full width (not a radius): his reference airports carry 40. */
+  width: number;
+}
+
 /** What a parking position is FOR, written verbatim into the `tags` row of both files.
  *
  *  ★ THESE THREE LITERALS ARE THE VOCABULARY, and they are spelled `parked_`, not `parking_`.
  *  ApfelFlieger's post announcing the submenu (forum #232) writes them as `[parking_ga]` / `[parking_jet]`
  *  in prose, but every FILE he has sent — his original SCLC, the three flight-test variants, the ACT's own
  *  output and the new #232 pair — writes `parked_ga`, and his own margin note in the original spells the
- *  set out: "[parked_ga] = 7.5 M / [parked_jet] = 40 M / [pushback] = PUSH BACK". The files win.
+ *  set out: "[parked_ga] = 7.5 M / [parked_jet] = 40 M / [pushback] = PUSH BACK". The files win — and so
+ *  do IPACS's: all three appear verbatim in the airport files shipped with the sim, while `parking_ga`
+ *  appears in none of its 85 749 files.
  *
- *  ⚠️ Getting one wrong FAILS SILENTLY. The row is a `string8u`, and the sim's binary carries no
- *  `parked_ga` literal (it does carry `parking_positions`), so these are almost certainly hashed at load —
- *  the same shape as an XREF name that does not resolve. There is no error to read in tm.log.
+ *  ⚠️ Getting one wrong FAILS SILENTLY — there is no error to read in tm.log. (An earlier note here
+ *  guessed that these were HASHED at load, from the fact that `parked_ga` is not a literal in
+ *  `aerofly_fs_4.exe`. That was wrong, and the correction is worth keeping: the sim never needs the
+ *  literal because BOTH sides are data — the airport names the tag and the aircraft declares what it can
+ *  use, so it only ever compares two strings that came out of files. The `appltsys`/`papi`/`reil` values
+ *  next door ARE in the binary, because those the sim resolves itself.)
  *
  *  What the user gets out of each (forum #232): `parked_ga`/`parked_jet` let a COLD & DARK–capable
  *  aircraft or helicopter be started in a chosen state; `pushback` lets the pushback truck be coupled at
@@ -295,6 +374,9 @@ export interface ProjectAirport {
   /** Every helipad, in document order. May be EMPTY: his "(1) DATA" example is a complete airport with
    *  no pads at all — identity plus a database entry. */
   pads: AirportPad[];
+  /** Every runway, in document order (forum #217 submenu (4)). Absent ≡ none, same rule as `parkings`
+   *  below and for the same reason: no runways ⇒ no block ⇒ an older project exports the same bytes. */
+  runways?: AirportRunway[];
   /** Every parking position, in document order (forum #232). Absent ≡ none, which is what every project
    *  written before v1.4 has — and the writers emit no `parking_positions` block at all in that case, so
    *  those projects keep exporting the same bytes.

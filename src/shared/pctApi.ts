@@ -12,6 +12,7 @@
 import type {
   AirportPad,
   AirportParking,
+  AirportRunway,
   Catalog,
   LonLat,
   PlacedObject,
@@ -124,10 +125,11 @@ export interface IcaoStatus {
  *
  *  `pads` — each its OWN point, never a reference to a placed object, so the helicopter cannot spawn inside
  *  the XREF it borrowed coordinates from (forum #168). EMPTY = one default pad at the POI's anchor, facing
- *  true north, at `radiusM`. `parkings` — EMPTY/absent writes no block at all (forum #232). `position` —
- *  the airport's own point (forum #15/#220), absent = the first pad's. */
+ *  true north, at `radiusM`. `runways` / `parkings` — EMPTY/absent write no block at all (forum
+ *  #217/#232). `position` — the airport's own point (forum #15/#220), absent = the first pad's. */
 export interface HeliportFileOptions {
   pads: AirportPad[];
+  runways?: AirportRunway[];
   parkings?: AirportParking[];
   position?: LonLat;
   iata?: string;

@@ -9,7 +9,14 @@
 // becomes repeatable) is what turns these into list rendering. Until then `firstPad` is the honest name
 // for what that UI means, and it is greppable when the time comes.
 
-import type { AirportPad, AirportParking, LonLat, ParkingType, ProjectAirport } from "./types";
+import type {
+  AirportPad,
+  AirportParking,
+  AirportRunway,
+  LonLat,
+  ParkingType,
+  ProjectAirport,
+} from "./types";
 
 /** The pad a single-pad UI means: the first one, or undefined for an airport with none (legal — his
  *  "(1) DATA" example is identity plus a database entry and no pads at all). */
@@ -32,6 +39,28 @@ export function airportPosition(airport: ProjectAirport): LonLat | null {
 export function parkingsOf(airport: ProjectAirport | undefined): AirportParking[] {
   return airport?.parkings ?? [];
 }
+
+/** The runways, with "absent" and "empty" collapsed into one thing — same contract as parkingsOf. */
+export function runwaysOf(airport: ProjectAirport | undefined): AirportRunway[] {
+  return airport?.runways ?? [];
+}
+
+/** The approach-lighting vocabulary, split the way ApfelFlieger's two sample airports split it, and in the
+ *  order a menu should offer it. Both halves are literals in the sim's binary (types.ts
+ *  ApproachLightSystem) — the split is about what his ACT offers, not about what FS4 accepts. */
+export const APPROACH_LIGHT_SYSTEMS_ACT = ["none", "std", "alsf-1", "alsf-2", "malsf", "malsr"] as const;
+export const APPROACH_LIGHT_SYSTEMS_LEGACY = ["calvert", "calvert-2", "odals", "rail", "sals"] as const;
+export const APPROACH_LIGHT_SYSTEMS = [
+  ...APPROACH_LIGHT_SYSTEMS_ACT,
+  ...APPROACH_LIGHT_SYSTEMS_LEGACY,
+] as const;
+
+export const PAPI_SIDES = ["none", "left", "right", "both"] as const;
+export const REIL_KINDS = ["none", "uni", "omni"] as const;
+
+/** The width a new runway starts at, metres. Not invented: every runway in his reference airports carries
+ *  40 (33 of the 44 `width` rows we hold; the other 11 are the 10 m strip of his tiny SCLC test field). */
+export const DEFAULT_RUNWAY_WIDTH_M = 40;
 
 /** The `tags` vocabulary, in the order a menu should offer it. Also the zod enum (schemas.ts) — one list,
  *  so a value the UI can produce is by construction a value the loader accepts. See types.ts ParkingType

@@ -11,6 +11,8 @@
 import type {
   AirportPad,
   AirportParking,
+  AirportRunway,
+  AirportRunwayEnd,
   HeightMode,
   HeightSpec,
   LonLat,
@@ -25,7 +27,7 @@ import type {
   ProjectAirport,
   Vec3,
 } from "./types";
-import { DEFAULT_PARKING_SIZE_M, parkingsOf } from "./airport";
+import { DEFAULT_PARKING_SIZE_M, DEFAULT_RUNWAY_WIDTH_M, parkingsOf, runwaysOf } from "./airport";
 
 const nowIso = (): string => new Date().toISOString();
 
@@ -549,6 +551,148 @@ export function setAirportPadRadius(
  *  legal and means unnamed, which the writer renders as "FATO/TLOF". */
 export function setAirportPadName(project: Project, name: string, now = nowIso(), padId?: string): Project {
   return updatePad(project, (pad) => (pad.name === name ? pad : { ...pad, name }), now, padId);
+}
+
+// ── Runways (v1.4, forum #217 submenu (4)) ─────────────────────────────────────────────────────────
+//
+// A runway is a PAIR: the format has no single-ended one, so every mutation below addresses an end by
+// index (0 or 1) rather than letting the list grow. Same no-mirror, required-id rules as the stands.
+
+/** A fresh end: no displaced threshold, no lights, usable both ways — the defaults every runway end in
+ *  ApfelFlieger's files carries. */
+function newRunwayEnd(endpoint: LonLat, identifier: string): AirportRunwayEnd {
+  return {
+    endpoint,
+    threshold: endpoint,
+    identifier,
+    appltsys: "none",
+    papi: "none",
+    reil: "none",
+    approach: true,
+    takeoff: true,
+  };
+}
+
+/** A runway between two points. `identifiers` is a pair of strings ("08"/"26"); both may be empty, which
+ *  is legal — his 0001 sample leaves the second blank. Creates the airport block when there is none, the
+ *  same rule the pad and the stand follow, and invents no identity either. */
+export function addAirportRunway(
+  project: Project,
+  endpoint1: LonLat,
+  endpoint2: LonLat,
+  opts: { width?: number; identifiers?: [string, string]; id?: string } = {},
+  now = nowIso(),
+): Project {
+  const [id1, id2] = opts.identifiers ?? ["", ""];
+  const runway: AirportRunway = {
+    id: opts.id ?? randomId(),
+    ends: [newRunwayEnd(endpoint1, id1), newRunwayEnd(endpoint2, id2)],
+    width: opts.width ?? DEFAULT_RUNWAY_WIDTH_M,
+  };
+  const airport = project.airport;
+  const next: ProjectAirport =
+    airport === undefined
+      ? { icao: "", name: "", country: "", pads: [], runways: [runway] }
+      : { ...airport, runways: [...runwaysOf(airport), runway] };
+  return { ...project, airport: next, modifiedAt: now };
+}
+
+/** Drop a runway by id. */
+export function removeAirportRunway(project: Project, runwayId: string, now = nowIso()): Project {
+  const airport = project.airport;
+  if (airport === undefined) return project;
+  const current = runwaysOf(airport);
+  const runways = current.filter((r) => r.id !== runwayId);
+  if (runways.length === current.length) return project;
+  return { ...project, airport: { ...airport, runways }, modifiedAt: now };
+}
+
+function updateRunway(
+  project: Project,
+  runwayId: string,
+  patch: (runway: AirportRunway) => AirportRunway,
+  now: string,
+): Project {
+  const airport = project.airport;
+  if (airport === undefined) return project;
+  const current = runwaysOf(airport);
+  const i = current.findIndex((r) => r.id === runwayId);
+  const found = i < 0 ? undefined : current[i];
+  if (found === undefined) return project;
+  const runway = patch(found);
+  if (runway === found) return project;
+  const runways = [...current];
+  runways[i] = runway;
+  return { ...project, airport: { ...airport, runways }, modifiedAt: now };
+}
+
+function patchEnd(
+  runway: AirportRunway,
+  end: 0 | 1,
+  patch: (e: AirportRunwayEnd) => AirportRunwayEnd,
+): AirportRunway {
+  const current = runway.ends[end];
+  const next = patch(current);
+  if (next === current) return runway;
+  const ends: [AirportRunwayEnd, AirportRunwayEnd] = [runway.ends[0], runway.ends[1]];
+  ends[end] = next;
+  return { ...runway, ends };
+}
+
+/** Widen or narrow a runway. Metres, refused rather than clamped when non-positive. */
+export function setAirportRunwayWidth(
+  project: Project,
+  runwayId: string,
+  width: number,
+  now = nowIso(),
+): Project {
+  if (!(Number.isFinite(width) && width > 0)) return project;
+  return updateRunway(project, runwayId, (r) => (r.width === width ? r : { ...r, width }), now);
+}
+
+/** Drag one END of the runway.
+ *
+ *  ★ The threshold FOLLOWS when it was not displaced. "ENDPOINT = THRESHOLD = NO EXTENSION" is his own
+ *  note, so the two being equal is the normal state and means "there is no displacement here" — dragging
+ *  the pavement end must not silently invent one. A threshold the user HAS moved stays where they put it. */
+export function moveAirportRunwayEnd(
+  project: Project,
+  runwayId: string,
+  end: 0 | 1,
+  endpoint: LonLat,
+  now = nowIso(),
+): Project {
+  return updateRunway(
+    project,
+    runwayId,
+    (r) =>
+      patchEnd(r, end, (e) => {
+        const undisplaced = e.threshold.lon === e.endpoint.lon && e.threshold.lat === e.endpoint.lat;
+        return { ...e, endpoint, threshold: undisplaced ? endpoint : e.threshold };
+      }),
+    now,
+  );
+}
+
+/** Everything else about one end, in one patch: identifier, the three lighting rows, approach/takeoff and
+ *  a DISPLACED threshold. `endpoint` is deliberately not patchable here — it has the rule above. */
+export function updateAirportRunwayEnd(
+  project: Project,
+  runwayId: string,
+  end: 0 | 1,
+  patch: Partial<Omit<AirportRunwayEnd, "endpoint">>,
+  now = nowIso(),
+): Project {
+  return updateRunway(
+    project,
+    runwayId,
+    (r) =>
+      patchEnd(r, end, (e) => {
+        const next = { ...e, ...patch };
+        return (Object.keys(patch) as (keyof typeof patch)[]).every((k) => e[k] === patch[k]) ? e : next;
+      }),
+    now,
+  );
 }
 
 // ── Parking positions (v1.4, forum #232) ───────────────────────────────────────────────────────────
