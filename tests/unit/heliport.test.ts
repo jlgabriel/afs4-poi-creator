@@ -212,11 +212,15 @@ describe("heliport template — runways (v1.4)", () => {
     ],
   };
 
-  it("writes NOTHING when there are no runways", () => {
-    for (const text of [buildHeliportTsc(SPEC), buildHeliportWad(SPEC)]) {
-      expect(nodesByName(parseTm(text), "runways")).toEqual([]);
-      expect(nodesByName(parseTm(text), "runway_pairs")).toEqual([]);
-    }
+  it("writes the list EMPTY when there are no runways (forum #236)", () => {
+    // It used to write nothing at all. "I'm in favor of PCT writing all the lines, even if some of them
+    // are just DEFAULT at the moment" — so the block is always there, and empty is a state, not an absence.
+    const tsc = parseTm(buildHeliportTsc(SPEC));
+    expect(nodesByName(tsc, "runways")).toHaveLength(1);
+    expect(nodesByName(tsc, "runways")[0]!.children).toEqual([]);
+    const wad = parseTm(buildHeliportWad(SPEC));
+    expect(nodesByName(wad, "runway_pairs")).toHaveLength(1);
+    expect(nodesByName(wad, "runway_pairs")[0]!.children).toEqual([]);
   });
 
   it("reproduces his hand-written SCLC runway in the .tsc — one element for the PAIR", () => {
@@ -378,11 +382,14 @@ describe("heliport template — glider starts (v1.4)", () => {
     ],
   };
 
-  it("writes NOTHING when there are none", () => {
-    for (const text of [buildHeliportTsc(SPEC), buildHeliportWad(SPEC)]) {
-      expect(text).not.toContain("glider_aerotows");
-      expect(text).not.toContain("glider_winches");
+  it("writes both lists EMPTY when there are none — and never in the .tsc", () => {
+    const wad = parseTm(buildHeliportWad(SPEC));
+    for (const list of ["glider_aerotows", "glider_winches"]) {
+      expect(nodesByName(wad, list)).toHaveLength(1);
+      expect(nodesByName(wad, list)[0]!.children).toEqual([]);
     }
+    // "All the lines" does NOT reach the .tsc: these elements do not exist in that file at all.
+    expect(buildHeliportTsc(SPEC)).not.toContain("glider");
   });
 
   it("puts BOTH of them in the .wad only — the .tsc has no such rows", () => {
@@ -488,13 +495,14 @@ describe("heliport template — parking positions (v1.4)", () => {
     })),
   };
 
-  it("writes NOTHING when there are no stands — the reason this needed no flight", () => {
-    // Every project that predates v1.4 exports the files it always did, byte for byte. His own DATA
-    // example carries the empty `parking_positions` list marked DEFAULT; that belongs with the rest of
-    // the #217 compliance rows, which move bytes in files that have already flown.
+  it("writes the list EMPTY when there are no stands (forum #236)", () => {
+    // ⚠️ This assertion is the INVERSE of what it was one commit ago, and deliberately so — see the note
+    // on HeliportSpec.parkings. Writing every line is what he asked for, and it is what moves the bytes
+    // of an already-flown file, which is why this change wants the tm.log gate the others did not.
     for (const text of [buildHeliportTsc(SPEC), buildHeliportWad(SPEC)]) {
-      expect(nodesByName(parseTm(text), "parking_positions")).toEqual([]);
-      expect(text).not.toContain("parking");
+      const list = nodesByName(parseTm(text), "parking_positions");
+      expect(list).toHaveLength(1);
+      expect(list[0]!.children).toEqual([]);
     }
   });
 
@@ -542,7 +550,8 @@ describe("heliport template — parking positions (v1.4)", () => {
     // nothing, with no error anywhere. His prose in #232 says `parking_ga`; all five of his FILES say
     // `parked_ga`. This test is what stops the prose from winning later.
     for (const text of [buildHeliportTsc(STANDS), buildHeliportWad(STANDS)]) {
-      const tags = nodesByName(parseTm(text), "tags");
+      // The .wad has an airport-level `tags` row too (a uint64 DEFAULT), so take the stands off the tail.
+      const tags = nodesByName(parseTm(text), "tags").slice(-3);
       expect(tags.map((n) => n.value)).toEqual(["parked_ga", "parked_ga", "parked_ga"]);
       expect(tags.map((n) => n.type)).toEqual(["string8u", "string8u", "string8u"]);
     }
@@ -562,6 +571,49 @@ describe("heliport template — parking positions (v1.4)", () => {
   });
 });
 
+// ── Every line, including the DEFAULT ones (forum #217 → #236) ───────────────────────────────────
+describe("heliport template — the full row set", () => {
+  /** The TOP-LEVEL rows in file order — the direct children of the one block inside `<[file]`. Names only:
+   *  the values are covered by the tests above, and what this one is about is whether a ROW is there. */
+  function rowNames(text: string): string[] {
+    return parseTm(text).children[0]!.children.map((c) => c.name);
+  }
+
+  // Taken from his sclc_0_demo, which is an airport that loads in FS 4 — so this is not a wish list, it
+  // is the row set of a working file. ONE deliberate difference: he opens the `.tsc` with sname/lname and
+  // PCT opens with `icao`, because he asked for exactly that in #172 ("I put the line <[string8u][icao]…>
+  // up, because that is more logical for me"). The sim's parser is name-keyed and does not care.
+  const TSC_ROWS = [
+    "icao", "sname", "lname", "country", "coordinate_system", "position",
+    "height", "tower_position", "autoheight", "autoheight_method", "geometry",
+    "objects", "objects_animated",
+    "runways", "helipads", "start_positions", "parking_positions", "cultivation_files",
+  ];
+  const WAD_ROWS = [
+    "uid", "icao", "iata", "name", "country",
+    "elevation", "tags", "priority", "connections", "time_zone", "position", "tower_position",
+    "runway_pairs", "helipads", "glider_winches", "glider_aerotows", "parking_positions",
+  ];
+
+  it("writes every row his own working file carries, even the empty ones", () => {
+    // ⚠️ THIS IS THE CHANGE THAT MOVES BYTES IN A FILE THAT HAS ALREADY FLOWN. Everything before it was
+    // additive-only by construction. See the gate note in the commit that introduced it.
+    expect(rowNames(buildHeliportTsc({ ...SPEC, cultivationFileName: null }))).toEqual(TSC_ROWS);
+    expect(rowNames(buildHeliportWad({ ...SPEC, pads: [] }))).toEqual(WAD_ROWS);
+  });
+
+  it("keeps the pad's own DEFAULT rows too", () => {
+    const padRows = (text: string, list: string): string[] =>
+      nodesByName(parseTm(text), list)[0]!.children[0]!.children.map((c) => c.name);
+    expect(padRows(buildHeliportTsc(SPEC), "helipads")).toEqual([
+      "name", "type_name", "position", "radius", "heading", "height",
+    ]);
+    expect(padRows(buildHeliportWad(SPEC), "helipads")).toEqual([
+      "name", "type_name", "position", "radius", "direction", "height",
+    ]);
+  });
+});
+
 describe("heliport template — structure", () => {
   it("names no airport: every identity field is a placeholder", () => {
     for (const text of [buildHeliportTsc(SPEC), buildHeliportWad(SPEC)]) {
@@ -578,10 +630,14 @@ describe("heliport template — structure", () => {
     }
   });
 
-  it("points the place at the POI's own cultivation, and drops it for an empty POI", () => {
+  it("points the place at the POI's own cultivation, and leaves the list EMPTY for an empty POI", () => {
     expect(valuesOf(buildHeliportTsc(SPEC), "filename")).toEqual(["poi"]);
-    const empty = buildHeliportTsc({ ...SPEC, cultivationFileName: null });
-    expect(nodesByName(parseTm(empty), "cultivation_files")).toEqual([]);
+    // The LIST is always written now (#236); the ELEMENT is not, because naming a `.toc` that is not
+    // beside the file would be worse than saying nothing.
+    const empty = parseTm(buildHeliportTsc({ ...SPEC, cultivationFileName: null }));
+    expect(nodesByName(empty, "cultivation_files")).toHaveLength(1);
+    expect(nodesByName(empty, "cultivation_files")[0]!.children).toEqual([]);
+    expect(nodesByName(empty, "filename")).toEqual([]);
   });
 
   it("repeats the plant anchor, because the .tsc replaces the .tsl that carried it", () => {
@@ -589,8 +645,9 @@ describe("heliport template — structure", () => {
       ...SPEC,
       anchor: { position: { lon: 11.85, lat: 48.376 }, heightAsl: 520 },
     });
-    expect(valuesOf(withAnchor, "geometry")).toEqual(["pct_anchor"]);
-    expect(valuesOf(buildHeliportTsc(SPEC), "geometry")).toEqual([]);
+    // The place carries its OWN empty `geometry` DEFAULT row, so the anchor's is the tail one.
+    expect(valuesOf(withAnchor, "geometry").slice(-1)).toEqual(["pct_anchor"]);
+    expect(valuesOf(buildHeliportTsc(SPEC), "geometry")).toEqual([""]);
   });
 
   it("mirrors the project's height mode onto the cultivation reference", () => {
@@ -724,9 +781,12 @@ describe("planExport — heliport option", () => {
     expect(standLon).toBeCloseTo(objLon, 7);
     expect(valuesOf(tsc, "tags")).toEqual(["parked_ga"]);
 
+    // With no stands the list is still written, and empty (#236).
     const none = planExport(PROJECT, [HANGAR], { heliport: { pads: [PAD] } });
     for (const f of [HELIPORT_TSC_FILE, HELIPORT_WAD_FILE]) {
-      expect(none.files.find((x) => x.relPath === f)!.content).not.toContain("parking");
+      const list = nodesByName(parseTm(none.files.find((x) => x.relPath === f)!.content), "parking_positions");
+      expect(list).toHaveLength(1);
+      expect(list[0]!.children).toEqual([]);
     }
   });
 

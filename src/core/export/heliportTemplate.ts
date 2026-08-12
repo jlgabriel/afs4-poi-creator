@@ -201,18 +201,19 @@ export interface HeliportSpec {
   /** Every helipad. May be EMPTY — his "(1) DATA" example is an airport with none, and the sim is happy
    *  with an empty `helipads` list. */
   pads: HeliportPadSpec[];
-  /** Every runway (forum #217 submenu (4)). EMPTY/absent → no `runways` / `runway_pairs` block at all,
-   *  same rule and same reason as `parkings`. */
+  /** Every runway (forum #217 submenu (4)). Absent ≡ empty; the block is written either way. */
   runways?: HeliportRunwaySpec[];
   /** Glider starts (forum #237/#238). Both are `.wad`-only — `buildHeliportTsc` ignores them entirely,
    *  which is not an omission: "The code lines for this submenu only appear in the WAD". */
   aerotows?: HeliportAerotowSpec[];
   winches?: HeliportWinchSpec[];
-  /** Every parking position (forum #232). EMPTY → NO `parking_positions` block is emitted at all, which is
-   *  what makes this feature free of a flight: a project without stands exports byte-for-byte what it
-   *  exported before. (His own files DO carry the empty list, marked `DEFAULT` — that belongs with the
-   *  other compliance rows of #217, which move bytes in files that have already flown and are gated
-   *  separately.) Absent ≡ empty, so a caller that predates stands needs no change. */
+  /** Every parking position (forum #232). Absent ≡ empty; the block is written either way.
+   *
+   *  ⚠️ It did NOT used to be. Through the parking and runway commits an empty list emitted NOTHING, which
+   *  is what let those ship without a flight — a project with no stands exported byte-for-byte what it
+   *  always had. #236 ends that: "I'm in favor of PCT writing all the lines, even if some of them are just
+   *  DEFAULT at the moment", so every airport file PCT writes now carries the full row set and the bytes
+   *  of an already-flown file DO move. See the gate note on buildHeliportTsc. */
   parkings?: HeliportParkingSpec[];
   /** IATA code (forum #220). Its row is written either way; empty is the normal case. */
   iata?: string;
@@ -286,6 +287,9 @@ function informationsBanner(): string[] {
     "//  [heading]:  TRUE heading in degrees, the sim displays magnetic, so expect this minus",
     "//              the local variation",
     "",
+    "//  Every other row below is a DEFAULT that Aerofly expects to find and PCT does not ask you",
+    "//  about. Leave them as they are unless you know the format.",
+    "",
   ];
 }
 
@@ -319,14 +323,13 @@ function parkingName(p: HeliportParkingSpec): string {
 const PAPI_GLIDE_SLOPE_DEG = 3;
 const PAPI_SPACING_M = 6;
 
-/** The `.tsc`'s `runways` list, or NOTHING when there are none (see HeliportSpec.runways).
+/** The `.tsc`'s `runways` list, EMPTY OR NOT (forum #236: write all the lines).
  *
  *  One element per PAIR, with every field suffixed `1`/`2` — that is the shape, not a convenience: the
  *  format has no single-ended runway. Field order is his, and so is the choice of which rows exist; both
  *  were checked against the sim's own binary, which carries `endpoint1`, `threshold1`, `name1`,
  *  `appltsys1`, `papi1_has_custom_position`, `papi1_glide_slope`, `papi1_spacing` and `reil1` as literals. */
 function runwayTscBlock(runways: HeliportRunwaySpec[]): string[] {
-  if (runways.length === 0) return [];
   const deg = (p: LonLat): string => `${fmtLonLat(p.lon)} ${fmtLonLat(p.lat)}`;
   const elements = runways.flatMap((r, i) => {
     const [a, b] = r.ends;
@@ -362,13 +365,12 @@ function runwayTscBlock(runways: HeliportRunwaySpec[]): string[] {
   return block("list_tmsimulator_runway", "runways", "", elements);
 }
 
-/** The `.wad`'s `runway_pairs`, or NOTHING when there are none.
+/** The `.wad`'s `runway_pairs`, empty or not.
  *
  *  A level deeper than the `.tsc`'s: the pair holds an ARRAY of exactly two ends, and the shared `width`
  *  sits beside it rather than inside. This is the half the navigation menu reads — `approach` and
  *  `takeoff` live only here, and `elevation` is a row his own file annotates "FS4: CURRENTLY UNUSED". */
 function runwayWadBlock(runways: HeliportRunwaySpec[]): string[] {
-  if (runways.length === 0) return [];
   const wad = (p: LonLat): string => `${formatWad(lonToWad(p.lon))} ${formatWad(latToWad(p.lat))}`;
   const elements = runways.flatMap((r, i) => {
     const ends = r.ends.flatMap((e, n) =>
@@ -390,7 +392,7 @@ function runwayWadBlock(runways: HeliportRunwaySpec[]): string[] {
   return block("list_tmworld_airport_detailed_rwy_pair", "runway_pairs", "", elements);
 }
 
-/** The two glider-start lists, `.wad`-only, or NOTHING when there are none.
+/** The two glider-start lists, `.wad`-only, empty or not.
  *
  *  ★ The WINCH is the only element PCT writes that has no heading of its own: `position` is the glider and
  *  `winch` is the far end of the rope, and "the length and direction then result from the two positions".
@@ -401,7 +403,7 @@ function runwayWadBlock(runways: HeliportRunwaySpec[]): string[] {
 function gliderBlocks(aerotows: HeliportAerotowSpec[], winches: HeliportWinchSpec[]): string[] {
   const wad = (p: LonLat): string => `${formatWad(lonToWad(p.lon))} ${formatWad(latToWad(p.lat))}`;
   const out: string[] = [];
-  if (winches.length > 0) {
+  {
     const elements = winches.flatMap((w, i) =>
       block("tmworld_airport_detailed_glider_winch", "element", String(i), [
         tag("string8", "name", sanitizeValue(w.name).trim()),
@@ -414,7 +416,7 @@ function gliderBlocks(aerotows: HeliportAerotowSpec[], winches: HeliportWinchSpe
       ...block("list_tmworld_airport_detailed_glider_winch", "glider_winches", "", elements),
     );
   }
-  if (aerotows.length > 0) {
+  {
     const elements = aerotows.flatMap((a, i) =>
       block("tmworld_airport_detailed_glider_aerotow", "element", String(i), [
         tag("string8", "name", sanitizeValue(a.name).trim()),
@@ -431,14 +433,13 @@ function gliderBlocks(aerotows: HeliportAerotowSpec[], winches: HeliportWinchSpe
   return out;
 }
 
-/** The `parking_positions` list, or NOTHING when there are no stands (see HeliportSpec.parkings).
+/** The `parking_positions` list, EMPTY OR NOT (forum #236: write all the lines).
  *
  *  The two files differ only in the element type and in the two converted fields, so they share this: the
  *  `.tsc` keeps degrees and a `heading` in degrees, the `.wad` gets the projected grid and a `direction` in
  *  radians. Field ORDER is his (position, heading/direction, size, name, tags), which the sim does not care
  *  about — its parser is name-keyed — but a reader comparing our file against his does. */
 function parkingBlock(parkings: HeliportParkingSpec[], wad: boolean): string[] {
-  if (parkings.length === 0) return [];
   const elementType = wad ? "tmworld_airport_detailed_parking_position" : "tmsimulator_parking_position";
   const listType = wad
     ? "list_tmworld_airport_detailed_parking_position"
@@ -479,41 +480,58 @@ export function buildHeliportTsc(spec: HeliportSpec): string {
     tag("string8u", "country", v.country),
     tag("string8u", "coordinate_system", "flat"),
     tag("vector2_float64", "position", pos),
+    // ── The DEFAULT rows (forum #217, answered in #236) ────────────────────────────────────────────
+    // "I'm in favor of PCT writing all the lines, even if some of them are just DEFAULT at the moment."
+    // Every one is copied verbatim from a file of his that loads, which is what makes them safe to add
+    // without inventing a value: nothing here is a guess about what the sim wants.
+    tag("float64", "height", "0"),
+    tag("vector2_float64", "tower_position", "0 0"),
     tag("bool", "autoheight", "true"),
+    tag("string8u", "autoheight_method", ""),
+    tag("string8u", "geometry", ""),
   ];
 
   const pads = spec.pads.flatMap((p, i) =>
     block("tmsimulator_helipad", "element", String(i), [
       tag("string8", "name", padName(p)),
+      // DEFAULT rows (#236). `type_name` is a pad TYPE we do not offer and `height` is the pad's own
+      // elevation, which PCT leaves to the terrain — both empty/zero in every file of his.
+      tag("string8u", "type_name", ""),
       tag("vector2_float64", "position", `${fmtLonLat(p.position.lon)} ${fmtLonLat(p.position.lat)}`),
       tag("float64", "radius", fmtNum(p.radiusM)),
       tag("float64", "heading", fmtNum(p.headingDeg)),
+      tag("float64", "height", "0"),
     ]),
   );
-  // Runways BEFORE helipads, which is his order. Inserting here rather than reordering what is already
-  // there keeps a project with no runways emitting the exact bytes it emitted before.
+  // ★ THE `objects` LIST IS THE ONE PLACE THE TWO SOURCES DISAGREE, so each case takes its line from the
+  // file that proves it. WITH an anchor we write `tmsimulator_scenery_objecttmslist`, the spelling from the
+  // Hong Kong pack that was FLOWN on 2026-07-31 (the palms did not blink). WITHOUT one we write his
+  // `list_tmsimulator_scenery_object` DEFAULT verbatim. His own block is empty, so it says nothing about
+  // the spelling that has to resolve geometry, and ours has never been written empty — so neither line is
+  // extrapolated past the file it came from. Exactly one `objects` entry either way, which is the part
+  // that matters.
+  if (spec.anchor !== null) body.push(...anchorObjects(spec.anchor));
+  else body.push(...block("list_tmsimulator_scenery_object", "objects", "", []));
+  body.push(...block("list_tmsimulator_scenery_object_animated", "objects_animated", "", []));
+
+  // Runways BEFORE helipads, then his order to the end: start_positions, parking, cultivation.
   body.push(...runwayTscBlock(spec.runways ?? []));
   body.push(...block("list_tmsimulator_helipad", "helipads", "", pads));
-
-  if (spec.anchor !== null) body.push(...anchorObjects(spec.anchor));
-
+  body.push(...block("list_tmsimulator_startposition", "start_positions", "", []));
   body.push(...parkingBlock(spec.parkings ?? [], false));
 
-  if (spec.cultivationFileName !== null) {
-    const cultivation = [
-      tag("string8", "filename", spec.cultivationFileName),
-      tag("bool", "auto_height", spec.autoheight ? "true" : "false"),
-      tag("bool", "use_height_offset", "true"),
-    ];
-    body.push(
-      ...block(
-        "list_tmsimulator_scenery_cultivation",
-        "cultivation_files",
-        "",
-        block("tmsimulator_scenery_cultivation", "element", "0", cultivation),
-      ),
-    );
-  }
+  // The LIST is always written; the ELEMENT only when the POI has a `.toc` to point at. An empty POI gets
+  // his `cultivation_files` DEFAULT — an empty list — rather than an element naming a file that is not
+  // there, which is the one thing worse than no line at all.
+  const cultivation =
+    spec.cultivationFileName === null
+      ? []
+      : block("tmsimulator_scenery_cultivation", "element", "0", [
+          tag("string8", "filename", spec.cultivationFileName),
+          tag("bool", "auto_height", spec.autoheight ? "true" : "false"),
+          tag("bool", "use_height_offset", "true"),
+        ]);
+  body.push(...block("list_tmsimulator_scenery_cultivation", "cultivation_files", "", cultivation));
 
   const place = block("tmsimulator_scenery_place", "", "", body);
   return tidy([...NO_HEADER, ...block("file", "", "", place)]);
@@ -550,6 +568,7 @@ export function buildHeliportWad(spec: HeliportSpec): string {
   const pads = spec.pads.flatMap((p, i) =>
     block("tmworld_airport_detailed_helipad", "element", String(i), [
       tag("string8", "name", padName(p)),
+      tag("string8u", "type_name", ""),
       tag(
         "vector2_float64",
         "position",
@@ -558,6 +577,7 @@ export function buildHeliportWad(spec: HeliportSpec): string {
       tag("float64", "radius", fmtNum(p.radiusM)),
       // The .wad stores the same rotation as the .toc, in RADIANS — hence the trip through headingToDirection.
       tag("float64", "direction", formatWad(directionToWad(headingToDirection(p.headingDeg)))),
+      tag("float64", "height", "0"),
     ]),
   );
   const v = identityValues(spec);
@@ -568,7 +588,17 @@ export function buildHeliportWad(spec: HeliportSpec): string {
     tag("stringt8c", "iata", (spec.iata ?? "").trim().toUpperCase()),
     tag("stringt8c", "name", v.name),
     tag("stringt8c", "country", v.country),
+    // The DEFAULT rows (forum #217 → #236), verbatim from his files. `time_zone` is settled and stays 0:
+    // he asked for -400 at first, then measured his own three `.wad` and found none of them carries it —
+    // "as in FS 4 the field is always still 0, one can do without the input" (#225).
+    tag("float32", "elevation", "0"),
+    tag("uint64", "tags", "0"),
+    tag("uint32", "priority", "0"),
+    tag("uint16", "connections", "0"),
+    tag("int8", "time_zone", "0"),
     tag("vector2_float64", "position", pos),
+    // The grid centre, which is what his files carry when no tower is placed.
+    tag("vector2_float64", "tower_position", "32768 32768"),
     ...runwayWadBlock(spec.runways ?? []),
     ...block("list_tmworld_airport_detailed_helipad", "helipads", "", pads),
     // Winches then aerotows then parking — his order in the `.wad`.
