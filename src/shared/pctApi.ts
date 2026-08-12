@@ -10,9 +10,11 @@
 //      WHERE. (Paths flowing back OUT, for display, are fine — they are main-produced.)
 // Types only, no runtime code — safe to import from any target (main / preload / renderer).
 import type {
+  AirportAerotow,
   AirportPad,
   AirportParking,
   AirportRunway,
+  AirportWinch,
   Catalog,
   LonLat,
   PlacedObject,
@@ -130,6 +132,8 @@ export interface IcaoStatus {
 export interface HeliportFileOptions {
   pads: AirportPad[];
   runways?: AirportRunway[];
+  aerotows?: AirportAerotow[];
+  winches?: AirportWinch[];
   parkings?: AirportParking[];
   position?: LonLat;
   iata?: string;

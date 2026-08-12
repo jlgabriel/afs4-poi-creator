@@ -168,7 +168,6 @@ const zPad = z.looseObject({
  *  parking `type` is: they are compared against literals, so a typo is a row the sim ignores rather than an
  *  error anyone can read — and the values here were taken from the simulator's own binary. */
 const zRunwayEnd = z.looseObject({
-  endpoint: zLonLat,
   threshold: zLonLat,
   identifier: z.string().max(IDENTITY_MAX),
   appltsys: z.enum(APPROACH_LIGHT_SYSTEMS),
@@ -184,6 +183,24 @@ const zRunway = z.looseObject({
   id: z.string().min(1),
   ends: z.tuple([zRunwayEnd, zRunwayEnd]),
   width: z.number().finite().positive(),
+});
+
+/** The two glider starts (types.ts AirportAerotow / AirportWinch). Both are `.wad`-only elements, so
+ *  nothing here has a `.tsc` counterpart to keep in step. The winch carries TWO points and no heading —
+ *  its direction is the line between them (forum #238). */
+const zAerotow = z.looseObject({
+  id: z.string().min(1),
+  name: z.string().max(IDENTITY_MAX),
+  position: zLonLat,
+  heading: z.number().finite(),
+});
+
+const zWinch = z.looseObject({
+  id: z.string().min(1),
+  name: z.string().max(IDENTITY_MAX),
+  position: zLonLat,
+  winch: zLonLat,
+  spacing: z.number().finite().positive(),
 });
 
 /** A parking position (types.ts AirportParking). `type` is validated as an ENUM, not a free string, and
@@ -213,6 +230,8 @@ export const zAirport = z.looseObject({
   // into every project.json that has an airport and neither, and "absent means none" costs nothing to read
   // (see runwaysOf / parkingsOf in airport.ts).
   runways: z.array(zRunway).optional(),
+  aerotows: z.array(zAerotow).optional(),
+  winches: z.array(zWinch).optional(),
   parkings: z.array(zParking).optional(),
   // The compatibility mirror (types.ts ProjectAirport.pad). Validated so a malformed one is caught here
   // rather than silently shipped to an older PCT, and normalised by migrateAirport before it gets here.

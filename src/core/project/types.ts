@@ -263,15 +263,19 @@ export type ReilKind = "none" | "uni" | "omni";
 /** ONE END of a runway. A runway is always a pair of these — the format has no single-ended runway: the
  *  `.tsc` suffixes every field `1`/`2` and the `.wad` nests an array of exactly two.
  *
- *  ★ ENDPOINT vs THRESHOLD, in his own words: "ENDPOINT = THRESHOLD = NO EXTENSION". The endpoint is where
- *  the pavement stops; the threshold is where landing distance starts. They are equal unless the threshold
- *  is displaced — his ACT's output for SCLC has them equal at the 08 end and 24 m apart at the 26 end.
- *  Both are stored, because the pair is what the file wants and deriving one from the other would need a
- *  displacement convention the format does not state. */
+ *  ★ ONE POINT, NOT TWO, and that is ApfelFlieger's call (forum #236). The files have both an `endpoint`
+ *  (where the pavement stops) and a `threshold` (where landing distance starts), and his ACT's SCLC output
+ *  does displace them, by 170 m at the 26 end. But: "At the PCT we have no visible runway. Therefore,
+ *  EXTENSIONS make no sense there either. => Therefore, in the PCT the leading variable is [threshold] and
+ *  their values are automatically transferred to [endpoint]."
+ *
+ *  He is right for a reason worth writing down: PCT is a Level-1 tool — it writes the airport's DATA, not
+ *  its asphalt. A displaced threshold is a fact about pavement that PCT never draws, so offering the field
+ *  would let a user describe a runway nobody can see the extension of. The WRITER still knows both rows are
+ *  separate (heliportTemplate's HeliportRunwayEndSpec keeps them, and a test pins his displaced case), so
+ *  the format knowledge survives even though the document cannot express it. */
 export interface AirportRunwayEnd {
-  /** Physical end of the pavement, degrees. */
-  endpoint: LonLat;
-  /** Landing threshold, degrees. Equal to `endpoint` when nothing is displaced. */
+  /** The runway end, degrees. Written into BOTH the `threshold` and the `endpoint` rows of both files. */
   threshold: LonLat;
   /** "08", "26", "ALSF2"… May be EMPTY: his 0001 leaves the second end's identifier blank. */
   identifier: string;
@@ -296,6 +300,53 @@ export interface AirportRunway {
   ends: [AirportRunwayEnd, AirportRunwayEnd];
   /** Metres, and here it really is the full width (not a radius): his reference airports carry 40. */
   width: number;
+}
+
+/** A glider AEROTOW start: where the glider stands to be pulled into the air by the DR400 (forum #237).
+ *
+ *  ★ THIS ONE LIVES ONLY IN THE `.wad`. "The code lines for this submenu only appear in the WAD" — so
+ *  unlike a pad or a stand there is nothing to write into the `.tsc`, and lon/lat/heading all go through
+ *  the projection. Independent of whether the airport has a runway at all; usually it sits on one, or on
+ *  its extension when the runway is too short.
+ *
+ *  The NAME should match the runway it belongs to ("26"), but that is the user's job: "the user must enter
+ *  this himself, PCT does not need to worry about it." No deriving it from a nearby runway.
+ *
+ *  The file also carries a `waypoints` list, which his own example leaves empty and marks DEFAULT. PCT
+ *  writes the empty list and offers nothing for it. */
+export interface AirportAerotow {
+  id: string;
+  /** Shown in LOCATION; free text, conventionally the runway's identifier. */
+  name: string;
+  /** Where the GLIDER stands, degrees. */
+  position: LonLat;
+  /** TRUE compass degrees — the pull direction. Converted to radians for the `.wad`, like every other
+   *  heading in the model. */
+  heading: number;
+}
+
+/** A glider WINCH LAUNCH start (forum #238). Also `.wad`-only.
+ *
+ *  ★ NO HEADING, and that is the interesting part: "The length and direction then result from the two
+ *  positions GLIDER and WINCH." So this element is defined by a PAIR of points, and the rope — 800 to
+ *  1000 m of it — is the line between them. Storing a heading as well would let the two disagree.
+ *
+ *  ⛔ WINCH LAUNCH DOES NOT CURRENTLY WORK IN FS 4 (forum #229): the glider comes out "twisted in the
+ *  ground". He has reported it to IPACS. PCT can write the block — it is data, and the fault is in the
+ *  simulator — but nothing here can be verified in-sim until that update lands. */
+export interface AirportWinch {
+  id: string;
+  /** Shown in LOCATION. His convention: name it like a runway, "supplemented if necessary by an
+   *  additional letter. However, this is at the discretion of the user." */
+  name: string;
+  /** Where the GLIDER stands, degrees. */
+  position: LonLat;
+  /** Where the WINCH stands, degrees. The far end of the rope. */
+  winch: LonLat;
+  /** How far apart two gliders launched side by side stand, metres — "if two gliders stand next to each
+   *  other, the distance is basically the span". A winch with two ropes starts two gliders at once; FS4
+   *  represents that with this one number. He enters 25, "but each user has to decide for himself". */
+  spacing: number;
 }
 
 /** What a parking position is FOR, written verbatim into the `tags` row of both files.
@@ -377,6 +428,9 @@ export interface ProjectAirport {
   /** Every runway, in document order (forum #217 submenu (4)). Absent ≡ none, same rule as `parkings`
    *  below and for the same reason: no runways ⇒ no block ⇒ an older project exports the same bytes. */
   runways?: AirportRunway[];
+  /** Glider AEROTOW and WINCH LAUNCH starts (forum #237/#238), `.wad`-only. Same absent-means-none rule. */
+  aerotows?: AirportAerotow[];
+  winches?: AirportWinch[];
   /** Every parking position, in document order (forum #232). Absent ≡ none, which is what every project
    *  written before v1.4 has — and the writers emit no `parking_positions` block at all in that case, so
    *  those projects keep exporting the same bytes.

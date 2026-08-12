@@ -124,9 +124,9 @@ describe("planHeliport", () => {
   // ★ REGRESSION. The INSTALL path and the export-TEMPLATE path build their own HeliportSpec, and when
   // stands were added only the template one got them: "Install HELIPORT…" wrote an airport with the
   // helipad and silently no parking. Nothing failed — the files were valid, just missing a block — which
-  // is why this is a test and not a code comment. Runways landed in both from the start; both are pinned
-  // here so the next repeatable element cannot be added to one half only.
-  it("writes runways and stands on the INSTALL path too, not only in the templates", () => {
+  // is why this is a test and not a code comment. EVERY repeatable element is pinned here, so the next
+  // one cannot be added to one half only.
+  it("writes every repeatable element on the INSTALL path too, not only in the templates", () => {
     const opts = {
       ...OPTS,
       heliport: {
@@ -137,7 +137,6 @@ describe("planHeliport", () => {
             width: 40,
             ends: [
               {
-                endpoint: { lon: -116.8, lat: 34.85 },
                 threshold: { lon: -116.8, lat: 34.85 },
                 identifier: "08",
                 appltsys: "none" as const,
@@ -147,7 +146,6 @@ describe("planHeliport", () => {
                 takeoff: true,
               },
               {
-                endpoint: { lon: -116.79, lat: 34.855 },
                 threshold: { lon: -116.79, lat: 34.855 },
                 identifier: "26",
                 appltsys: "none" as const,
@@ -157,6 +155,23 @@ describe("planHeliport", () => {
                 takeoff: true,
               },
             ] as [AirportRunwayEnd, AirportRunwayEnd],
+          },
+        ],
+        aerotows: [
+          {
+            id: "ato-1",
+            name: "26",
+            position: { lon: -116.7975, lat: 34.8548 },
+            heading: 260,
+          },
+        ],
+        winches: [
+          {
+            id: "wnc-1",
+            name: "26",
+            position: { lon: -116.7975, lat: 34.8548 },
+            winch: { lon: -116.807, lat: 34.8525 },
+            spacing: 25,
           },
         ],
         parkings: [
@@ -186,6 +201,13 @@ describe("planHeliport", () => {
     expect(plan.files.find((f) => f.relPath === "pct001.wad")!.content).toContain(
       "[list_tmworld_airport_detailed_rwy_pair][runway_pairs]",
     );
+    // The glider starts are .wad-only: present there, absent from the .tsc, and that is correct.
+    const wad = plan.files.find((f) => f.relPath === "pct001.wad")!.content;
+    const tsc = plan.files.find((f) => f.relPath === "pct001.tsc")!.content;
+    for (const t of ["glider_aerotows", "glider_winches"]) {
+      expect(wad).toContain(t);
+      expect(tsc).not.toContain(t);
+    }
   });
 
   it("drops the cultivation reference entirely for an empty project", () => {

@@ -334,6 +334,109 @@ describe("heliport template — runways (v1.4)", () => {
   });
 });
 
+// ── Glider starts: AEROTOW and WINCH LAUNCH (v1.4, forum #237/#238) ──────────────────────────────
+//
+// THE CONTROL is his `sclc_0_demo` pair. Both elements exist ONLY in the `.wad`, so he publishes no
+// degrees for them at all — these coordinates are his printed grid values run back through the
+// projection, and the test asserts they come out as the exact strings he shipped.
+const HIS_GLIDER = {
+  // The glider stands at the same spot for both starts in his file; the winch is 800-ish m down the strip.
+  winchGlider: { lon: -70.57713, lat: -33.3800928995, wad: [19919.82557867, 26282.19471649] },
+  winchWinch: { lon: -70.58609, lat: -33.3811, wad: [19918.19446044, 26281.97234722] },
+  aerotow: { lon: -70.5783086328, lat: -33.3800358697, wad: [19919.61101511, 26282.20730868] },
+  // 260 deg TRUE — which is what the sim's own LOCATION panel shows in his screenshot.
+  headingDeg: 260,
+  direction: 3.31612557878923,
+  spacingM: 25,
+};
+
+/** A `.wad` "lon lat" pair against his printed one, to half a millimetre. */
+function expectWad(actual: string, expected: readonly number[]): void {
+  const [lon, lat] = actual.split(" ").map(Number);
+  expect(lon).toBeCloseTo(expected[0]!, 6);
+  expect(lat).toBeCloseTo(expected[1]!, 6);
+}
+
+describe("heliport template — glider starts (v1.4)", () => {
+  const GLIDERS: HeliportSpec = {
+    ...SPEC,
+    position: { lon: -70.582247, lat: -33.380724 },
+    aerotows: [
+      {
+        name: "26",
+        position: { lon: HIS_GLIDER.aerotow.lon, lat: HIS_GLIDER.aerotow.lat },
+        headingDeg: HIS_GLIDER.headingDeg,
+      },
+    ],
+    winches: [
+      {
+        name: "26",
+        position: { lon: HIS_GLIDER.winchGlider.lon, lat: HIS_GLIDER.winchGlider.lat },
+        winch: { lon: HIS_GLIDER.winchWinch.lon, lat: HIS_GLIDER.winchWinch.lat },
+        spacingM: HIS_GLIDER.spacingM,
+      },
+    ],
+  };
+
+  it("writes NOTHING when there are none", () => {
+    for (const text of [buildHeliportTsc(SPEC), buildHeliportWad(SPEC)]) {
+      expect(text).not.toContain("glider_aerotows");
+      expect(text).not.toContain("glider_winches");
+    }
+  });
+
+  it("puts BOTH of them in the .wad only — the .tsc has no such rows", () => {
+    // ★ "The code lines for this submenu only appear in the WAD" (#237, and again in #238). A .tsc that
+    // grew these blocks would not be an extra feature; it would be rows the sim's place parser does not
+    // know, in the file that decides whether the airport loads at all.
+    const tsc = buildHeliportTsc(GLIDERS);
+    expect(tsc).not.toContain("glider");
+    expect(tsc).not.toContain("waypoints");
+    const wad = buildHeliportWad(GLIDERS);
+    expect(nodesByName(parseTm(wad), "glider_aerotows")).toHaveLength(1);
+    expect(nodesByName(parseTm(wad), "glider_winches")).toHaveLength(1);
+  });
+
+  it("reproduces his AEROTOW row, and writes the empty waypoints list he marks DEFAULT", () => {
+    const wad = buildHeliportWad(GLIDERS);
+    const aerotow = nodesByName(parseTm(wad), "glider_aerotows")[0]!.children[0]!;
+    const value = (name: string): string => aerotow.children.find((c) => c.name === name)!.value;
+    expect(value("name")).toBe("26");
+    // Six decimals of a grid unit is half a millimetre; his file prints eight, and the coordinates here
+    // are his own values run backwards through the projection, so the last digits are our arithmetic.
+    expectWad(value("position"), HIS_GLIDER.aerotow.wad);
+    expect(Number(value("direction"))).toBeCloseTo(HIS_GLIDER.direction, 9);
+    // Written even though PCT offers nothing for it: he asked for all the lines, DEFAULT ones included.
+    expect(value("waypoints")).toBe("");
+  });
+
+  it("reproduces his WINCH row — two points, no heading", () => {
+    const wad = buildHeliportWad(GLIDERS);
+    const winch = nodesByName(parseTm(wad), "glider_winches")[0]!.children[0]!;
+    const value = (name: string): string => winch.children.find((c) => c.name === name)!.value;
+    expect(value("name")).toBe("26");
+    expectWad(value("position"), HIS_GLIDER.winchGlider.wad);
+    expectWad(value("winch"), HIS_GLIDER.winchWinch.wad);
+    expect(value("spacing")).toBe("25");
+    // ★ No `direction` anywhere in the element: "the length and direction then result from the two
+    // positions GLIDER and WINCH". A heading here could disagree with the points and nothing would say so.
+    expect(winch.children.some((c) => c.name === "direction")).toBe(false);
+  });
+
+  it("writes several of each, in order", () => {
+    const two: HeliportSpec = {
+      ...GLIDERS,
+      aerotows: [GLIDERS.aerotows![0]!, { ...GLIDERS.aerotows![0]!, name: "08" }],
+      winches: [GLIDERS.winches![0]!, { ...GLIDERS.winches![0]!, name: "08L" }],
+    };
+    const wad = parseTm(buildHeliportWad(two));
+    const names = (list: string): string[] =>
+      nodesByName(wad, list)[0]!.children.map((e) => e.children.find((c) => c.name === "name")!.value);
+    expect(names("glider_aerotows")).toEqual(["26", "08"]);
+    expect(names("glider_winches")).toEqual(["26", "08L"]);
+  });
+});
+
 // ── Parking positions (v1.4, forum #232) ─────────────────────────────────────────────────────────
 //
 // THE CONTROL here is ApfelFlieger's own sclc_apt_hpd_prk pair: the three stands he published with the

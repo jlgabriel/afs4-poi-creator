@@ -229,6 +229,8 @@ export function ExportDialog({ onClose }: { onClose: () => void }): React.ReactE
     if (heliport) {
       opts.heliport = { pads: storeAirport?.pads ?? [], radiusM: padRadius };
       if (storeAirport?.runways !== undefined) opts.heliport.runways = storeAirport.runways;
+      if (storeAirport?.aerotows !== undefined) opts.heliport.aerotows = storeAirport.aerotows;
+      if (storeAirport?.winches !== undefined) opts.heliport.winches = storeAirport.winches;
       if (storeAirport?.parkings !== undefined) opts.heliport.parkings = storeAirport.parkings;
       if (storeAirport?.position !== undefined) opts.heliport.position = storeAirport.position;
       if (storeAirport?.iata !== undefined) opts.heliport.iata = storeAirport.iata;

@@ -9,10 +9,12 @@
 // accepts an override so tests stay deterministic.
 
 import type {
+  AirportAerotow,
   AirportPad,
   AirportParking,
   AirportRunway,
   AirportRunwayEnd,
+  AirportWinch,
   HeightMode,
   HeightSpec,
   LonLat,
@@ -27,7 +29,15 @@ import type {
   ProjectAirport,
   Vec3,
 } from "./types";
-import { DEFAULT_PARKING_SIZE_M, DEFAULT_RUNWAY_WIDTH_M, parkingsOf, runwaysOf } from "./airport";
+import {
+  DEFAULT_PARKING_SIZE_M,
+  DEFAULT_RUNWAY_WIDTH_M,
+  DEFAULT_WINCH_SPACING_M,
+  aerotowsOf,
+  parkingsOf,
+  runwaysOf,
+  winchesOf,
+} from "./airport";
 
 const nowIso = (): string => new Date().toISOString();
 
@@ -558,12 +568,11 @@ export function setAirportPadName(project: Project, name: string, now = nowIso()
 // A runway is a PAIR: the format has no single-ended one, so every mutation below addresses an end by
 // index (0 or 1) rather than letting the list grow. Same no-mirror, required-id rules as the stands.
 
-/** A fresh end: no displaced threshold, no lights, usable both ways — the defaults every runway end in
- *  ApfelFlieger's files carries. */
-function newRunwayEnd(endpoint: LonLat, identifier: string): AirportRunwayEnd {
+/** A fresh end: no lights, usable both ways — the defaults every runway end in ApfelFlieger's files
+ *  carries. */
+function newRunwayEnd(threshold: LonLat, identifier: string): AirportRunwayEnd {
   return {
-    endpoint,
-    threshold: endpoint,
+    threshold,
     identifier,
     appltsys: "none",
     papi: "none",
@@ -578,15 +587,15 @@ function newRunwayEnd(endpoint: LonLat, identifier: string): AirportRunwayEnd {
  *  same rule the pad and the stand follow, and invents no identity either. */
 export function addAirportRunway(
   project: Project,
-  endpoint1: LonLat,
-  endpoint2: LonLat,
+  threshold1: LonLat,
+  threshold2: LonLat,
   opts: { width?: number; identifiers?: [string, string]; id?: string } = {},
   now = nowIso(),
 ): Project {
   const [id1, id2] = opts.identifiers ?? ["", ""];
   const runway: AirportRunway = {
     id: opts.id ?? randomId(),
-    ends: [newRunwayEnd(endpoint1, id1), newRunwayEnd(endpoint2, id2)],
+    ends: [newRunwayEnd(threshold1, id1), newRunwayEnd(threshold2, id2)],
     width: opts.width ?? DEFAULT_RUNWAY_WIDTH_M,
   };
   const airport = project.airport;
@@ -650,37 +659,25 @@ export function setAirportRunwayWidth(
   return updateRunway(project, runwayId, (r) => (r.width === width ? r : { ...r, width }), now);
 }
 
-/** Drag one END of the runway.
- *
- *  ★ The threshold FOLLOWS when it was not displaced. "ENDPOINT = THRESHOLD = NO EXTENSION" is his own
- *  note, so the two being equal is the normal state and means "there is no displacement here" — dragging
- *  the pavement end must not silently invent one. A threshold the user HAS moved stays where they put it. */
+/** Drag one END of the runway. One point per end — the writer puts it in both the `threshold` and the
+ *  `endpoint` rows (forum #236: "in the PCT the leading variable is [threshold]"). */
 export function moveAirportRunwayEnd(
   project: Project,
   runwayId: string,
   end: 0 | 1,
-  endpoint: LonLat,
+  threshold: LonLat,
   now = nowIso(),
 ): Project {
-  return updateRunway(
-    project,
-    runwayId,
-    (r) =>
-      patchEnd(r, end, (e) => {
-        const undisplaced = e.threshold.lon === e.endpoint.lon && e.threshold.lat === e.endpoint.lat;
-        return { ...e, endpoint, threshold: undisplaced ? endpoint : e.threshold };
-      }),
-    now,
-  );
+  return updateRunway(project, runwayId, (r) => patchEnd(r, end, (e) => ({ ...e, threshold })), now);
 }
 
-/** Everything else about one end, in one patch: identifier, the three lighting rows, approach/takeoff and
- *  a DISPLACED threshold. `endpoint` is deliberately not patchable here — it has the rule above. */
+/** Everything else about one end, in one patch: identifier, the three lighting rows, approach/takeoff.
+ *  `threshold` is deliberately not patchable here — dragging it is `moveAirportRunwayEnd`. */
 export function updateAirportRunwayEnd(
   project: Project,
   runwayId: string,
   end: 0 | 1,
-  patch: Partial<Omit<AirportRunwayEnd, "endpoint">>,
+  patch: Partial<Omit<AirportRunwayEnd, "threshold">>,
   now = nowIso(),
 ): Project {
   return updateRunway(
@@ -693,6 +690,130 @@ export function updateAirportRunwayEnd(
       }),
     now,
   );
+}
+
+// ── Glider starts: AEROTOW and WINCH LAUNCH (v1.4, forum #237/#238) ────────────────────────────────
+//
+// Both are `.wad`-only elements, both repeatable, both named by the user after the runway they serve —
+// "the user must enter this himself, PCT does not need to worry about it", so nothing here derives a name
+// from a nearby runway. The winch is the only element in the model defined by TWO points.
+
+/** APPEND an aerotow start. Creates the airport block when there is none, like every other placement. */
+export function addAirportAerotow(
+  project: Project,
+  position: LonLat,
+  now = nowIso(),
+  id?: string,
+): Project {
+  const aerotow: AirportAerotow = { id: id ?? randomId(), name: "", position, heading: 0 };
+  const airport = project.airport;
+  const next: ProjectAirport =
+    airport === undefined
+      ? { icao: "", name: "", country: "", pads: [], aerotows: [aerotow] }
+      : { ...airport, aerotows: [...aerotowsOf(airport), aerotow] };
+  return { ...project, airport: next, modifiedAt: now };
+}
+
+/** APPEND a winch launch. `winch` is the far end of the rope — 800 to 1000 m away in his description, and
+ *  the caller's job to place, because the length and direction come out of the two points and nothing
+ *  else. A UI can offer two map clicks (his suggestion) or a length plus a pull direction; either way it
+ *  resolves to this pair before it gets here. */
+export function addAirportWinch(
+  project: Project,
+  position: LonLat,
+  winch: LonLat,
+  now = nowIso(),
+  id?: string,
+): Project {
+  const w: AirportWinch = {
+    id: id ?? randomId(),
+    name: "",
+    position,
+    winch,
+    spacing: DEFAULT_WINCH_SPACING_M,
+  };
+  const airport = project.airport;
+  const next: ProjectAirport =
+    airport === undefined
+      ? { icao: "", name: "", country: "", pads: [], winches: [w] }
+      : { ...airport, winches: [...winchesOf(airport), w] };
+  return { ...project, airport: next, modifiedAt: now };
+}
+
+export function removeAirportAerotow(project: Project, aerotowId: string, now = nowIso()): Project {
+  const airport = project.airport;
+  if (airport === undefined) return project;
+  const current = aerotowsOf(airport);
+  const aerotows = current.filter((a) => a.id !== aerotowId);
+  if (aerotows.length === current.length) return project;
+  return { ...project, airport: { ...airport, aerotows }, modifiedAt: now };
+}
+
+export function removeAirportWinch(project: Project, winchId: string, now = nowIso()): Project {
+  const airport = project.airport;
+  if (airport === undefined) return project;
+  const current = winchesOf(airport);
+  const winches = current.filter((w) => w.id !== winchId);
+  if (winches.length === current.length) return project;
+  return { ...project, airport: { ...airport, winches }, modifiedAt: now };
+}
+
+/** Patch one aerotow. `heading` is normalised into [0, 360) like every other facing in the model. */
+export function updateAirportAerotow(
+  project: Project,
+  aerotowId: string,
+  patch: Partial<Omit<AirportAerotow, "id">>,
+  now = nowIso(),
+): Project {
+  const airport = project.airport;
+  if (airport === undefined) return project;
+  const current = aerotowsOf(airport);
+  const i = current.findIndex((a) => a.id === aerotowId);
+  const found = i < 0 ? undefined : current[i];
+  if (found === undefined) return project;
+  const next = { ...found, ...patch };
+  if (patch.heading !== undefined) next.heading = norm360(patch.heading);
+  if (
+    next.name === found.name &&
+    next.heading === found.heading &&
+    next.position === found.position
+  ) {
+    return project;
+  }
+  const aerotows = [...current];
+  aerotows[i] = next;
+  return { ...project, airport: { ...airport, aerotows }, modifiedAt: now };
+}
+
+/** Patch one winch launch. A non-positive `spacing` is refused rather than clamped, like every other
+ *  metre value in the model. */
+export function updateAirportWinch(
+  project: Project,
+  winchId: string,
+  patch: Partial<Omit<AirportWinch, "id">>,
+  now = nowIso(),
+): Project {
+  if (patch.spacing !== undefined && !(Number.isFinite(patch.spacing) && patch.spacing > 0)) {
+    return project;
+  }
+  const airport = project.airport;
+  if (airport === undefined) return project;
+  const current = winchesOf(airport);
+  const i = current.findIndex((w) => w.id === winchId);
+  const found = i < 0 ? undefined : current[i];
+  if (found === undefined) return project;
+  const next = { ...found, ...patch };
+  if (
+    next.name === found.name &&
+    next.spacing === found.spacing &&
+    next.position === found.position &&
+    next.winch === found.winch
+  ) {
+    return project;
+  }
+  const winches = [...current];
+  winches[i] = next;
+  return { ...project, airport: { ...airport, winches }, modifiedAt: now };
 }
 
 // ── Parking positions (v1.4, forum #232) ───────────────────────────────────────────────────────────

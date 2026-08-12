@@ -10,9 +10,11 @@
 // for what that UI means, and it is greppable when the time comes.
 
 import type {
+  AirportAerotow,
   AirportPad,
   AirportParking,
   AirportRunway,
+  AirportWinch,
   LonLat,
   ParkingType,
   ProjectAirport,
@@ -44,6 +46,18 @@ export function parkingsOf(airport: ProjectAirport | undefined): AirportParking[
 export function runwaysOf(airport: ProjectAirport | undefined): AirportRunway[] {
   return airport?.runways ?? [];
 }
+
+/** The glider starts, absent and empty collapsed — same contract as parkingsOf. */
+export function aerotowsOf(airport: ProjectAirport | undefined): AirportAerotow[] {
+  return airport?.aerotows ?? [];
+}
+export function winchesOf(airport: ProjectAirport | undefined): AirportWinch[] {
+  return airport?.winches ?? [];
+}
+
+/** How far apart two side-by-side gliders stand on a winch launch, metres. His number: "When I enter a
+ *  value here, it is usually [25], but each user has to decide for himself" — a glider's span. */
+export const DEFAULT_WINCH_SPACING_M = 25;
 
 /** The approach-lighting vocabulary, split the way ApfelFlieger's two sample airports split it, and in the
  *  order a menu should offer it. Both halves are literals in the sim's binary (types.ts

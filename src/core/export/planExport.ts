@@ -5,9 +5,11 @@
 // the whole POI package golden-testable byte-for-byte, the way the Race App exporter was.
 
 import type {
+  AirportAerotow,
   AirportPad,
   AirportParking,
   AirportRunway,
+  AirportWinch,
   ExportPlan,
   LonLat,
   PoiFile,
@@ -28,12 +30,14 @@ import {
   validateIdentity,
   HELIPORT_TSC_FILE,
   HELIPORT_WAD_FILE,
+  type HeliportAerotowSpec,
   type HeliportIdentity,
   type HeliportPadSpec,
   type HeliportParkingSpec,
   type HeliportRunwayEndSpec,
   type HeliportRunwaySpec,
   type HeliportSpec,
+  type HeliportWinchSpec,
   type IdentityProblem,
 } from "./heliportTemplate";
 
@@ -86,6 +90,9 @@ export interface HeliportOptions {
   parkings?: AirportParking[];
   /** The runways, unshifted (forum #217 submenu (4)). Absent or EMPTY → no block in either file. */
   runways?: AirportRunway[];
+  /** The glider starts, unshifted (forum #237/#238). Absent or EMPTY → no block; `.wad`-only. */
+  aerotows?: AirportAerotow[];
+  winches?: AirportWinch[];
   /** The AIRPORT's own point, unshifted (forum #15/#220 — it is independent of any pad). Absent → the
    *  first pad's position, which is exactly how v1.2/v1.3 behaved. */
   position?: LonLat;
@@ -136,7 +143,8 @@ function heliportRunways(
   return (runways ?? []).map((r) => ({
     widthM: r.width,
     ends: r.ends.map((e) => ({
-      endpoint: shiftPoint(e.endpoint, shift),
+      // ONE point in the document, BOTH rows in the file (types.ts AirportRunwayEnd, forum #236).
+      endpoint: shiftPoint(e.threshold, shift),
       threshold: shiftPoint(e.threshold, shift),
       identifier: e.identifier,
       appltsys: e.appltsys,
@@ -145,6 +153,31 @@ function heliportRunways(
       approach: e.approach,
       takeoff: e.takeoff,
     })) as [HeliportRunwayEndSpec, HeliportRunwayEndSpec],
+  }));
+}
+
+/** The glider starts, shifted with the scene. The winch gets BOTH of its points moved — shifting only the
+ *  glider would stretch the rope instead of moving the launch. */
+function heliportAerotows(
+  aerotows: AirportAerotow[] | undefined,
+  shift: Project["shift"],
+): HeliportAerotowSpec[] {
+  return (aerotows ?? []).map((a) => ({
+    name: a.name,
+    position: shiftPoint(a.position, shift),
+    headingDeg: a.heading,
+  }));
+}
+
+function heliportWinches(
+  winches: AirportWinch[] | undefined,
+  shift: Project["shift"],
+): HeliportWinchSpec[] {
+  return (winches ?? []).map((w) => ({
+    name: w.name,
+    position: shiftPoint(w.position, shift),
+    winch: shiftPoint(w.winch, shift),
+    spacingM: w.spacing,
   }));
 }
 
@@ -231,6 +264,8 @@ export function planExport(
       position: heliportPosition(opts.heliport, pads, ref, project.shift),
       pads,
       runways: heliportRunways(opts.heliport.runways, project.shift),
+      aerotows: heliportAerotows(opts.heliport.aerotows, project.shift),
+      winches: heliportWinches(opts.heliport.winches, project.shift),
       parkings: heliportParkings(opts.heliport.parkings, project.shift),
       iata: opts.heliport.iata,
       cultivationFileName: tocFileName,
@@ -303,6 +338,8 @@ export function planHeliport(
     position: heliportPosition(opts.heliport, pads, ref, project.shift),
     pads,
     runways: heliportRunways(opts.heliport.runways, project.shift),
+    aerotows: heliportAerotows(opts.heliport.aerotows, project.shift),
+    winches: heliportWinches(opts.heliport.winches, project.shift),
     parkings: heliportParkings(opts.heliport.parkings, project.shift),
     iata: opts.heliport.iata,
     cultivationFileName: tocFileName,

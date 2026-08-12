@@ -135,6 +135,10 @@ export interface HeliportPadSpec {
 
 /** One runway end as the two writers want it. Both points already shifted with the scene. */
 export interface HeliportRunwayEndSpec {
+  /** Where the pavement stops. The FILE keeps this separate from the threshold, and his ACT's own SCLC
+   *  output displaces them by 170 m — but the PROJECT model carries one point and planExport copies it
+   *  into both (types.ts AirportRunwayEnd, forum #236). Kept apart here so the writer still describes the
+   *  format truthfully, and so the displaced case stays testable. */
   endpoint: LonLat;
   threshold: LonLat;
   identifier: string;
@@ -149,6 +153,26 @@ export interface HeliportRunwayEndSpec {
 export interface HeliportRunwaySpec {
   ends: [HeliportRunwayEndSpec, HeliportRunwayEndSpec];
   widthM: number;
+}
+
+/** A glider AEROTOW start, `.wad`-only (forum #237). Position already shifted with the scene. */
+export interface HeliportAerotowSpec {
+  name: string;
+  position: LonLat;
+  /** TRUE compass degrees; converted to radians here, like every other heading. */
+  headingDeg: number;
+}
+
+/** A glider WINCH LAUNCH start, `.wad`-only (forum #238). TWO points and no heading — the direction and
+ *  the rope length are whatever the pair says. */
+export interface HeliportWinchSpec {
+  name: string;
+  /** Where the glider stands. */
+  position: LonLat;
+  /** Where the winch stands, at the far end of the rope. */
+  winch: LonLat;
+  /** Metres between two side-by-side gliders. */
+  spacingM: number;
 }
 
 /** One parking position as the two writers want it. Position already shifted with the scene, like a pad's.
@@ -180,6 +204,10 @@ export interface HeliportSpec {
   /** Every runway (forum #217 submenu (4)). EMPTY/absent → no `runways` / `runway_pairs` block at all,
    *  same rule and same reason as `parkings`. */
   runways?: HeliportRunwaySpec[];
+  /** Glider starts (forum #237/#238). Both are `.wad`-only — `buildHeliportTsc` ignores them entirely,
+   *  which is not an omission: "The code lines for this submenu only appear in the WAD". */
+  aerotows?: HeliportAerotowSpec[];
+  winches?: HeliportWinchSpec[];
   /** Every parking position (forum #232). EMPTY → NO `parking_positions` block is emitted at all, which is
    *  what makes this feature free of a flight: a project without stands exports byte-for-byte what it
    *  exported before. (His own files DO carry the empty list, marked `DEFAULT` — that belongs with the
@@ -362,6 +390,47 @@ function runwayWadBlock(runways: HeliportRunwaySpec[]): string[] {
   return block("list_tmworld_airport_detailed_rwy_pair", "runway_pairs", "", elements);
 }
 
+/** The two glider-start lists, `.wad`-only, or NOTHING when there are none.
+ *
+ *  ★ The WINCH is the only element PCT writes that has no heading of its own: `position` is the glider and
+ *  `winch` is the far end of the rope, and "the length and direction then result from the two positions".
+ *  The AEROTOW does carry one, and it goes through the same radian conversion as a pad's.
+ *
+ *  The aerotow's `waypoints` row is written as an empty list — his own example has it that way and marks
+ *  it DEFAULT. PCT offers nothing for it, but the row is written, because he asked for all the lines. */
+function gliderBlocks(aerotows: HeliportAerotowSpec[], winches: HeliportWinchSpec[]): string[] {
+  const wad = (p: LonLat): string => `${formatWad(lonToWad(p.lon))} ${formatWad(latToWad(p.lat))}`;
+  const out: string[] = [];
+  if (winches.length > 0) {
+    const elements = winches.flatMap((w, i) =>
+      block("tmworld_airport_detailed_glider_winch", "element", String(i), [
+        tag("string8", "name", sanitizeValue(w.name).trim()),
+        tag("vector2_float64", "position", wad(w.position)),
+        tag("vector2_float64", "winch", wad(w.winch)),
+        tag("float64", "spacing", fmtNum(w.spacingM)),
+      ]),
+    );
+    out.push(
+      ...block("list_tmworld_airport_detailed_glider_winch", "glider_winches", "", elements),
+    );
+  }
+  if (aerotows.length > 0) {
+    const elements = aerotows.flatMap((a, i) =>
+      block("tmworld_airport_detailed_glider_aerotow", "element", String(i), [
+        tag("string8", "name", sanitizeValue(a.name).trim()),
+        tag("vector2_float64", "position", wad(a.position)),
+        tag("float64", "direction", formatWad(directionToWad(headingToDirection(a.headingDeg)))),
+        // An empty LIST as a single line, which is the form his own file uses for it.
+        tag("list_vector2_float64", "waypoints", ""),
+      ]),
+    );
+    out.push(
+      ...block("list_tmworld_airport_detailed_glider_aerotow", "glider_aerotows", "", elements),
+    );
+  }
+  return out;
+}
+
 /** The `parking_positions` list, or NOTHING when there are no stands (see HeliportSpec.parkings).
  *
  *  The two files differ only in the element type and in the two converted fields, so they share this: the
@@ -502,6 +571,8 @@ export function buildHeliportWad(spec: HeliportSpec): string {
     tag("vector2_float64", "position", pos),
     ...runwayWadBlock(spec.runways ?? []),
     ...block("list_tmworld_airport_detailed_helipad", "helipads", "", pads),
+    // Winches then aerotows then parking — his order in the `.wad`.
+    ...gliderBlocks(spec.aerotows ?? [], spec.winches ?? []),
     ...parkingBlock(spec.parkings ?? [], true),
   ];
   const airport = block("tmworld_airport_detailed", "", "", body);

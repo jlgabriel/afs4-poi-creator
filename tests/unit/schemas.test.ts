@@ -407,6 +407,49 @@ describe("zProject — the airport block", () => {
     }
   });
 
+  // ── Glider starts (v1.4, forum #237/#238) ──────────────────────────────────────────────────────
+  const AEROTOW = { id: "ato-1", name: "26", position: { lon: -70.5783, lat: -33.38 }, heading: 260 };
+  const WINCH = {
+    id: "wnc-1",
+    name: "26",
+    position: { lon: -70.57713, lat: -33.3801 },
+    winch: { lon: -70.58609, lat: -33.3811 },
+    spacing: 25,
+  };
+
+  it("round-trips the glider starts, and leaves them absent when there are none", () => {
+    const p = parseProject({
+      ...validProject(),
+      airport: {
+        icao: "sclc",
+        name: "Vitacura",
+        country: "cl",
+        pads: [],
+        aerotows: [AEROTOW],
+        winches: [WINCH],
+      },
+    });
+    expect(p.airport?.aerotows).toEqual([AEROTOW]);
+    expect(p.airport?.winches).toEqual([WINCH]);
+    const none = parseProject({
+      ...validProject(),
+      airport: { icao: "sclc", name: "Vitacura", country: "cl", pads: [] },
+    });
+    expect("aerotows" in none.airport!).toBe(false);
+    expect("winches" in none.airport!).toBe(false);
+  });
+
+  it("REFUSES a winch with no second point or a non-positive spacing", () => {
+    const withWinches = (winches: unknown[]): unknown => ({
+      ...validProject(),
+      airport: { icao: "sclc", name: "Vitacura", country: "cl", pads: [], winches },
+    });
+    const { winch: _dropped, ...noWinch } = WINCH;
+    // The pair IS the element: without the far point there is no direction and no rope length.
+    expect(() => parseProject(withWinches([noWinch]))).toThrow();
+    expect(() => parseProject(withWinches([{ ...WINCH, spacing: 0 }]))).toThrow();
+  });
+
   it("REJECTS a parking tag the sim would never match", () => {
     // ★ The one place a typo here can still be caught. `parking_ga` is not a strawman: it is the spelling
     // ApfelFlieger himself used in the prose of #232, while all of his files — and all of IPACS's — say

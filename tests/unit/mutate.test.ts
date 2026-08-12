@@ -47,8 +47,14 @@ import {
   removeAirportRunway,
   setAirportRunwayWidth,
   updateAirportRunwayEnd,
+  addAirportAerotow,
+  addAirportWinch,
+  removeAirportAerotow,
+  removeAirportWinch,
+  updateAirportAerotow,
+  updateAirportWinch,
 } from "../../src/core/project/mutate";
-import { parkingsOf, runwaysOf } from "../../src/core/project/airport";
+import { aerotowsOf, parkingsOf, runwaysOf, winchesOf } from "../../src/core/project/airport";
 import type {
   AirportPad,
   ParkingType,
@@ -444,14 +450,15 @@ describe("the airport block", () => {
     const withRunway = (): Project =>
       addAirportRunway(setAirport(baseProject(), AIRPORT, NOW), A, B, { identifiers: ["08", "26"], id: "rwy-1" }, LATER);
 
-    it("creates a pair with the thresholds ON the endpoints and no lights", () => {
+    it("creates a pair with ONE point per end and no lights", () => {
       const r = runwaysOf(withRunway().airport)[0]!;
       expect(r.id).toBe("rwy-1");
       expect(r.width).toBe(40); // every runway in his reference airports
       expect(r.ends).toHaveLength(2);
+      // ★ forum #236: "in the PCT the leading variable is [threshold]" — the document has no `endpoint`,
+      // because PCT draws no pavement and an extension it cannot show is a field nobody can judge.
       expect(r.ends[0]).toEqual({
-        endpoint: A,
-        threshold: A, // "ENDPOINT = THRESHOLD = NO EXTENSION"
+        threshold: A,
         identifier: "08",
         appltsys: "none",
         papi: "none",
@@ -459,20 +466,15 @@ describe("the airport block", () => {
         approach: true,
         takeoff: true,
       });
+      expect(r.ends[0]).not.toHaveProperty("endpoint");
       expect(r.ends[1]!.identifier).toBe("26");
     });
 
-    it("drags the threshold along with an UNDISPLACED endpoint, and leaves a displaced one alone", () => {
-      // ★ The rule that matters. Equal points mean "nothing is displaced here", so moving the pavement end
-      // must not silently invent a displacement — but a threshold the user has moved is theirs.
+    it("drags one end and leaves the other alone", () => {
       const moved = moveAirportRunwayEnd(withRunway(), "rwy-1", 0, { lon: -70.586, lat: -33.3815 }, LATER);
-      expect(runwaysOf(moved.airport)[0]!.ends[0]!.threshold).toEqual({ lon: -70.586, lat: -33.3815 });
-
-      const displaced = updateAirportRunwayEnd(withRunway(), "rwy-1", 1, { threshold: { lon: -70.5793, lat: -33.3802 } }, LATER);
-      const then = moveAirportRunwayEnd(displaced, "rwy-1", 1, { lon: -70.5772, lat: -33.3799 }, LATER);
-      const e = runwaysOf(then.airport)[0]!.ends[1]!;
-      expect(e.endpoint).toEqual({ lon: -70.5772, lat: -33.3799 });
-      expect(e.threshold).toEqual({ lon: -70.5793, lat: -33.3802 }); // stayed put
+      const [a, b] = runwaysOf(moved.airport)[0]!.ends;
+      expect(a.threshold).toEqual({ lon: -70.586, lat: -33.3815 });
+      expect(b.threshold).toEqual(B);
     });
 
     it("patches one end's identifier, lights and usability without touching the other", () => {
@@ -508,6 +510,60 @@ describe("the airport block", () => {
       expect(fresh.airport).toMatchObject({ icao: "", name: "", country: "", pads: [] });
       expect(runwaysOf(fresh.airport)).toHaveLength(1);
       expect(withRunway().airport!.pad).toEqual(PAD);
+    });
+  });
+
+  // ── Glider starts (v1.4, forum #237/#238) ──────────────────────────────────────────────────────
+  describe("glider starts", () => {
+    const G = { lon: -70.57713, lat: -33.3800929 };
+    const W = { lon: -70.58609, lat: -33.3811 };
+    const withBoth = (): Project => {
+      const p = setAirport(baseProject(), AIRPORT, NOW);
+      return addAirportWinch(addAirportAerotow(p, G, LATER, "ato-1"), G, W, LATER, "wnc-1");
+    };
+
+    it("adds an aerotow facing north and a winch at his default spacing", () => {
+      const p = withBoth();
+      expect(aerotowsOf(p.airport)).toEqual([{ id: "ato-1", name: "", position: G, heading: 0 }]);
+      expect(winchesOf(p.airport)).toEqual([
+        { id: "wnc-1", name: "", position: G, winch: W, spacing: 25 },
+      ]);
+    });
+
+    it("names them and turns the aerotow, normalising the heading", () => {
+      let p = updateAirportAerotow(withBoth(), "ato-1", { name: "26", heading: -100 }, LATER);
+      expect(aerotowsOf(p.airport)[0]).toMatchObject({ name: "26", heading: 260 });
+      p = updateAirportWinch(p, "wnc-1", { name: "26", spacing: 18 }, LATER);
+      expect(winchesOf(p.airport)[0]).toMatchObject({ name: "26", spacing: 18 });
+      // A non-positive spacing is refused rather than clamped, like every other metre value.
+      expect(updateAirportWinch(p, "wnc-1", { spacing: 0 }, LATER)).toBe(p);
+      // …and a patch that changes nothing keeps the reference.
+      expect(updateAirportAerotow(p, "ato-1", { name: "26" }, LATER)).toBe(p);
+      expect(updateAirportWinch(p, "wnc-1", { name: "26" }, LATER)).toBe(p);
+    });
+
+    it("moves the WINCH end without moving the glider — they are two independent points", () => {
+      const far = { lon: -70.595, lat: -33.3825 };
+      const p = updateAirportWinch(withBoth(), "wnc-1", { winch: far }, LATER);
+      expect(winchesOf(p.airport)[0]!.winch).toEqual(far);
+      expect(winchesOf(p.airport)[0]!.position).toEqual(G);
+    });
+
+    it("removes by id, and does nothing to a project with no airport", () => {
+      const p = withBoth();
+      expect(aerotowsOf(removeAirportAerotow(p, "ato-1", LATER).airport)).toEqual([]);
+      expect(winchesOf(removeAirportWinch(p, "wnc-1", LATER).airport)).toEqual([]);
+      expect(removeAirportAerotow(p, "nope")).toBe(p);
+      const empty = baseProject();
+      expect(updateAirportAerotow(empty, "ato-1", { name: "x" })).toBe(empty);
+      expect(removeAirportWinch(empty, "wnc-1")).toBe(empty);
+    });
+
+    it("creates the airport block from a placement, and leaves the pad mirror alone", () => {
+      const fresh = addAirportWinch(baseProject(), G, W, LATER, "wnc-1");
+      expect(fresh.airport).toMatchObject({ icao: "", name: "", country: "", pads: [] });
+      expect(winchesOf(fresh.airport)).toHaveLength(1);
+      expect(withBoth().airport!.pad).toEqual(PAD);
     });
   });
 
