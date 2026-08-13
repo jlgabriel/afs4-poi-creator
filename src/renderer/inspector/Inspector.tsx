@@ -26,6 +26,7 @@ import { HeightControl } from "./HeightControl";
 import { HeliportFields } from "./HeliportFields";
 import { NumberInput } from "./NumberInput";
 import { ParkingFields } from "./ParkingFields";
+import { RunwayFields } from "./RunwayFields";
 
 /** Object note — local draft committed on blur/Enter (one undo entry, not one per key; Escape reverts).
  *  Empty/whitespace clears the field (mutate.setLabel drops it). Mirrors TopBar's ProjectNameField. */
@@ -809,6 +810,11 @@ export function Inspector(): React.ReactElement {
       ? s.project.airport?.parkings?.find((p) => p.id === s.airportSelection?.id)
       : undefined,
   );
+  const runway = useEditor((s) =>
+    s.airportSelection?.kind === "runway"
+      ? s.project.airport?.runways?.find((r) => r.id === s.airportSelection?.id)
+      : undefined,
+  );
   const plantMeta = useEditor((s) => (obj?.kind === "plant" ? s.plantIndex.get(plantKey(obj)) : undefined));
   const resolvedAsl = useEditor((s) => (obj ? s.resolvedElev.get(obj.id) : undefined));
 
@@ -821,6 +827,8 @@ export function Inspector(): React.ReactElement {
         // Keyed by id for the same reason ObjectFields is: every numeric draft resets when the selection
         // moves to another stand, but editing THIS one keeps the panel alive.
         <ParkingFields key={parking.id} parking={parking} />
+      ) : runway !== undefined ? (
+        <RunwayFields key={runway.id} runway={runway} />
       ) : obj ? (
         // Key by id so every draft (numeric fields + the fetch spinner) resets on a selection change;
         // an EDIT to the same object keeps the id, so the panel is not torn down.

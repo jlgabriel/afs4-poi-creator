@@ -15,6 +15,7 @@ import { tileSourceFor } from "./tileProviders";
 import { FootprintLayer } from "./FootprintLayer";
 import { HelipadLayer } from "./HelipadLayer";
 import { ParkingLayer } from "./ParkingLayer";
+import { RunwayLayer } from "./RunwayLayer";
 
 /** The tile layer for the current provider (Esri satellite / OSM streets / custom XYZ). Overzoom
  *  (maxNativeZoom < maxZoom) keeps metre-precise placement usable past the source's native resolution.
@@ -50,6 +51,15 @@ export function MapView(): React.ReactElement {
         tileLayer = buildTileLayer(tiles).addTo(map);
       },
     );
+
+    // ★ THE RUNWAYS GO FIRST, and the order is load-bearing. Leaflet stacks LayerGroups in the order they
+    // are added, so whatever is created last sits on top and takes the clicks. A runway is a strip
+    // hundreds of metres wide that stands, pads and objects are placed ON — created last it would cover
+    // all of them and swallow every click meant for something standing on it.
+    const runway = new RunwayLayer(map, {
+      onMoveEnd: (id, end, p) => editorStore.getState().moveAirportRunwayEnd(id, end, p),
+      onSelect: (id) => editorStore.getState().selectAirportPart({ kind: "runway", id }),
+    });
 
     const layer = new FootprintLayer(map, {
       onSelect: (id, additive) => editorStore.getState().select([id], additive),
@@ -91,6 +101,10 @@ export function MapView(): React.ReactElement {
       parking.sync(
         s.project.airport?.parkings ?? [],
         s.airportSelection?.kind === "parking" ? s.airportSelection.id : null,
+      );
+      runway.sync(
+        s.project.airport?.runways ?? [],
+        s.airportSelection?.kind === "runway" ? s.airportSelection.id : null,
       );
     };
     paint();
@@ -155,6 +169,7 @@ export function MapView(): React.ReactElement {
       parking.destroy();
       helipad.destroy();
       layer.destroy();
+      runway.destroy();
       map.remove(); // frees the container so StrictMode's second mount can re-init it
     };
   }, []);

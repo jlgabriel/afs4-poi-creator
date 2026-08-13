@@ -9,9 +9,10 @@
 import { useMemo } from "react";
 import { editorStore, useEditor } from "../state/editorStore";
 import { Thumbnail } from "../catalog/Thumbnail";
-import { HelipadIcon, ParkingIcon } from "../catalog/categoryIcon";
+import { HelipadIcon, ParkingIcon, RunwayIcon } from "../catalog/categoryIcon";
 import { photoKeyForPlaced as placedPhotoKey } from "../../core/catalog/photoKey";
 import { PARKING_TYPE_LABELS, firstPad } from "../../core/project/airport";
+import { haversine, initialBearing } from "../../core/geo/geo";
 import { rowInfo } from "./rowInfo";
 
 /** The helipad's row, pinned above the objects (v1.3, forum #173: "which is then listed on the right for
@@ -99,6 +100,51 @@ function ParkingRows(): React.ReactElement | null {
   );
 }
 
+/** One row per runway. Same contract as the stands', and the label is how anyone refers to a runway: its
+ *  two identifiers. Both may be empty — legal, his 0001 sample leaves the second blank. */
+function RunwayRows(): React.ReactElement | null {
+  const runways = useEditor((s) => s.project.airport?.runways);
+  const selectedId = useEditor((s) =>
+    s.airportSelection?.kind === "runway" ? s.airportSelection.id : null,
+  );
+  if (runways === undefined || runways.length === 0) return null;
+  return (
+    <>
+      {runways.map((r) => {
+        const selected = r.id === selectedId;
+        const a = r.ends[0].identifier.trim();
+        const b = r.ends[1].identifier.trim();
+        const label = a === "" && b === "" ? "Runway" : `Runway ${[a, b].filter(Boolean).join(" / ")}`;
+        const lengthM = haversine(r.ends[0].threshold, r.ends[1].threshold);
+        return (
+          <button
+            key={r.id}
+            type="button"
+            className={selected ? "pct-placed-row pct-placed-pad sel" : "pct-placed-row pct-placed-pad"}
+            aria-pressed={selected}
+            title="A runway"
+            onClick={() => editorStore.getState().selectAirportPart({ kind: "runway", id: r.id })}
+            onDoubleClick={() => editorStore.getState().flyTo(r.ends[0].threshold)}
+          >
+            <RunwayIcon />
+            <span className="pct-placed-text">
+              <span className="pct-placed-name">
+                <span className="pct-placed-label">{label}</span>
+                <span className="pct-placed-code">{r.width} m</span>
+              </span>
+              <span className="pct-placed-meta">
+                {lengthM < 10000 ? `${Math.round(lengthM)} m` : `${(lengthM / 1000).toFixed(1)} km`} ·{" "}
+                {String(Math.round(initialBearing(r.ends[0].threshold, r.ends[1].threshold)) % 360).padStart(3, "0")}
+                ° true
+              </span>
+            </span>
+          </button>
+        );
+      })}
+    </>
+  );
+}
+
 export function PlacedList(): React.ReactElement {
   const objects = useEditor((s) => s.project.objects);
   const selection = useEditor((s) => s.selection);
@@ -138,6 +184,7 @@ export function PlacedList(): React.ReactElement {
 
       <div className="pct-placed-list">
         <HelipadRow />
+        <RunwayRows />
         <ParkingRows />
         {objects.length === 0 ? (
           <p className="pct-empty">No objects yet — click the map to place one.</p>

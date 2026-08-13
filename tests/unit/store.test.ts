@@ -1,7 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Catalog, PlacedXref, Project } from "../../src/core/project/types";
-import { createEditorStore, type EditorDeps } from "../../src/renderer/state/store";
-import { destination, haversine } from "../../src/core/geo/geo";
+import { NEW_RUNWAY_LENGTH_M, createEditorStore, type EditorDeps } from "../../src/renderer/state/store";
+import { destination, haversine, initialBearing } from "../../src/core/geo/geo";
+
+const near = (got: number, want: number, tol: number): void =>
+  expect(Math.abs(got - want)).toBeLessThan(tol);
 
 function baseProject(objects: PlacedXref[] = []): Project {
   return {
@@ -343,6 +346,85 @@ describe("store — parking positions", () => {
     store.getState().setAirportParkingSize(a, 33);
     store.getState().setAirportParkingType(a, "parked_ga");
     expect(store.getState().project.airport!.parkings![0].size).toBe(33); // a typed size is the user's
+  });
+});
+
+// v1.4, forum #242. A runway is the only airport part a single click cannot finish, because it is defined
+// by TWO points — these pin what one click actually produces and how the two ends stay independent.
+describe("store — runways", () => {
+  const placeRunway = (store: ReturnType<typeof makeStore>["store"], lon: number, lat: number): string => {
+    store.getState().armPlacement({ kind: "runway" });
+    store.getState().placeAt({ lon, lat });
+    return store.getState().airportSelection!.id;
+  };
+
+  it("one click drops a WHOLE runway, then disarms", () => {
+    const { store } = makeStore();
+    const id = placeRunway(store, 10, 48);
+    const st = store.getState();
+    // Disarms, unlike a stand: dropping runway on runway is not a gesture, and the next thing anyone
+    // does is adjust the one they just made.
+    expect(st.placing).toBeNull();
+    expect(st.airportSelection).toEqual({ kind: "runway", id });
+
+    const r = st.project.airport!.runways![0];
+    expect(r.ends[0].threshold).toEqual({ lon: 10, lat: 48 });
+    expect(r.width).toBe(40);
+    // End 2 lands a default length due east. The bearing is what makes the strip readable at once; the
+    // IDENTIFIERS stay empty on purpose — naming a runway 09/27 would be a claim about the real world
+    // that a default heading cannot make.
+    near(haversine(r.ends[0].threshold, r.ends[1].threshold), NEW_RUNWAY_LENGTH_M, 1);
+    near(initialBearing(r.ends[0].threshold, r.ends[1].threshold), 90, 0.5);
+    expect([r.ends[0].identifier, r.ends[1].identifier]).toEqual(["", ""]);
+    // A fresh end is unlit and usable both ways — the defaults every end in his files carries.
+    expect(r.ends[0]).toMatchObject({ appltsys: "none", papi: "none", reil: "none", approach: true, takeoff: true });
+  });
+
+  it("keeps the two ENDS in separate undo entries", () => {
+    // The key has to carry the end as well as the runway id: dragging threshold 1 and then threshold 2 is
+    // two gestures, and one Ctrl+Z must not snap the whole strip back.
+    const { store } = makeStore({ coalesceMs: 800 });
+    const id = placeRunway(store, 10, 48);
+    store.getState().moveAirportRunwayEnd(id, 0, { lon: 10.001, lat: 48.001 });
+    store.getState().moveAirportRunwayEnd(id, 1, { lon: 10.02, lat: 48.002 });
+    store.getState().undo();
+
+    const r = store.getState().project.airport!.runways![0];
+    expect(r.ends[1].threshold).not.toEqual({ lon: 10.02, lat: 48.002 }); // undone
+    expect(r.ends[0].threshold).toEqual({ lon: 10.001, lat: 48.001 }); // untouched
+  });
+
+  it("edits one end without touching the other", () => {
+    const { store } = makeStore();
+    const id = placeRunway(store, 10, 48);
+    store.getState().updateAirportRunwayEnd(id, 0, { identifier: "08", appltsys: "alsf-2", papi: "both" });
+    const r = store.getState().project.airport!.runways![0];
+    expect(r.ends[0]).toMatchObject({ identifier: "08", appltsys: "alsf-2", papi: "both" });
+    expect(r.ends[1]).toMatchObject({ identifier: "", appltsys: "none", papi: "none" });
+  });
+
+  it("Delete removes THAT runway and leaves the stands and the pad alone", () => {
+    const { store } = makeStore();
+    store.getState().armPlacement({ kind: "helipad" });
+    store.getState().placeAt({ lon: 10, lat: 48 });
+    const first = placeRunway(store, 10.1, 48.1);
+    placeRunway(store, 10.2, 48.2);
+
+    store.getState().selectAirportPart({ kind: "runway", id: first });
+    store.getState().deleteSelection();
+
+    const airport = store.getState().project.airport!;
+    expect(airport.runways).toHaveLength(1);
+    expect(airport.runways![0].id).not.toBe(first);
+    expect(airport.pads).toHaveLength(1);
+  });
+
+  it("deleting the only runway takes the airport block with it", () => {
+    const { store } = makeStore();
+    const id = placeRunway(store, 10, 48);
+    store.getState().selectAirportPart({ kind: "runway", id });
+    store.getState().deleteSelection();
+    expect(store.getState().project.airport).toBeUndefined();
   });
 });
 

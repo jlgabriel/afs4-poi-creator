@@ -259,3 +259,25 @@ export const ParkingIcon = memo(function ParkingIcon(): React.ReactElement {
     </svg>
   );
 });
+
+/** A runway (v1.4, forum #242). Not a circle, because a runway is not a point — the strip in perspective
+ *  is the shape everyone already reads as "runway", and it distinguishes this card from its two round
+ *  siblings at a glance. The dashes are a centre line, which is a liberty: PCT draws no markings. It is a
+ *  pictogram for a menu, not a promise about the output, and the panel says so in words. */
+export const RunwayIcon = memo(function RunwayIcon(): React.ReactElement {
+  return (
+    <svg
+      className="pct-thumb"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M9.5 21 6 3h5.5l3.5 18z" />
+      <path d="M10.4 7.5v2M11 12v2M11.6 16.5v2" />
+    </svg>
+  );
+});

@@ -22,7 +22,7 @@ import { useCallback } from "react";
 import type { ParkingType } from "../../core/project/types";
 import { PARKING_TYPES, PARKING_TYPE_LABELS } from "../../core/project/airport";
 import { editorStore, useEditor } from "../state/editorStore";
-import { HelipadIcon, ParkingIcon } from "./categoryIcon";
+import { HelipadIcon, ParkingIcon, RunwayIcon } from "./categoryIcon";
 
 /** The stand type a fresh card arms. GA is the common case and the smallest footprint, so a user who
  *  never opens the type field gets the stand a light aircraft fits on rather than a 40 m jet apron. */
@@ -34,6 +34,7 @@ const HELIPAD_TERMS = "start - helicopter helipad heliport pad";
 const PARKING_TERMS = `parking stand gate apron aircraft ${PARKING_TYPES.map(
   (t) => PARKING_TYPE_LABELS[t],
 ).join(" ")}`.toLowerCase();
+const RUNWAY_TERMS = "runway strip threshold papi reil approach lighting";
 
 export function AirportSection(): React.ReactElement {
   const placing = useEditor((s) => s.placing);
@@ -43,17 +44,20 @@ export function AirportSection(): React.ReactElement {
   // Spotted on screen in the preview harness, not by a test.
   const hasPad = useEditor((s) => (s.project.airport?.pads.length ?? 0) > 0);
   const standCount = useEditor((s) => s.project.airport?.parkings?.length ?? 0);
+  const runwayCount = useEditor((s) => s.project.airport?.runways?.length ?? 0);
   const query = useEditor((s) => s.filter.query);
 
   const padArmed = placing?.kind === "helipad";
   const parkingArmed = placing?.kind === "parking";
+  const runwayArmed = placing?.kind === "runway";
 
   // The search box filters every section (a query that hides the xrefs but leaves these cards sitting
   // there reads as a bug — see LightsSection's note on the same problem).
   const q = query.trim().toLowerCase();
   const padMatches = q === "" || HELIPAD_TERMS.includes(q);
   const parkingMatches = q === "" || PARKING_TERMS.includes(q);
-  const count = (padMatches ? 1 : 0) + (parkingMatches ? 1 : 0);
+  const runwayMatches = q === "" || RUNWAY_TERMS.includes(q);
+  const count = (padMatches ? 1 : 0) + (parkingMatches ? 1 : 0) + (runwayMatches ? 1 : 0);
 
   const armPad = useCallback(() => {
     const cur = editorStore.getState().placing;
@@ -67,6 +71,11 @@ export function AirportSection(): React.ReactElement {
       .armPlacement(
         cur?.kind === "parking" ? null : { kind: "parking", parkingType: DEFAULT_NEW_PARKING },
       );
+  }, []);
+
+  const armRunway = useCallback(() => {
+    const cur = editorStore.getState().placing;
+    editorStore.getState().armPlacement(cur?.kind === "runway" ? null : { kind: "runway" });
   }, []);
 
   return (
@@ -112,6 +121,28 @@ export function AirportSection(): React.ReactElement {
                 {standCount === 0
                   ? "a stand to start a flight from"
                   : `${standCount} placed · click the map to add another`}
+              </span>
+            </span>
+          </button>
+        )}
+        {runwayMatches && (
+          <button
+            type="button"
+            className={runwayArmed ? "pct-obj-card armed" : "pct-obj-card"}
+            aria-pressed={runwayArmed}
+            title="A runway. Click, then click the map — then drag either threshold"
+            onClick={armRunway}
+          >
+            <RunwayIcon />
+            <span className="pct-obj-text">
+              <span className="pct-obj-name">Runway</span>
+              {/* The one thing about this card that surprises: the click does not put a thing under the
+                  cursor, it starts one you then shape. Saying it beats letting someone place a runway
+                  pointing the wrong way and conclude PCT guessed. */}
+              <span className="pct-obj-cat">
+                {runwayCount === 0
+                  ? "drops a strip · drag its two ends"
+                  : `${runwayCount} placed · drops a strip you then drag`}
               </span>
             </span>
           </button>

@@ -20,6 +20,7 @@ import { createStore, type Mutate, type StoreApi } from "zustand/vanilla";
 import { subscribeWithSelector } from "zustand/middleware";
 import { byDisplayName } from "../catalog/sortObjects";
 import type {
+  AirportRunwayEnd,
   Catalog,
   CatalogAirportLight,
   CatalogObject,
@@ -72,6 +73,12 @@ export type PlacingSpec =
   // ordinary multi-drop card — it arms, drops, and STAYS armed. The type rides along because the catalog
   // card is what chooses it; everything else about the stand is edited in the Inspector.
   | { kind: "parking"; parkingType: ParkingType }
+  // v1.4 (forum #242): a runway. ONE click drops the whole thing — end 1 under the cursor, end 2 a
+  // default length due east — and the user then drags either threshold. He asked for both points to be
+  // clickable on the map "parallel to an input field", which is map-settable IN ADDITION TO numeric
+  // fields, not a demand that creation take two clicks; and a card that needs two clicks when every
+  // other card needs one is the inconsistency #173 asked us to remove.
+  | { kind: "runway" }
   // `naturalHeight` rides along rather than being looked up at place time. The palette has the
   // CatalogPlant in hand when it arms, so carrying it removes the only path where a plant could be
   // created with height 0 — the one value that may mean "invisible" (see mutate.createPlant).
@@ -124,6 +131,14 @@ export const DEFAULT_CAMERA: Camera = { lon: 0, lat: 20, zoom: 2 };
  *  flyTo zoom (≥17) is object-placement close — too tight to see an airport — so the airport search
  *  passes this instead. */
 export const AIRPORT_ZOOM = 13;
+
+/** How long a freshly dropped runway is, metres, before the user drags either threshold. A starting value
+ *  in a field the user edits, not a measurement: 1 km is a small field's strip, long enough to see and
+ *  grab both ends at the zoom you place things at, short enough not to run off the screen. The direction
+ *  is due east, so the strip reads as the 09/27 a runway most often is — but PCT does NOT fill the
+ *  identifiers in from it (mutate.addAirportRunway leaves them empty, which is legal and is what his 0001
+ *  sample does): naming a runway is a claim about the real world that a default heading cannot make. */
+export const NEW_RUNWAY_LENGTH_M = 1000;
 
 const capUndo = (stack: Project[]): Project[] =>
   stack.length > UNDO_CAP ? stack.slice(stack.length - UNDO_CAP) : stack;
@@ -286,6 +301,15 @@ export interface EditorState {
   setAirportParkingSize: (id: string, size: number) => void;
   setAirportParkingName: (id: string, name: string) => void;
   setAirportParkingType: (id: string, type: ParkingType) => void;
+  //    v1.4 runways (forum #242). An END is addressed by index, never by id — the format has no
+  //    single-ended runway, so there are always exactly two and they cannot be reordered.
+  moveAirportRunwayEnd: (id: string, end: 0 | 1, threshold: LonLat) => void;
+  updateAirportRunwayEnd: (
+    id: string,
+    end: 0 | 1,
+    patch: Partial<Omit<AirportRunwayEnd, "threshold">>,
+  ) => void;
+  setAirportRunwayWidth: (id: string, width: number) => void;
   duplicateSelection: (offsetM?: number) => void;
   deleteSelection: () => void;
 
@@ -561,6 +585,24 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
             set({ selection: [], airportSelection: { kind: "parking", id: standId } });
             return;
           }
+          // A runway is TWO points, and this is the one card whose click does not put a thing under the
+          // cursor so much as start one: end 1 lands on the click, end 2 a default length due east, and
+          // both are then draggable. Placement DISARMS — dropping runway after runway on top of each
+          // other is not a gesture anyone wants, and the next thing you do is always adjust this one.
+          if (spec.kind === "runway") {
+            const rwyId = deps.newId();
+            commit((proj) =>
+              mutate.addAirportRunway(
+                proj,
+                p,
+                destination(p, NEW_RUNWAY_LENGTH_M, 90),
+                { id: rwyId },
+                undefined,
+              ),
+            );
+            set({ placing: null, selection: [], airportSelection: { kind: "runway", id: rwyId } });
+            return;
+          }
           const id = deps.newId();
           const obj =
             spec.kind === "xref"
@@ -693,6 +735,21 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
         // undo two visible changes.
         setAirportParkingType: (id, type) =>
           commit((proj) => mutate.setAirportParkingType(proj, id, type)),
+
+        // Runways. The coalesce key carries the runway id AND the end, for the same reason the stands'
+        // carry theirs: dragging threshold 1 and then threshold 2 is two gestures and should be two
+        // undo entries, or a single Ctrl+Z would snap the whole strip back.
+        moveAirportRunwayEnd: (id, end, threshold) =>
+          commitCoalesced(`airport:runway:end:${id}:${end}`, (proj) =>
+            mutate.moveAirportRunwayEnd(proj, id, end, threshold),
+          ),
+        // NOT coalesced: these are discrete choices from menus and checkboxes, not a dragged value.
+        updateAirportRunwayEnd: (id, end, patch) =>
+          commit((proj) => mutate.updateAirportRunwayEnd(proj, id, end, patch)),
+        setAirportRunwayWidth: (id, width) =>
+          commitCoalesced(`airport:runway:width:${id}`, (proj) =>
+            mutate.setAirportRunwayWidth(proj, id, width),
+          ),
 
         duplicateSelection: (offsetM = 5) => {
           const { selection } = get();
