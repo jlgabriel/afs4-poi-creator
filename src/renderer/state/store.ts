@@ -43,6 +43,7 @@ import {
 import { destination } from "../../core/geo/geo";
 import { lineUp, spaceEvenly } from "../../core/geo/arrange";
 import { DEFAULT_PAD_RADIUS_M } from "../../core/export/planExport";
+import { firstPad } from "../../core/project/airport";
 import * as mutate from "../../core/project/mutate";
 
 export type Camera = Project["camera"];
@@ -70,6 +71,26 @@ export type PlacingSpec =
   // CatalogPlant in hand when it arms, so carrying it removes the only path where a plant could be
   // created with height 0 — the one value that may mean "invisible" (see mutate.createPlant).
   | { kind: "plant"; group: string; species: string; naturalHeight: number };
+
+/** Which airport part the Inspector is showing, if any.
+ *
+ *  v1.4 (forum #217) turns the airport into FIVE repeatable kinds, so v1.3's `padSelected: boolean` can
+ *  no longer say which one is selected. Only the cardinality changed, so only the type widened: this is
+ *  still a field of its own rather than a sentinel id inside `selection`, and the v1.3 reason holds —
+ *  a dozen call sites do `objects.find(o => o.id === selection[0])` and every one of them would have to
+ *  learn about an id that is not an object's.
+ *
+ *  Mutually exclusive with `selection`: the Inspector shows exactly one thing, so selecting either
+ *  clears the other.
+ *
+ *  ★ A runway END is deliberately not part of this key. An end is addressed by index (0 | 1) inside its
+ *  panel and by which handle the drag grabbed, which is the shape `mutate.updateAirportRunwayEnd` already
+ *  takes. Putting it here would add a fourth piece of state to a field three components read, to express
+ *  something only one of them needs. */
+export type AirportSelection = {
+  kind: "pad" | "runway" | "parking" | "aerotow" | "winch";
+  id: string;
+};
 
 const UNDO_CAP = 50; // design §3.6: snapshot stacks capped at 50
 /** The blank-project world view (new project before the user navigates). Exported for the shell's
@@ -165,11 +186,9 @@ export interface EditorState {
 
   // ── EPHEMERAL (never undo, never autosaved) ──
   selection: string[]; // placed-object ids (multi-select ready)
-  // v1.3: the helipad is selected, so the Inspector shows the heliport instead of an object. A separate
-  // flag rather than a sentinel id in `selection`, because a dozen call sites do
-  // `objects.find(o => o.id === selection[0])` and every one of them would have to learn about a
-  // non-object id. Mutually exclusive with `selection` — selecting either clears the other.
-  padSelected: boolean;
+  // The airport part the Inspector is showing — see AirportSelection for why it is its own field and
+  // why a runway end is not in it. Mutually exclusive with `selection`.
+  airportSelection: AirportSelection | null;
   placing: PlacingSpec | null; // what click-to-place is armed for (xref / airport_light / light / helipad)
   filter: Filter;
   mapView: Camera; // the LIVE camera; stamped into the document only at save
@@ -197,8 +216,9 @@ export interface EditorState {
   // ── selection / placement / filter (ephemeral) ──
   select: (ids: string[], additive?: boolean) => void;
   clearSelection: () => void;
-  /** Select (or deselect) the helipad. Clears any object selection — the Inspector shows one thing. */
-  selectPad: (on: boolean) => void;
+  /** Select an airport part, or `null` to deselect. Clears any object selection — the Inspector shows
+   *  one thing. */
+  selectAirportPart: (sel: AirportSelection | null) => void;
   armPlacement: (spec: PlacingSpec | null) => void;
   setFilter: (patch: Partial<Filter>) => void;
   placeAt: (p: LonLat) => void;
@@ -396,7 +416,7 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
           undoStack: [],
           redoStack: [],
           selection: [],
-          padSelected: false,
+          airportSelection: null,
           placing: null,
           resolvedElev: new Map(),
           pendingRecovery: null, // a fresh document clears any recovery banner
@@ -422,7 +442,7 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
         undoStack: [],
         redoStack: [],
         selection: [],
-        padSelected: false,
+        airportSelection: null,
         placing: null,
         filter: { query: "", category: null },
         mapView: deps.initialProject.camera,
@@ -475,10 +495,10 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
         select: (ids, additive = false) =>
           set((s) => ({
             selection: additive ? [...new Set([...s.selection, ...ids])] : [...ids],
-            padSelected: false,
+            airportSelection: null,
           })),
-        clearSelection: () => set({ selection: [], padSelected: false }),
-        selectPad: (on) => set({ padSelected: on, selection: [] }),
+        clearSelection: () => set({ selection: [], airportSelection: null }),
+        selectAirportPart: (sel) => set({ airportSelection: sel, selection: [] }),
         armPlacement: (name) => set({ placing: name }),
         setFilter: (patch) => set((s) => ({ filter: { ...s.filter, ...patch } })),
 
@@ -491,7 +511,14 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
           // do. Selecting it puts the heliport in the Inspector, which is where the rest of it is set.
           if (spec.kind === "helipad") {
             commit((proj) => mutate.placeAirportPad(proj, p, DEFAULT_PAD_RADIUS_M));
-            set({ placing: null, selection: [], padSelected: true });
+            // Read the id back rather than minting one: placeAirportPad either CREATES the first pad or
+            // MOVES it, so which pad ended up under the click is its answer to give, not ours to assume.
+            const pad = firstPad(get().project.airport);
+            set({
+              placing: null,
+              selection: [],
+              airportSelection: pad === undefined ? null : { kind: "pad", id: pad.id },
+            });
             return;
           }
           const id = deps.newId();
@@ -504,11 +531,11 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
                   ? mutate.createPlant(spec.group, spec.species, spec.naturalHeight, p, { id })
                   : mutate.createLight(p, { id });
           commit((proj) => mutate.addObject(proj, obj));
-          // Select the fresh object; placement stays armed (multi-drop). `padSelected` has to be cleared
-          // by hand here — this is the one selection write that does not go through `select()`, and
-          // without it, dropping an object while the pad was selected left the Inspector showing the
+          // Select the fresh object; placement stays armed (multi-drop). `airportSelection` has to be
+          // cleared by hand here — this is the one selection write that does not go through `select()`,
+          // and without it, dropping an object while the pad was selected left the Inspector showing the
           // heliport while `selection` pointed at the new object. Caught in the preview harness.
-          set({ selection: [id], padSelected: false });
+          set({ selection: [id], airportSelection: null });
         },
 
         moveObject: (id, p) => {
@@ -637,13 +664,19 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
         },
 
         deleteSelection: () => {
-          const { selection, padSelected } = get();
+          const { selection, airportSelection } = get();
           // Del on the pad removes the whole airport block, identity included — the same thing v1.2's
           // "Remove helipad" button did, now reachable the way you remove anything else. Undo brings the
           // code and the name back with it, because they went in one commit.
-          if (padSelected) {
+          //
+          // ⚠️ This is v1.3 behaviour kept EXACTLY as it was, and it is only correct while the pad is the
+          // one thing the airport can hold. The moment a second kind is placeable, deleting a pad must
+          // delete THAT PAD — otherwise removing one stand-mate takes the stands with it. Change it in
+          // the commit that makes the second kind reachable, not before: this one is a refactor and has
+          // to be provably behaviour-neutral.
+          if (airportSelection !== null) {
             commit((proj) => mutate.setAirport(proj, null));
-            set({ padSelected: false });
+            set({ airportSelection: null });
             return;
           }
           if (selection.length === 0) return;

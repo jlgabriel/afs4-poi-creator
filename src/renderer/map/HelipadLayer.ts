@@ -27,8 +27,9 @@ import { snapAngle } from "./rotate";
 export interface HelipadCallbacks {
   onMove(p: LonLat): void; // fired once on drag END (undo-friendly), like FootprintLayer's
   onRotate(headingDeg: number): void; // TRUE compass degrees
-  /** A click that was not a drag — the pad becomes the Inspector's subject (v1.3, forum #173). */
-  onSelect(): void;
+  /** A click that was not a drag — the pad becomes the Inspector's subject (v1.3, forum #173). Carries
+   *  the pad's own id: v1.4 has several airport parts and the store needs to know WHICH one was hit. */
+  onSelect(padId: string): void;
 }
 
 /** White, because a helipad IS white — and because every other colour on this map is spoken for
@@ -93,8 +94,12 @@ export class HelipadLayer {
   }
 
   /** Reconcile with the document. `undefined` (a project with no airport block) clears the pad, and so
-   *  does an airport whose `pads` is empty — there is no geometry to draw for one. */
-  sync(airport: ProjectAirport | undefined, selected = false): void {
+   *  does an airport whose `pads` is empty — there is no geometry to draw for one.
+   *
+   *  `selectedPadId` is an ID rather than the store's AirportSelection on purpose: this class stays
+   *  store-agnostic, exactly like FootprintLayer taking a `Set<string>` instead of the selection state.
+   *  MapView does the one-line narrowing. */
+  sync(airport: ProjectAirport | undefined, selectedPadId: string | null = null): void {
     const next = airport ?? null;
     const nextPad = firstPad(airport) ?? null;
     if (next === null || nextPad === null) {
@@ -104,6 +109,7 @@ export class HelipadLayer {
       this.selected = false;
       return;
     }
+    const selected = selectedPadId !== null && selectedPadId === nextPad.id;
     const selectionChanged = this.selected !== selected;
     this.selected = selected;
     // Mid-drag the shapes hold a PREVIEW the store hasn't been told about yet; rebuilding from the
@@ -311,7 +317,9 @@ export class HelipadLayer {
     if (d.mode === "rotate") this.grip?.unbindTooltip();
     if (!d.moved) {
       this.rebuild(); // a click, not a drag — drop any half-applied preview
-      this.cb.onSelect(); // …and a click on the pad SELECTS it (v1.3), like a click on a footprint
+      // …and a click on the pad SELECTS it (v1.3), like a click on a footprint. `this.pad` cannot be
+      // null here: a drag only starts on shapes that exist, and sync() clears the drag with them.
+      if (this.pad !== null) this.cb.onSelect(this.pad.id);
       return;
     }
     if (d.mode === "move") {

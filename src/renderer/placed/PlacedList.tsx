@@ -20,7 +20,7 @@ import { rowInfo } from "./rowInfo";
  *  rather than a place in it. Click selects, double-click flies, and the Inspector shows the heliport. */
 function HelipadRow(): React.ReactElement | null {
   const airport = useEditor((s) => s.project.airport);
-  const selected = useEditor((s) => s.padSelected);
+  const selected = useEditor((s) => s.airportSelection?.kind === "pad");
   if (airport === undefined) return null;
   const { icao, name } = airport;
   // One row for one pad — the v1.3 shape. A pad-less airport has no row to draw (airport.ts), and the
@@ -33,7 +33,7 @@ function HelipadRow(): React.ReactElement | null {
       className={selected ? "pct-placed-row pct-placed-pad sel" : "pct-placed-row pct-placed-pad"}
       aria-pressed={selected}
       title="The helicopter's start pad"
-      onClick={() => editorStore.getState().selectPad(true)}
+      onClick={() => editorStore.getState().selectAirportPart({ kind: "pad", id: pad.id })}
       onDoubleClick={() => editorStore.getState().flyTo(pad.position)}
     >
       <HelipadIcon />
@@ -56,7 +56,7 @@ function HelipadRow(): React.ReactElement | null {
 export function PlacedList(): React.ReactElement {
   const objects = useEditor((s) => s.project.objects);
   const selection = useEditor((s) => s.selection);
-  const padSelected = useEditor((s) => s.padSelected);
+  const airportSelected = useEditor((s) => s.airportSelection !== null);
   const catalogIndex = useEditor((s) => s.catalogIndex);
   const airportLightIndex = useEditor((s) => s.airportLightIndex);
   const plantIndex = useEditor((s) => s.plantIndex);
@@ -81,7 +81,7 @@ export function PlacedList(): React.ReactElement {
               not: a project has one start position. */}
           <button
             type="button"
-            disabled={!hasSelection && !padSelected}
+            disabled={!hasSelection && !airportSelected}
             title="Delete selection (Del)"
             onClick={() => editorStore.getState().deleteSelection()}
           >

@@ -785,10 +785,12 @@ function ObjectFields({
 
 export function Inspector(): React.ReactElement {
   const selCount = useEditor((s) => s.selection.length);
-  // The helipad is not in `objects`, so it is not in `selection` either — it has its own flag. Guarded
-  // on the block still existing: undoing the placement leaves padSelected true for one render otherwise,
+  // The helipad is not in `objects`, so it is not in `selection` either — it has its own field. Guarded
+  // on the block still existing: undoing the placement leaves the selection set for one render otherwise,
   // and the panel would be editing an airport that is no longer there.
-  const airport = useEditor((s) => (s.padSelected ? s.project.airport : undefined));
+  const airport = useEditor((s) =>
+    s.airportSelection?.kind === "pad" ? s.project.airport : undefined,
+  );
   // Select the object REFERENCE directly — stable across unrelated store changes (no re-render on pan).
   const obj = useEditor((s) =>
     s.selection.length === 1 ? s.project.objects.find((o) => o.id === s.selection[0]) : undefined,

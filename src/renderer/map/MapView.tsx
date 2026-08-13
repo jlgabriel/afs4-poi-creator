@@ -61,7 +61,7 @@ export function MapView(): React.ReactElement {
     const helipad = new HelipadLayer(map, {
       onMove: (p) => editorStore.getState().moveAirportPad(p),
       onRotate: (deg) => editorStore.getState().rotateAirportPad(deg),
-      onSelect: () => editorStore.getState().selectPad(true),
+      onSelect: (id) => editorStore.getState().selectAirportPart({ kind: "pad", id }),
     });
 
     // Paint now, then re-paint whenever objects / catalog / selection change — subscribed OUTSIDE
@@ -75,7 +75,10 @@ export function MapView(): React.ReactElement {
         s.plantIndex,
         new Set(s.selection),
       );
-      helipad.sync(s.project.airport, s.padSelected);
+      helipad.sync(
+        s.project.airport,
+        s.airportSelection?.kind === "pad" ? s.airportSelection.id : null,
+      );
     };
     paint();
     const unsub = editorStore.subscribe(
@@ -90,7 +93,7 @@ export function MapView(): React.ReactElement {
           s.plantIndex,
           s.selection,
           s.project.airport,
-          s.padSelected,
+          s.airportSelection,
         ] as const,
       paint,
       { equalityFn: shallow },

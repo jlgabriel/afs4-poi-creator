@@ -166,7 +166,10 @@ describe("placeAt — the helipad (v1.3)", () => {
     store.getState().placeAt({ lon: 10, lat: 48 });
     const st = store.getState();
     expect(st.placing).toBeNull();
-    expect(st.padSelected).toBe(true);
+    // v1.4: the selection names WHICH pad, and the id has to be the one actually in the document —
+    // placeAirportPad may have moved an existing pad rather than created one.
+    expect(st.airportSelection).toEqual({ kind: "pad", id: st.project.airport?.pads[0]?.id });
+    expect(st.airportSelection?.id).toBeTruthy();
     expect(st.selection).toEqual([]);
   });
 
@@ -185,7 +188,7 @@ describe("placeAt — the helipad (v1.3)", () => {
   });
 
   // The bug the preview harness caught: this is the one selection write that does not go through
-  // select(), so it was leaving padSelected true while `selection` pointed at the new object — the
+  // select(), so it was leaving the airport selected while `selection` pointed at the new object — the
   // Inspector showed the heliport for an object you had just placed.
   it("dropping an OBJECT lets the pad go", () => {
     const { store } = makeStore();
@@ -194,7 +197,7 @@ describe("placeAt — the helipad (v1.3)", () => {
     store.getState().armPlacement({ kind: "xref", name: "tower" });
     store.getState().placeAt({ lon: 10.1, lat: 48.1 });
     const st = store.getState();
-    expect(st.padSelected).toBe(false);
+    expect(st.airportSelection).toBeNull();
     expect(st.selection).toEqual(["id0"]);
   });
 
@@ -203,16 +206,18 @@ describe("placeAt — the helipad (v1.3)", () => {
     store.getState().armPlacement({ kind: "helipad" });
     store.getState().placeAt({ lon: 10, lat: 48 });
 
+    const padId = store.getState().project.airport!.pads[0].id;
+
     store.getState().select(["a"]);
-    expect(store.getState().padSelected).toBe(false);
+    expect(store.getState().airportSelection).toBeNull();
     expect(store.getState().selection).toEqual(["a"]);
 
-    store.getState().selectPad(true);
+    store.getState().selectAirportPart({ kind: "pad", id: padId });
     expect(store.getState().selection).toEqual([]);
-    expect(store.getState().padSelected).toBe(true);
+    expect(store.getState().airportSelection).toEqual({ kind: "pad", id: padId });
 
     store.getState().clearSelection();
-    expect(store.getState().padSelected).toBe(false);
+    expect(store.getState().airportSelection).toBeNull();
   });
 
   it("Delete on the pad removes the whole airport block, and undo brings the identity back with it", () => {
@@ -223,7 +228,7 @@ describe("placeAt — the helipad (v1.3)", () => {
 
     store.getState().deleteSelection();
     expect(store.getState().project.airport).toBeUndefined();
-    expect(store.getState().padSelected).toBe(false);
+    expect(store.getState().airportSelection).toBeNull();
 
     store.getState().undo();
     expect(store.getState().project.airport).toMatchObject({ icao: "pct001", name: "Roof" });
