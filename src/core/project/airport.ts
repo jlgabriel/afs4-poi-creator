@@ -55,6 +55,27 @@ export function winchesOf(airport: ProjectAirport | undefined): AirportWinch[] {
   return airport?.winches ?? [];
 }
 
+/** Whether the airport block holds no geometry at all: no pads, no stands, no runways, no glider starts.
+ *
+ *  Such a block is INVISIBLE — nothing draws it on the map and no Inspector panel opens on it — so the UI
+ *  treats reaching this state as "the airport is gone" and drops the block, identity and all. That is
+ *  exactly what v1.3's Del-on-the-pad did back when a pad was the only thing an airport could hold; this
+ *  is the same behaviour, stated as the rule it always was. Leaving an empty block behind would give the
+ *  user an airport they can neither see, edit, nor delete.
+ *
+ *  Note it is not the same as "the writers would emit nothing": an identity-only airport is still a legal
+ *  DOCUMENT (his "(1) DATA" example is exactly that), which is why this lives here as a UI question and
+ *  not as a validation rule. */
+export function airportIsEmpty(airport: ProjectAirport): boolean {
+  return (
+    airport.pads.length === 0 &&
+    parkingsOf(airport).length === 0 &&
+    runwaysOf(airport).length === 0 &&
+    aerotowsOf(airport).length === 0 &&
+    winchesOf(airport).length === 0
+  );
+}
+
 /** How far apart two side-by-side gliders stand on a winch launch, metres. His number: "When I enter a
  *  value here, it is usually [25], but each user has to decide for himself" — a glider's span. */
 export const DEFAULT_WINCH_SPACING_M = 25;

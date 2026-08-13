@@ -1,5 +1,5 @@
-// AirportSection.tsx — the catalog's Airport section: one card, "Start - Helicopter", which arms the
-// helipad and drops it on the next map click.
+// AirportSection.tsx — the catalog's Airport section: the cards that arm an airport part and drop it on
+// the next map click.
 //
 // WHY IT EXISTS (forum #173, ApfelFlieger). Until v1.3 the only way to get a start pad was to open
 // "Create HELIPORT…", scroll past three text fields and press a button inside the dialog — then close
@@ -10,49 +10,80 @@
 // then listed on the right for editing — "if the procedure is exactly the same as when positioning the
 // POI elements, then PCT works consistently comparable".
 //
-// So this card behaves exactly like a light or a plant: click to arm, click the map to drop, Escape to
-// cancel. The one difference is downstream, in the store: there is one pad per project, so placing
-// again MOVES it and placement disarms after the drop (see placeAt).
+// So these cards behave exactly like a light or a plant: click to arm, click the map to drop, Escape to
+// cancel. The section is his design too (#217/#227/#232): Data · Helipad · Parking · Runway · Aerotow ·
+// Winch Launch. Two of the six exist so far.
 //
-// The name is his too — "Start - Helicopter", from the section he sketched with the rest greyed out for
-// later (Start-Runway, Glider-Aerotow, Parking-Aircraft…). Nothing here is built for those; the section
-// is named Airport so they have somewhere to land if they ever exist.
+// ★ THE ONE PLACE THE TWO CARDS DIFFER, and it is the model's doing, not a UI choice: there is one start
+// pad per project, so placing again MOVES it and placement disarms after the drop. "Any number of parking
+// positions can be created" (#232), so a stand drops and stays armed, like every object card. Each card
+// says which it is in its own subtitle rather than leaving it to be discovered.
 import { useCallback } from "react";
+import type { ParkingType } from "../../core/project/types";
+import { PARKING_TYPES, PARKING_TYPE_LABELS } from "../../core/project/airport";
 import { editorStore, useEditor } from "../state/editorStore";
-import { HelipadIcon } from "./categoryIcon";
+import { HelipadIcon, ParkingIcon } from "./categoryIcon";
+
+/** The stand type a fresh card arms. GA is the common case and the smallest footprint, so a user who
+ *  never opens the type field gets the stand a light aircraft fits on rather than a 40 m jet apron. */
+const DEFAULT_NEW_PARKING: ParkingType = "parked_ga";
+
+/** What each card answers the search box with. The words are what someone would actually type looking
+ *  for the thing, not the label alone — "heliport" finds the pad, "stand"/"gate"/"apron" find parking. */
+const HELIPAD_TERMS = "start - helicopter helipad heliport pad";
+const PARKING_TERMS = `parking stand gate apron aircraft ${PARKING_TYPES.map(
+  (t) => PARKING_TYPE_LABELS[t],
+).join(" ")}`.toLowerCase();
 
 export function AirportSection(): React.ReactElement {
   const placing = useEditor((s) => s.placing);
-  const hasPad = useEditor((s) => s.project.airport !== undefined);
+  // PADS, not "is there an airport block". Placing a stand creates the block too (mutate.ts: putting an
+  // airport part on the map is the user asking for the airport in as many words), so keying this off the
+  // block made the card claim "already placed" for a project whose only airport part was a stand.
+  // Spotted on screen in the preview harness, not by a test.
+  const hasPad = useEditor((s) => (s.project.airport?.pads.length ?? 0) > 0);
+  const standCount = useEditor((s) => s.project.airport?.parkings?.length ?? 0);
   const query = useEditor((s) => s.filter.query);
 
-  const armed = placing?.kind === "helipad";
+  const padArmed = placing?.kind === "helipad";
+  const parkingArmed = placing?.kind === "parking";
 
-  // The search box filters every section (a query that hides the xrefs but leaves this card sitting
+  // The search box filters every section (a query that hides the xrefs but leaves these cards sitting
   // there reads as a bug — see LightsSection's note on the same problem).
   const q = query.trim().toLowerCase();
-  const matches = q === "" || "start - helicopter helipad heliport".includes(q);
+  const padMatches = q === "" || HELIPAD_TERMS.includes(q);
+  const parkingMatches = q === "" || PARKING_TERMS.includes(q);
+  const count = (padMatches ? 1 : 0) + (parkingMatches ? 1 : 0);
 
-  const arm = useCallback(() => {
+  const armPad = useCallback(() => {
     const cur = editorStore.getState().placing;
     editorStore.getState().armPlacement(cur?.kind === "helipad" ? null : { kind: "helipad" });
   }, []);
 
+  const armParking = useCallback(() => {
+    const cur = editorStore.getState().placing;
+    editorStore
+      .getState()
+      .armPlacement(
+        cur?.kind === "parking" ? null : { kind: "parking", parkingType: DEFAULT_NEW_PARKING },
+      );
+  }, []);
+
   return (
     <details className="pct-lights">
-      <summary className="pct-lights-summary">Airport ({matches ? 1 : 0})</summary>
+      <summary className="pct-lights-summary">Airport ({count})</summary>
       <div className="pct-lights-list">
-        {matches ? (
+        {padMatches && (
           <button
             type="button"
-            className={armed ? "pct-obj-card armed" : "pct-obj-card"}
-            aria-pressed={armed}
+            className={padArmed ? "pct-obj-card armed" : "pct-obj-card"}
+            aria-pressed={padArmed}
             title={
               hasPad
                 ? "Move the helicopter's start pad — click the map to put it somewhere else"
                 : "Where a flight starts. Click, then click the map"
             }
-            onClick={arm}
+            onClick={armPad}
           >
             <HelipadIcon />
             <span className="pct-obj-text">
@@ -65,9 +96,27 @@ export function AirportSection(): React.ReactElement {
               </span>
             </span>
           </button>
-        ) : (
-          <p className="pct-empty">No matching airport parts</p>
         )}
+        {parkingMatches && (
+          <button
+            type="button"
+            className={parkingArmed ? "pct-obj-card armed" : "pct-obj-card"}
+            aria-pressed={parkingArmed}
+            title="Where an aircraft is parked and can start a flight from. Click, then click the map"
+            onClick={armParking}
+          >
+            <ParkingIcon />
+            <span className="pct-obj-text">
+              <span className="pct-obj-name">Parking</span>
+              <span className="pct-obj-cat">
+                {standCount === 0
+                  ? "a stand to start a flight from"
+                  : `${standCount} placed · click the map to add another`}
+              </span>
+            </span>
+          </button>
+        )}
+        {count === 0 && <p className="pct-empty">No matching airport parts</p>}
       </div>
     </details>
   );

@@ -238,3 +238,24 @@ export const HelipadIcon = memo(function HelipadIcon(): React.ReactElement {
     </svg>
   );
 });
+
+/** A parking position (v1.4, forum #232). Same reasoning as HelipadIcon — no catalog category behind it —
+ *  and the same circle, so the two read as siblings in the Airport section. The P is the universal parking
+ *  glyph and needs no translation, which matters for a UI that is English-only for now. */
+export const ParkingIcon = memo(function ParkingIcon(): React.ReactElement {
+  return (
+    <svg
+      className="pct-thumb"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="9" />
+      <path d="M10 16.5V7.5h3.2a2.6 2.6 0 0 1 0 5.2H10" />
+    </svg>
+  );
+});

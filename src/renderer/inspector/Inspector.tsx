@@ -25,6 +25,7 @@ import { editorStore, useEditor } from "../state/editorStore";
 import { HeightControl } from "./HeightControl";
 import { HeliportFields } from "./HeliportFields";
 import { NumberInput } from "./NumberInput";
+import { ParkingFields } from "./ParkingFields";
 
 /** Object note — local draft committed on blur/Enter (one undo entry, not one per key; Escape reverts).
  *  Empty/whitespace clears the field (mutate.setLabel drops it). Mirrors TopBar's ProjectNameField. */
@@ -801,6 +802,13 @@ export function Inspector(): React.ReactElement {
   const airportLightMeta = useEditor((s) =>
     obj?.kind === "airport_light" ? s.airportLightIndex.get(obj.typeName) : undefined,
   );
+  // Same guard as the pad's, for the same reason: the stand may already be gone (undo, or a delete from
+  // the list) while the selection still names it for one render.
+  const parking = useEditor((s) =>
+    s.airportSelection?.kind === "parking"
+      ? s.project.airport?.parkings?.find((p) => p.id === s.airportSelection?.id)
+      : undefined,
+  );
   const plantMeta = useEditor((s) => (obj?.kind === "plant" ? s.plantIndex.get(plantKey(obj)) : undefined));
   const resolvedAsl = useEditor((s) => (obj ? s.resolvedElev.get(obj.id) : undefined));
 
@@ -809,6 +817,10 @@ export function Inspector(): React.ReactElement {
       <h2 className="pct-panel-title">Inspector</h2>
       {airport !== undefined ? (
         <HeliportFields airport={airport} />
+      ) : parking !== undefined ? (
+        // Keyed by id for the same reason ObjectFields is: every numeric draft resets when the selection
+        // moves to another stand, but editing THIS one keeps the panel alive.
+        <ParkingFields key={parking.id} parking={parking} />
       ) : obj ? (
         // Key by id so every draft (numeric fields + the fetch spinner) resets on a selection change;
         // an EDIT to the same object keeps the id, so the panel is not torn down.

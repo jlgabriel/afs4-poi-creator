@@ -9,9 +9,9 @@
 import { useMemo } from "react";
 import { editorStore, useEditor } from "../state/editorStore";
 import { Thumbnail } from "../catalog/Thumbnail";
-import { HelipadIcon } from "../catalog/categoryIcon";
+import { HelipadIcon, ParkingIcon } from "../catalog/categoryIcon";
 import { photoKeyForPlaced as placedPhotoKey } from "../../core/catalog/photoKey";
-import { firstPad } from "../../core/project/airport";
+import { PARKING_TYPE_LABELS, firstPad } from "../../core/project/airport";
 import { rowInfo } from "./rowInfo";
 
 /** The helipad's row, pinned above the objects (v1.3, forum #173: "which is then listed on the right for
@@ -50,6 +50,52 @@ function HelipadRow(): React.ReactElement | null {
         </span>
       </span>
     </button>
+  );
+}
+
+/** One row per parking position, pinned with the pad above the objects and for the same reasons: a stand
+ *  is not an object, never joins their count, never goes into the cultivation, and Duplicate means
+ *  nothing for it. Repeatable, though — "any number of parking positions can be created" (forum #232) —
+ *  so unlike the pad this is a list, and it is the shape the other four kinds will take. */
+function ParkingRows(): React.ReactElement | null {
+  const parkings = useEditor((s) => s.project.airport?.parkings);
+  const selectedId = useEditor((s) =>
+    s.airportSelection?.kind === "parking" ? s.airportSelection.id : null,
+  );
+  if (parkings === undefined || parkings.length === 0) return null;
+  return (
+    <>
+      {parkings.map((p) => {
+        const selected = p.id === selectedId;
+        return (
+          <button
+            key={p.id}
+            type="button"
+            className={selected ? "pct-placed-row pct-placed-pad sel" : "pct-placed-row pct-placed-pad"}
+            aria-pressed={selected}
+            title="A parking position"
+            onClick={() => editorStore.getState().selectAirportPart({ kind: "parking", id: p.id })}
+            onDoubleClick={() => editorStore.getState().flyTo(p.position)}
+          >
+            <ParkingIcon />
+            <span className="pct-placed-text">
+              <span className="pct-placed-name">
+                <span className="pct-placed-label">
+                  {p.name.trim() === "" ? "Parking" : p.name.trim()}
+                </span>
+                {/* His word, not the file's token — see ParkingFields on why the user never sees
+                    `parked_ga`. */}
+                <span className="pct-placed-code">{PARKING_TYPE_LABELS[p.type]}</span>
+              </span>
+              <span className="pct-placed-meta">
+                lon {p.position.lon.toFixed(6)} · lat {p.position.lat.toFixed(6)} ·{" "}
+                {Math.round(p.heading)}° · {p.size} m
+              </span>
+            </span>
+          </button>
+        );
+      })}
+    </>
   );
 }
 
@@ -92,6 +138,7 @@ export function PlacedList(): React.ReactElement {
 
       <div className="pct-placed-list">
         <HelipadRow />
+        <ParkingRows />
         {objects.length === 0 ? (
           <p className="pct-empty">No objects yet — click the map to place one.</p>
         ) : (

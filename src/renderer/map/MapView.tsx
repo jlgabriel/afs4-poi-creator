@@ -14,6 +14,7 @@ import { wrapLon } from "../../core/geo/geo";
 import { tileSourceFor } from "./tileProviders";
 import { FootprintLayer } from "./FootprintLayer";
 import { HelipadLayer } from "./HelipadLayer";
+import { ParkingLayer } from "./ParkingLayer";
 
 /** The tile layer for the current provider (Esri satellite / OSM streets / custom XYZ). Overzoom
  *  (maxNativeZoom < maxZoom) keeps metre-precise placement usable past the source's native resolution.
@@ -64,6 +65,14 @@ export function MapView(): React.ReactElement {
       onSelect: (id) => editorStore.getState().selectAirportPart({ kind: "pad", id }),
     });
 
+    // The parking positions (v1.4, forum #232). Its own layer for the same reason the pad has one — a
+    // stand is not a placed object — but a LIST rather than a singleton, because any number can exist.
+    const parking = new ParkingLayer(map, {
+      onMove: (id, p) => editorStore.getState().moveAirportParking(id, p),
+      onRotate: (id, deg) => editorStore.getState().rotateAirportParking(id, deg),
+      onSelect: (id) => editorStore.getState().selectAirportPart({ kind: "parking", id }),
+    });
+
     // Paint now, then re-paint whenever objects / catalog / selection change — subscribed OUTSIDE
     // React so drag and undo never wait on a render.
     const paint = (): void => {
@@ -78,6 +87,10 @@ export function MapView(): React.ReactElement {
       helipad.sync(
         s.project.airport,
         s.airportSelection?.kind === "pad" ? s.airportSelection.id : null,
+      );
+      parking.sync(
+        s.project.airport?.parkings ?? [],
+        s.airportSelection?.kind === "parking" ? s.airportSelection.id : null,
       );
     };
     paint();
@@ -139,6 +152,7 @@ export function MapView(): React.ReactElement {
       unsub();
       unsubCamera();
       unsubTiles();
+      parking.destroy();
       helipad.destroy();
       layer.destroy();
       map.remove(); // frees the container so StrictMode's second mount can re-init it

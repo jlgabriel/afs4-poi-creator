@@ -27,6 +27,7 @@ import type {
   HeightMode,
   HeightSpec,
   LonLat,
+  ParkingType,
   PoiShift,
   Project,
   ProjectAirport,
@@ -43,7 +44,7 @@ import {
 import { destination } from "../../core/geo/geo";
 import { lineUp, spaceEvenly } from "../../core/geo/arrange";
 import { DEFAULT_PAD_RADIUS_M } from "../../core/export/planExport";
-import { firstPad } from "../../core/project/airport";
+import { airportIsEmpty, firstPad } from "../../core/project/airport";
 import * as mutate from "../../core/project/mutate";
 
 export type Camera = Project["camera"];
@@ -67,6 +68,10 @@ export type PlacingSpec =
   // by clicking the map — the same three gestures every other card uses. It is NOT a placed object (see
   // placeAt), so this is the one spec that writes the airport block instead of adding to `objects`.
   | { kind: "helipad" }
+  // v1.4 (forum #232): a parking position. Unlike the pad, "any number can be created", so this is the
+  // ordinary multi-drop card — it arms, drops, and STAYS armed. The type rides along because the catalog
+  // card is what chooses it; everything else about the stand is edited in the Inspector.
+  | { kind: "parking"; parkingType: ParkingType }
   // `naturalHeight` rides along rather than being looked up at place time. The palette has the
   // CatalogPlant in hand when it arms, so carrying it removes the only path where a plant could be
   // created with height 0 — the one value that may mean "invisible" (see mutate.createPlant).
@@ -91,6 +96,24 @@ export type AirportSelection = {
   kind: "pad" | "runway" | "parking" | "aerotow" | "winch";
   id: string;
 };
+
+/** Drop whichever airport part the selection names. Exhaustive on purpose — no `default` branch — so
+ *  adding a sixth kind to AirportSelection fails the typecheck here instead of silently deleting nothing
+ *  when the user presses Del. */
+function removeAirportPart(project: Project, sel: AirportSelection): Project {
+  switch (sel.kind) {
+    case "pad":
+      return mutate.removeAirportPad(project, sel.id);
+    case "parking":
+      return mutate.removeAirportParking(project, sel.id);
+    case "runway":
+      return mutate.removeAirportRunway(project, sel.id);
+    case "aerotow":
+      return mutate.removeAirportAerotow(project, sel.id);
+    case "winch":
+      return mutate.removeAirportWinch(project, sel.id);
+  }
+}
 
 const UNDO_CAP = 50; // design §3.6: snapshot stacks capped at 50
 /** The blank-project world view (new project before the user navigates). Exported for the shell's
@@ -256,6 +279,13 @@ export interface EditorState {
   //    get their own writers rather than going through setAirport with a whole reconstructed block.
   setAirportPadRadius: (radius: number) => void;
   setAirportIdentity: (patch: Partial<Pick<ProjectAirport, "icao" | "name" | "country">>) => void;
+  //    v1.4 parking positions (forum #232). Every one takes an id: there has never been a one-stand UI,
+  //    so letting it default would only hide a caller that forgot which stand it meant (mutate.ts).
+  moveAirportParking: (id: string, position: LonLat) => void;
+  rotateAirportParking: (id: string, heading: number) => void;
+  setAirportParkingSize: (id: string, size: number) => void;
+  setAirportParkingName: (id: string, name: string) => void;
+  setAirportParkingType: (id: string, type: ParkingType) => void;
   duplicateSelection: (offsetM?: number) => void;
   deleteSelection: () => void;
 
@@ -521,6 +551,16 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
             });
             return;
           }
+          // A stand IS repeatable, so it behaves like an object card in every way except where it is
+          // written: drop, select the new one, stay armed for the next.
+          if (spec.kind === "parking") {
+            const standId = deps.newId();
+            commit((proj) =>
+              mutate.addAirportParking(proj, p, spec.parkingType, undefined, standId),
+            );
+            set({ selection: [], airportSelection: { kind: "parking", id: standId } });
+            return;
+          }
           const id = deps.newId();
           const obj =
             spec.kind === "xref"
@@ -629,6 +669,31 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
             });
           }),
 
+        // Every coalesce key carries the STAND'S ID. Without it, dragging stand A and then stand B would
+        // fold into one undo entry and a single Ctrl+Z would put both back — the pad's keys can be
+        // id-less only because there is one of it in that UI.
+        moveAirportParking: (id, position) =>
+          commitCoalesced(`airport:parking:pos:${id}`, (proj) =>
+            mutate.moveAirportParking(proj, id, position),
+          ),
+        rotateAirportParking: (id, heading) =>
+          commitCoalesced(`airport:parking:rot:${id}`, (proj) =>
+            mutate.rotateAirportParking(proj, id, heading),
+          ),
+        setAirportParkingSize: (id, size) =>
+          commitCoalesced(`airport:parking:size:${id}`, (proj) =>
+            mutate.setAirportParkingSize(proj, id, size),
+          ),
+        setAirportParkingName: (id, name) =>
+          commitCoalesced(`airport:parking:name:${id}`, (proj) =>
+            mutate.setAirportParkingName(proj, id, name),
+          ),
+        // NOT coalesced: picking a type is a discrete choice, and it can silently move the SIZE with it
+        // (mutate.setAirportParkingType). Folding that into a neighbouring gesture would make one Ctrl+Z
+        // undo two visible changes.
+        setAirportParkingType: (id, type) =>
+          commit((proj) => mutate.setAirportParkingType(proj, id, type)),
+
         duplicateSelection: (offsetM = 5) => {
           const { selection } = get();
           if (selection.length === 0) return;
@@ -665,17 +730,21 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
 
         deleteSelection: () => {
           const { selection, airportSelection } = get();
-          // Del on the pad removes the whole airport block, identity included — the same thing v1.2's
-          // "Remove helipad" button did, now reachable the way you remove anything else. Undo brings the
-          // code and the name back with it, because they went in one commit.
+          // Del removes the airport part that is selected — and only that part. Through v1.3 this branch
+          // deleted the WHOLE airport block, which was right when a pad was all an airport could hold and
+          // is wrong the moment a stand exists beside it.
           //
-          // ⚠️ This is v1.3 behaviour kept EXACTLY as it was, and it is only correct while the pad is the
-          // one thing the airport can hold. The moment a second kind is placeable, deleting a pad must
-          // delete THAT PAD — otherwise removing one stand-mate takes the stands with it. Change it in
-          // the commit that makes the second kind reachable, not before: this one is a refactor and has
-          // to be provably behaviour-neutral.
+          // What survives from v1.3 is the FELT behaviour, now stated as the rule it always was: deleting
+          // the last part takes the block with it, identity included. An airport with no geometry draws
+          // nothing and opens no panel, so leaving one behind would be an airport you can neither see,
+          // edit nor remove. It is one commit either way, so undo brings the code and the name back.
           if (airportSelection !== null) {
-            commit((proj) => mutate.setAirport(proj, null));
+            const sel = airportSelection;
+            commit((proj) => {
+              const next = removeAirportPart(proj, sel);
+              const a = next.airport;
+              return a !== undefined && airportIsEmpty(a) ? mutate.setAirport(next, null) : next;
+            });
             set({ airportSelection: null });
             return;
           }

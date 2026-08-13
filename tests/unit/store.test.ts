@@ -241,6 +241,111 @@ describe("placeAt — the helipad (v1.3)", () => {
   });
 });
 
+// v1.4, forum #232. The stand is the first REPEATABLE airport part to get a UI, so these pin the two
+// things that make it different from the pad rather than re-testing the mutations (mutate.test.ts).
+describe("store — parking positions", () => {
+  const placeStand = (store: ReturnType<typeof makeStore>["store"], lon: number, lat: number): string => {
+    store.getState().armPlacement({ kind: "parking", parkingType: "parked_ga" });
+    store.getState().placeAt({ lon, lat });
+    return store.getState().airportSelection!.id;
+  };
+
+  it("drops a stand, selects it, and STAYS armed — any number can be created", () => {
+    const { store } = makeStore();
+    const first = placeStand(store, 10, 48);
+    const st = store.getState();
+    expect(st.placing).toEqual({ kind: "parking", parkingType: "parked_ga" }); // ≠ the pad, which disarms
+    expect(st.airportSelection).toEqual({ kind: "parking", id: first });
+    expect(st.selection).toEqual([]);
+    expect(st.project.airport?.parkings).toHaveLength(1);
+    expect(st.project.airport?.parkings?.[0]).toMatchObject({
+      position: { lon: 10, lat: 48 },
+      heading: 0,
+      size: 7.5, // his margin note: [parked_ga] = 7.5 M
+      name: "",
+    });
+
+    store.getState().placeAt({ lon: 11, lat: 49 });
+    expect(store.getState().project.airport?.parkings).toHaveLength(2); // appended, not moved
+  });
+
+  it("keeps each stand's drag in its OWN undo entry", () => {
+    // The regression this guards: a coalesce key without the id folds two stands' drags into one, and a
+    // single Ctrl+Z puts both back.
+    const { store } = makeStore({ coalesceMs: 800 });
+    const a = placeStand(store, 10, 48);
+    const b = placeStand(store, 11, 49);
+
+    store.getState().moveAirportParking(a, { lon: 10.5, lat: 48.5 });
+    store.getState().moveAirportParking(b, { lon: 11.5, lat: 49.5 });
+    store.getState().undo();
+
+    const parkings = store.getState().project.airport!.parkings!;
+    expect(parkings.find((p) => p.id === b)!.position).toEqual({ lon: 11, lat: 49 }); // undone
+    expect(parkings.find((p) => p.id === a)!.position).toEqual({ lon: 10.5, lat: 48.5 }); // untouched
+  });
+
+  it("Delete removes THAT stand and leaves the pad and its neighbours alone", () => {
+    // Through v1.3 this branch deleted the whole airport block. With a second kind placeable that would
+    // take the pad and the other stands with it.
+    const { store } = makeStore();
+    store.getState().armPlacement({ kind: "helipad" });
+    store.getState().placeAt({ lon: 10, lat: 48 });
+    store.getState().setAirportIdentity({ icao: "pct001", name: "Roof", country: "cl" });
+    const a = placeStand(store, 10.1, 48.1);
+    placeStand(store, 10.2, 48.2);
+
+    store.getState().selectAirportPart({ kind: "parking", id: a });
+    store.getState().deleteSelection();
+
+    const airport = store.getState().project.airport!;
+    expect(airport.parkings).toHaveLength(1);
+    expect(airport.parkings![0].id).not.toBe(a);
+    expect(airport.pads).toHaveLength(1);
+    expect(airport).toMatchObject({ icao: "pct001", name: "Roof" });
+    expect(store.getState().airportSelection).toBeNull();
+  });
+
+  it("deleting the LAST part takes the block with it — an empty airport cannot be seen or removed", () => {
+    const { store } = makeStore();
+    const a = placeStand(store, 10, 48);
+    store.getState().setAirportIdentity({ icao: "pct001", name: "Roof", country: "cl" });
+
+    store.getState().selectAirportPart({ kind: "parking", id: a });
+    store.getState().deleteSelection();
+    expect(store.getState().project.airport).toBeUndefined();
+
+    store.getState().undo(); // one commit, so the identity comes back with the stand
+    expect(store.getState().project.airport).toMatchObject({ icao: "pct001", name: "Roof" });
+  });
+
+  it("deleting the pad no longer takes the stands with it", () => {
+    const { store } = makeStore();
+    store.getState().armPlacement({ kind: "helipad" });
+    store.getState().placeAt({ lon: 10, lat: 48 });
+    const padId = store.getState().airportSelection!.id;
+    placeStand(store, 10.1, 48.1);
+
+    store.getState().selectAirportPart({ kind: "pad", id: padId });
+    store.getState().deleteSelection();
+
+    const airport = store.getState().project.airport!;
+    expect(airport.pads).toHaveLength(0);
+    expect(airport.parkings).toHaveLength(1);
+  });
+
+  it("switching type moves the size only while it is still the old type's default", () => {
+    const { store } = makeStore();
+    const a = placeStand(store, 10, 48);
+    store.getState().setAirportParkingType(a, "parked_jet");
+    expect(store.getState().project.airport!.parkings![0].size).toBe(40);
+
+    store.getState().setAirportParkingSize(a, 33);
+    store.getState().setAirportParkingType(a, "parked_ga");
+    expect(store.getState().project.airport!.parkings![0].size).toBe(33); // a typed size is the user's
+  });
+});
+
 describe("nudgeHeight — promotion + coalescing", () => {
   it("promotes terrain → terrain-offset and coalesces a rapid run into one undo entry", () => {
     const { store, clock } = makeStore({ coalesceMs: 800 });
