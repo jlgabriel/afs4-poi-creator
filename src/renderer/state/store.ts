@@ -79,6 +79,11 @@ export type PlacingSpec =
   // fields, not a demand that creation take two clicks; and a card that needs two clicks when every
   // other card needs one is the inconsistency #173 asked us to remove.
   | { kind: "runway" }
+  // v1.4 (forum #237/#238): the two glider starts. An AEROTOW is a point plus a heading, so it behaves
+  // like a stand — drop, select, stay armed. A WINCH is a PAIR of points with no heading at all, so it
+  // behaves like a runway — one click lays the whole rope out and disarms.
+  | { kind: "aerotow" }
+  | { kind: "winch" }
   // `naturalHeight` rides along rather than being looked up at place time. The palette has the
   // CatalogPlant in hand when it arms, so carrying it removes the only path where a plant could be
   // created with height 0 — the one value that may mean "invisible" (see mutate.createPlant).
@@ -139,6 +144,11 @@ export const AIRPORT_ZOOM = 13;
  *  identifiers in from it (mutate.addAirportRunway leaves them empty, which is legal and is what his 0001
  *  sample does): naming a runway is a claim about the real world that a default heading cannot make. */
 export const NEW_RUNWAY_LENGTH_M = 1000;
+
+/** How much rope a freshly dropped winch launch starts with, metres. His range: "the distance between the
+ *  glider and the winch is 800 to 1000 m", so the middle of it — and, like the runway's default length, a
+ *  starting value the user then drags, not a measurement. Due east for the same reason. */
+export const NEW_WINCH_ROPE_M = 900;
 
 const capUndo = (stack: Project[]): Project[] =>
   stack.length > UNDO_CAP ? stack.slice(stack.length - UNDO_CAP) : stack;
@@ -312,6 +322,17 @@ export interface EditorState {
     patch: Partial<Omit<AirportRunwayEnd, "threshold">>,
   ) => void;
   setAirportRunwayWidth: (id: string, width: number) => void;
+  //    v1.4 glider starts (forum #237/#238), both `.wad`-only.
+  moveAirportAerotow: (id: string, position: LonLat) => void;
+  rotateAirportAerotow: (id: string, heading: number) => void;
+  setAirportAerotowName: (id: string, name: string) => void;
+  /** Drag one of the winch launch's TWO points. There is no heading to set — "the length and direction
+   *  then result from the two positions". */
+  moveAirportWinchPoint: (id: string, which: "glider" | "winch", position: LonLat) => void;
+  /** Drag the rope: both points, as one undo entry. */
+  moveAirportWinch: (id: string, glider: LonLat, winch: LonLat) => void;
+  setAirportWinchName: (id: string, name: string) => void;
+  setAirportWinchSpacing: (id: string, spacing: number) => void;
   duplicateSelection: (offsetM?: number) => void;
   deleteSelection: () => void;
 
@@ -605,6 +626,24 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
             set({ placing: null, selection: [], airportSelection: { kind: "runway", id: rwyId } });
             return;
           }
+          // An aerotow is a point and a heading — a stand's gesture: drop, select, stay armed.
+          if (spec.kind === "aerotow") {
+            const towId = deps.newId();
+            commit((proj) => mutate.addAirportAerotow(proj, p, undefined, towId));
+            set({ selection: [], airportSelection: { kind: "aerotow", id: towId } });
+            return;
+          }
+          // A winch launch is a PAIR of points — a runway's gesture: the click lays the whole rope out,
+          // the winch end goes a default distance due east, and placement disarms so the next thing you
+          // do is drag one of the two ends.
+          if (spec.kind === "winch") {
+            const winchId = deps.newId();
+            commit((proj) =>
+              mutate.addAirportWinch(proj, p, destination(p, NEW_WINCH_ROPE_M, 90), undefined, winchId),
+            );
+            set({ placing: null, selection: [], airportSelection: { kind: "winch", id: winchId } });
+            return;
+          }
           const id = deps.newId();
           const obj =
             spec.kind === "xref"
@@ -758,6 +797,39 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
         setAirportRunwayWidth: (id, width) =>
           commitCoalesced(`airport:runway:width:${id}`, (proj) =>
             mutate.setAirportRunwayWidth(proj, id, width),
+          ),
+
+        moveAirportAerotow: (id, position) =>
+          commitCoalesced(`airport:aerotow:pos:${id}`, (proj) =>
+            mutate.updateAirportAerotow(proj, id, { position }),
+          ),
+        rotateAirportAerotow: (id, heading) =>
+          commitCoalesced(`airport:aerotow:rot:${id}`, (proj) =>
+            mutate.updateAirportAerotow(proj, id, { heading }),
+          ),
+        setAirportAerotowName: (id, name) =>
+          commitCoalesced(`airport:aerotow:name:${id}`, (proj) =>
+            mutate.updateAirportAerotow(proj, id, { name }),
+          ),
+        // The two points key separately, like a runway's two thresholds: moving the glider and then the
+        // winch is two gestures, and one Ctrl+Z must not undo both.
+        moveAirportWinchPoint: (id, which, position) =>
+          commitCoalesced(`airport:winch:${which}:${id}`, (proj) =>
+            mutate.updateAirportWinch(proj, id, which === "glider" ? { position } : { winch: position }),
+          ),
+        // Both points in ONE patch, so a single Ctrl+Z after moving a launch cannot put the glider back
+        // and leave the winch where the drag left it.
+        moveAirportWinch: (id, glider, winch) =>
+          commitCoalesced(`airport:winch:move:${id}`, (proj) =>
+            mutate.updateAirportWinch(proj, id, { position: glider, winch }),
+          ),
+        setAirportWinchName: (id, name) =>
+          commitCoalesced(`airport:winch:name:${id}`, (proj) =>
+            mutate.updateAirportWinch(proj, id, { name }),
+          ),
+        setAirportWinchSpacing: (id, spacing) =>
+          commitCoalesced(`airport:winch:spacing:${id}`, (proj) =>
+            mutate.updateAirportWinch(proj, id, { spacing }),
           ),
 
         duplicateSelection: (offsetM = 5) => {

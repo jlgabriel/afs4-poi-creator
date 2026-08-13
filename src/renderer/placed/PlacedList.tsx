@@ -9,7 +9,7 @@
 import { useMemo } from "react";
 import { editorStore, useEditor } from "../state/editorStore";
 import { Thumbnail } from "../catalog/Thumbnail";
-import { HelipadIcon, ParkingIcon, RunwayIcon } from "../catalog/categoryIcon";
+import { AerotowIcon, HelipadIcon, ParkingIcon, RunwayIcon, WinchIcon } from "../catalog/categoryIcon";
 import { photoKeyForPlaced as placedPhotoKey } from "../../core/catalog/photoKey";
 import { PARKING_TYPE_LABELS, firstPad } from "../../core/project/airport";
 import { haversine, initialBearing } from "../../core/geo/geo";
@@ -145,6 +145,73 @@ function RunwayRows(): React.ReactElement | null {
   );
 }
 
+/** One row per glider start, aerotows then winch launches. Both `.wad`-only, both repeatable, and both
+ *  named by the user after the runway they serve — an empty name is normal, not a mistake. */
+function GliderRows(): React.ReactElement | null {
+  const aerotows = useEditor((s) => s.project.airport?.aerotows);
+  const winches = useEditor((s) => s.project.airport?.winches);
+  const sel = useEditor((s) => s.airportSelection);
+  const rows: React.ReactElement[] = [];
+
+  for (const a of aerotows ?? []) {
+    const selected = sel?.kind === "aerotow" && sel.id === a.id;
+    rows.push(
+      <button
+        key={a.id}
+        type="button"
+        className={selected ? "pct-placed-row pct-placed-pad sel" : "pct-placed-row pct-placed-pad"}
+        aria-pressed={selected}
+        title="A glider aerotow start"
+        onClick={() => editorStore.getState().selectAirportPart({ kind: "aerotow", id: a.id })}
+        onDoubleClick={() => editorStore.getState().flyTo(a.position)}
+      >
+        <AerotowIcon />
+        <span className="pct-placed-text">
+          <span className="pct-placed-name">
+            <span className="pct-placed-label">
+              {a.name.trim() === "" ? "Aerotow" : `Aerotow ${a.name.trim()}`}
+            </span>
+          </span>
+          <span className="pct-placed-meta">
+            lon {a.position.lon.toFixed(6)} · lat {a.position.lat.toFixed(6)} · {Math.round(a.heading)}°
+          </span>
+        </span>
+      </button>,
+    );
+  }
+
+  for (const w of winches ?? []) {
+    const selected = sel?.kind === "winch" && sel.id === w.id;
+    rows.push(
+      <button
+        key={w.id}
+        type="button"
+        className={selected ? "pct-placed-row pct-placed-pad sel" : "pct-placed-row pct-placed-pad"}
+        aria-pressed={selected}
+        title="A glider winch launch"
+        onClick={() => editorStore.getState().selectAirportPart({ kind: "winch", id: w.id })}
+        onDoubleClick={() => editorStore.getState().flyTo(w.position)}
+      >
+        <WinchIcon />
+        <span className="pct-placed-text">
+          <span className="pct-placed-name">
+            <span className="pct-placed-label">
+              {w.name.trim() === "" ? "Winch launch" : `Winch launch ${w.name.trim()}`}
+            </span>
+            <span className="pct-placed-code">{Math.round(haversine(w.position, w.winch))} m</span>
+          </span>
+          <span className="pct-placed-meta">
+            lon {w.position.lon.toFixed(6)} · lat {w.position.lat.toFixed(6)} · {w.spacing} m apart
+          </span>
+        </span>
+      </button>,
+    );
+  }
+
+  if (rows.length === 0) return null;
+  return <>{rows}</>;
+}
+
 export function PlacedList(): React.ReactElement {
   const objects = useEditor((s) => s.project.objects);
   const selection = useEditor((s) => s.selection);
@@ -186,6 +253,7 @@ export function PlacedList(): React.ReactElement {
         <HelipadRow />
         <RunwayRows />
         <ParkingRows />
+        <GliderRows />
         {objects.length === 0 ? (
           <p className="pct-empty">No objects yet — click the map to place one.</p>
         ) : (

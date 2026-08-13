@@ -16,6 +16,7 @@ import { FootprintLayer } from "./FootprintLayer";
 import { HelipadLayer } from "./HelipadLayer";
 import { ParkingLayer } from "./ParkingLayer";
 import { RunwayLayer } from "./RunwayLayer";
+import { GliderLayer } from "./GliderLayer";
 
 /** The tile layer for the current provider (Esri satellite / OSM streets / custom XYZ). Overzoom
  *  (maxNativeZoom < maxZoom) keeps metre-precise placement usable past the source's native resolution.
@@ -84,6 +85,16 @@ export function MapView(): React.ReactElement {
       onSelect: (id) => editorStore.getState().selectAirportPart({ kind: "parking", id }),
     });
 
+    // The two glider starts (v1.4, forum #237/#238). One layer for both — they are one family, and it
+    // saves a fourth and fifth copy of the same drag state machine.
+    const glider = new GliderLayer(map, {
+      onMoveAerotow: (id, p) => editorStore.getState().moveAirportAerotow(id, p),
+      onRotateAerotow: (id, deg) => editorStore.getState().rotateAirportAerotow(id, deg),
+      onMoveWinchPoint: (id, which, p) => editorStore.getState().moveAirportWinchPoint(id, which, p),
+      onMoveWinch: (id, g, w) => editorStore.getState().moveAirportWinch(id, g, w),
+      onSelect: (kind, id) => editorStore.getState().selectAirportPart({ kind, id }),
+    });
+
     // Paint now, then re-paint whenever objects / catalog / selection change — subscribed OUTSIDE
     // React so drag and undo never wait on a render.
     const paint = (): void => {
@@ -106,6 +117,16 @@ export function MapView(): React.ReactElement {
       runway.sync(
         s.project.airport?.runways ?? [],
         s.airportSelection?.kind === "runway" ? s.airportSelection.id : null,
+      );
+      // Rebuilt rather than passed through: narrowing `kind` inside a ternary condition does not narrow
+      // the OBJECT, and this layer only ever wants the two glider kinds.
+      const sel = s.airportSelection;
+      glider.sync(
+        s.project.airport?.aerotows ?? [],
+        s.project.airport?.winches ?? [],
+        sel !== null && (sel.kind === "aerotow" || sel.kind === "winch")
+          ? { kind: sel.kind, id: sel.id }
+          : null,
       );
     };
     paint();
@@ -167,6 +188,7 @@ export function MapView(): React.ReactElement {
       unsub();
       unsubCamera();
       unsubTiles();
+      glider.destroy();
       parking.destroy();
       helipad.destroy();
       layer.destroy();

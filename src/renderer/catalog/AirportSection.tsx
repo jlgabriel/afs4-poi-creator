@@ -22,7 +22,7 @@ import { useCallback } from "react";
 import type { ParkingType } from "../../core/project/types";
 import { PARKING_TYPES, PARKING_TYPE_LABELS } from "../../core/project/airport";
 import { editorStore, useEditor } from "../state/editorStore";
-import { HelipadIcon, ParkingIcon, RunwayIcon } from "./categoryIcon";
+import { AerotowIcon, HelipadIcon, ParkingIcon, RunwayIcon, WinchIcon } from "./categoryIcon";
 
 /** The stand type a fresh card arms. GA is the common case and the smallest footprint, so a user who
  *  never opens the type field gets the stand a light aircraft fits on rather than a 40 m jet apron. */
@@ -35,6 +35,8 @@ const PARKING_TERMS = `parking stand gate apron aircraft ${PARKING_TYPES.map(
   (t) => PARKING_TYPE_LABELS[t],
 ).join(" ")}`.toLowerCase();
 const RUNWAY_TERMS = "runway strip threshold papi reil approach lighting";
+const AEROTOW_TERMS = "aerotow glider tow towing sailplane dr400 start";
+const WINCH_TERMS = "winch launch glider cable rope sailplane start";
 
 export function AirportSection(): React.ReactElement {
   const placing = useEditor((s) => s.placing);
@@ -45,11 +47,15 @@ export function AirportSection(): React.ReactElement {
   const hasPad = useEditor((s) => (s.project.airport?.pads.length ?? 0) > 0);
   const standCount = useEditor((s) => s.project.airport?.parkings?.length ?? 0);
   const runwayCount = useEditor((s) => s.project.airport?.runways?.length ?? 0);
+  const aerotowCount = useEditor((s) => s.project.airport?.aerotows?.length ?? 0);
+  const winchCount = useEditor((s) => s.project.airport?.winches?.length ?? 0);
   const query = useEditor((s) => s.filter.query);
 
   const padArmed = placing?.kind === "helipad";
   const parkingArmed = placing?.kind === "parking";
   const runwayArmed = placing?.kind === "runway";
+  const aerotowArmed = placing?.kind === "aerotow";
+  const winchArmed = placing?.kind === "winch";
 
   // The search box filters every section (a query that hides the xrefs but leaves these cards sitting
   // there reads as a bug — see LightsSection's note on the same problem).
@@ -57,7 +63,14 @@ export function AirportSection(): React.ReactElement {
   const padMatches = q === "" || HELIPAD_TERMS.includes(q);
   const parkingMatches = q === "" || PARKING_TERMS.includes(q);
   const runwayMatches = q === "" || RUNWAY_TERMS.includes(q);
-  const count = (padMatches ? 1 : 0) + (parkingMatches ? 1 : 0) + (runwayMatches ? 1 : 0);
+  const aerotowMatches = q === "" || AEROTOW_TERMS.includes(q);
+  const winchMatches = q === "" || WINCH_TERMS.includes(q);
+  const count =
+    (padMatches ? 1 : 0) +
+    (parkingMatches ? 1 : 0) +
+    (runwayMatches ? 1 : 0) +
+    (aerotowMatches ? 1 : 0) +
+    (winchMatches ? 1 : 0);
 
   const armPad = useCallback(() => {
     const cur = editorStore.getState().placing;
@@ -76,6 +89,16 @@ export function AirportSection(): React.ReactElement {
   const armRunway = useCallback(() => {
     const cur = editorStore.getState().placing;
     editorStore.getState().armPlacement(cur?.kind === "runway" ? null : { kind: "runway" });
+  }, []);
+
+  const armAerotow = useCallback(() => {
+    const cur = editorStore.getState().placing;
+    editorStore.getState().armPlacement(cur?.kind === "aerotow" ? null : { kind: "aerotow" });
+  }, []);
+
+  const armWinch = useCallback(() => {
+    const cur = editorStore.getState().placing;
+    editorStore.getState().armPlacement(cur?.kind === "winch" ? null : { kind: "winch" });
   }, []);
 
   return (
@@ -143,6 +166,46 @@ export function AirportSection(): React.ReactElement {
                 {runwayCount === 0
                   ? "drops a strip · drag its two ends"
                   : `${runwayCount} placed · drops a strip you then drag`}
+              </span>
+            </span>
+          </button>
+        )}
+        {aerotowMatches && (
+          <button
+            type="button"
+            className={aerotowArmed ? "pct-obj-card armed" : "pct-obj-card"}
+            aria-pressed={aerotowArmed}
+            title="Where a glider waits to be towed into the air. Click, then click the map"
+            onClick={armAerotow}
+          >
+            <AerotowIcon />
+            <span className="pct-obj-text">
+              <span className="pct-obj-name">Aerotow</span>
+              <span className="pct-obj-cat">
+                {aerotowCount === 0
+                  ? "a glider start, towed by the DR400"
+                  : `${aerotowCount} placed · click the map to add another`}
+              </span>
+            </span>
+          </button>
+        )}
+        {winchMatches && (
+          <button
+            type="button"
+            className={winchArmed ? "pct-obj-card armed" : "pct-obj-card"}
+            aria-pressed={winchArmed}
+            title="A glider launched by a winch. Click, then click the map — then drag either end"
+            onClick={armWinch}
+          >
+            <WinchIcon />
+            <span className="pct-obj-text">
+              <span className="pct-obj-name">Winch Launch</span>
+              {/* The subtitle carries the warning, because this is where someone decides to build one.
+                  The bug is Aerofly's and he reported it himself (#229) — see WinchFields. */}
+              <span className="pct-obj-cat">
+                {winchCount === 0
+                  ? "lays out a rope · broken in FS 4 today"
+                  : `${winchCount} placed · broken in FS 4 today`}
               </span>
             </span>
           </button>

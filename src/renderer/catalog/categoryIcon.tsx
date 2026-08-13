@@ -281,3 +281,45 @@ export const RunwayIcon = memo(function RunwayIcon(): React.ReactElement {
     </svg>
   );
 });
+
+/** An AEROTOW start (v1.4, forum #237): a glider with a rope leading away. The long thin wing is what
+ *  says "glider" at 24 px — a fuselage alone would read as any aircraft. */
+export const AerotowIcon = memo(function AerotowIcon(): React.ReactElement {
+  return (
+    <svg
+      className="pct-thumb"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M3 15h13" />
+      <path d="M9.5 12v6" />
+      <path d="M16 15l5-6" />
+    </svg>
+  );
+});
+
+/** A WINCH LAUNCH (v1.4, forum #238): two points and the rope between them, which is exactly what the
+ *  element is — the only one in the model with no heading of its own. */
+export const WinchIcon = memo(function WinchIcon(): React.ReactElement {
+  return (
+    <svg
+      className="pct-thumb"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <circle cx="5" cy="18" r="2.2" />
+      <circle cx="19" cy="6" r="2.2" />
+      <path d="M6.6 16.4 17.4 7.6" />
+    </svg>
+  );
+});

@@ -27,6 +27,7 @@ import { HeliportFields } from "./HeliportFields";
 import { NumberInput } from "./NumberInput";
 import { ParkingFields } from "./ParkingFields";
 import { RunwayFields } from "./RunwayFields";
+import { AerotowFields, WinchFields } from "./GliderFields";
 
 /** Object note — local draft committed on blur/Enter (one undo entry, not one per key; Escape reverts).
  *  Empty/whitespace clears the field (mutate.setLabel drops it). Mirrors TopBar's ProjectNameField. */
@@ -815,6 +816,16 @@ export function Inspector(): React.ReactElement {
       ? s.project.airport?.runways?.find((r) => r.id === s.airportSelection?.id)
       : undefined,
   );
+  const aerotow = useEditor((s) =>
+    s.airportSelection?.kind === "aerotow"
+      ? s.project.airport?.aerotows?.find((a) => a.id === s.airportSelection?.id)
+      : undefined,
+  );
+  const winch = useEditor((s) =>
+    s.airportSelection?.kind === "winch"
+      ? s.project.airport?.winches?.find((w) => w.id === s.airportSelection?.id)
+      : undefined,
+  );
   const plantMeta = useEditor((s) => (obj?.kind === "plant" ? s.plantIndex.get(plantKey(obj)) : undefined));
   const resolvedAsl = useEditor((s) => (obj ? s.resolvedElev.get(obj.id) : undefined));
 
@@ -829,6 +840,10 @@ export function Inspector(): React.ReactElement {
         <ParkingFields key={parking.id} parking={parking} />
       ) : runway !== undefined ? (
         <RunwayFields key={runway.id} runway={runway} />
+      ) : aerotow !== undefined ? (
+        <AerotowFields key={aerotow.id} aerotow={aerotow} />
+      ) : winch !== undefined ? (
+        <WinchFields key={winch.id} winch={winch} />
       ) : obj ? (
         // Key by id so every draft (numeric fields + the fetch spinner) resets on a selection change;
         // an EDIT to the same object keeps the id, so the panel is not torn down.

@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Catalog, PlacedXref, Project } from "../../src/core/project/types";
-import { NEW_RUNWAY_LENGTH_M, createEditorStore, type EditorDeps } from "../../src/renderer/state/store";
+import {
+  NEW_RUNWAY_LENGTH_M,
+  NEW_WINCH_ROPE_M,
+  createEditorStore,
+  type EditorDeps,
+} from "../../src/renderer/state/store";
 import { destination, haversine, initialBearing } from "../../src/core/geo/geo";
 
 const near = (got: number, want: number, tol: number): void =>
@@ -453,6 +458,101 @@ describe("store — runways", () => {
     store.getState().selectAirportPart({ kind: "runway", id });
     store.getState().deleteSelection();
     expect(store.getState().project.airport).toBeUndefined();
+  });
+});
+
+// v1.4, forum #237/#238. The two glider starts are the same family with one structural difference, and
+// that difference is what these pin: an aerotow is a point with a HEADING, a winch launch is a PAIR of
+// points with none — "the length and direction then result from the two positions".
+describe("store — glider starts", () => {
+  const placeAerotow = (store: ReturnType<typeof makeStore>["store"], lon: number, lat: number): string => {
+    store.getState().armPlacement({ kind: "aerotow" });
+    store.getState().placeAt({ lon, lat });
+    return store.getState().airportSelection!.id;
+  };
+  const placeWinch = (store: ReturnType<typeof makeStore>["store"], lon: number, lat: number): string => {
+    store.getState().armPlacement({ kind: "winch" });
+    store.getState().placeAt({ lon, lat });
+    return store.getState().airportSelection!.id;
+  };
+
+  it("an aerotow drops like a stand — selected, and STILL armed", () => {
+    const { store } = makeStore();
+    const id = placeAerotow(store, 10, 48);
+    const st = store.getState();
+    expect(st.placing).toEqual({ kind: "aerotow" });
+    expect(st.airportSelection).toEqual({ kind: "aerotow", id });
+    expect(st.project.airport!.aerotows![0]).toMatchObject({
+      position: { lon: 10, lat: 48 },
+      heading: 0,
+      name: "", // his rule: the name is the user's job, PCT never derives it from a nearby runway
+    });
+  });
+
+  it("a winch launch drops like a runway — the whole rope, then disarms", () => {
+    const { store } = makeStore();
+    const id = placeWinch(store, 10, 48);
+    const st = store.getState();
+    expect(st.placing).toBeNull();
+    expect(st.airportSelection).toEqual({ kind: "winch", id });
+    const w = st.project.airport!.winches![0];
+    expect(w.position).toEqual({ lon: 10, lat: 48 });
+    expect(w.spacing).toBe(25); // his number: "basically the span"
+    near(haversine(w.position, w.winch), NEW_WINCH_ROPE_M, 1); // inside his 800–1000 m
+    near(initialBearing(w.position, w.winch), 90, 0.5);
+  });
+
+  it("dragging the rope moves BOTH points by the same offset, as one undo entry", () => {
+    // The regression: the rope shipped without a mousedown at first, so pressing the longest part of an
+    // 800 m object panned the map — the same defect the runway strip had.
+    const { store } = makeStore({ coalesceMs: 800 });
+    const id = placeWinch(store, 10, 48);
+    const before = store.getState().project.airport!.winches![0];
+    store.getState().moveAirportWinch(
+      id,
+      { lon: before.position.lon + 0.01, lat: before.position.lat + 0.01 },
+      { lon: before.winch.lon + 0.01, lat: before.winch.lat + 0.01 },
+    );
+    const after = store.getState().project.airport!.winches![0];
+    near(haversine(after.position, after.winch), haversine(before.position, before.winch), 2);
+
+    store.getState().undo();
+    const undone = store.getState().project.airport!.winches![0];
+    expect(undone.position).toEqual(before.position);
+    expect(undone.winch).toEqual(before.winch); // one entry, so BOTH come back
+  });
+
+  it("keeps the glider and the winch in separate undo entries when dragged one at a time", () => {
+    const { store } = makeStore({ coalesceMs: 800 });
+    const id = placeWinch(store, 10, 48);
+    const before = store.getState().project.airport!.winches![0];
+    store.getState().moveAirportWinchPoint(id, "glider", { lon: 10.001, lat: 48.001 });
+    store.getState().moveAirportWinchPoint(id, "winch", { lon: 10.02, lat: 48.002 });
+    store.getState().undo();
+    const w = store.getState().project.airport!.winches![0];
+    expect(w.position).toEqual({ lon: 10.001, lat: 48.001 }); // untouched
+    expect(w.winch).toEqual(before.winch); // undone
+  });
+
+  it("refuses a non-positive glider spacing rather than clamping it", () => {
+    const { store } = makeStore();
+    const id = placeWinch(store, 10, 48);
+    store.getState().setAirportWinchSpacing(id, 0);
+    expect(store.getState().project.airport!.winches![0].spacing).toBe(25);
+    store.getState().setAirportWinchSpacing(id, 18);
+    expect(store.getState().project.airport!.winches![0].spacing).toBe(18);
+  });
+
+  it("Delete removes THAT glider start and leaves the other kind alone", () => {
+    const { store } = makeStore();
+    const tow = placeAerotow(store, 10, 48);
+    placeWinch(store, 10.1, 48.1);
+    store.getState().selectAirportPart({ kind: "aerotow", id: tow });
+    store.getState().deleteSelection();
+
+    const airport = store.getState().project.airport!;
+    expect(airport.aerotows).toHaveLength(0);
+    expect(airport.winches).toHaveLength(1); // an empty aerotow list is not an empty airport
   });
 });
 
