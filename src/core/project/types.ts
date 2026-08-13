@@ -84,7 +84,8 @@ export interface UserFootprint {
 export interface CatalogPlant extends UserFootprint {
   group: string; // the .toc `group`, e.g. "conifer_forest" — verbatim from the filename
   species: string; // the .toc `species`, e.g. "00" — 2 zero-padded digits, verbatim
-  naturalHeight: number; // metres, decoded from the filename's h#### (h1750 → 17.5)
+  naturalHeight: number; // metres, decoded from the filename's [h]#### (h1750 → 17.5; the `h` is
+  // missing from two files the FS4 beta shipped, forum #244 — the digits still read as centimetres
   source: "install";
   category: string; // display taxonomy path, e.g. "plants/broadleaf"
   displayName: string; // derived pretty label, e.g. "Broadleaf 00"
