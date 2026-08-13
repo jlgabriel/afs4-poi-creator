@@ -304,6 +304,8 @@ export interface EditorState {
   //    v1.4 runways (forum #242). An END is addressed by index, never by id — the format has no
   //    single-ended runway, so there are always exactly two and they cannot be reordered.
   moveAirportRunwayEnd: (id: string, end: 0 | 1, threshold: LonLat) => void;
+  /** Drag the WHOLE strip: both thresholds, as one undo entry. */
+  moveAirportRunway: (id: string, a: LonLat, b: LonLat) => void;
   updateAirportRunwayEnd: (
     id: string,
     end: 0 | 1,
@@ -742,6 +744,13 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
         moveAirportRunwayEnd: (id, end, threshold) =>
           commitCoalesced(`airport:runway:end:${id}:${end}`, (proj) =>
             mutate.moveAirportRunwayEnd(proj, id, end, threshold),
+          ),
+        // Both ends inside ONE commit callback, not two calls: the mutations are pure and compose, so
+        // this needs no new mutation — and it must be one commit, or a single Ctrl+Z after moving a
+        // runway would put one threshold back and leave the other where the drag left it.
+        moveAirportRunway: (id, a, b) =>
+          commitCoalesced(`airport:runway:move:${id}`, (proj) =>
+            mutate.moveAirportRunwayEnd(mutate.moveAirportRunwayEnd(proj, id, 0, a), id, 1, b),
           ),
         // NOT coalesced: these are discrete choices from menus and checkboxes, not a dragged value.
         updateAirportRunwayEnd: (id, end, patch) =>

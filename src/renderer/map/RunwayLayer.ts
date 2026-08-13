@@ -11,10 +11,17 @@
 // their rotate grips: a field with six runways would otherwise carry twelve grabbable dots, most of them
 // belonging to something the user is not editing.
 //
-// WHAT IT DELIBERATELY DOES NOT DO: drag the whole strip. A runway is defined BY its two thresholds
-// (there is no heading in the model — "the direction is whatever the two endpoints say"), so moving it
-// bodily is a compound edit of both ends, and the mutation layer has no single call for it. Grabbing a
-// threshold is the gesture that matches the data.
+// ★★ DRAGGING THE STRIP MOVES THE WHOLE RUNWAY, and the first cut of this file got that wrong. The
+// argument was that a runway is defined BY its two thresholds, so the gesture that matches the data is
+// grabbing one of them — true about the model, and irrelevant to the person looking at a runway in the
+// wrong field. Juan tried to move it within a minute of opening the app.
+//
+// The failure was not just a missing feature, it was a missing MOUSEDOWN. Leaflet's map drag lives on the
+// container, and a path does not stop it: every layer here calls `map.dragging.disable()` from its own
+// mousedown, which is what makes a shape grabbable at all. With no handler on the strip, pressing it and
+// pulling panned the map — the runway did not merely refuse to move, it looked inert while the world slid
+// under it. A shape that is not draggable has to be a shape that does not look draggable, and this one
+// does. Both ends move together in ONE commit, so it is one undo entry.
 //
 // Colour: the palette had no saturated colour left that is not already spoken for — blue footprints,
 // white pad, green plants, amber selection, red missing, cyan grips, violet stands. So the strip is
@@ -28,6 +35,8 @@ import { stripCorners } from "./runwayStrip";
 export interface RunwayCallbacks {
   /** Fired once on drag END, with which end moved (0 or 1) — the shape mutate.moveAirportRunwayEnd takes. */
   onMoveEnd(id: string, end: 0 | 1, p: LonLat): void;
+  /** The whole strip was dragged: BOTH thresholds, so the store can commit them as one undo entry. */
+  onMove(id: string, a: LonLat, b: LonLat): void;
   /** A click that was not a drag — the runway becomes the Inspector's subject. */
   onSelect(id: string): void;
 }
@@ -48,14 +57,20 @@ interface Entry {
   handles: L.CircleMarker[];
 }
 
-interface Drag {
-  id: string;
-  end: 0 | 1;
-  startAt: LonLat;
-  startMouse: L.LatLng;
-  at: LonLat;
-  moved: boolean;
-}
+type Drag =
+  /** One threshold: the other stays put, so length and direction follow the cursor. */
+  | { id: string; mode: "end"; end: 0 | 1; startAt: LonLat; startMouse: L.LatLng; at: LonLat; moved: boolean }
+  /** The whole strip: both thresholds by the same offset, so length and direction are preserved. */
+  | {
+      id: string;
+      mode: "body";
+      startA: LonLat;
+      startB: LonLat;
+      startMouse: L.LatLng;
+      a: LonLat;
+      b: LonLat;
+      moved: boolean;
+    };
 
 export class RunwayLayer {
   private readonly group: L.LayerGroup;
@@ -127,6 +142,7 @@ export class RunwayLayer {
     // document mouseup when the drag never `moved` loses the click to any stray mousemove, because
     // `moved` is set unconditionally on the first one. Leaflet already decides what a click is.
     strip.on("click", () => this.cb.onSelect(r.id));
+    strip.on("mousedown", (e: L.LeafletMouseEvent) => this.onGrabBody(r.id, e));
 
     const entry: Entry = { runway: r, selected, strip, handles: [] };
     if (selected) this.addHandles(entry);
@@ -171,16 +187,39 @@ export class RunwayLayer {
     if (e.originalEvent.button !== 0 || entry === undefined) return;
     this.map.dragging.disable();
     const at = entry.runway.ends[end].threshold;
-    this.drag = { id, end, startAt: at, startMouse: e.latlng, at, moved: false };
+    this.drag = { id, mode: "end", end, startAt: at, startMouse: e.latlng, at, moved: false };
   };
 
-  /** Redraw the strip and the handles with ONE threshold moved — the other stays where the document has
-   *  it, which is the whole point: the runway's length and direction follow the drag. */
-  private preview(e: Entry, end: 0 | 1, at: LonLat): void {
-    const a = end === 0 ? at : e.runway.ends[0].threshold;
-    const b = end === 1 ? at : e.runway.ends[1].threshold;
+  /** Grab the strip itself. `map.dragging.disable()` is the load-bearing line: without it Leaflet's own
+   *  container drag wins and pressing the runway pans the map instead of moving anything. */
+  private onGrabBody = (id: string, e: L.LeafletMouseEvent): void => {
+    const entry = this.entries.get(id);
+    if (e.originalEvent.button !== 0 || entry === undefined) return;
+    this.map.dragging.disable();
+    const [a, b] = entry.runway.ends;
+    this.drag = {
+      id,
+      mode: "body",
+      startA: a.threshold,
+      startB: b.threshold,
+      startMouse: e.latlng,
+      a: a.threshold,
+      b: b.threshold,
+      moved: false,
+    };
+  };
+
+  /** Redraw the strip and its handles from two thresholds — whichever of them the drag is changing. */
+  private preview(e: Entry, a: LonLat, b: LonLat): void {
     e.strip.setLatLngs(stripCorners(a, b, e.runway.width).map(toLatLng));
-    e.handles[end]?.setLatLng(toLatLng(at));
+    e.handles[0]?.setLatLng(toLatLng(a));
+    e.handles[1]?.setLatLng(toLatLng(b));
+  }
+
+  /** Where the two thresholds are RIGHT NOW: mid-drag that is the preview, otherwise the document. */
+  private static thresholds(d: Drag, e: Entry): [LonLat, LonLat] {
+    if (d.mode === "body") return [d.a, d.b];
+    return d.end === 0 ? [d.at, e.runway.ends[1].threshold] : [e.runway.ends[0].threshold, d.at];
   }
 
   private onMouseMove = (ev: L.LeafletMouseEvent): void => {
@@ -189,11 +228,18 @@ export class RunwayLayer {
     const e = this.entries.get(d.id);
     if (e === undefined) return;
     d.moved = true;
-    d.at = {
-      lon: d.startAt.lon + (ev.latlng.lng - d.startMouse.lng),
-      lat: d.startAt.lat + (ev.latlng.lat - d.startMouse.lat),
-    };
-    this.preview(e, d.end, d.at);
+    const dLon = ev.latlng.lng - d.startMouse.lng;
+    const dLat = ev.latlng.lat - d.startMouse.lat;
+    if (d.mode === "end") {
+      d.at = { lon: d.startAt.lon + dLon, lat: d.startAt.lat + dLat };
+    } else {
+      // The SAME offset on both, so the runway keeps its length and its direction — the two numbers the
+      // panel shows and the two a user is least likely to want changed by a reposition.
+      d.a = { lon: d.startA.lon + dLon, lat: d.startA.lat + dLat };
+      d.b = { lon: d.startB.lon + dLon, lat: d.startB.lat + dLat };
+    }
+    const [a, b] = RunwayLayer.thresholds(d, e);
+    this.preview(e, a, b);
   };
 
   private onMouseUp = (): void => {
@@ -205,12 +251,20 @@ export class RunwayLayer {
     if (!d.moved) {
       // A press with no movement: drop any half-applied preview. Selecting is the shapes' own `click`
       // handlers' job.
-      if (e !== undefined) this.preview(e, d.end, e.runway.ends[d.end].threshold);
+      if (e !== undefined) this.preview(e, e.runway.ends[0].threshold, e.runway.ends[1].threshold);
       return;
     }
     // Wrap only at COMMIT: a drag across the antimeridian stays visually continuous while the value
     // handed to the store is normalised into the range the loader accepts.
-    this.cb.onMoveEnd(d.id, d.end, { lon: wrapLon(d.at.lon), lat: d.at.lat });
+    if (d.mode === "end") {
+      this.cb.onMoveEnd(d.id, d.end, { lon: wrapLon(d.at.lon), lat: d.at.lat });
+      return;
+    }
+    this.cb.onMove(
+      d.id,
+      { lon: wrapLon(d.a.lon), lat: d.a.lat },
+      { lon: wrapLon(d.b.lon), lat: d.b.lat },
+    );
   };
 }
 

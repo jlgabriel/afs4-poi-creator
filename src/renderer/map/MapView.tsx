@@ -58,6 +58,7 @@ export function MapView(): React.ReactElement {
     // all of them and swallow every click meant for something standing on it.
     const runway = new RunwayLayer(map, {
       onMoveEnd: (id, end, p) => editorStore.getState().moveAirportRunwayEnd(id, end, p),
+      onMove: (id, a, b) => editorStore.getState().moveAirportRunway(id, a, b),
       onSelect: (id) => editorStore.getState().selectAirportPart({ kind: "runway", id }),
     });
 

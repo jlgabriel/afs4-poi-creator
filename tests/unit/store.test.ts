@@ -394,6 +394,34 @@ describe("store — runways", () => {
     expect(r.ends[0].threshold).toEqual({ lon: 10.001, lat: 48.001 }); // untouched
   });
 
+  it("moves the WHOLE strip as one undo entry, keeping its length and direction", () => {
+    // Juan's first gesture in the real app was to drag the runway, and it panned the map instead: the
+    // strip had no mousedown handler, so nothing disabled Leaflet's own container drag. These pin the
+    // store half of the fix — the layer half is the handler itself.
+    const { store } = makeStore({ coalesceMs: 800 });
+    const id = placeRunway(store, 10, 48);
+    const before = store.getState().project.airport!.runways![0];
+    const lengthBefore = haversine(before.ends[0].threshold, before.ends[1].threshold);
+    const dirBefore = initialBearing(before.ends[0].threshold, before.ends[1].threshold);
+
+    store.getState().moveAirportRunway(
+      id,
+      { lon: before.ends[0].threshold.lon + 0.01, lat: before.ends[0].threshold.lat + 0.01 },
+      { lon: before.ends[1].threshold.lon + 0.01, lat: before.ends[1].threshold.lat + 0.01 },
+    );
+
+    const after = store.getState().project.airport!.runways![0];
+    expect(after.ends[0].threshold).toEqual({ lon: 10.01, lat: 48.01 });
+    near(haversine(after.ends[0].threshold, after.ends[1].threshold), lengthBefore, 2);
+    near(initialBearing(after.ends[0].threshold, after.ends[1].threshold), dirBefore, 0.5);
+
+    // ONE entry: undo must not leave one threshold moved and the other back where it started.
+    store.getState().undo();
+    const undone = store.getState().project.airport!.runways![0];
+    expect(undone.ends[0].threshold).toEqual(before.ends[0].threshold);
+    expect(undone.ends[1].threshold).toEqual(before.ends[1].threshold);
+  });
+
   it("edits one end without touching the other", () => {
     const { store } = makeStore();
     const id = placeRunway(store, 10, 48);
