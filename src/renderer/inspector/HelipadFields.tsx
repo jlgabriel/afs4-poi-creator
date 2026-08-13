@@ -1,4 +1,4 @@
-// HeliportFields.tsx — the Inspector's panel for the helipad: where the helicopter starts.
+// HelipadFields.tsx — the Inspector's panel for ONE helicopter start pad.
 //
 // WHY IT EXISTS (forum #173, ApfelFlieger). Through v1.2 the whole heliport lived in a modal: you opened
 // "Create HELIPORT…" to place the pad, to type the code, to move it, to install it. He asked for the pad
@@ -6,30 +6,25 @@
 // every other thing in PCT works — and he is right that a full-screen overlay is a bad place to edit
 // something you have to see on the map to judge. The dialog covers the map; this panel does not.
 //
-// ★ WHAT LEFT THIS PANEL, and why. Until v1.4 this also held the airport's identity — code, name, country
-// — and the Install button, on the reasoning that "a project has exactly one airport, so the pad IS the
-// airport as far as anyone using this can tell". His submenu (1) DATA (forum #217/#232) says otherwise
-// and so does the model: pads are repeatable now, and one code shown inside N pad panels reads as N
-// codes. All of it moved to AirportDataFields, which is also the door a project with no pad at all can
-// use — there was none before, and a parking-only project could not be given a code.
-import type { ProjectAirport } from "../../core/project/types";
+// ★ ONE pad, named by id (forum #221: "this element can now be used as often as desired" — his own SCLC
+// ships three). It was `HeliportFields` and reached for `pads[0]`; the file is renamed because "heliport"
+// now means the airport, which is AirportDataFields, and this is the pad.
+//
+// ★ WHAT LEFT, and why. This panel used to hold the airport's identity — code, name, country — and the
+// Install button, on the reasoning that "a project has exactly one airport, so the pad IS the airport as
+// far as anyone using this can tell". His submenu (1) DATA says otherwise and so does the model: one code
+// shown inside N pad panels reads as N codes. It all lives in AirportDataFields now.
+import type { AirportPad } from "../../core/project/types";
 import { clampLonLat } from "../../core/project/schemas";
-import { firstPad } from "../../core/project/airport";
 import { editorStore, useEditor } from "../state/editorStore";
 import { NumberInput } from "./NumberInput";
 
 const fmtDeg = (n: number): string => n.toFixed(6);
 
-export function HeliportFields({ airport }: { airport: ProjectAirport }): React.ReactElement | null {
+export function HelipadFields({ pad }: { pad: AirportPad }): React.ReactElement {
   const store = editorStore.getState;
-  // This panel edits ONE pad, and every route into it goes through placing one, so a pad-less airport
-  // cannot be reached from this UI — the model allows it (airport.ts) but nothing here creates it. Render
-  // nothing rather than invent a pad; the repeatable HELICOPTER menu (forum #219/#221) is what turns this
-  // into a list and gives a pad-less airport its own empty state.
-  const pad = firstPad(airport);
+  const { id } = pad;
   const heightMode = useEditor((s) => s.project.heightMode) ?? "baked-asl";
-
-  if (pad === undefined) return null;
 
   return (
     // .pct-inspector-body is what every other kind's panel opens with, and it is not decoration: the
@@ -37,14 +32,17 @@ export function HeliportFields({ airport }: { airport: ProjectAirport }): React.
     // both edges of the panel while the object panels sat inset — spotted on screen, not by a test.
     <div className="pct-inspector-body">
       <div className="pct-field-title">
-        {airport.name.trim() === "" ? "Start - Helicopter" : airport.name.trim()}
+        {pad.name.trim() === "" ? "Start - Helicopter" : pad.name.trim()}
       </div>
 
       <div className="pct-field pct-field-col">
         <span className="pct-field-label">Helipad — where the helicopter starts</span>
+        {/* The gesture this sentence promises is the gesture the layer implements: click to select,
+            THEN the grip appears. It used to be there always, which stopped being tenable at three pads
+            — and a panel that promised a grip you could not see would be a bug the prose invented. */}
         <span className="pct-field-meta">
-          Drag the white circle on the map to move it, and its cyan grip to turn it. It is its own point,
-          not one of your objects, so nothing spawns inside a building.
+          Drag the white circle on the map to move it, and — once it is selected — its cyan grip to turn
+          it. It is its own point, not one of your objects, so nothing spawns inside a building.
         </span>
       </div>
 
@@ -54,7 +52,7 @@ export function HeliportFields({ airport }: { airport: ProjectAirport }): React.
           <NumberInput
             value={pad.position.lon}
             format={fmtDeg}
-            onCommit={(lon) => store().moveAirportPad(clampLonLat({ lon, lat: pad.position.lat }))}
+            onCommit={(lon) => store().moveAirportPad(id, clampLonLat({ lon, lat: pad.position.lat }))}
             ariaLabel="Helipad longitude"
           />
         </label>
@@ -63,7 +61,7 @@ export function HeliportFields({ airport }: { airport: ProjectAirport }): React.
           <NumberInput
             value={pad.position.lat}
             format={fmtDeg}
-            onCommit={(lat) => store().moveAirportPad(clampLonLat({ lon: pad.position.lon, lat }))}
+            onCommit={(lat) => store().moveAirportPad(id, clampLonLat({ lon: pad.position.lon, lat }))}
             ariaLabel="Helipad latitude"
           />
         </label>
@@ -74,25 +72,43 @@ export function HeliportFields({ airport }: { airport: ProjectAirport }): React.
           <span className="pct-field-label">Heading — true</span>
           <NumberInput
             value={pad.heading}
-            onCommit={(heading) => store().rotateAirportPad(heading)}
+            onCommit={(heading) => store().rotateAirportPad(id, heading)}
             ariaLabel="Helipad heading, true degrees"
           />
         </label>
         <label className="pct-field-col">
-          <span className="pct-field-label">Radius — m</span>
+          <span className="pct-field-label">Size — m</span>
           <NumberInput
             value={pad.radius}
-            onCommit={(radius) => store().setAirportPadRadius(radius)}
-            ariaLabel="Helipad radius, metres"
+            onCommit={(radius) => store().setAirportPadRadius(id, radius)}
+            ariaLabel="Helipad size, metres"
           />
         </label>
       </div>
       {/* Measured in-sim 2026-07-31: we wrote heading 40 and the sim's menu showed 028 — 40 minus the
           local magnetic variation. So the field is TRUE and the sim's panel is magnetic. */}
       <span className="pct-field-meta">
-        Aerofly shows this heading as MAGNETIC, so expect it to read a few degrees off. Radius{" "}
-        {pad.radius} m shows there as a size of {Math.round(pad.radius * 2)} m.
+        Aerofly shows this heading as MAGNETIC, so expect it to read a few degrees off. Size {pad.radius}{" "}
+        m is a radius — the sim shows it as {Math.round(pad.radius * 2)} m.
       </span>
+
+      {/* #221: "the name can be freely assigned". It is what LOCATION shows for the pad, and with several
+          pads it is the only thing that tells them apart in the list — which is why it arrives with the
+          repeat and not before. Empty is normal: the writers render an unnamed pad as FATO/TLOF, the
+          literal v1.2 and v1.3 always wrote, so an old project still exports the same bytes. */}
+      <label className="pct-field pct-field-col">
+        <span className="pct-field-label">Name — shown in LOCATION</span>
+        <input
+          className="pct-text"
+          value={pad.name}
+          placeholder="e.g. Helipad_W1"
+          aria-label="Helipad name"
+          onChange={(e) => store().setAirportPadName(id, e.target.value)}
+        />
+        <span className="pct-field-meta">
+          Leave it empty and Aerofly shows the pad as &ldquo;FATO/TLOF&rdquo;.
+        </span>
+      </label>
 
       {heightMode === "autoheight" && (
         <span className="pct-field-meta">

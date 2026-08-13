@@ -69,11 +69,11 @@ export function MapView(): React.ReactElement {
       onRotate: (id, deg) => editorStore.getState().rotateObject(id, deg),
     });
 
-    // The helicopter's start pad (v1.2). Its own layer, not a footprint: one per project, never in the
-    // selection, and drawn whenever the project has an airport block. See HelipadLayer.
+    // The helicopter's start pads (v1.2, a LIST since v1.4 / forum #221). Their own layer, not
+    // footprints: a pad is not a placed object and never joins `selection`. See HelipadLayer.
     const helipad = new HelipadLayer(map, {
-      onMove: (p) => editorStore.getState().moveAirportPad(p),
-      onRotate: (deg) => editorStore.getState().rotateAirportPad(deg),
+      onMove: (id, p) => editorStore.getState().moveAirportPad(id, p),
+      onRotate: (id, deg) => editorStore.getState().rotateAirportPad(id, deg),
       onSelect: (id) => editorStore.getState().selectAirportPart({ kind: "pad", id }),
     });
 
@@ -107,7 +107,7 @@ export function MapView(): React.ReactElement {
         new Set(s.selection),
       );
       helipad.sync(
-        s.project.airport,
+        s.project.airport?.pads ?? [],
         s.airportSelection?.kind === "pad" ? s.airportSelection.id : null,
       );
       parking.sync(

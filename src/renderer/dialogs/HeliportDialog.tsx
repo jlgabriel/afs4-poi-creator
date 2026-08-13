@@ -11,15 +11,15 @@
 //   • He tests twice, and the first pass is deliberately without reading anything we wrote ("intuitive
 //     - without reading what Claude wrote"). A control you can only find by reading fails that pass.
 //
-// So placing lives in the catalog (AirportSection), editing lives in the Inspector (HeliportFields),
-// and what is left here is the one act that writes outside the project — plus the things that belong to
-// writing and to nothing else: the destination, the overwrite confirmation, the result, and the list of
-// what PCT has already installed with its Uninstall.
+// So placing lives in the catalog (AirportSection), editing lives in the Inspector (HelipadFields for a
+// pad, AirportDataFields for the airport's name and code), and what is left here is the one act that
+// writes outside the project — plus the things that belong to writing and to nothing else: the
+// destination, the overwrite confirmation, the result, and the list of what PCT has already installed
+// with its Uninstall.
 import { useCallback, useEffect, useState } from "react";
 import type { HeliportInstallOptions, InstallResult, InstalledHeliport, PctError } from "../../shared/pctApi";
 import { identityProblemText, validateIdentity } from "../../core/export/heliportTemplate";
 import { firstProjectError } from "../../core/project/schemas";
-import { firstPad } from "../../core/project/airport";
 import { editorStore, useEditor } from "../state/editorStore";
 import { getPct } from "../app/pct";
 
@@ -122,7 +122,7 @@ export function HeliportDialog({ onClose }: { onClose: () => void }): React.Reac
     if (!pct || airport === undefined || identity === null || problem !== null) return;
     setError(null);
 
-    if (firstPad(airport) === undefined) {
+    if (airport.pads.length === 0) {
       setError("This airport has no helipad yet. Place one from the catalog first.");
       return;
     }
@@ -180,9 +180,9 @@ export function HeliportDialog({ onClose }: { onClose: () => void }): React.Reac
     setError(messageFor(res.error));
   };
 
-  /** The pad the summary below describes. Undefined for an airport with none — legal in the model
-   *  (airport.ts), unreachable from this UI, and shown as an em dash rather than crashing the dialog. */
-  const summaryPad = firstPad(airport);
+  /** What the summary below says about the pads. A pad-less airport is legal in the model (airport.ts)
+   *  and the install refuses it above, so the summary says so rather than crashing on an absent pad. */
+  const pads = airport?.pads ?? [];
   const blocked = airport === undefined || problem !== null || busy || pct === null;
 
   return (
@@ -268,11 +268,13 @@ export function HeliportDialog({ onClose }: { onClose: () => void }): React.Reac
                       <span>{airport.country.trim() || "—"}</span>
                     </li>
                     <li>
-                      <span className="pct-field-meta">Pad</span>
+                      <span className="pct-field-meta">{pads.length === 1 ? "Helipad" : "Helipads"}</span>
                       <span>
-                        {summaryPad === undefined
+                        {pads.length === 0
                           ? "—"
-                          : `${summaryPad.position.lon.toFixed(6)}, ${summaryPad.position.lat.toFixed(6)} · ${Math.round(summaryPad.heading)}° · ${summaryPad.radius} m`}
+                          : pads.length === 1 && pads[0] !== undefined
+                            ? `${pads[0].position.lon.toFixed(6)}, ${pads[0].position.lat.toFixed(6)} · ${Math.round(pads[0].heading)}° · ${pads[0].radius} m`
+                            : `${pads.length}, all of them installed`}
                       </span>
                     </li>
                   </ul>

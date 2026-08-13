@@ -1,5 +1,5 @@
-// HelipadLayer.ts — the helicopter's start pad on the map: a circle at its real radius, an H, a heading
-// tick and a rotate grip. Drag it to move it, drag the grip to turn it.
+// HelipadLayer.ts — the helicopter start pads on the map: a circle at each pad's real radius, an H, a
+// heading tick, and a rotate grip on the selected one. Drag one to move it, drag its grip to turn it.
 //
 // WHY IT EXISTS. Until v1.2 the pad had no representation at all — it was derived at export time from
 // whichever object happened to be selected, so "where does the helicopter actually start, and which way
@@ -8,33 +8,48 @@
 // size", and — separately, #168 — it must not be an XREF, "because this will lead to collisions too
 // quickly". Both wants are the same object: a pad of its own, drawn.
 //
-// WHY A SEPARATE LAYER, not a third `Entry` shape in FootprintLayer. The pad is not a placed object: there
-// is exactly ONE per project, it is never in `selection`, it has no catalog entry, no height and no
-// missing state, and it is drawn whether or not anything is selected. Threading that through
-// FootprintLayer's diff/restyle/drag machinery would mean widening `Entry`, `Drag` and four dispatch
-// sites so every one of them could ask "…unless it's the pad". This class carries its own six-line drag
-// instead. The two layers share the map and nothing else.
+// ★ A LIST SINCE v1.4 (forum #221: "this element can now be used as often as desired" — his own SCLC
+// ships three). This class was a SINGLETON that reached for `pads[0]`, which is the last place the UI
+// knew less than the model. It now takes ParkingLayer's shape verbatim — a Map of entries keyed by id,
+// reference-diff sync, drag state that names an id — because that shape was written for this (see its
+// header, which says so) and a second list machine would be a second thing to keep correct.
 //
-// The H is drawn only when the circle is big enough to hold it (see H_MIN_PX): at world zoom a 10 m pad
-// is a pixel, and a fixed-size glyph over it reads as a label pinned to the ocean.
+// ★★ AND THE REWRITE FIXES A KNOWN BUG, which is half the reason it is a rewrite and not a widening.
+// This class used to fire `onSelect` from the DOCUMENT's mouseup when a drag had never `moved`, and
+// `moved` is set on the first mousemove with no threshold — so any tremor between pressing and releasing
+// ate the click and the pad did not select. ParkingLayer hit this on day one and fixed it by splitting
+// the gestures: `click` on the shape selects, `mousedown` starts the drag, and Leaflet decides which is
+// which. The note left behind then said this file still had the fragile spelling. It does not now.
+//
+// WHY NOT FOLD INTO ParkingLayer OUTRIGHT. A pad is not a stand where it is drawn: the white-on-satellite
+// ring, and the H — which turns with the heading and vanishes below a pixel threshold, because at world
+// zoom a 10 m pad is one pixel and a fixed-size glyph over it reads as a label pinned to the ocean. That
+// is a real amount of behaviour keyed to zoom, and a shared class carrying it for one of its two callers
+// would be worse than two classes that share a shape.
+//
+// The three contracts it keeps, the same three every layer here keeps:
+//   • Reference-diff sync — mutate.ts guarantees structural sharing, so a pad whose reference AND
+//     selected flag are unchanged is SKIPPED; a selection-only change RESTYLES; geometry REBUILDS.
+//   • Drag is layer-local — the store is untouched until mouseup fires exactly ONE callback.
+//   • The rotate grip exists only on the SELECTED pad. N grips on N pads is clutter, and it is the call
+//     FootprintLayer and ParkingLayer already make.
 
 import * as L from "leaflet";
-import type { AirportPad, LonLat, ProjectAirport } from "../../core/project/types";
-import { firstPad } from "../../core/project/airport";
+import type { AirportPad, LonLat } from "../../core/project/types";
 import { destination, initialBearing, wrapLon } from "../../core/geo/geo";
 import { snapAngle } from "./rotate";
 
 export interface HelipadCallbacks {
-  onMove(p: LonLat): void; // fired once on drag END (undo-friendly), like FootprintLayer's
-  onRotate(headingDeg: number): void; // TRUE compass degrees
+  onMove(id: string, p: LonLat): void; // fired once on drag END (undo-friendly), like every other layer's
+  onRotate(id: string, headingDeg: number): void; // TRUE compass degrees
   /** A click that was not a drag — the pad becomes the Inspector's subject (v1.3, forum #173). Carries
-   *  the pad's own id: v1.4 has several airport parts and the store needs to know WHICH one was hit. */
-  onSelect(padId: string): void;
+   *  the pad's own id: there are several airport parts and the store needs to know WHICH one was hit. */
+  onSelect(id: string): void;
 }
 
 /** White, because a helipad IS white — and because every other colour on this map is spoken for
- *  (blue footprints, amber selection, cyan grips, green plants). A dark casing underneath keeps it
- *  readable on pale satellite imagery. */
+ *  (blue footprints, violet stands, amber selection, cyan grips, green plants). A dark casing underneath
+ *  keeps it readable on pale satellite imagery. */
 const PAD_STROKE = "#ffffff";
 const PAD_CASING = "#0f172a";
 /** Selected: the same amber every other selected thing on this map wears (FootprintLayer's
@@ -43,33 +58,32 @@ const PAD_SELECTED = "#f59e0b";
 const COLOR_HANDLE = "#06b6d4"; // the same cyan grip the footprints use — it is the same control
 const SNAP_DEG = 5; // Shift-snap, as everywhere else
 
-/** Gap in metres between the pad's rim and its rotate grip. */
+/** Gap in metres between a pad's rim and its rotate grip. */
 const HANDLE_MARGIN_M = 6;
 /** Don't draw the H until the pad's on-screen radius reaches this many pixels. */
 const H_MIN_PX = 14;
 
 const toLatLng = (p: LonLat): L.LatLngExpression => [p.lat, p.lon];
 
+interface Entry {
+  /** The pad this entry was BUILT from — the reference the diff compares against. */
+  pad: AirportPad;
+  selected: boolean;
+  casing: L.Circle;
+  ring: L.Circle;
+  tick: L.Polyline;
+  glyph?: L.Marker; // the H — present only while the pad is big enough on screen to hold it
+  handle?: L.CircleMarker; // present only while selected
+}
+
 type Drag =
-  | { mode: "move"; startPad: LonLat; startMouse: L.LatLng; at: LonLat; moved: boolean }
-  | { mode: "rotate"; at: LonLat; startHeading: number; heading: number; moved: boolean };
+  | { id: string; mode: "move"; startAt: LonLat; startMouse: L.LatLng; at: LonLat; moved: boolean }
+  | { id: string; mode: "rotate"; at: LonLat; startHeading: number; heading: number; moved: boolean };
 
 export class HelipadLayer {
   private readonly group: L.LayerGroup;
-  private airport: ProjectAirport | null = null;
-  /** The pad being drawn, derived from `airport.pads[0]` in sync() and the only thing the geometry below
-   *  reads. Null for no airport OR for an airport with no pads — which is legal (see airport.ts) and
-   *  means there is simply nothing to draw. Kept as a field so every method has the null-check for free
-   *  instead of re-deriving it eight times. */
-  private pad: AirportPad | null = null;
-  private selected = false;
+  private readonly entries = new Map<string, Entry>();
   private drag: Drag | null = null;
-
-  private casing: L.Circle | null = null;
-  private ring: L.Circle | null = null;
-  private glyph: L.Marker | null = null;
-  private tick: L.Polyline | null = null;
-  private grip: L.CircleMarker | null = null;
 
   constructor(
     private readonly map: L.Map,
@@ -79,7 +93,7 @@ export class HelipadLayer {
     map.on("mousemove", this.onMouseMove);
     map.on("zoomend", this.onZoomEnd);
     // document-level, for the same reason FootprintLayer uses it: the Inspector and catalog flank the
-    // map, so a release over them never reaches the map's own mouseup and the pad stays glued to the
+    // map, so a release over them never reaches the map's own mouseup and a pad stays glued to the
     // cursor with the button up.
     document.addEventListener("mouseup", this.onMouseUp);
   }
@@ -90,63 +104,60 @@ export class HelipadLayer {
     document.removeEventListener("mouseup", this.onMouseUp);
     if (this.drag) this.map.dragging.enable();
     this.drag = null;
+    this.entries.clear();
     this.group.remove();
   }
 
-  /** Reconcile with the document. `undefined` (a project with no airport block) clears the pad, and so
-   *  does an airport whose `pads` is empty — there is no geometry to draw for one.
+  /** Reconcile with the document. An empty list clears everything, which is what a project with no
+   *  airport — or an airport with no pads, legal since the DATA submenu — draws.
    *
-   *  `selectedPadId` is an ID rather than the store's AirportSelection on purpose: this class stays
-   *  store-agnostic, exactly like FootprintLayer taking a `Set<string>` instead of the selection state.
-   *  MapView does the one-line narrowing. */
-  sync(airport: ProjectAirport | undefined, selectedPadId: string | null = null): void {
-    const next = airport ?? null;
-    const nextPad = firstPad(airport) ?? null;
-    if (next === null || nextPad === null) {
-      if (this.pad !== null) this.clear();
-      this.airport = next;
-      this.pad = null;
-      this.selected = false;
-      return;
+   *  `selectedId` is an ID rather than the store's AirportSelection on purpose: this class stays
+   *  store-agnostic, exactly like FootprintLayer taking a `Set<string>`. MapView does the narrowing.
+   *
+   *  Mid-drag the dragged pad is left alone: its shapes hold a PREVIEW the store has not been told about,
+   *  and rebuilding from the stored value would snap it back under the cursor on any unrelated repaint. */
+  sync(pads: readonly AirportPad[], selectedId: string | null = null): void {
+    const live = new Set<string>();
+    for (const p of pads) {
+      live.add(p.id);
+      const selected = p.id === selectedId;
+      const cur = this.entries.get(p.id);
+      if (cur !== undefined && this.drag?.id === p.id) {
+        cur.pad = p; // keep the reference fresh; the shapes stay where the drag put them
+        continue;
+      }
+      if (cur === undefined) {
+        this.entries.set(p.id, this.build(p, selected));
+        continue;
+      }
+      if (cur.pad === p && cur.selected === selected) continue; // untouched → skip
+      if (cur.pad === p) {
+        cur.selected = selected;
+        this.restyle(cur);
+        continue;
+      }
+      this.remove(p.id);
+      this.entries.set(p.id, this.build(p, selected));
     }
-    const selected = selectedPadId !== null && selectedPadId === nextPad.id;
-    const selectionChanged = this.selected !== selected;
-    this.selected = selected;
-    // Mid-drag the shapes hold a PREVIEW the store hasn't been told about yet; rebuilding from the
-    // stored (pre-drag) values would snap the pad back under the cursor on every unrelated repaint.
-    if (this.drag !== null) {
-      this.airport = next;
-      this.pad = nextPad;
-      return;
-    }
-    const changed =
-      this.pad === null ||
-      this.pad.position !== nextPad.position ||
-      this.pad.heading !== nextPad.heading ||
-      this.pad.radius !== nextPad.radius;
-    this.airport = next;
-    this.pad = nextPad;
-    if (changed) this.rebuild();
-    else if (selectionChanged) this.restyle();
+    for (const id of [...this.entries.keys()]) if (!live.has(id)) this.remove(id);
   }
 
-  private clear(): void {
-    this.group.clearLayers();
-    this.casing = this.ring = null;
-    this.glyph = null;
-    this.tick = null;
-    this.grip = null;
+  private remove(id: string): void {
+    const e = this.entries.get(id);
+    if (e === undefined) return;
+    this.group.removeLayer(e.casing);
+    this.group.removeLayer(e.ring);
+    this.group.removeLayer(e.tick);
+    if (e.glyph) this.group.removeLayer(e.glyph);
+    if (e.handle) this.group.removeLayer(e.handle);
+    this.entries.delete(id);
   }
 
-  private rebuild(): void {
-    const a = this.pad;
-    if (a === null) return;
-    this.clear();
-    const { position, radius } = a;
-
+  private build(p: AirportPad, selected: boolean): Entry {
+    const { position, radius } = p;
     // Two concentric circles rather than one: Leaflet strokes a single path in one colour, and a white
     // rim alone vanishes over concrete or snow. The casing is the same circle, one step wider and dark.
-    this.casing = L.circle(toLatLng(position), {
+    const casing = L.circle(toLatLng(position), {
       radius,
       color: PAD_CASING,
       weight: 5,
@@ -154,22 +165,32 @@ export class HelipadLayer {
       fill: false,
       interactive: false,
     }).addTo(this.group);
-    this.ring = L.circle(toLatLng(position), {
+    const ring = L.circle(toLatLng(position), {
       radius,
-      ...this.ringStyle(),
+      ...ringStyle(selected),
       className: "pct-helipad",
-      bubblingMouseEvents: false, // grabbing the pad never starts a map pan or a place-click
+      bubblingMouseEvents: false, // grabbing a pad never starts a map pan or a place-click
     }).addTo(this.group);
-    this.ring.on("mousedown", this.onGrab);
+    // Select on CLICK, drag on MOUSEDOWN — see the header. This split is the whole fix.
+    ring.on("click", () => this.cb.onSelect(p.id));
+    ring.on("mousedown", (e: L.LeafletMouseEvent) => this.onGrab(p.id, e));
 
-    this.tick = L.polyline([toLatLng(position), toLatLng(this.tipAt(position))], {
+    const tick = L.polyline([toLatLng(position), toLatLng(tipAt(p, position, p.heading))], {
       color: PAD_STROKE,
       weight: 2,
       opacity: 0.9,
       interactive: false,
     }).addTo(this.group);
 
-    this.grip = L.circleMarker(toLatLng(this.gripAt(position)), {
+    const entry: Entry = { pad: p, selected, casing, ring, tick };
+    if (selected) this.addHandle(entry);
+    this.layoutGlyph(entry);
+    return entry;
+  }
+
+  private addHandle(e: Entry): void {
+    const p = e.pad;
+    const handle = L.circleMarker(toLatLng(gripAt(p, p.position, p.heading)), {
       radius: 6,
       color: COLOR_HANDLE,
       weight: 2,
@@ -178,100 +199,87 @@ export class HelipadLayer {
       className: "pct-rotate-handle",
       bubblingMouseEvents: false,
     }).addTo(this.group);
-    this.grip.on("mousedown", this.onGrabHandle);
-
-    this.layoutGlyph();
+    handle.on("mousedown", (ev: L.LeafletMouseEvent) => this.onGrabHandle(p.id, ev));
+    e.handle = handle;
   }
 
-  /** The ring's paint, which is the only thing selection changes. Kept in one place so `rebuild` and
-   *  `restyle` cannot drift apart. */
-  private ringStyle(): L.PathOptions {
-    const color = this.selected ? PAD_SELECTED : PAD_STROKE;
-    return { color, weight: this.selected ? 3 : 2, fillColor: color, fillOpacity: 0.12 };
+  /** Selection changed but the geometry did not — repaint without tearing the shapes down, and add or
+   *  drop the grip, which is the one shape selection creates. */
+  private restyle(e: Entry): void {
+    e.ring.setStyle(ringStyle(e.selected));
+    if (e.selected && e.handle === undefined) {
+      this.addHandle(e);
+      return;
+    }
+    if (!e.selected && e.handle !== undefined) {
+      this.group.removeLayer(e.handle);
+      e.handle = undefined;
+    }
   }
 
-  /** Selection changed but the geometry did not — repaint without tearing down the shapes (the same
-   *  cheap path FootprintLayer takes; a rebuild here would drop a tooltip mid-gesture). */
-  private restyle(): void {
-    this.ring?.setStyle(this.ringStyle());
-  }
-
-  // ── geometry (the optional `heading` previews an un-committed angle mid-drag) ──
-
-  /** Where the heading tick ends: on the rim. */
-  private tipAt(at: LonLat, heading = this.pad?.heading ?? 0): LonLat {
-    return destination(at, this.pad?.radius ?? 0, heading);
-  }
-
-  /** Where the rotate grip sits: just past the rim, so it never overlaps the pad it turns. */
-  private gripAt(at: LonLat, heading = this.pad?.heading ?? 0): LonLat {
-    return destination(at, (this.pad?.radius ?? 0) + HANDLE_MARGIN_M, heading);
-  }
-
-  /** The pad's on-screen radius in pixels — how the H decides whether it fits. */
-  private radiusPx(): number {
-    const a = this.pad;
-    if (a === null) return 0;
-    const c = this.map.latLngToLayerPoint(toLatLng(a.position));
-    const edge = this.map.latLngToLayerPoint(toLatLng(destination(a.position, a.radius, 90)));
+  /** A pad's on-screen radius in pixels — how the H decides whether it fits. */
+  private radiusPx(p: AirportPad): number {
+    const c = this.map.latLngToLayerPoint(toLatLng(p.position));
+    const edge = this.map.latLngToLayerPoint(toLatLng(destination(p.position, p.radius, 90)));
     return Math.abs(edge.x - c.x);
   }
 
-  /** Create, move or drop the H. Called on rebuild and on every zoom, because whether it fits is a
-   *  function of the zoom and nothing else. */
-  private layoutGlyph(at?: LonLat, heading?: number): void {
-    const a = this.pad;
-    if (a === null) return;
-    const where = at ?? a.position;
-    const rot = heading ?? a.heading;
-    if (this.radiusPx() < H_MIN_PX) {
-      if (this.glyph !== null) {
-        this.group.removeLayer(this.glyph);
-        this.glyph = null;
+  /** Create, move or drop one pad's H. Called on build, on every zoom and through the drag preview,
+   *  because whether it fits is a function of the zoom and nothing else. */
+  private layoutGlyph(e: Entry, at?: LonLat, heading?: number): void {
+    const p = e.pad;
+    const where = at ?? p.position;
+    const rot = heading ?? p.heading;
+    if (this.radiusPx(p) < H_MIN_PX) {
+      if (e.glyph !== undefined) {
+        this.group.removeLayer(e.glyph);
+        e.glyph = undefined;
       }
       return;
     }
     // The H turns WITH the pad — a helipad's H is painted along the approach, so a pad heading 090 shows
     // an H lying on its side. That is also the cheapest readout of the heading at a glance.
     const html = `<div class="pct-helipad-h" style="transform:rotate(${rot}deg)">H</div>`;
-    if (this.glyph === null) {
-      this.glyph = L.marker(toLatLng(where), {
+    if (e.glyph === undefined) {
+      e.glyph = L.marker(toLatLng(where), {
         icon: L.divIcon({ html, className: "pct-helipad-glyph", iconSize: [24, 24], iconAnchor: [12, 12] }),
         interactive: false,
         keyboard: false,
       }).addTo(this.group);
       return;
     }
-    this.glyph.setLatLng(toLatLng(where));
-    const el = this.glyph.getElement()?.firstElementChild as HTMLElement | undefined;
+    e.glyph.setLatLng(toLatLng(where));
+    const el = e.glyph.getElement()?.firstElementChild as HTMLElement | undefined;
     if (el) el.style.transform = `rotate(${rot}deg)`;
   }
 
   private onZoomEnd = (): void => {
-    if (this.pad !== null) this.layoutGlyph();
+    for (const e of this.entries.values()) this.layoutGlyph(e);
   };
 
-  // ── drag: layer-local preview, one commit on release (the same contract FootprintLayer keeps) ──
+  // ── drag: layer-local preview, one commit on release (the contract every layer here keeps) ──
 
   private static isPrimary(e: L.LeafletMouseEvent): boolean {
     return e.originalEvent.button === 0;
   }
 
-  private onGrab = (e: L.LeafletMouseEvent): void => {
-    if (!HelipadLayer.isPrimary(e) || this.pad === null) return;
+  private onGrab = (id: string, e: L.LeafletMouseEvent): void => {
+    const entry = this.entries.get(id);
+    if (!HelipadLayer.isPrimary(e) || entry === undefined) return;
     this.map.dragging.disable();
-    const at = this.pad.position;
-    this.drag = { mode: "move", startPad: at, startMouse: e.latlng, at, moved: false };
+    const at = entry.pad.position;
+    this.drag = { id, mode: "move", startAt: at, startMouse: e.latlng, at, moved: false };
   };
 
-  private onGrabHandle = (e: L.LeafletMouseEvent): void => {
-    if (!HelipadLayer.isPrimary(e) || this.pad === null) return;
+  private onGrabHandle = (id: string, e: L.LeafletMouseEvent): void => {
+    const entry = this.entries.get(id);
+    if (!HelipadLayer.isPrimary(e) || entry === undefined) return;
     this.map.dragging.disable();
-    const { position, heading } = this.pad;
-    this.drag = { mode: "rotate", at: position, startHeading: heading, heading, moved: false };
+    const { position, heading } = entry.pad;
+    this.drag = { id, mode: "rotate", at: position, startHeading: heading, heading, moved: false };
     // The store isn't touched until release, so without a live readout the angle being dragged to is
-    // invisible. Degrees here are TRUE — the sim shows magnetic, which is why the dialog says so too.
-    this.grip
+    // invisible. Degrees here are TRUE — the sim shows magnetic, which is why the panel says so too.
+    entry.handle
       ?.bindTooltip(`${Math.round(heading)}°`, {
         permanent: true,
         direction: "top",
@@ -281,30 +289,32 @@ export class HelipadLayer {
       .openTooltip();
   };
 
-  private preview(at: LonLat, heading: number): void {
-    this.casing?.setLatLng(toLatLng(at));
-    this.ring?.setLatLng(toLatLng(at));
-    this.tick?.setLatLngs([toLatLng(at), toLatLng(this.tipAt(at, heading))]);
-    this.grip?.setLatLng(toLatLng(this.gripAt(at, heading)));
-    this.layoutGlyph(at, heading);
+  private preview(e: Entry, at: LonLat, heading: number): void {
+    e.casing.setLatLng(toLatLng(at));
+    e.ring.setLatLng(toLatLng(at));
+    e.tick.setLatLngs([toLatLng(at), toLatLng(tipAt(e.pad, at, heading))]);
+    e.handle?.setLatLng(toLatLng(gripAt(e.pad, at, heading)));
+    this.layoutGlyph(e, at, heading);
   }
 
-  private onMouseMove = (e: L.LeafletMouseEvent): void => {
+  private onMouseMove = (ev: L.LeafletMouseEvent): void => {
     const d = this.drag;
-    if (d === null || this.pad === null) return;
+    if (d === null) return;
+    const e = this.entries.get(d.id);
+    if (e === undefined) return;
     d.moved = true;
     if (d.mode === "move") {
       d.at = {
-        lon: d.startPad.lon + (e.latlng.lng - d.startMouse.lng),
-        lat: d.startPad.lat + (e.latlng.lat - d.startMouse.lat),
+        lon: d.startAt.lon + (ev.latlng.lng - d.startMouse.lng),
+        lat: d.startAt.lat + (ev.latlng.lat - d.startMouse.lat),
       };
-      this.preview(d.at, this.pad.heading);
+      this.preview(e, d.at, e.pad.heading);
     } else {
-      let heading = initialBearing(d.at, { lon: e.latlng.lng, lat: e.latlng.lat });
-      if (e.originalEvent.shiftKey) heading = snapAngle(heading, SNAP_DEG);
+      let heading = initialBearing(d.at, { lon: ev.latlng.lng, lat: ev.latlng.lat });
+      if (ev.originalEvent.shiftKey) heading = snapAngle(heading, SNAP_DEG);
       d.heading = heading;
-      this.preview(d.at, heading);
-      this.grip?.setTooltipContent(`${Math.round(heading)}°`);
+      this.preview(e, d.at, heading);
+      e.handle?.setTooltipContent(`${Math.round(heading)}°`);
     }
   };
 
@@ -313,21 +323,37 @@ export class HelipadLayer {
     if (d === null) return;
     this.drag = null;
     this.map.dragging.enable();
+    const e = this.entries.get(d.id);
     // The tooltip belongs to the gesture, not the grip: it goes on ANY release, drag or not.
-    if (d.mode === "rotate") this.grip?.unbindTooltip();
+    if (d.mode === "rotate") e?.handle?.unbindTooltip();
     if (!d.moved) {
-      this.rebuild(); // a click, not a drag — drop any half-applied preview
-      // …and a click on the pad SELECTS it (v1.3), like a click on a footprint. `this.pad` cannot be
-      // null here: a drag only starts on shapes that exist, and sync() clears the drag with them.
-      if (this.pad !== null) this.cb.onSelect(this.pad.id);
+      // A press with no movement: drop any half-applied preview. Selecting is the ring's own `click`
+      // handler's job, not this one's — see build().
+      if (e !== undefined) this.preview(e, e.pad.position, e.pad.heading);
       return;
     }
     if (d.mode === "move") {
       // Wrap only at COMMIT: dragging across the antimeridian stays visually continuous while the value
       // handed to the store is normalised into the range the loader accepts.
-      this.cb.onMove({ lon: wrapLon(d.at.lon), lat: d.at.lat });
+      this.cb.onMove(d.id, { lon: wrapLon(d.at.lon), lat: d.at.lat });
     } else if (d.heading !== d.startHeading) {
-      this.cb.onRotate(d.heading);
+      this.cb.onRotate(d.id, d.heading);
     }
   };
+}
+
+/** The ring's paint, which is what selection changes. One place, so build and restyle cannot drift. */
+function ringStyle(selected: boolean): L.PathOptions {
+  const color = selected ? PAD_SELECTED : PAD_STROKE;
+  return { color, weight: selected ? 3 : 2, fillColor: color, fillOpacity: 0.12 };
+}
+
+/** Where the heading tick ends: on the rim. */
+function tipAt(p: AirportPad, at: LonLat, heading: number): LonLat {
+  return destination(at, p.radius, heading);
+}
+
+/** Where the rotate grip sits: just past the rim, so it never overlaps the pad it turns. */
+function gripAt(p: AirportPad, at: LonLat, heading: number): LonLat {
+  return destination(at, p.radius + HANDLE_MARGIN_M, heading);
 }

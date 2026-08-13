@@ -45,7 +45,7 @@ import {
 import { destination } from "../../core/geo/geo";
 import { lineUp, spaceEvenly } from "../../core/geo/arrange";
 import { DEFAULT_PAD_RADIUS_M } from "../../core/export/planExport";
-import { airportIsBlank, firstPad } from "../../core/project/airport";
+import { airportIsBlank } from "../../core/project/airport";
 import * as mutate from "../../core/project/mutate";
 
 export type Camera = Project["camera"];
@@ -304,11 +304,17 @@ export interface EditorState {
   //    `setAirport` is the dialog's writer (identity and pad together, as typed); the other two are the
   //    MAP's, because the pad is a thing you drag and turn like a footprint.
   setAirport: (airport: ProjectAirport | null) => void;
-  moveAirportPad: (position: LonLat) => void;
-  rotateAirportPad: (heading: number) => void;
+  //    v1.4 (forum #221): every one takes the pad's ID. They defaulted to the first pad while the UI knew
+  //    only one — the model has carried a list since the DATA/HELICOPTER model landed — and an id-less
+  //    call is now a caller that has not said which of N pads it means.
+  moveAirportPad: (id: string, position: LonLat) => void;
+  rotateAirportPad: (id: string, heading: number) => void;
   //    v1.3: the INSPECTOR edits the heliport now (forum #173), so the two fields the dialog used to own
   //    get their own writers rather than going through setAirport with a whole reconstructed block.
-  setAirportPadRadius: (radius: number) => void;
+  setAirportPadRadius: (id: string, radius: number) => void;
+  //    The pad's free name (#221: "the name can be freely assigned"). Empty is legal and the writers
+  //    render it as FATO/TLOF, which is the literal v1.2 and v1.3 always wrote.
+  setAirportPadName: (id: string, name: string) => void;
   setAirportIdentity: (patch: Partial<Pick<ProjectAirport, "icao" | "name" | "country">>) => void;
   //    v1.4 DATA (forum #217/#232, his submenu (1)). `iata` has been in the model and in BOTH writers
   //    since 7b1f38b with nothing on screen able to set it — a field the file could carry and the user
@@ -594,20 +600,17 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
         placeAt: (p) => {
           const spec = get().placing;
           if (spec === null) return;
-          // The pad is not an object: one per project, no catalog entry, no height, never exported into
-          // the cultivation. So it takes the same gesture and a different write, and — unlike the other
-          // kinds — placement DISARMS afterwards, because dropping a second one is not a thing you can
-          // do. Selecting it puts the heliport in the Inspector, which is where the rest of it is set.
+          // The pad is not an object: no catalog entry, no height, never exported into the cultivation.
+          // So it takes the same gesture and a different write.
+          //
+          // ★ It ADDS since v1.4 (forum #221: "this element can now be used as often as desired"; his own
+          // SCLC ships three). Through v1.3 this called `placeAirportPad`, which MOVED the single pad on a
+          // second drop and then disarmed, because a second pad was not a thing that could exist. Now it
+          // behaves like a stand: drop, select the new one, stay armed for the next.
           if (spec.kind === "helipad") {
-            commit((proj) => mutate.placeAirportPad(proj, p, DEFAULT_PAD_RADIUS_M));
-            // Read the id back rather than minting one: placeAirportPad either CREATES the first pad or
-            // MOVES it, so which pad ended up under the click is its answer to give, not ours to assume.
-            const pad = firstPad(get().project.airport);
-            set({
-              placing: null,
-              selection: [],
-              airportSelection: pad === undefined ? null : { kind: "pad", id: pad.id },
-            });
+            const padId = deps.newId();
+            commit((proj) => mutate.addAirportPad(proj, p, DEFAULT_PAD_RADIUS_M, undefined, padId));
+            set({ selection: [], airportSelection: { kind: "pad", id: padId } });
             return;
           }
           // A stand IS repeatable, so it behaves like an object card in every way except where it is
@@ -741,13 +744,25 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
         setAirport: (airport) =>
           commitCoalesced("airport:identity", (proj) => mutate.setAirport(proj, airport)),
         // Coalesced on one key each, like every other map gesture: a drag is dozens of commits and the
-        // undo stack should hold the gesture, not each frame of it.
-        moveAirportPad: (position) =>
-          commitCoalesced("airport:pad:pos", (proj) => mutate.moveAirportPad(proj, position)),
-        rotateAirportPad: (heading) =>
-          commitCoalesced("airport:pad:rot", (proj) => mutate.rotateAirportPad(proj, heading)),
-        setAirportPadRadius: (radius) =>
-          commitCoalesced("airport:pad:radius", (proj) => mutate.setAirportPadRadius(proj, radius)),
+        // undo stack should hold the gesture, not each frame of it. Every key carries the PAD'S ID —
+        // without it, dragging pad A and then pad B would fold into one undo entry and a single Ctrl+Z
+        // would put both back. The keys could be id-less only while there was one pad to drag.
+        moveAirportPad: (id, position) =>
+          commitCoalesced(`airport:pad:pos:${id}`, (proj) =>
+            mutate.moveAirportPad(proj, position, undefined, id),
+          ),
+        rotateAirportPad: (id, heading) =>
+          commitCoalesced(`airport:pad:rot:${id}`, (proj) =>
+            mutate.rotateAirportPad(proj, heading, undefined, id),
+          ),
+        setAirportPadRadius: (id, radius) =>
+          commitCoalesced(`airport:pad:radius:${id}`, (proj) =>
+            mutate.setAirportPadRadius(proj, radius, undefined, id),
+          ),
+        setAirportPadName: (id, name) =>
+          commitCoalesced(`airport:pad:name:${id}`, (proj) =>
+            mutate.setAirportPadName(proj, name, undefined, id),
+          ),
         // Coalesced on ONE key for all three fields, like the dialog's writer was: typing a six-character
         // code must not cost six undo steps, and tabbing from the code to the name is one edit of one
         // thing. A no-op when there is no block — the identity has nowhere to live without a pad, and

@@ -23,7 +23,7 @@ import { directionToWad, formatWad, latToWad, lonToWad } from "../../core/geo/wa
 import { rowAxis } from "../../core/geo/arrange";
 import { editorStore, useEditor } from "../state/editorStore";
 import { HeightControl } from "./HeightControl";
-import { HeliportFields } from "./HeliportFields";
+import { HelipadFields } from "./HelipadFields";
 import { AirportDataFields } from "./AirportDataFields";
 import { NumberInput } from "./NumberInput";
 import { ParkingFields } from "./ParkingFields";
@@ -792,9 +792,10 @@ export function Inspector(): React.ReactElement {
   // The helipad is not in `objects`, so it is not in `selection` either — it has its own field. Guarded
   // on the block still existing: undoing the placement leaves the selection set for one render otherwise,
   // and the panel would be editing an airport that is no longer there.
-  const airport = useEditor((s) =>
-    s.airportSelection?.kind === "pad" ? s.project.airport : undefined,
-  );
+  const pad = useEditor((s) => {
+    const sel = s.airportSelection;
+    return sel?.kind === "pad" ? s.project.airport?.pads.find((p) => p.id === sel.id) : undefined;
+  });
   // The airport ITSELF (his submenu (1) DATA), which is the one airport selection that names no part and
   // so carries no id. Same guard as the others: the block may already be gone while the selection still
   // points at it for one render.
@@ -845,8 +846,10 @@ export function Inspector(): React.ReactElement {
       <h2 className="pct-panel-title">Inspector</h2>
       {airportData !== undefined ? (
         <AirportDataFields airport={airportData} />
-      ) : airport !== undefined ? (
-        <HeliportFields airport={airport} />
+      ) : pad !== undefined ? (
+        // Keyed by id like every other repeatable part's panel: the numeric drafts reset when the
+        // selection moves to another pad, and editing THIS one keeps the panel alive.
+        <HelipadFields key={pad.id} pad={pad} />
       ) : parking !== undefined ? (
         // Keyed by id for the same reason ObjectFields is: every numeric draft resets when the selection
         // moves to another stand, but editing THIS one keeps the panel alive.

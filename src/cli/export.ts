@@ -16,7 +16,6 @@ import os from "node:os";
 import path from "node:path";
 import type { ExportPlan, Project } from "../core/project/types";
 import { DEFAULT_PAD_RADIUS_M, planExport } from "../core/export/planExport";
-import { firstPad } from "../core/project/airport";
 import { directionToHeading } from "../core/geo/orientation";
 import {
   NeedsElevationError,
@@ -163,11 +162,14 @@ function main(): number {
     throw e;
   }
 
-  // The pad. The project's own (v1.2's airport block) wins; `--helipad-object` is the older way of
-  // saying "put it where that object is", kept because the gate scripts use it — and it now COPIES the
-  // object's position and heading into a pad of its own rather than leaving the pad bound to the object
-  // (forum #168: a bound pad spawns the helicopter inside the XREF it borrowed its coordinates from).
-  let pad = firstPad(project.airport) ?? null;
+  // The pads. The project's own (v1.2's airport block) win, ALL of them — a project can hold several
+  // since forum #221, and taking only the first here would have dropped the rest without a word.
+  // `--helipad-object` is the older way of saying "put it where that object is", kept because the gate
+  // scripts use it; it COPIES the object's position and heading into a pad of its own rather than
+  // leaving the pad bound to the object (forum #168: a bound pad spawns the helicopter inside the XREF
+  // it borrowed its coordinates from), and it REPLACES the list, because naming one object is naming
+  // one pad.
+  let pads = project.airport?.pads ?? [];
   if (args.heliportObjectId !== null) {
     const o = project.objects.find((x) => x.id === args.heliportObjectId);
     if (o === undefined) {
@@ -178,13 +180,15 @@ function main(): number {
       o.kind === "xref" ? directionToHeading(o.direction) : o.kind === "airport_light" ? o.orientation : 0;
     // Built here and thrown away — it is never stored, so the id only has to be non-empty, and a fixed
     // one keeps two runs of the same command byte-identical.
-    pad = { id: "cli-pad", name: "", position: o.position, heading, radius: args.heliportRadius };
-  } else if (pad !== null && args.heliportRadius !== DEFAULT_PAD_RADIUS_M) {
-    pad = { ...pad, radius: args.heliportRadius }; // an explicit --heliport-radius overrides the stored one
+    pads = [{ id: "cli-pad", name: "", position: o.position, heading, radius: args.heliportRadius }];
+  } else if (args.heliportRadius !== DEFAULT_PAD_RADIUS_M) {
+    // An explicit --heliport-radius overrides the stored one — on EVERY pad, since the flag names a size
+    // and not a pad. Silently resizing only the first would be the same bug in a smaller place.
+    pads = pads.map((p) => ({ ...p, radius: args.heliportRadius }));
   }
 
   const plan = planExport(project, resolved, {
-    heliport: args.heliport ? { pads: pad === null ? [] : [pad], radiusM: args.heliportRadius } : undefined,
+    heliport: args.heliport ? { pads, radiusM: args.heliportRadius } : undefined,
   });
   for (const w of plan.warnings) console.warn(`WARNING: ${w}`);
 

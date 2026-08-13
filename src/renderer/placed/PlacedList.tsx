@@ -18,7 +18,7 @@ import {
   WinchIcon,
 } from "../catalog/categoryIcon";
 import { photoKeyForPlaced as placedPhotoKey } from "../../core/catalog/photoKey";
-import { PARKING_TYPE_LABELS, firstPad } from "../../core/project/airport";
+import { PARKING_TYPE_LABELS } from "../../core/project/airport";
 import { haversine, initialBearing } from "../../core/geo/geo";
 import { rowInfo } from "./rowInfo";
 
@@ -66,49 +66,58 @@ function DataRow(): React.ReactElement | null {
   );
 }
 
-/** The helipad's row, pinned above the objects (v1.3, forum #173: "which is then listed on the right for
- *  editing"). It is NOT one of the objects and does not join their count — there is exactly one, it never
- *  goes into the cultivation, and Duplicate means nothing for it — so it gets its own row above the list
- *  rather than a place in it. Click selects, double-click flies, and the Inspector shows the heliport. */
-function HelipadRow(): React.ReactElement | null {
-  const airport = useEditor((s) => s.project.airport);
-  const selected = useEditor((s) => s.airportSelection?.kind === "pad");
-  if (airport === undefined) return null;
-  const { icao, name } = airport;
-  // One row for one pad — the v1.3 shape. A pad-less airport has no row to draw (airport.ts), and the
-  // repeatable HELICOPTER menu (forum #219/#221) is what turns this into one row per pad.
-  const pad = firstPad(airport);
-  if (pad === undefined) return null;
+/** One row per helicopter start pad (v1.3, forum #173: "which is then listed on the right for editing";
+ *  a LIST since #221). They are NOT objects and do not join their count — none of them goes into the
+ *  cultivation and Duplicate means nothing for them — so they sit above the list rather than in it.
+ *
+ *  The label is the pad's own name, not the airport's. Through v1.3 it showed the AIRPORT's name and code
+ *  here, which was the same shortcut the pad panel took: with one pad you cannot tell the two apart. With
+ *  three you can, and the airport's name belongs to the Data row above. */
+function HelipadRows(): React.ReactElement | null {
+  const pads = useEditor((s) => s.project.airport?.pads);
+  const selectedId = useEditor((s) =>
+    s.airportSelection?.kind === "pad" ? s.airportSelection.id : null,
+  );
+  if (pads === undefined || pads.length === 0) return null;
   return (
-    <button
-      type="button"
-      className={selected ? "pct-placed-row pct-placed-pad sel" : "pct-placed-row pct-placed-pad"}
-      aria-pressed={selected}
-      title="The helicopter's start pad"
-      onClick={() => editorStore.getState().selectAirportPart({ kind: "pad", id: pad.id })}
-      onDoubleClick={() => editorStore.getState().flyTo(pad.position)}
-    >
-      <HelipadIcon />
-      <span className="pct-placed-text">
-        <span className="pct-placed-name">
-          <span className="pct-placed-label">
-            {name.trim() === "" ? "Start - Helicopter" : name.trim()}
-          </span>
-          {icao.trim() !== "" && <span className="pct-placed-code">{icao.toUpperCase()}</span>}
-        </span>
-        <span className="pct-placed-meta">
-          lon {pad.position.lon.toFixed(6)} · lat {pad.position.lat.toFixed(6)} ·{" "}
-          {Math.round(pad.heading)}°
-        </span>
-      </span>
-    </button>
+    <>
+      {pads.map((pad) => {
+        const selected = pad.id === selectedId;
+        return (
+          <button
+            key={pad.id}
+            type="button"
+            className={selected ? "pct-placed-row pct-placed-pad sel" : "pct-placed-row pct-placed-pad"}
+            aria-pressed={selected}
+            title="A helicopter start pad"
+            onClick={() => editorStore.getState().selectAirportPart({ kind: "pad", id: pad.id })}
+            onDoubleClick={() => editorStore.getState().flyTo(pad.position)}
+          >
+            <HelipadIcon />
+            <span className="pct-placed-text">
+              <span className="pct-placed-name">
+                <span className="pct-placed-label">
+                  {pad.name.trim() === "" ? "Start - Helicopter" : pad.name.trim()}
+                </span>
+                <span className="pct-placed-code">{pad.radius} m</span>
+              </span>
+              <span className="pct-placed-meta">
+                lon {pad.position.lon.toFixed(6)} · lat {pad.position.lat.toFixed(6)} ·{" "}
+                {Math.round(pad.heading)}°
+              </span>
+            </span>
+          </button>
+        );
+      })}
+    </>
   );
 }
 
-/** One row per parking position, pinned with the pad above the objects and for the same reasons: a stand
+/** One row per parking position, pinned with the pads above the objects and for the same reasons: a stand
  *  is not an object, never joins their count, never goes into the cultivation, and Duplicate means
- *  nothing for it. Repeatable, though — "any number of parking positions can be created" (forum #232) —
- *  so unlike the pad this is a list, and it is the shape the other four kinds will take. */
+ *  nothing for it. This was the FIRST of the repeatable kinds to be built ("any number of parking
+ *  positions can be created", forum #232) and the other four followed its shape — the pad last, because
+ *  it was the one that already existed as a singleton. */
 function ParkingRows(): React.ReactElement | null {
   const parkings = useEditor((s) => s.project.airport?.parkings);
   const selectedId = useEditor((s) =>
@@ -303,7 +312,7 @@ export function PlacedList(): React.ReactElement {
 
       <div className="pct-placed-list">
         <DataRow />
-        <HelipadRow />
+        <HelipadRows />
         <RunwayRows />
         <ParkingRows />
         <GliderRows />

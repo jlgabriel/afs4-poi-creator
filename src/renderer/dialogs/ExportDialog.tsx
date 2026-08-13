@@ -12,7 +12,6 @@ import { shiftEastNorth } from "../../core/geo/geo";
 import { centroid, poiFolderName } from "../../core/geo/poiName";
 import { unsupportedInAutoheight } from "../../core/export/heights";
 import { firstProjectError, isExportablePoiName } from "../../core/project/schemas";
-import { firstPad } from "../../core/project/airport";
 import { editorStore, useEditor } from "../state/editorStore";
 import { getPct } from "../app/pct";
 import { unregisteredPlacedNames } from "../catalog/registration";
@@ -120,6 +119,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }): React.ReactE
   // The project's helipad, if it has one — set in "Create heliport…" and drawn on the map. The templates
   // describe THAT pad, so the two routes can never disagree about where the helicopter starts.
   const storeAirport = useEditor((s) => s.project.airport);
+  const padCount = storeAirport?.pads.length ?? 0;
 
   const [slug, setSlug] = useState(storePoiName);
   const [refMode, setRefMode] = useState<"auto" | "map">(storeRef !== null ? "map" : "auto");
@@ -378,12 +378,11 @@ export function ExportDialog({ onClose }: { onClose: () => void }): React.ReactE
               </label>
               {heliport && (
                 <>
-                  {firstPad(storeAirport) !== undefined ? (
+                  {padCount > 0 ? (
                     <span className="pct-field-meta">
-                      Uses this project&apos;s helipad — the white circle on the map, radius{" "}
-                      {firstPad(storeAirport)?.radius} m, heading{" "}
-                      {Math.round(firstPad(storeAirport)?.heading ?? 0)}° true. Drag it on the map, or
-                      select it to edit it in the Inspector.
+                      Uses this project&apos;s{" "}
+                      {padCount === 1 ? "helipad — the white circle" : `${padCount} helipads — the white circles`}{" "}
+                      on the map. Drag one to move it, or select it to edit it in the Inspector.
                     </span>
                   ) : (
                     <>

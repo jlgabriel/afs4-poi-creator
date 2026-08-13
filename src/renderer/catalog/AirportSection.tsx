@@ -49,7 +49,7 @@ export function AirportSection(): React.ReactElement {
   // airport part on the map is the user asking for the airport in as many words), so keying this off the
   // block made the card claim "already placed" for a project whose only airport part was a stand.
   // Spotted on screen in the preview harness, not by a test.
-  const hasPad = useEditor((s) => (s.project.airport?.pads.length ?? 0) > 0);
+  const padCount = useEditor((s) => s.project.airport?.pads.length ?? 0);
   const hasAirport = useEditor((s) => s.project.airport !== undefined);
   const airportIcao = useEditor((s) => s.project.airport?.icao.trim() ?? "");
   const standCount = useEditor((s) => s.project.airport?.parkings?.length ?? 0);
@@ -145,21 +145,19 @@ export function AirportSection(): React.ReactElement {
             type="button"
             className={padArmed ? "pct-obj-card armed" : "pct-obj-card"}
             aria-pressed={padArmed}
-            title={
-              hasPad
-                ? "Move the helicopter's start pad — click the map to put it somewhere else"
-                : "Where a flight starts. Click, then click the map"
-            }
+            title="Where a helicopter flight starts. Click, then click the map"
             onClick={armPad}
           >
             <HelipadIcon />
             <span className="pct-obj-text">
               <span className="pct-obj-name">Start - Helicopter</span>
-              {/* The subtitle carries the one thing that is different from every other card: there is
-                  only ever one, so a second click relocates rather than adds. Saying it here is cheaper
-                  than letting someone discover it by placing a second pad that never appears. */}
+              {/* It said "already placed · click the map to move it" until #221 made the element
+                  repeatable. A card that still said that would be describing the v1.3 model, and the
+                  count is the thing that tells you it is not. */}
               <span className="pct-obj-cat">
-                {hasPad ? "already placed · click the map to move it" : "the helicopter's start pad"}
+                {padCount === 0
+                  ? "the helicopter's start pad"
+                  : `${padCount} placed · click the map to add another`}
               </span>
             </span>
           </button>

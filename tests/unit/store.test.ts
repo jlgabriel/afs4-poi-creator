@@ -179,32 +179,99 @@ describe("placeAt — the helipad (v1.3)", () => {
     expect(st.project.airport?.pad).toEqual(pad); // the compat mirror rides along
   });
 
-  it("disarms and selects the pad — there is only one, so multi-drop is meaningless", () => {
+  it("selects the pad it just dropped, and clears any object selection", () => {
     const { store } = makeStore();
     store.getState().armPlacement({ kind: "helipad" });
     store.getState().placeAt({ lon: 10, lat: 48 });
     const st = store.getState();
-    expect(st.placing).toBeNull();
-    // v1.4: the selection names WHICH pad, and the id has to be the one actually in the document —
-    // placeAirportPad may have moved an existing pad rather than created one.
     expect(st.airportSelection).toEqual({ kind: "pad", id: st.project.airport?.pads[0]?.id });
     // …and that id is a real one, so the assertion above is not two undefineds agreeing.
     expect(st.project.airport?.pads[0]?.id).toBeTruthy();
     expect(st.selection).toEqual([]);
   });
 
-  it("placing again MOVES the pad and keeps the identity typed in between", () => {
+  // v1.4, forum #221: "this element can now be used as often as desired". Until then a second drop MOVED
+  // the one pad, because a second pad was not a thing that could exist. His own SCLC ships three.
+  it("placing again APPENDS a pad and keeps the identity typed in between", () => {
     const { store } = makeStore();
     store.getState().armPlacement({ kind: "helipad" });
     store.getState().placeAt({ lon: 10, lat: 48 });
     store.getState().setAirportIdentity({ icao: "pct001", name: "Roof", country: "cl" });
-    store.getState().armPlacement({ kind: "helipad" });
-    store.getState().placeAt({ lon: 11, lat: 49 });
+    store.getState().placeAt({ lon: 11, lat: 49 }); // still armed — no re-arm needed
     const a = store.getState().project.airport;
-    expect(store.getState().project.objects).toHaveLength(0); // never a second pad
-    expect(a?.pads[0]?.position).toEqual({ lon: 11, lat: 49 });
-    expect(a?.pads).toHaveLength(1); // moved, not appended
+    expect(store.getState().project.objects).toHaveLength(0); // a pad is never an object
+    expect(a?.pads).toHaveLength(2);
+    expect(a?.pads[0]?.position).toEqual({ lon: 10, lat: 48 }); // the first one stayed put
+    expect(a?.pads[1]?.position).toEqual({ lon: 11, lat: 49 });
     expect(a).toMatchObject({ icao: "pct001", name: "Roof", country: "cl" });
+  });
+
+  it("a pad drops like a stand — selected, and STILL armed for the next", () => {
+    const { store } = makeStore();
+    store.getState().armPlacement({ kind: "helipad" });
+    store.getState().placeAt({ lon: 10, lat: 48 });
+    const st = store.getState();
+    expect(st.placing).toEqual({ kind: "helipad" });
+    expect(st.airportSelection).toEqual({ kind: "pad", id: st.project.airport?.pads[0]?.id });
+  });
+
+  it("each pad moves, turns and resizes on its own", () => {
+    const { store } = makeStore();
+    store.getState().armPlacement({ kind: "helipad" });
+    store.getState().placeAt({ lon: 10, lat: 48 });
+    store.getState().placeAt({ lon: 11, lat: 49 });
+    const [a, b] = store.getState().project.airport?.pads ?? [];
+    if (a === undefined || b === undefined) throw new Error("expected two pads");
+
+    store.getState().moveAirportPad(b.id, { lon: 12, lat: 50 });
+    store.getState().rotateAirportPad(b.id, 90);
+    store.getState().setAirportPadRadius(b.id, 25);
+    store.getState().setAirportPadName(b.id, "Helipad_W1");
+
+    const pads = store.getState().project.airport?.pads ?? [];
+    expect(pads[0]).toMatchObject({ position: { lon: 10, lat: 48 }, heading: 0, radius: 10, name: "" });
+    expect(pads[1]).toMatchObject({
+      position: { lon: 12, lat: 50 },
+      heading: 90,
+      radius: 25,
+      name: "Helipad_W1",
+    });
+  });
+
+  it("dragging pad A then pad B is TWO undo entries, not one", () => {
+    const { store } = makeStore();
+    store.getState().armPlacement({ kind: "helipad" });
+    store.getState().placeAt({ lon: 10, lat: 48 });
+    store.getState().placeAt({ lon: 11, lat: 49 });
+    const [a, b] = store.getState().project.airport?.pads ?? [];
+    if (a === undefined || b === undefined) throw new Error("expected two pads");
+
+    store.getState().moveAirportPad(a.id, { lon: 10.5, lat: 48.5 });
+    store.getState().moveAirportPad(b.id, { lon: 11.5, lat: 49.5 });
+    // One Ctrl+Z puts back only B — the coalesce key carries the pad id, so the two drags are two
+    // gestures. With a shared key they folded into one entry and a single undo moved both.
+    store.getState().undo();
+    const pads = store.getState().project.airport?.pads ?? [];
+    expect(pads[1]?.position).toEqual({ lon: 11, lat: 49 });
+    expect(pads[0]?.position).toEqual({ lon: 10.5, lat: 48.5 });
+  });
+
+  it("deleting one pad leaves the others alone", () => {
+    const { store } = makeStore();
+    store.getState().armPlacement({ kind: "helipad" });
+    store.getState().placeAt({ lon: 10, lat: 48 });
+    store.getState().placeAt({ lon: 11, lat: 49 });
+    store.getState().placeAt({ lon: 12, lat: 50 });
+    const pads = store.getState().project.airport?.pads ?? [];
+    const middle = pads[1];
+    if (middle === undefined) throw new Error("expected three pads");
+
+    store.getState().selectAirportPart({ kind: "pad", id: middle.id });
+    store.getState().deleteSelection();
+
+    const left = store.getState().project.airport?.pads ?? [];
+    expect(left).toHaveLength(2);
+    expect(left.map((p) => p.position.lon)).toEqual([10, 12]);
   });
 
   // The bug the preview harness caught: this is the one selection write that does not go through
@@ -218,7 +285,9 @@ describe("placeAt — the helipad (v1.3)", () => {
     store.getState().placeAt({ lon: 10.1, lat: 48.1 });
     const st = store.getState();
     expect(st.airportSelection).toBeNull();
-    expect(st.selection).toEqual(["id0"]);
+    // id1, not id0: the pad above minted id0 from the same counter, because a pad carries an id of its
+    // own now rather than being read back off `pads[0]`.
+    expect(st.selection).toEqual(["id1"]);
   });
 
   it("selecting an object and selecting the pad are mutually exclusive", () => {

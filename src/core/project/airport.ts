@@ -5,13 +5,14 @@
 // would mean the app agreed with a shape it is supposed to be migrating away from, and would quietly
 // keep working on one pad while `pads` grew a second.
 //
-// The v1.3 UI still shows exactly ONE pad — the reworked AIRPORT menu (forum #219/#221, where HELICOPTER
-// becomes repeatable) is what turns these into list rendering. Until then `firstPad` is the honest name
-// for what that UI means, and it is greppable when the time comes.
+// ★ `firstPad()` USED TO LIVE HERE and is gone (v1.4, forum #221). It was the honest name for what a
+// one-pad UI meant while the model already held a list, and it was written to be greppable for the day
+// the UI caught up. That day came: the catalog card adds instead of moving, the list draws one row per
+// pad, the map draws them all and the Inspector edits the selected one — so every caller became a list
+// or an id, and the last one to go was the CLI, which had been exporting pad one and dropping the rest.
 
 import type {
   AirportAerotow,
-  AirportPad,
   AirportParking,
   AirportRunway,
   AirportWinch,
@@ -19,12 +20,6 @@ import type {
   ParkingType,
   ProjectAirport,
 } from "./types";
-
-/** The pad a single-pad UI means: the first one, or undefined for an airport with none (legal — his
- *  "(1) DATA" example is identity plus a database entry and no pads at all). */
-export function firstPad(airport: ProjectAirport | undefined): AirportPad | undefined {
-  return airport?.pads[0];
-}
 
 /** Where the AIRPORT itself sits.
  *
