@@ -57,15 +57,9 @@ export function winchesOf(airport: ProjectAirport | undefined): AirportWinch[] {
 
 /** Whether the airport block holds no geometry at all: no pads, no stands, no runways, no glider starts.
  *
- *  Such a block is INVISIBLE — nothing draws it on the map and no Inspector panel opens on it — so the UI
- *  treats reaching this state as "the airport is gone" and drops the block, identity and all. That is
- *  exactly what v1.3's Del-on-the-pad did back when a pad was the only thing an airport could hold; this
- *  is the same behaviour, stated as the rule it always was. Leaving an empty block behind would give the
- *  user an airport they can neither see, edit, nor delete.
- *
- *  Note it is not the same as "the writers would emit nothing": an identity-only airport is still a legal
- *  DOCUMENT (his "(1) DATA" example is exactly that), which is why this lives here as a UI question and
- *  not as a validation rule. */
+ *  Not the same as "the writers would emit nothing": an identity-only airport is still a legal DOCUMENT —
+ *  his "(1) DATA" example is exactly that — which is why this lives here as a UI question and not as a
+ *  validation rule. */
 export function airportIsEmpty(airport: ProjectAirport): boolean {
   return (
     airport.pads.length === 0 &&
@@ -73,6 +67,26 @@ export function airportIsEmpty(airport: ProjectAirport): boolean {
     runwaysOf(airport).length === 0 &&
     aerotowsOf(airport).length === 0 &&
     winchesOf(airport).length === 0
+  );
+}
+
+/** Whether the block holds nothing at all — no geometry AND nothing typed into it. This is what the UI
+ *  treats as "the airport is gone": deleting the last part of a never-named airport takes the block with
+ *  it, which is what v1.3's Del-on-the-pad felt like when a pad was all an airport could hold.
+ *
+ *  ★ WHY THE IDENTITY IS PART OF THE TEST, since v1.4's DATA submenu (forum #217/#232). Before it, the
+ *  identity could only be reached through the pad's panel, so a block with no geometry was a block the
+ *  user could neither see nor edit and dropping it was a kindness. The Data row changes that: an
+ *  identity-only airport now has a row, a panel and a Del of its own. Keeping the old test would mean
+ *  deleting the last stand silently threw away a code the user had typed — and undo is not an answer to
+ *  a deletion nobody asked for. */
+export function airportIsBlank(airport: ProjectAirport): boolean {
+  return (
+    airportIsEmpty(airport) &&
+    airport.icao.trim() === "" &&
+    airport.name.trim() === "" &&
+    airport.country.trim() === "" &&
+    (airport.iata ?? "").trim() === ""
   );
 }
 

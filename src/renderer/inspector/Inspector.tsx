@@ -24,6 +24,7 @@ import { rowAxis } from "../../core/geo/arrange";
 import { editorStore, useEditor } from "../state/editorStore";
 import { HeightControl } from "./HeightControl";
 import { HeliportFields } from "./HeliportFields";
+import { AirportDataFields } from "./AirportDataFields";
 import { NumberInput } from "./NumberInput";
 import { ParkingFields } from "./ParkingFields";
 import { RunwayFields } from "./RunwayFields";
@@ -794,6 +795,12 @@ export function Inspector(): React.ReactElement {
   const airport = useEditor((s) =>
     s.airportSelection?.kind === "pad" ? s.project.airport : undefined,
   );
+  // The airport ITSELF (his submenu (1) DATA), which is the one airport selection that names no part and
+  // so carries no id. Same guard as the others: the block may already be gone while the selection still
+  // points at it for one render.
+  const airportData = useEditor((s) =>
+    s.airportSelection?.kind === "data" ? s.project.airport : undefined,
+  );
   // Select the object REFERENCE directly — stable across unrelated store changes (no re-render on pan).
   const obj = useEditor((s) =>
     s.selection.length === 1 ? s.project.objects.find((o) => o.id === s.selection[0]) : undefined,
@@ -806,33 +813,39 @@ export function Inspector(): React.ReactElement {
   );
   // Same guard as the pad's, for the same reason: the stand may already be gone (undo, or a delete from
   // the list) while the selection still names it for one render.
-  const parking = useEditor((s) =>
-    s.airportSelection?.kind === "parking"
-      ? s.project.airport?.parkings?.find((p) => p.id === s.airportSelection?.id)
-      : undefined,
-  );
-  const runway = useEditor((s) =>
-    s.airportSelection?.kind === "runway"
-      ? s.project.airport?.runways?.find((r) => r.id === s.airportSelection?.id)
-      : undefined,
-  );
-  const aerotow = useEditor((s) =>
-    s.airportSelection?.kind === "aerotow"
-      ? s.project.airport?.aerotows?.find((a) => a.id === s.airportSelection?.id)
-      : undefined,
-  );
-  const winch = useEditor((s) =>
-    s.airportSelection?.kind === "winch"
-      ? s.project.airport?.winches?.find((w) => w.id === s.airportSelection?.id)
-      : undefined,
-  );
+  //
+  // Each of these reads the selection into a local first. Not style: `{ kind: "data" }` carries no id, so
+  // `s.airportSelection?.id` inside the callback no longer typechecks — and the local is what lets TS see
+  // that past the kind test there IS one.
+  const parking = useEditor((s) => {
+    const sel = s.airportSelection;
+    return sel?.kind === "parking"
+      ? s.project.airport?.parkings?.find((p) => p.id === sel.id)
+      : undefined;
+  });
+  const runway = useEditor((s) => {
+    const sel = s.airportSelection;
+    return sel?.kind === "runway" ? s.project.airport?.runways?.find((r) => r.id === sel.id) : undefined;
+  });
+  const aerotow = useEditor((s) => {
+    const sel = s.airportSelection;
+    return sel?.kind === "aerotow"
+      ? s.project.airport?.aerotows?.find((a) => a.id === sel.id)
+      : undefined;
+  });
+  const winch = useEditor((s) => {
+    const sel = s.airportSelection;
+    return sel?.kind === "winch" ? s.project.airport?.winches?.find((w) => w.id === sel.id) : undefined;
+  });
   const plantMeta = useEditor((s) => (obj?.kind === "plant" ? s.plantIndex.get(plantKey(obj)) : undefined));
   const resolvedAsl = useEditor((s) => (obj ? s.resolvedElev.get(obj.id) : undefined));
 
   return (
     <aside className="pct-inspector">
       <h2 className="pct-panel-title">Inspector</h2>
-      {airport !== undefined ? (
+      {airportData !== undefined ? (
+        <AirportDataFields airport={airportData} />
+      ) : airport !== undefined ? (
         <HeliportFields airport={airport} />
       ) : parking !== undefined ? (
         // Keyed by id for the same reason ObjectFields is: every numeric draft resets when the selection

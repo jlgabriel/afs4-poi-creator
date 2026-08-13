@@ -278,7 +278,11 @@ export function HeliportDialog({ onClose }: { onClose: () => void }): React.Reac
                   </ul>
                   {problem !== null && (
                     <span className="pct-warn">
-                      {identityProblemText(problem)} Select the helipad and fix it in the Inspector.
+                      {/* "Select the helipad" was the old address of these fields and could be a dead
+                          end: a project whose only airport part was a stand had no helipad to select.
+                          They live in Data now, which is in the list whenever the airport is. */}
+                      {identityProblemText(problem)} Select <strong>Data</strong> in the list on the
+                      right and fix it in the Inspector.
                     </span>
                   )}
                 </div>

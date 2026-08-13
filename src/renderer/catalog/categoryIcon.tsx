@@ -213,6 +213,30 @@ export const CategoryIcon = memo(function CategoryIcon({
   );
 });
 
+/** The airport's identity — his submenu (1) DATA (v1.4, forum #217/#232). Deliberately NOT a circle like
+ *  the helipad's and the stand's: those two are things you put somewhere on the map, and this one is the
+ *  record behind them. It is drawn as a card with two lines of writing on it, which is what the panel it
+ *  opens actually is — a name and a code. His own description of the submenu is the database entry, and a
+ *  pictogram that promised a point on the map would be promising a gesture this card does not have. */
+export const DataIcon = memo(function DataIcon(): React.ReactElement {
+  return (
+    <svg
+      className="pct-thumb"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <line x1="7" y1="10" x2="17" y2="10" />
+      <line x1="7" y1="14" x2="13" y2="14" />
+    </svg>
+  );
+});
+
 /** The helipad (v1.3). It gets its own export rather than an ICONS entry because it is keyed by nothing
  *  — there is no catalog category behind it; the pad is PCT's own idea of a start position, not an
  *  object from the install. Same 0 0 24 24 line style as every glyph above, deliberately: the first cut

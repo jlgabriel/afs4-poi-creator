@@ -1,5 +1,4 @@
-// HeliportFields.tsx — the Inspector's panel for the helipad: where the helicopter starts, and which
-// airport it belongs to.
+// HeliportFields.tsx — the Inspector's panel for the helipad: where the helicopter starts.
 //
 // WHY IT EXISTS (forum #173, ApfelFlieger). Through v1.2 the whole heliport lived in a modal: you opened
 // "Create HELIPORT…" to place the pad, to type the code, to move it, to install it. He asked for the pad
@@ -7,49 +6,17 @@
 // every other thing in PCT works — and he is right that a full-screen overlay is a bad place to edit
 // something you have to see on the map to judge. The dialog covers the map; this panel does not.
 //
-// So the whole heliport is HERE now: the pad's geometry and the airport's identity. The dialog keeps
-// exactly one job, the one that writes to disk.
-//
-// The identity is not really a property of the PAD — it belongs to the airport the pad sits in. But a
-// project has exactly one airport, so the pad IS the airport as far as anyone using this can tell, and
-// splitting the two across two panels would be a distinction drawn for the code's benefit.
-import { useEffect, useState } from "react";
+// ★ WHAT LEFT THIS PANEL, and why. Until v1.4 this also held the airport's identity — code, name, country
+// — and the Install button, on the reasoning that "a project has exactly one airport, so the pad IS the
+// airport as far as anyone using this can tell". His submenu (1) DATA (forum #217/#232) says otherwise
+// and so does the model: pads are repeatable now, and one code shown inside N pad panels reads as N
+// codes. All of it moved to AirportDataFields, which is also the door a project with no pad at all can
+// use — there was none before, and a parking-only project could not be given a code.
 import type { ProjectAirport } from "../../core/project/types";
-import type { IcaoStatus } from "../../shared/pctApi";
 import { clampLonLat } from "../../core/project/schemas";
 import { firstPad } from "../../core/project/airport";
-import { identityProblemText, validateIdentity, SNAME_MAX } from "../../core/export/heliportTemplate";
 import { editorStore, useEditor } from "../state/editorStore";
-import { getPct } from "../app/pct";
 import { NumberInput } from "./NumberInput";
-
-/** Ask the dialog to open. Same channel the photo menu uses for Settings (`pct:open-settings`): the
- *  dialog's open flag is AppShell's local state and this panel is not its child, so a window event is
- *  the established way across rather than threading a prop through three components. */
-function openInstallDialog(): void {
-  window.dispatchEvent(new Event("pct:open-heliport"));
-}
-
-/** Live availability of the typed code on THIS machine. Convenience only — the install re-checks at the
- *  write boundary, so a stale answer here costs nothing (see main/icaoIndex). */
-function useIcaoStatus(icao: string, wellFormed: boolean): IcaoStatus {
-  const pct = getPct();
-  const [status, setStatus] = useState<IcaoStatus>({ taken: false, ours: [] });
-  useEffect(() => {
-    let cancelled = false;
-    if (pct === null || !wellFormed) {
-      setStatus({ taken: false, ours: [] });
-      return;
-    }
-    void pct.icaoStatus(icao).then((s) => {
-      if (!cancelled) setStatus(s);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [pct, icao, wellFormed]);
-  return status;
-}
 
 const fmtDeg = (n: number): string => n.toFixed(6);
 
@@ -62,17 +29,6 @@ export function HeliportFields({ airport }: { airport: ProjectAirport }): React.
   const pad = firstPad(airport);
   const heightMode = useEditor((s) => s.project.heightMode) ?? "baked-asl";
 
-  const identity = {
-    icao: airport.icao.trim().toLowerCase(),
-    name: airport.name,
-    country: airport.country.trim().toLowerCase(),
-  };
-  const problem = validateIdentity(identity);
-  const status = useIcaoStatus(identity.icao, problem !== "icao-format");
-  const replacing = status.ours.length > 0;
-
-  // AFTER every hook, never before one: an early return above `useIcaoStatus` would call a different
-  // number of hooks on different renders, which is the one thing React does not allow.
   if (pad === undefined) return null;
 
   return (
@@ -138,73 +94,6 @@ export function HeliportFields({ airport }: { airport: ProjectAirport }): React.
         {pad.radius} m shows there as a size of {Math.round(pad.radius * 2)} m.
       </span>
 
-      <div className="pct-field pct-field-col">
-        <span className="pct-field-label">Airport</span>
-        <span className="pct-field-meta">
-          What this becomes in Aerofly. Needed before you can install it; not needed to move the pad
-          around.
-        </span>
-      </div>
-
-      <label className="pct-field pct-field-col">
-        <span className="pct-field-label">Code</span>
-        {/* Shown in CAPITALS (forum #170 EDIT 2) and, since v1.2.1, written that way into the .tsc and
-            the .wad too — the file NAMES stay lowercase, which is what Aerofly does with its own. */}
-        <input
-          className="pct-num"
-          value={airport.icao.toUpperCase()}
-          placeholder="4-6 letters or digits, e.g. PCT001"
-          aria-label="Airport code"
-          onChange={(e) => store().setAirportIdentity({ icao: e.target.value.trim().toLowerCase() })}
-        />
-        {airport.icao.trim() !== "" && problem === "icao-format" && (
-          <span className="pct-warn">{identityProblemText("icao-format")}</span>
-        )}
-        {problem !== "icao-format" && status.taken && (
-          <span className="pct-warn">
-            {identity.icao.toUpperCase()} is already an airport on this machine. Using it would make that
-            airport disappear — pick another code.
-          </span>
-        )}
-        {problem !== "icao-format" && !status.taken && replacing && (
-          <span className="pct-field-meta">
-            You already installed {identity.icao.toUpperCase()} — installing again replaces it.
-          </span>
-        )}
-        {problem !== "icao-format" && !status.taken && !replacing && airport.icao.trim() !== "" && (
-          <span className="pct-field-meta">Free on this machine.</span>
-        )}
-      </label>
-
-      <label className="pct-field pct-field-col">
-        <span className="pct-field-label">Name — shown in LOCATION</span>
-        <input
-          className="pct-text"
-          value={airport.name}
-          maxLength={SNAME_MAX}
-          placeholder="e.g. Daggett Helipad"
-          aria-label="Heliport name"
-          onChange={(e) => store().setAirportIdentity({ name: e.target.value })}
-        />
-        <span className="pct-field-meta">
-          {airport.name.trim().length}/{SNAME_MAX} — Aerofly drops the whole airport above its limit.
-        </span>
-      </label>
-
-      <label className="pct-field pct-field-col">
-        <span className="pct-field-label">Country code</span>
-        <input
-          className="pct-num"
-          value={airport.country}
-          placeholder="two letters, e.g. us"
-          aria-label="Country code"
-          onChange={(e) => store().setAirportIdentity({ country: e.target.value.trim().toLowerCase() })}
-        />
-        {airport.country.trim() !== "" && problem === "country-format" && (
-          <span className="pct-warn">{identityProblemText("country-format")}</span>
-        )}
-      </label>
-
       {heightMode === "autoheight" && (
         <span className="pct-field-meta">
           This project is on sim autoheight, so the pad follows the terrain and there is no base
@@ -212,22 +101,13 @@ export function HeliportFields({ airport }: { airport: ProjectAirport }): React.
         </span>
       )}
 
-      {/* The one act that writes outside the project. It stays in a dialog because that is where the
-          things that belong to WRITING live: the destination, the installed list with Uninstall, the
-          overwrite confirmation and the result. */}
-      <div className="pct-modal-actions">
-        <span className="pct-spacer" />
-        <button type="button" className="pct-primary" onClick={openInstallDialog}>
-          Install into AFS4…
-        </button>
-      </div>
-      {problem !== null && (
-        <span className="pct-field-meta">
-          {problem === "name-empty"
-            ? "Add a name before installing."
-            : identityProblemText(problem)}
-        </span>
-      )}
+      {/* One line, because the fields that used to be below this one are gone and Michael tests every
+          release the way a new user would. Without it, "where did the code go" is a question the panel
+          invites and does not answer. */}
+      <span className="pct-field-meta">
+        The airport&apos;s name, code and Install button are in <strong>Data</strong>, at the top of the
+        list on the right.
+      </span>
     </div>
   );
 }

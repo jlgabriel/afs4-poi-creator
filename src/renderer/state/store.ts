@@ -45,7 +45,7 @@ import {
 import { destination } from "../../core/geo/geo";
 import { lineUp, spaceEvenly } from "../../core/geo/arrange";
 import { DEFAULT_PAD_RADIUS_M } from "../../core/export/planExport";
-import { airportIsEmpty, firstPad } from "../../core/project/airport";
+import { airportIsBlank, firstPad } from "../../core/project/airport";
 import * as mutate from "../../core/project/mutate";
 
 export type Camera = Project["camera"];
@@ -104,16 +104,22 @@ export type PlacingSpec =
  *  panel and by which handle the drag grabbed, which is the shape `mutate.updateAirportRunwayEnd` already
  *  takes. Putting it here would add a fourth piece of state to a field three components read, to express
  *  something only one of them needs. */
-export type AirportSelection = {
-  kind: "pad" | "runway" | "parking" | "aerotow" | "winch";
-  id: string;
-};
+export type AirportSelection =
+  | { kind: "data" }
+  | { kind: "pad" | "runway" | "parking" | "aerotow" | "winch"; id: string };
 
 /** Drop whichever airport part the selection names. Exhaustive on purpose — no `default` branch — so
- *  adding a sixth kind to AirportSelection fails the typecheck here instead of silently deleting nothing
- *  when the user presses Del. */
+ *  adding a seventh kind to AirportSelection fails the typecheck here instead of silently deleting
+ *  nothing when the user presses Del.
+ *
+ *  ★ `data` deletes the WHOLE airport, geometry and all, and it is the only way to do that on purpose.
+ *  The identity is not a part you can delete on its own — an airport without a name is still an airport,
+ *  and there would be nothing on screen to show for it — so Del on the Data row means "no airport here",
+ *  which is what selecting the airport itself and pressing Del reads as. */
 function removeAirportPart(project: Project, sel: AirportSelection): Project {
   switch (sel.kind) {
+    case "data":
+      return mutate.setAirport(project, null);
     case "pad":
       return mutate.removeAirportPad(project, sel.id);
     case "parking":
@@ -304,6 +310,12 @@ export interface EditorState {
   //    get their own writers rather than going through setAirport with a whole reconstructed block.
   setAirportPadRadius: (radius: number) => void;
   setAirportIdentity: (patch: Partial<Pick<ProjectAirport, "icao" | "name" | "country">>) => void;
+  //    v1.4 DATA (forum #217/#232, his submenu (1)). `iata` has been in the model and in BOTH writers
+  //    since 7b1f38b with nothing on screen able to set it — a field the file could carry and the user
+  //    could not fill. `createAirport` is the Data card's click: unlike the other five it places nothing,
+  //    so it makes the block (when there is none) and selects it, which is the whole gesture.
+  setAirportIata: (iata: string) => void;
+  createAirport: () => void;
   //    v1.4 parking positions (forum #232). Every one takes an id: there has never been a one-stand UI,
   //    so letting it default would only hide a caller that forgot which stand it meant (mutate.ts).
   moveAirportParking: (id: string, position: LonLat) => void;
@@ -751,6 +763,18 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
               country: patch.country ?? a.country,
             });
           }),
+        // The same coalesce key as the other three: IATA sits in the same mask (his DATA submenu is four
+        // fields) and tabbing between them is one edit of one thing.
+        setAirportIata: (iata) =>
+          commitCoalesced("airport:identity", (proj) => mutate.setAirportIata(proj, iata)),
+        // NOT coalesced and not a placement: it either makes an empty block or does nothing, and then
+        // selects it either way, so clicking Data on an airport that already exists just opens its panel.
+        createAirport: () => {
+          if (get().project.airport === undefined) {
+            commit((proj) => mutate.setAirport(proj, { icao: "", name: "", country: "", pads: [] }));
+          }
+          set({ selection: [], airportSelection: { kind: "data" } });
+        },
 
         // Every coalesce key carries the STAND'S ID. Without it, dragging stand A and then stand B would
         // fold into one undo entry and a single Ctrl+Z would put both back — the pad's keys can be
@@ -872,16 +896,17 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
           // deleted the WHOLE airport block, which was right when a pad was all an airport could hold and
           // is wrong the moment a stand exists beside it.
           //
-          // What survives from v1.3 is the FELT behaviour, now stated as the rule it always was: deleting
-          // the last part takes the block with it, identity included. An airport with no geometry draws
-          // nothing and opens no panel, so leaving one behind would be an airport you can neither see,
-          // edit nor remove. It is one commit either way, so undo brings the code and the name back.
+          // What survives from v1.3 is the FELT behaviour: deleting the last part of an airport nobody
+          // ever named takes the block with it. It stops there — an airport with a code typed into it
+          // survives losing its last stand, because since the DATA submenu that airport still has a row,
+          // a panel and a Del of its own (airport.ts, airportIsBlank). Deleting a pad is not a request to
+          // throw away the identity beside it.
           if (airportSelection !== null) {
             const sel = airportSelection;
             commit((proj) => {
               const next = removeAirportPart(proj, sel);
               const a = next.airport;
-              return a !== undefined && airportIsEmpty(a) ? mutate.setAirport(next, null) : next;
+              return a !== undefined && airportIsBlank(a) ? mutate.setAirport(next, null) : next;
             });
             set({ airportSelection: null });
             return;

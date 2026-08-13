@@ -9,11 +9,62 @@
 import { useMemo } from "react";
 import { editorStore, useEditor } from "../state/editorStore";
 import { Thumbnail } from "../catalog/Thumbnail";
-import { AerotowIcon, HelipadIcon, ParkingIcon, RunwayIcon, WinchIcon } from "../catalog/categoryIcon";
+import {
+  AerotowIcon,
+  DataIcon,
+  HelipadIcon,
+  ParkingIcon,
+  RunwayIcon,
+  WinchIcon,
+} from "../catalog/categoryIcon";
 import { photoKeyForPlaced as placedPhotoKey } from "../../core/catalog/photoKey";
 import { PARKING_TYPE_LABELS, firstPad } from "../../core/project/airport";
 import { haversine, initialBearing } from "../../core/geo/geo";
 import { rowInfo } from "./rowInfo";
+
+/** The airport's own row — his submenu (1) DATA — pinned above every airport part, because the parts
+ *  belong to it. Present whenever the block is, INCLUDING an airport with no geometry at all: that is a
+ *  legal document (his "(1) DATA" example is identity plus a database entry and nothing else), and it is
+ *  the row that makes such an airport visible instead of a block nobody can see or reach.
+ *
+ *  No double-click-to-fly: the airport's position follows its first helipad and is not a point of its own
+ *  yet (AirportDataFields), so flying "to the airport" would fly to a pad while claiming otherwise. */
+function DataRow(): React.ReactElement | null {
+  const airport = useEditor((s) => s.project.airport);
+  const selected = useEditor((s) => s.airportSelection?.kind === "data");
+  if (airport === undefined) return null;
+  const { icao, name } = airport;
+  const parts =
+    airport.pads.length +
+    (airport.parkings?.length ?? 0) +
+    (airport.runways?.length ?? 0) +
+    (airport.aerotows?.length ?? 0) +
+    (airport.winches?.length ?? 0);
+  return (
+    <button
+      type="button"
+      className={selected ? "pct-placed-row pct-placed-pad sel" : "pct-placed-row pct-placed-pad"}
+      aria-pressed={selected}
+      title="The airport itself — its name and code"
+      onClick={() => editorStore.getState().selectAirportPart({ kind: "data" })}
+    >
+      <DataIcon />
+      <span className="pct-placed-text">
+        <span className="pct-placed-name">
+          <span className="pct-placed-label">{name.trim() === "" ? "Airport" : name.trim()}</span>
+          {icao.trim() !== "" && <span className="pct-placed-code">{icao.toUpperCase()}</span>}
+        </span>
+        <span className="pct-placed-meta">
+          {icao.trim() === "" && name.trim() === ""
+            ? "no name or code yet — click to add them"
+            : parts === 0
+              ? "no parts placed yet"
+              : `${parts} ${parts === 1 ? "part" : "parts"}`}
+        </span>
+      </span>
+    </button>
+  );
+}
 
 /** The helipad's row, pinned above the objects (v1.3, forum #173: "which is then listed on the right for
  *  editing"). It is NOT one of the objects and does not join their count — there is exactly one, it never
@@ -235,9 +286,10 @@ export function PlacedList(): React.ReactElement {
           >
             Duplicate
           </button>
-          {/* Delete also reaches the pad — deleteSelection removes the airport block when it is the
-              thing selected, so the button follows whatever the panel above is showing. Duplicate does
-              not: a project has one start position. */}
+          {/* Delete also reaches the airport parts — deleteSelection drops whichever one is selected, so
+              the button follows whatever the panel above is showing. On the Data row it deletes the whole
+              airport, geometry and all, which is the only deliberate way to do that. Duplicate does not
+              reach any of them. */}
           <button
             type="button"
             disabled={!hasSelection && !airportSelected}
@@ -250,6 +302,7 @@ export function PlacedList(): React.ReactElement {
       </div>
 
       <div className="pct-placed-list">
+        <DataRow />
         <HelipadRow />
         <RunwayRows />
         <ParkingRows />

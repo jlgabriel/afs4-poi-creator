@@ -12,17 +12,21 @@
 //
 // So these cards behave exactly like a light or a plant: click to arm, click the map to drop, Escape to
 // cancel. The section is his design too (#217/#227/#232): Data · Helipad · Parking · Runway · Aerotow ·
-// Winch Launch. Two of the six exist so far.
+// Winch Launch — all six, in his order.
 //
-// ★ THE ONE PLACE THE TWO CARDS DIFFER, and it is the model's doing, not a UI choice: there is one start
-// pad per project, so placing again MOVES it and placement disarms after the drop. "Any number of parking
-// positions can be created" (#232), so a stand drops and stays armed, like every object card. Each card
-// says which it is in its own subtitle rather than leaving it to be discovered.
+// ★ DATA IS THE ODD ONE, and honestly so: it places NOTHING. There is one airport per project and its
+// identity is not a point on the map, so its card makes the block if there is none and opens its panel,
+// with no armed state and no map click in between. Every other card here arms a placement.
+//
+// ★ AND THE FIVE DIFFER AMONG THEMSELVES in whether the drop re-arms, which is the model's doing rather
+// than a UI choice: a repeatable part stays armed for the next one, and the two that a single click lays
+// out whole (a runway, a winch launch) disarm so the next thing you do is drag an end. Each card says
+// which it is in its own subtitle rather than leaving it to be discovered.
 import { useCallback } from "react";
 import type { ParkingType } from "../../core/project/types";
 import { PARKING_TYPES, PARKING_TYPE_LABELS } from "../../core/project/airport";
 import { editorStore, useEditor } from "../state/editorStore";
-import { AerotowIcon, HelipadIcon, ParkingIcon, RunwayIcon, WinchIcon } from "./categoryIcon";
+import { AerotowIcon, DataIcon, HelipadIcon, ParkingIcon, RunwayIcon, WinchIcon } from "./categoryIcon";
 
 /** The stand type a fresh card arms. GA is the common case and the smallest footprint, so a user who
  *  never opens the type field gets the stand a light aircraft fits on rather than a 40 m jet apron. */
@@ -30,6 +34,7 @@ const DEFAULT_NEW_PARKING: ParkingType = "parked_ga";
 
 /** What each card answers the search box with. The words are what someone would actually type looking
  *  for the thing, not the label alone — "heliport" finds the pad, "stand"/"gate"/"apron" find parking. */
+const DATA_TERMS = "data airport icao iata code country name identity heliport";
 const HELIPAD_TERMS = "start - helicopter helipad heliport pad";
 const PARKING_TERMS = `parking stand gate apron aircraft ${PARKING_TYPES.map(
   (t) => PARKING_TYPE_LABELS[t],
@@ -45,6 +50,8 @@ export function AirportSection(): React.ReactElement {
   // block made the card claim "already placed" for a project whose only airport part was a stand.
   // Spotted on screen in the preview harness, not by a test.
   const hasPad = useEditor((s) => (s.project.airport?.pads.length ?? 0) > 0);
+  const hasAirport = useEditor((s) => s.project.airport !== undefined);
+  const airportIcao = useEditor((s) => s.project.airport?.icao.trim() ?? "");
   const standCount = useEditor((s) => s.project.airport?.parkings?.length ?? 0);
   const runwayCount = useEditor((s) => s.project.airport?.runways?.length ?? 0);
   const aerotowCount = useEditor((s) => s.project.airport?.aerotows?.length ?? 0);
@@ -60,17 +67,25 @@ export function AirportSection(): React.ReactElement {
   // The search box filters every section (a query that hides the xrefs but leaves these cards sitting
   // there reads as a bug — see LightsSection's note on the same problem).
   const q = query.trim().toLowerCase();
+  const dataMatches = q === "" || DATA_TERMS.includes(q);
   const padMatches = q === "" || HELIPAD_TERMS.includes(q);
   const parkingMatches = q === "" || PARKING_TERMS.includes(q);
   const runwayMatches = q === "" || RUNWAY_TERMS.includes(q);
   const aerotowMatches = q === "" || AEROTOW_TERMS.includes(q);
   const winchMatches = q === "" || WINCH_TERMS.includes(q);
   const count =
+    (dataMatches ? 1 : 0) +
     (padMatches ? 1 : 0) +
     (parkingMatches ? 1 : 0) +
     (runwayMatches ? 1 : 0) +
     (aerotowMatches ? 1 : 0) +
     (winchMatches ? 1 : 0);
+
+  // No arming, and no toggle: there is nothing to cancel because nothing is waiting for a map click.
+  // Clicking it again on an airport that already exists just brings its panel back.
+  const openData = useCallback(() => {
+    editorStore.getState().createAirport();
+  }, []);
 
   const armPad = useCallback(() => {
     const cur = editorStore.getState().placing;
@@ -105,6 +120,26 @@ export function AirportSection(): React.ReactElement {
     <details className="pct-lights">
       <summary className="pct-lights-summary">Airport ({count})</summary>
       <div className="pct-lights-list">
+        {dataMatches && (
+          <button
+            type="button"
+            className="pct-obj-card"
+            title="The airport's name and code — what it becomes in Aerofly"
+            onClick={openData}
+          >
+            <DataIcon />
+            <span className="pct-obj-text">
+              <span className="pct-obj-name">Data</span>
+              <span className="pct-obj-cat">
+                {!hasAirport
+                  ? "name and code for your airport"
+                  : airportIcao === ""
+                    ? "no code yet · click to fill it in"
+                    : `${airportIcao.toUpperCase()} · click to edit`}
+              </span>
+            </span>
+          </button>
+        )}
         {padMatches && (
           <button
             type="button"

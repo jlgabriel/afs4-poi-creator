@@ -53,6 +53,17 @@ function makeStore(over: Partial<EditorDeps> = {}) {
   return { store, persist, clock };
 }
 
+/** The id of the airport PART the store has selected. Throws rather than returning undefined, and the
+ *  throw is the point: `{ kind: "data" }` names the airport itself and carries no id (store.ts), so a
+ *  test that reaches for one after selecting Data has asked the wrong question and should say so. */
+function selectedPartId(store: ReturnType<typeof makeStore>["store"]): string {
+  const sel = store.getState().airportSelection;
+  if (sel === null || sel.kind === "data") {
+    throw new Error(`expected an airport part to be selected, got ${JSON.stringify(sel)}`);
+  }
+  return sel.id;
+}
+
 afterEach(() => {
   vi.useRealTimers();
 });
@@ -177,7 +188,8 @@ describe("placeAt — the helipad (v1.3)", () => {
     // v1.4: the selection names WHICH pad, and the id has to be the one actually in the document —
     // placeAirportPad may have moved an existing pad rather than created one.
     expect(st.airportSelection).toEqual({ kind: "pad", id: st.project.airport?.pads[0]?.id });
-    expect(st.airportSelection?.id).toBeTruthy();
+    // …and that id is a real one, so the assertion above is not two undefineds agreeing.
+    expect(st.project.airport?.pads[0]?.id).toBeTruthy();
     expect(st.selection).toEqual([]);
   });
 
@@ -228,18 +240,77 @@ describe("placeAt — the helipad (v1.3)", () => {
     expect(store.getState().airportSelection).toBeNull();
   });
 
-  it("Delete on the pad removes the whole airport block, and undo brings the identity back with it", () => {
+  it("Delete on the pad of a never-named airport takes the block with it", () => {
     const { store } = makeStore();
     store.getState().armPlacement({ kind: "helipad" });
     store.getState().placeAt({ lon: 10, lat: 48 });
-    store.getState().setAirportIdentity({ icao: "pct001", name: "Roof", country: "cl" });
 
     store.getState().deleteSelection();
     expect(store.getState().project.airport).toBeUndefined();
     expect(store.getState().airportSelection).toBeNull();
 
     store.getState().undo();
+    expect(store.getState().project.airport?.pads).toHaveLength(1);
+  });
+
+  // v1.4, and a deliberate change from v1.3: the identity used to go with the last part. It cannot any
+  // more — the DATA submenu gives an identity-only airport a row and a panel, so keeping the old rule
+  // would mean deleting a pad silently threw away a code the user had typed somewhere else.
+  it("Delete on the pad KEEPS an airport that has been named", () => {
+    const { store } = makeStore();
+    store.getState().armPlacement({ kind: "helipad" });
+    store.getState().placeAt({ lon: 10, lat: 48 });
+    store.getState().setAirportIdentity({ icao: "pct001", name: "Roof", country: "cl" });
+
+    store.getState().deleteSelection();
+    const a = store.getState().project.airport;
+    expect(a).toMatchObject({ icao: "pct001", name: "Roof", country: "cl" });
+    expect(a?.pads).toHaveLength(0);
+  });
+
+  it("Delete on DATA removes the whole airport, geometry and all", () => {
+    const { store } = makeStore();
+    store.getState().armPlacement({ kind: "helipad" });
+    store.getState().placeAt({ lon: 10, lat: 48 });
+    store.getState().setAirportIdentity({ icao: "pct001", name: "Roof", country: "cl" });
+
+    store.getState().selectAirportPart({ kind: "data" });
+    store.getState().deleteSelection();
+    expect(store.getState().project.airport).toBeUndefined();
+    expect(store.getState().airportSelection).toBeNull();
+
+    store.getState().undo(); // one commit, so the pad comes back with the identity
     expect(store.getState().project.airport).toMatchObject({ icao: "pct001", name: "Roof" });
+    expect(store.getState().project.airport?.pads).toHaveLength(1);
+  });
+
+  it("the Data card makes an empty airport and selects it, without placing anything", () => {
+    const { store } = makeStore();
+    store.getState().createAirport();
+    const st = store.getState();
+    expect(st.project.airport).toMatchObject({ icao: "", name: "", country: "", pads: [] });
+    expect(st.airportSelection).toEqual({ kind: "data" });
+    expect(st.placing).toBeNull(); // it arms nothing — there is no map click coming
+    expect(st.project.objects).toHaveLength(0);
+  });
+
+  it("the Data card on an existing airport only re-selects it — no second block, no new commit", () => {
+    const { store } = makeStore();
+    store.getState().armPlacement({ kind: "helipad" });
+    store.getState().placeAt({ lon: 10, lat: 48 });
+    const undos = store.getState().undoStack.length;
+
+    store.getState().createAirport();
+    expect(store.getState().project.airport?.pads).toHaveLength(1);
+    expect(store.getState().airportSelection).toEqual({ kind: "data" });
+    expect(store.getState().undoStack).toHaveLength(undos);
+  });
+
+  it("IATA is writable — it was in the model and both writers with no way to set it", () => {
+    const { store } = makeStore();
+    store.getState().createAirport();
+    store.getState().setAirportIata("SCL");
+    expect(store.getState().project.airport?.iata).toBe("SCL");
   });
 
   it("setAirportIdentity is a no-op without a pad — the identity has nowhere to live", () => {
@@ -255,7 +326,7 @@ describe("store — parking positions", () => {
   const placeStand = (store: ReturnType<typeof makeStore>["store"], lon: number, lat: number): string => {
     store.getState().armPlacement({ kind: "parking", parkingType: "parked_ga" });
     store.getState().placeAt({ lon, lat });
-    return store.getState().airportSelection!.id;
+    return selectedPartId(store);
   };
 
   it("drops a stand, selects it, and STAYS armed — any number can be created", () => {
@@ -314,24 +385,40 @@ describe("store — parking positions", () => {
     expect(store.getState().airportSelection).toBeNull();
   });
 
-  it("deleting the LAST part takes the block with it — an empty airport cannot be seen or removed", () => {
+  it("deleting the LAST part of a never-named airport takes the block with it", () => {
+    const { store } = makeStore();
+    const a = placeStand(store, 10, 48);
+
+    store.getState().selectAirportPart({ kind: "parking", id: a });
+    store.getState().deleteSelection();
+    expect(store.getState().project.airport).toBeUndefined();
+
+    store.getState().undo(); // one commit, so the stand comes back
+    expect(store.getState().project.airport?.parkings).toHaveLength(1);
+  });
+
+  // The dead end the DATA submenu was built to close: placing a stand creates the airport block, and
+  // until v1.4 the identity fields lived inside the PAD's panel — so this project had an airport, no
+  // pad, and no way to give it a code. Now the identity is reachable, and so it has to survive the
+  // stand it arrived with.
+  it("deleting the LAST part KEEPS an airport that has been named", () => {
     const { store } = makeStore();
     const a = placeStand(store, 10, 48);
     store.getState().setAirportIdentity({ icao: "pct001", name: "Roof", country: "cl" });
 
     store.getState().selectAirportPart({ kind: "parking", id: a });
     store.getState().deleteSelection();
-    expect(store.getState().project.airport).toBeUndefined();
-
-    store.getState().undo(); // one commit, so the identity comes back with the stand
-    expect(store.getState().project.airport).toMatchObject({ icao: "pct001", name: "Roof" });
+    const airport = store.getState().project.airport;
+    expect(airport).toMatchObject({ icao: "pct001", name: "Roof" });
+    expect(airport?.parkings ?? []).toHaveLength(0);
+    expect(airport?.pads).toHaveLength(0);
   });
 
   it("deleting the pad no longer takes the stands with it", () => {
     const { store } = makeStore();
     store.getState().armPlacement({ kind: "helipad" });
     store.getState().placeAt({ lon: 10, lat: 48 });
-    const padId = store.getState().airportSelection!.id;
+    const padId = selectedPartId(store);
     placeStand(store, 10.1, 48.1);
 
     store.getState().selectAirportPart({ kind: "pad", id: padId });
@@ -360,7 +447,7 @@ describe("store — runways", () => {
   const placeRunway = (store: ReturnType<typeof makeStore>["store"], lon: number, lat: number): string => {
     store.getState().armPlacement({ kind: "runway" });
     store.getState().placeAt({ lon, lat });
-    return store.getState().airportSelection!.id;
+    return selectedPartId(store);
   };
 
   it("one click drops a WHOLE runway, then disarms", () => {
@@ -468,12 +555,12 @@ describe("store — glider starts", () => {
   const placeAerotow = (store: ReturnType<typeof makeStore>["store"], lon: number, lat: number): string => {
     store.getState().armPlacement({ kind: "aerotow" });
     store.getState().placeAt({ lon, lat });
-    return store.getState().airportSelection!.id;
+    return selectedPartId(store);
   };
   const placeWinch = (store: ReturnType<typeof makeStore>["store"], lon: number, lat: number): string => {
     store.getState().armPlacement({ kind: "winch" });
     store.getState().placeAt({ lon, lat });
-    return store.getState().airportSelection!.id;
+    return selectedPartId(store);
   };
 
   it("an aerotow drops like a stand — selected, and STILL armed", () => {
