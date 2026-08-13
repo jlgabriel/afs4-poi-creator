@@ -858,12 +858,45 @@ body {
 .pct-text::placeholder {
   color: #94a3b8;
 }
-.pct-lock {
+/* A checkbox and its words on one line. `.pct-lock` came first (the object's Lock row) and `.pct-check`
+   is the same idiom under a name that is not about locking — the runway's can-land / can-take-off pair
+   (v1.4). One rule rather than two, so they cannot drift. */
+.pct-lock,
+.pct-check {
   display: flex;
   align-items: center;
   gap: 6px;
   font-size: 13px;
   color: #334155;
+}
+
+/* One RUNWAY END, fold-out. ApfelFlieger asked for the two ends as "two possibly fold-out and retractable
+   blocks below each other" (forum #242), explicitly not side by side. Same collapsed-details idiom as
+   .pct-wad, with a frame because unlike that read-out these blocks are EDITABLE and there are two of
+   them — without an edge, END 2's fields read as a continuation of END 1's. */
+.pct-runway-end {
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.pct-runway-end > summary {
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: #334155;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+/* Collapsed, the summary is the whole block — the 10px gap above would otherwise leave a stripe of
+   padding under it. :not([open]) rather than a class, so the browser owns the state. */
+.pct-runway-end:not([open]) {
+  gap: 0;
 }
 
 /* Arrange (v0.9.2) — the multi-selection panel's two position buttons, side by side and equal width so
@@ -1108,7 +1141,12 @@ body {
 }
 /* The airport code beside the name — same slot and restraint as the `missing` badge, different job:
    this one is information, not a warning, so it stays grey. */
-.pct-placed-code {
+/* A small pill next to a name. `.pct-placed-code` is the placed list's (an object's code, a stand's
+   type); `.pct-end-code` is the same pill on a RUNWAY END's fold-out summary, under a name that does not
+   claim to belong to the list — a class borrowed across components for its looks is how two things start
+   drifting apart the first time one of them is restyled. */
+.pct-placed-code,
+.pct-end-code {
   flex: 0 0 auto;
   padding: 0 5px;
   font-size: 11px;

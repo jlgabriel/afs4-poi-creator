@@ -300,7 +300,8 @@ from any other reason an object might be absent. `mobile_lighttower` does not ex
 the 911; `mobile_LightTower` does.
 
 Other local catalogs derivable from text or filenames:
-- **plants** `scenery/plants/` (`group__iNN__hHHHH_color.ttx`)
+- **plants** `scenery/plants/` (`group__iNN__hHHHH_color.ttx` — the `h` is missing from two
+  files added by the FS4 beta stream, so treat it as optional when parsing)
 - **airport lights** `airport_lights/al_*` (~15 types; use the name without `al_`)
 - **animated** `scenery/animated/` (only 4 `windturbine_*`)
 

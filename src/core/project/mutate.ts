@@ -9,10 +9,16 @@
 // accepts an override so tests stay deterministic.
 
 import type {
+  AirportAerotow,
   AirportPad,
+  AirportParking,
+  AirportRunway,
+  AirportRunwayEnd,
+  AirportWinch,
   HeightMode,
   HeightSpec,
   LonLat,
+  ParkingType,
   PlacedAirportLight,
   PlacedLight,
   PlacedObject,
@@ -23,6 +29,15 @@ import type {
   ProjectAirport,
   Vec3,
 } from "./types";
+import {
+  DEFAULT_PARKING_SIZE_M,
+  DEFAULT_RUNWAY_WIDTH_M,
+  DEFAULT_WINCH_SPACING_M,
+  aerotowsOf,
+  parkingsOf,
+  runwaysOf,
+  winchesOf,
+} from "./airport";
 
 const nowIso = (): string => new Date().toISOString();
 
@@ -372,7 +387,21 @@ export function setCamera(project: Project, camera: Project["camera"], now = now
 // block, while the MAP drags the pad and turns it. Splitting them keeps the map from having to know an
 // identity it never shows, and keeps a drag from being able to clobber a code the user just typed.
 
-/** Adopt (or drop, with `null`) the whole airport block. The dialog's writer: identity plus pad in one
+/** Keep `airport.pad` equal to `pads[0]` (types.ts explains why the mirror exists). EVERY writer below
+ *  funnels through here, so no path can produce a block whose mirror has drifted — an older PCT reading
+ *  a stale mirror would put the helipad somewhere the user moved it away from. */
+function withPadMirror(airport: ProjectAirport): ProjectAirport {
+  const first = airport.pads[0];
+  if (first === undefined) {
+    if (airport.pad === undefined) return airport;
+    const next = { ...airport };
+    delete next.pad;
+    return next;
+  }
+  return airport.pad === first ? airport : { ...airport, pad: first };
+}
+
+/** Adopt (or drop, with `null`) the whole airport block. The dialog's writer: identity plus pads in one
  *  commit, because the user typed them together. Absent ≡ "this project is POI-only" — the same
  *  absent-means-default rule `shift` and `heightMode` follow, so a project that never opened the
  *  heliport dialog stays byte-identical on save. */
@@ -383,10 +412,43 @@ export function setAirport(project: Project, airport: ProjectAirport | null, now
     delete next.airport;
     return next;
   }
-  return { ...project, airport, modifiedAt: now };
+  return { ...project, airport: withPadMirror(airport), modifiedAt: now };
 }
 
-/** Put the pad AT `position`, creating the airport block if the project has none. The one mutation
+/** The airport's OWN point (types.ts ProjectAirport.position), independent of any pad. `null` clears it,
+ *  which puts the block back on "follow the first pad" — the v1.2/v1.3 behaviour. */
+export function setAirportPosition(project: Project, position: LonLat | null, now = nowIso()): Project {
+  const airport = project.airport;
+  if (airport === undefined) return project;
+  if (position === null) {
+    if (airport.position === undefined) return project;
+    const next = { ...airport };
+    delete next.position;
+    return { ...project, airport: next, modifiedAt: now };
+  }
+  return { ...project, airport: { ...airport, position }, modifiedAt: now };
+}
+
+/** IATA code (forum #220). Empty string clears it — the `.wad` row is written either way, just blank. */
+export function setAirportIata(project: Project, iata: string, now = nowIso()): Project {
+  const airport = project.airport;
+  if (airport === undefined) return project;
+  if ((airport.iata ?? "") === iata) return project;
+  if (iata === "") {
+    const next = { ...airport };
+    delete next.iata;
+    return { ...project, airport: next, modifiedAt: now };
+  }
+  return { ...project, airport: { ...airport, iata }, modifiedAt: now };
+}
+
+/** A fresh pad, unnamed and facing true north. Unnamed is not a placeholder: the writer renders it as
+ *  "FATO/TLOF", the literal v1.2/v1.3 always emitted, so a one-pad project's files do not move. */
+function newPad(position: LonLat, radius: number, id = randomId()): AirportPad {
+  return { id, name: "", position, heading: 0, radius };
+}
+
+/** Put the FIRST pad AT `position`, creating the airport block if the project has none. The one mutation
  *  allowed to bring the block into being from a map gesture, and it is deliberate: in v1.3 the pad is
  *  placed from the catalog like any other object (forum #173), so "click the map" is the user asking
  *  for it in as many words.
@@ -395,8 +457,10 @@ export function setAirport(project: Project, airport: ProjectAirport | null, now
  *  they are filled, which is the rule heliportTemplate exists to keep. `updatePad` below stays a no-op
  *  on a padless project on purpose: a DRAG is not a request for an airport.
  *
- *  Placing again MOVES the pad rather than adding a second. A project has exactly one start position;
- *  that is the whole reason the pad is not a PlacedObject. */
+ *  ⚠️ Placing again MOVES the first pad rather than adding a second — the v1.3 behaviour, kept because
+ *  the v1.3 UI is still the one calling this and it has exactly one pad card. `addAirportPad` is the
+ *  mutation that grows the list, and it is what the reworked AIRPORT menu (forum #219/#221, where
+ *  HELICOPTER is repeatable) will call instead. */
 export function placeAirportPad(
   project: Project,
   position: LonLat,
@@ -405,44 +469,486 @@ export function placeAirportPad(
 ): Project {
   const airport = project.airport;
   if (airport === undefined) {
+    const pad = newPad(position, defaultRadius);
     return {
       ...project,
-      airport: { icao: "", name: "", country: "", pad: { position, heading: 0, radius: defaultRadius } },
+      airport: { icao: "", name: "", country: "", pads: [pad], pad },
       modifiedAt: now,
     };
   }
+  if (airport.pads.length === 0) return addAirportPad(project, position, defaultRadius, now);
   return moveAirportPad(project, position, now);
 }
 
-/** Apply `patch` to the pad, if there is one. A project with no airport block has no pad to move, so
- *  this returns the same reference and the map's drag is a silent no-op rather than an invented airport
- *  — PCT never picks an identity (see heliportTemplate), and creating one from a drag would do exactly
- *  that. */
-function updatePad(project: Project, patch: (pad: AirportPad) => AirportPad, now: string): Project {
+/** APPEND a pad (forum #221 — "this element can now be used as often as desired"; his SCLC ships three).
+ *  Creates the airport block when there is none, same rule as placeAirportPad. */
+export function addAirportPad(
+  project: Project,
+  position: LonLat,
+  defaultRadius: number,
+  now = nowIso(),
+  id?: string,
+): Project {
+  const pad = newPad(position, defaultRadius, id);
+  const airport = project.airport;
+  const next: ProjectAirport =
+    airport === undefined
+      ? { icao: "", name: "", country: "", pads: [pad] }
+      : { ...airport, pads: [...airport.pads, pad] };
+  return { ...project, airport: withPadMirror(next), modifiedAt: now };
+}
+
+/** Drop a pad by id. A pad-less airport stays a valid block — his "(1) DATA" example is an airport with
+ *  no pads — so this never deletes the airport itself. */
+export function removeAirportPad(project: Project, padId: string, now = nowIso()): Project {
   const airport = project.airport;
   if (airport === undefined) return project;
-  const pad = patch(airport.pad);
-  if (pad === airport.pad) return project;
-  return { ...project, airport: { ...airport, pad }, modifiedAt: now };
+  const pads = airport.pads.filter((p) => p.id !== padId);
+  if (pads.length === airport.pads.length) return project;
+  return { ...project, airport: withPadMirror({ ...airport, pads }), modifiedAt: now };
 }
 
-/** Drag the pad to a new centre. */
-export function moveAirportPad(project: Project, position: LonLat, now = nowIso()): Project {
-  return updatePad(project, (pad) => ({ ...pad, position }), now);
+/** Apply `patch` to one pad. A project with no airport block has no pad to move, so this returns the
+ *  same reference and the map's drag is a silent no-op rather than an invented airport — PCT never picks
+ *  an identity (see heliportTemplate), and creating one from a drag would do exactly that.
+ *
+ *  `padId` undefined targets the FIRST pad, which is what every v1.3 caller means: that UI knows one. */
+function updatePad(
+  project: Project,
+  patch: (pad: AirportPad) => AirportPad,
+  now: string,
+  padId?: string,
+): Project {
+  const airport = project.airport;
+  if (airport === undefined) return project;
+  const i = padId === undefined ? 0 : airport.pads.findIndex((p) => p.id === padId);
+  const current = i < 0 ? undefined : airport.pads[i];
+  if (current === undefined) return project;
+  const pad = patch(current);
+  if (pad === current) return project;
+  const pads = [...airport.pads];
+  pads[i] = pad;
+  return { ...project, airport: withPadMirror({ ...airport, pads }), modifiedAt: now };
 }
 
-/** Turn the pad. `heading` is TRUE compass degrees, normalised into [0, 360) like every other facing
+/** Drag a pad to a new centre. */
+export function moveAirportPad(project: Project, position: LonLat, now = nowIso(), padId?: string): Project {
+  return updatePad(project, (pad) => ({ ...pad, position }), now, padId);
+}
+
+/** Turn a pad. `heading` is TRUE compass degrees, normalised into [0, 360) like every other facing
  *  in the model — the sim's `heading` field is true (gate 2026-07-31), so it is written verbatim and
  *  what the user sees on the map is what the file gets. */
-export function rotateAirportPad(project: Project, heading: number, now = nowIso()): Project {
+export function rotateAirportPad(project: Project, heading: number, now = nowIso(), padId?: string): Project {
   const h = norm360(heading);
-  return updatePad(project, (pad) => (pad.heading === h ? pad : { ...pad, heading: h }), now);
+  return updatePad(project, (pad) => (pad.heading === h ? pad : { ...pad, heading: h }), now, padId);
 }
 
-/** Resize the pad. Metres — the sim shows the diameter, so radius 10 reads as "Size 66 ft / 20 m".
+/** Resize a pad. Metres — the sim shows the diameter, so radius 10 reads as "Size 66 ft / 20 m".
  *  Non-positive is refused rather than clamped: it comes from a number field, and a silently corrected
  *  value is how you end up not noticing you typed one. */
-export function setAirportPadRadius(project: Project, radius: number, now = nowIso()): Project {
+export function setAirportPadRadius(
+  project: Project,
+  radius: number,
+  now = nowIso(),
+  padId?: string,
+): Project {
   if (!(Number.isFinite(radius) && radius > 0)) return project;
-  return updatePad(project, (pad) => (pad.radius === radius ? pad : { ...pad, radius }), now);
+  return updatePad(project, (pad) => (pad.radius === radius ? pad : { ...pad, radius }), now, padId);
+}
+
+/** Name a pad (forum #221 — "the name can be freely assigned"; it is what LOCATION shows). Empty is
+ *  legal and means unnamed, which the writer renders as "FATO/TLOF". */
+export function setAirportPadName(project: Project, name: string, now = nowIso(), padId?: string): Project {
+  return updatePad(project, (pad) => (pad.name === name ? pad : { ...pad, name }), now, padId);
+}
+
+// ── Runways (v1.4, forum #217 submenu (4)) ─────────────────────────────────────────────────────────
+//
+// A runway is a PAIR: the format has no single-ended one, so every mutation below addresses an end by
+// index (0 or 1) rather than letting the list grow. Same no-mirror, required-id rules as the stands.
+
+/** A fresh end: no lights, usable both ways — the defaults every runway end in ApfelFlieger's files
+ *  carries. */
+function newRunwayEnd(threshold: LonLat, identifier: string): AirportRunwayEnd {
+  return {
+    threshold,
+    identifier,
+    appltsys: "none",
+    papi: "none",
+    reil: "none",
+    approach: true,
+    takeoff: true,
+  };
+}
+
+/** A runway between two points. `identifiers` is a pair of strings ("08"/"26"); both may be empty, which
+ *  is legal — his 0001 sample leaves the second blank. Creates the airport block when there is none, the
+ *  same rule the pad and the stand follow, and invents no identity either. */
+export function addAirportRunway(
+  project: Project,
+  threshold1: LonLat,
+  threshold2: LonLat,
+  opts: { width?: number; identifiers?: [string, string]; id?: string } = {},
+  now = nowIso(),
+): Project {
+  const [id1, id2] = opts.identifiers ?? ["", ""];
+  const runway: AirportRunway = {
+    id: opts.id ?? randomId(),
+    ends: [newRunwayEnd(threshold1, id1), newRunwayEnd(threshold2, id2)],
+    width: opts.width ?? DEFAULT_RUNWAY_WIDTH_M,
+  };
+  const airport = project.airport;
+  const next: ProjectAirport =
+    airport === undefined
+      ? { icao: "", name: "", country: "", pads: [], runways: [runway] }
+      : { ...airport, runways: [...runwaysOf(airport), runway] };
+  return { ...project, airport: next, modifiedAt: now };
+}
+
+/** Drop a runway by id. */
+export function removeAirportRunway(project: Project, runwayId: string, now = nowIso()): Project {
+  const airport = project.airport;
+  if (airport === undefined) return project;
+  const current = runwaysOf(airport);
+  const runways = current.filter((r) => r.id !== runwayId);
+  if (runways.length === current.length) return project;
+  return { ...project, airport: { ...airport, runways }, modifiedAt: now };
+}
+
+function updateRunway(
+  project: Project,
+  runwayId: string,
+  patch: (runway: AirportRunway) => AirportRunway,
+  now: string,
+): Project {
+  const airport = project.airport;
+  if (airport === undefined) return project;
+  const current = runwaysOf(airport);
+  const i = current.findIndex((r) => r.id === runwayId);
+  const found = i < 0 ? undefined : current[i];
+  if (found === undefined) return project;
+  const runway = patch(found);
+  if (runway === found) return project;
+  const runways = [...current];
+  runways[i] = runway;
+  return { ...project, airport: { ...airport, runways }, modifiedAt: now };
+}
+
+function patchEnd(
+  runway: AirportRunway,
+  end: 0 | 1,
+  patch: (e: AirportRunwayEnd) => AirportRunwayEnd,
+): AirportRunway {
+  const current = runway.ends[end];
+  const next = patch(current);
+  if (next === current) return runway;
+  const ends: [AirportRunwayEnd, AirportRunwayEnd] = [runway.ends[0], runway.ends[1]];
+  ends[end] = next;
+  return { ...runway, ends };
+}
+
+/** Widen or narrow a runway. Metres, refused rather than clamped when non-positive. */
+export function setAirportRunwayWidth(
+  project: Project,
+  runwayId: string,
+  width: number,
+  now = nowIso(),
+): Project {
+  if (!(Number.isFinite(width) && width > 0)) return project;
+  return updateRunway(project, runwayId, (r) => (r.width === width ? r : { ...r, width }), now);
+}
+
+/** Drag one END of the runway. One point per end — the writer puts it in both the `threshold` and the
+ *  `endpoint` rows (forum #236: "in the PCT the leading variable is [threshold]"). */
+export function moveAirportRunwayEnd(
+  project: Project,
+  runwayId: string,
+  end: 0 | 1,
+  threshold: LonLat,
+  now = nowIso(),
+): Project {
+  return updateRunway(project, runwayId, (r) => patchEnd(r, end, (e) => ({ ...e, threshold })), now);
+}
+
+/** Everything else about one end, in one patch: identifier, the three lighting rows, approach/takeoff.
+ *  `threshold` is deliberately not patchable here — dragging it is `moveAirportRunwayEnd`. */
+export function updateAirportRunwayEnd(
+  project: Project,
+  runwayId: string,
+  end: 0 | 1,
+  patch: Partial<Omit<AirportRunwayEnd, "threshold">>,
+  now = nowIso(),
+): Project {
+  return updateRunway(
+    project,
+    runwayId,
+    (r) =>
+      patchEnd(r, end, (e) => {
+        const next = { ...e, ...patch };
+        return (Object.keys(patch) as (keyof typeof patch)[]).every((k) => e[k] === patch[k]) ? e : next;
+      }),
+    now,
+  );
+}
+
+// ── Glider starts: AEROTOW and WINCH LAUNCH (v1.4, forum #237/#238) ────────────────────────────────
+//
+// Both are `.wad`-only elements, both repeatable, both named by the user after the runway they serve —
+// "the user must enter this himself, PCT does not need to worry about it", so nothing here derives a name
+// from a nearby runway. The winch is the only element in the model defined by TWO points.
+
+/** APPEND an aerotow start. Creates the airport block when there is none, like every other placement. */
+export function addAirportAerotow(
+  project: Project,
+  position: LonLat,
+  now = nowIso(),
+  id?: string,
+): Project {
+  const aerotow: AirportAerotow = { id: id ?? randomId(), name: "", position, heading: 0 };
+  const airport = project.airport;
+  const next: ProjectAirport =
+    airport === undefined
+      ? { icao: "", name: "", country: "", pads: [], aerotows: [aerotow] }
+      : { ...airport, aerotows: [...aerotowsOf(airport), aerotow] };
+  return { ...project, airport: next, modifiedAt: now };
+}
+
+/** APPEND a winch launch. `winch` is the far end of the rope — 800 to 1000 m away in his description, and
+ *  the caller's job to place, because the length and direction come out of the two points and nothing
+ *  else. A UI can offer two map clicks (his suggestion) or a length plus a pull direction; either way it
+ *  resolves to this pair before it gets here. */
+export function addAirportWinch(
+  project: Project,
+  position: LonLat,
+  winch: LonLat,
+  now = nowIso(),
+  id?: string,
+): Project {
+  const w: AirportWinch = {
+    id: id ?? randomId(),
+    name: "",
+    position,
+    winch,
+    spacing: DEFAULT_WINCH_SPACING_M,
+  };
+  const airport = project.airport;
+  const next: ProjectAirport =
+    airport === undefined
+      ? { icao: "", name: "", country: "", pads: [], winches: [w] }
+      : { ...airport, winches: [...winchesOf(airport), w] };
+  return { ...project, airport: next, modifiedAt: now };
+}
+
+export function removeAirportAerotow(project: Project, aerotowId: string, now = nowIso()): Project {
+  const airport = project.airport;
+  if (airport === undefined) return project;
+  const current = aerotowsOf(airport);
+  const aerotows = current.filter((a) => a.id !== aerotowId);
+  if (aerotows.length === current.length) return project;
+  return { ...project, airport: { ...airport, aerotows }, modifiedAt: now };
+}
+
+export function removeAirportWinch(project: Project, winchId: string, now = nowIso()): Project {
+  const airport = project.airport;
+  if (airport === undefined) return project;
+  const current = winchesOf(airport);
+  const winches = current.filter((w) => w.id !== winchId);
+  if (winches.length === current.length) return project;
+  return { ...project, airport: { ...airport, winches }, modifiedAt: now };
+}
+
+/** Patch one aerotow. `heading` is normalised into [0, 360) like every other facing in the model. */
+export function updateAirportAerotow(
+  project: Project,
+  aerotowId: string,
+  patch: Partial<Omit<AirportAerotow, "id">>,
+  now = nowIso(),
+): Project {
+  const airport = project.airport;
+  if (airport === undefined) return project;
+  const current = aerotowsOf(airport);
+  const i = current.findIndex((a) => a.id === aerotowId);
+  const found = i < 0 ? undefined : current[i];
+  if (found === undefined) return project;
+  const next = { ...found, ...patch };
+  if (patch.heading !== undefined) next.heading = norm360(patch.heading);
+  if (
+    next.name === found.name &&
+    next.heading === found.heading &&
+    next.position === found.position
+  ) {
+    return project;
+  }
+  const aerotows = [...current];
+  aerotows[i] = next;
+  return { ...project, airport: { ...airport, aerotows }, modifiedAt: now };
+}
+
+/** Patch one winch launch. A non-positive `spacing` is refused rather than clamped, like every other
+ *  metre value in the model. */
+export function updateAirportWinch(
+  project: Project,
+  winchId: string,
+  patch: Partial<Omit<AirportWinch, "id">>,
+  now = nowIso(),
+): Project {
+  if (patch.spacing !== undefined && !(Number.isFinite(patch.spacing) && patch.spacing > 0)) {
+    return project;
+  }
+  const airport = project.airport;
+  if (airport === undefined) return project;
+  const current = winchesOf(airport);
+  const i = current.findIndex((w) => w.id === winchId);
+  const found = i < 0 ? undefined : current[i];
+  if (found === undefined) return project;
+  const next = { ...found, ...patch };
+  if (
+    next.name === found.name &&
+    next.spacing === found.spacing &&
+    next.position === found.position &&
+    next.winch === found.winch
+  ) {
+    return project;
+  }
+  const winches = [...current];
+  winches[i] = next;
+  return { ...project, airport: { ...airport, winches }, modifiedAt: now };
+}
+
+// ── Parking positions (v1.4, forum #232) ───────────────────────────────────────────────────────────
+//
+// The same shape as the pad mutations above, with two deliberate differences:
+//
+//   • NO MIRROR. `parkings` has no compatibility twin to keep in step (types.ts), so these write the
+//     field directly instead of funnelling through withPadMirror.
+//   • THE ID IS REQUIRED. `updatePad` lets it default to the first pad because the v1.3 UI knows exactly
+//     one; there has never been a one-parking UI, so defaulting here would only hide a caller that forgot
+//     which stand it meant.
+
+/** A fresh stand: unnamed, facing true north, sized from its type (airport.ts DEFAULT_PARKING_SIZE_M). */
+function newParking(position: LonLat, type: ParkingType, id = randomId()): AirportParking {
+  return { id, name: "", position, heading: 0, size: DEFAULT_PARKING_SIZE_M[type], type };
+}
+
+/** APPEND a parking position ("any number of parking positions can be created" — forum #232). Creates the
+ *  airport block when the project has none, the same rule placeAirportPad follows and for the same reason:
+ *  placing one from the catalog is the user asking for the airport in as many words. It still invents no
+ *  identity — icao/name/country come in empty and the install refuses until they are filled. */
+export function addAirportParking(
+  project: Project,
+  position: LonLat,
+  type: ParkingType,
+  now = nowIso(),
+  id?: string,
+): Project {
+  const parking = newParking(position, type, id);
+  const airport = project.airport;
+  const next: ProjectAirport =
+    airport === undefined
+      ? { icao: "", name: "", country: "", pads: [], parkings: [parking] }
+      : { ...airport, parkings: [...parkingsOf(airport), parking] };
+  return { ...project, airport: next, modifiedAt: now };
+}
+
+/** Drop a stand by id. Removing the last one leaves `parkings: []` rather than deleting the key: the
+ *  difference is invisible to the writers (both emit no block) and keeping it avoids a save that silently
+ *  reverts the file to its pre-v1.4 shape. */
+export function removeAirportParking(project: Project, parkingId: string, now = nowIso()): Project {
+  const airport = project.airport;
+  if (airport === undefined) return project;
+  const current = parkingsOf(airport);
+  const parkings = current.filter((p) => p.id !== parkingId);
+  if (parkings.length === current.length) return project;
+  return { ...project, airport: { ...airport, parkings }, modifiedAt: now };
+}
+
+/** Apply `patch` to one stand. No airport, or no stand with that id → the same project reference, so a
+ *  drag on something that is no longer there is a no-op rather than an invented block. */
+function updateParking(
+  project: Project,
+  parkingId: string,
+  patch: (parking: AirportParking) => AirportParking,
+  now: string,
+): Project {
+  const airport = project.airport;
+  if (airport === undefined) return project;
+  const current = parkingsOf(airport);
+  const i = current.findIndex((p) => p.id === parkingId);
+  const found = i < 0 ? undefined : current[i];
+  if (found === undefined) return project;
+  const parking = patch(found);
+  if (parking === found) return project;
+  const parkings = [...current];
+  parkings[i] = parking;
+  return { ...project, airport: { ...airport, parkings }, modifiedAt: now };
+}
+
+/** Drag a stand to a new centre. */
+export function moveAirportParking(
+  project: Project,
+  parkingId: string,
+  position: LonLat,
+  now = nowIso(),
+): Project {
+  return updateParking(project, parkingId, (p) => ({ ...p, position }), now);
+}
+
+/** Turn a stand. TRUE compass degrees, normalised into [0, 360) like every other facing in the model —
+ *  ApfelFlieger's own files carry NEGATIVE headings (-195, -100, -200) and the `.wad` conversion takes
+ *  them unchanged, so this normalisation changes the number the user sees, never the rotation written. */
+export function rotateAirportParking(
+  project: Project,
+  parkingId: string,
+  heading: number,
+  now = nowIso(),
+): Project {
+  const h = norm360(heading);
+  return updateParking(project, parkingId, (p) => (p.heading === h ? p : { ...p, heading: h }), now);
+}
+
+/** Resize a stand. Metres, and a RADIUS — the sim shows the diameter, so 7.5 reads as "15 m". Non-positive
+ *  is refused rather than clamped, exactly as for a pad radius. */
+export function setAirportParkingSize(
+  project: Project,
+  parkingId: string,
+  size: number,
+  now = nowIso(),
+): Project {
+  if (!(Number.isFinite(size) && size > 0)) return project;
+  return updateParking(project, parkingId, (p) => (p.size === size ? p : { ...p, size }), now);
+}
+
+/** Name a stand. Shown in LOCATION; empty means unnamed and the writer emits "Parking". */
+export function setAirportParkingName(
+  project: Project,
+  parkingId: string,
+  name: string,
+  now = nowIso(),
+): Project {
+  return updateParking(project, parkingId, (p) => (p.name === name ? p : { ...p, name }), now);
+}
+
+/** Change what a stand is for. The SIZE follows only when the user had left it on the previous type's
+ *  default: switching GA → Jet on an untouched 7.5 m stand should give the 40 m one his note documents,
+ *  but a size someone typed is theirs and survives the switch. */
+export function setAirportParkingType(
+  project: Project,
+  parkingId: string,
+  type: ParkingType,
+  now = nowIso(),
+): Project {
+  return updateParking(
+    project,
+    parkingId,
+    (p) =>
+      p.type === type
+        ? p
+        : {
+            ...p,
+            type,
+            size: p.size === DEFAULT_PARKING_SIZE_M[p.type] ? DEFAULT_PARKING_SIZE_M[type] : p.size,
+          },
+    now,
+  );
 }

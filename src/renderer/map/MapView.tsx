@@ -14,6 +14,9 @@ import { wrapLon } from "../../core/geo/geo";
 import { tileSourceFor } from "./tileProviders";
 import { FootprintLayer } from "./FootprintLayer";
 import { HelipadLayer } from "./HelipadLayer";
+import { ParkingLayer } from "./ParkingLayer";
+import { RunwayLayer } from "./RunwayLayer";
+import { GliderLayer } from "./GliderLayer";
 
 /** The tile layer for the current provider (Esri satellite / OSM streets / custom XYZ). Overzoom
  *  (maxNativeZoom < maxZoom) keeps metre-precise placement usable past the source's native resolution.
@@ -50,18 +53,46 @@ export function MapView(): React.ReactElement {
       },
     );
 
+    // ★ THE RUNWAYS GO FIRST, and the order is load-bearing. Leaflet stacks LayerGroups in the order they
+    // are added, so whatever is created last sits on top and takes the clicks. A runway is a strip
+    // hundreds of metres wide that stands, pads and objects are placed ON — created last it would cover
+    // all of them and swallow every click meant for something standing on it.
+    const runway = new RunwayLayer(map, {
+      onMoveEnd: (id, end, p) => editorStore.getState().moveAirportRunwayEnd(id, end, p),
+      onMove: (id, a, b) => editorStore.getState().moveAirportRunway(id, a, b),
+      onSelect: (id) => editorStore.getState().selectAirportPart({ kind: "runway", id }),
+    });
+
     const layer = new FootprintLayer(map, {
       onSelect: (id, additive) => editorStore.getState().select([id], additive),
       onMove: (id, p) => editorStore.getState().moveObject(id, p),
       onRotate: (id, deg) => editorStore.getState().rotateObject(id, deg),
     });
 
-    // The helicopter's start pad (v1.2). Its own layer, not a footprint: one per project, never in the
-    // selection, and drawn whenever the project has an airport block. See HelipadLayer.
+    // The helicopter's start pads (v1.2, a LIST since v1.4 / forum #221). Their own layer, not
+    // footprints: a pad is not a placed object and never joins `selection`. See HelipadLayer.
     const helipad = new HelipadLayer(map, {
-      onMove: (p) => editorStore.getState().moveAirportPad(p),
-      onRotate: (deg) => editorStore.getState().rotateAirportPad(deg),
-      onSelect: () => editorStore.getState().selectPad(true),
+      onMove: (id, p) => editorStore.getState().moveAirportPad(id, p),
+      onRotate: (id, deg) => editorStore.getState().rotateAirportPad(id, deg),
+      onSelect: (id) => editorStore.getState().selectAirportPart({ kind: "pad", id }),
+    });
+
+    // The parking positions (v1.4, forum #232). Its own layer for the same reason the pad has one — a
+    // stand is not a placed object — but a LIST rather than a singleton, because any number can exist.
+    const parking = new ParkingLayer(map, {
+      onMove: (id, p) => editorStore.getState().moveAirportParking(id, p),
+      onRotate: (id, deg) => editorStore.getState().rotateAirportParking(id, deg),
+      onSelect: (id) => editorStore.getState().selectAirportPart({ kind: "parking", id }),
+    });
+
+    // The two glider starts (v1.4, forum #237/#238). One layer for both — they are one family, and it
+    // saves a fourth and fifth copy of the same drag state machine.
+    const glider = new GliderLayer(map, {
+      onMoveAerotow: (id, p) => editorStore.getState().moveAirportAerotow(id, p),
+      onRotateAerotow: (id, deg) => editorStore.getState().rotateAirportAerotow(id, deg),
+      onMoveWinchPoint: (id, which, p) => editorStore.getState().moveAirportWinchPoint(id, which, p),
+      onMoveWinch: (id, g, w) => editorStore.getState().moveAirportWinch(id, g, w),
+      onSelect: (kind, id) => editorStore.getState().selectAirportPart({ kind, id }),
     });
 
     // Paint now, then re-paint whenever objects / catalog / selection change — subscribed OUTSIDE
@@ -75,7 +106,28 @@ export function MapView(): React.ReactElement {
         s.plantIndex,
         new Set(s.selection),
       );
-      helipad.sync(s.project.airport, s.padSelected);
+      helipad.sync(
+        s.project.airport?.pads ?? [],
+        s.airportSelection?.kind === "pad" ? s.airportSelection.id : null,
+      );
+      parking.sync(
+        s.project.airport?.parkings ?? [],
+        s.airportSelection?.kind === "parking" ? s.airportSelection.id : null,
+      );
+      runway.sync(
+        s.project.airport?.runways ?? [],
+        s.airportSelection?.kind === "runway" ? s.airportSelection.id : null,
+      );
+      // Rebuilt rather than passed through: narrowing `kind` inside a ternary condition does not narrow
+      // the OBJECT, and this layer only ever wants the two glider kinds.
+      const sel = s.airportSelection;
+      glider.sync(
+        s.project.airport?.aerotows ?? [],
+        s.project.airport?.winches ?? [],
+        sel !== null && (sel.kind === "aerotow" || sel.kind === "winch")
+          ? { kind: sel.kind, id: sel.id }
+          : null,
+      );
     };
     paint();
     const unsub = editorStore.subscribe(
@@ -90,7 +142,7 @@ export function MapView(): React.ReactElement {
           s.plantIndex,
           s.selection,
           s.project.airport,
-          s.padSelected,
+          s.airportSelection,
         ] as const,
       paint,
       { equalityFn: shallow },
@@ -136,8 +188,11 @@ export function MapView(): React.ReactElement {
       unsub();
       unsubCamera();
       unsubTiles();
+      glider.destroy();
+      parking.destroy();
       helipad.destroy();
       layer.destroy();
+      runway.destroy();
       map.remove(); // frees the container so StrictMode's second mount can re-init it
     };
   }, []);

@@ -84,7 +84,8 @@ export interface UserFootprint {
 export interface CatalogPlant extends UserFootprint {
   group: string; // the .toc `group`, e.g. "conifer_forest" — verbatim from the filename
   species: string; // the .toc `species`, e.g. "00" — 2 zero-padded digits, verbatim
-  naturalHeight: number; // metres, decoded from the filename's h#### (h1750 → 17.5)
+  naturalHeight: number; // metres, decoded from the filename's [h]#### (h1750 → 17.5; the `h` is
+  // missing from two files the FS4 beta shipped, forum #244 — the digits still read as centimetres
   source: "install";
   category: string; // display taxonomy path, e.g. "plants/broadleaf"
   displayName: string; // derived pretty label, e.g. "Broadleaf 00"
@@ -207,11 +208,188 @@ export type HeightMode = "baked-asl" | "autoheight";
  *  starting position for Helicopter should be independent of XREF objects because this will lead to
  *  collisions too quickly". A pad that IS an object puts the helicopter inside the mast or the hangar
  *  it borrowed its coordinates from. The user can still seed it from a selection — that is a one-shot
- *  copy of two numbers, not a link. */
+ *  copy of two numbers, not a link.
+ *
+ *  ★ v1.4: a project may carry SEVERAL. ApfelFlieger's submenu split (forum #221) makes HELICOPTER a
+ *  repeatable element — his own SCLC ships three — and gives each pad a free NAME, shown in LOCATION.
+ *  Until then there was exactly one, unnamed, always written as the literal "FATO/TLOF". */
 export interface AirportPad {
+  /** Stable across reorder and delete, so a map drag can name its target without an index. Same reason
+   *  PlacedObject carries one; pads are minted with the same `randomId`. */
+  id: string;
+  /** Shown in LOCATION (forum #221). Free text. EMPTY means "unnamed", and the writer then emits
+   *  "FATO/TLOF" — which is what v1.2/v1.3 hard-coded, so a migrated project's files do not move. */
+  name: string;
   position: LonLat; // pad centre
   heading: number; // TRUE compass degrees (the sim's `heading` field is true — gate 2026-07-31)
   radius: number; // metres; the sim shows the DIAMETER as "Size" (radius 10 → "66 ft / 20 m")
+}
+
+/** The approach lighting system at ONE runway end, written verbatim into `appltsys`.
+ *
+ *  ★ EVERY ONE OF THESE IS A LITERAL IN THE SIMULATOR'S OWN BINARY, checked rather than assumed: a strings
+ *  pass over `aerofly_fs_4.exe` finds `std`, `alsf-1`, `alsf-2`, `malsf`, `malsr`, `calvert`, `calvert-2`,
+ *  `odals`, `rail`, `sals` and `none`, next to the field names `appltsys1`/`appltsys2` themselves. So this
+ *  list is the sim's, not a transcription of a forum post.
+ *
+ *  The split ApfelFlieger drew (his two sample airports, 0001 and 0002): the first six are what his ACT
+ *  offers; the last five are FS2 systems it does NOT offer but FS4 still loads. PCT can write both — there
+ *  is no reason to be narrower than the sim. */
+export type ApproachLightSystem =
+  | "none"
+  | "std"
+  | "alsf-1"
+  | "alsf-2"
+  | "malsf"
+  | "malsr"
+  | "calvert"
+  | "calvert-2"
+  | "odals"
+  | "rail"
+  | "sals";
+
+/** Which side of the runway the PAPI sits on, and the REIL kind — both verbatim rows, both literals in
+ *  the sim's binary.
+ *
+ *  ★★ THE REIL VALUES ARE THE REASON NOT TO CROSS-READ THE TWO FORMATS. IPACS ships 146 `.tap` files
+ *  under scenery/airports/, and they spell these `reil_omni` / `reil_uni`. Those spellings appear NOWHERE
+ *  in the executable, while `omni` and `uni` do — because a `.tap` is the AUTHORING project file, and the
+ *  simulator reads the `.tsc` it was compiled into. Michael's own `.tsc` files agree: `omni` / `uni`.
+ *  Copying the vocabulary out of the richer, more official-looking file would have written a row the sim
+ *  quietly ignores. (Same trap in miniature elsewhere in the `.tap`: `radius` for what the `.tsc` calls
+ *  `size`, and a parking type declared `<[float64][type]>` while holding a string.) */
+export type PapiSide = "none" | "left" | "right" | "both";
+export type ReilKind = "none" | "uni" | "omni";
+
+/** ONE END of a runway. A runway is always a pair of these — the format has no single-ended runway: the
+ *  `.tsc` suffixes every field `1`/`2` and the `.wad` nests an array of exactly two.
+ *
+ *  ★ ONE POINT, NOT TWO, and that is ApfelFlieger's call (forum #236). The files have both an `endpoint`
+ *  (where the pavement stops) and a `threshold` (where landing distance starts), and his ACT's SCLC output
+ *  does displace them, by 170 m at the 26 end. But: "At the PCT we have no visible runway. Therefore,
+ *  EXTENSIONS make no sense there either. => Therefore, in the PCT the leading variable is [threshold] and
+ *  their values are automatically transferred to [endpoint]."
+ *
+ *  He is right for a reason worth writing down: PCT is a Level-1 tool — it writes the airport's DATA, not
+ *  its asphalt. A displaced threshold is a fact about pavement that PCT never draws, so offering the field
+ *  would let a user describe a runway nobody can see the extension of. The WRITER still knows both rows are
+ *  separate (heliportTemplate's HeliportRunwayEndSpec keeps them, and a test pins his displaced case), so
+ *  the format knowledge survives even though the document cannot express it. */
+export interface AirportRunwayEnd {
+  /** The runway end, degrees. Written into BOTH the `threshold` and the `endpoint` rows of both files. */
+  threshold: LonLat;
+  /** "08", "26", "ALSF2"… May be EMPTY: his 0001 leaves the second end's identifier blank. */
+  identifier: string;
+  appltsys: ApproachLightSystem;
+  papi: PapiSide;
+  reil: ReilKind;
+  /** Whether this end may be used to land on / take off from. Both true in every file he has sent, and
+   *  both are their own row in the `.wad`, which is the half the navigation menu reads. */
+  approach: boolean;
+  takeoff: boolean;
+}
+
+/** A runway, i.e. the PAIR (forum #217's submenu (4), "RUNWAY").
+ *
+ *  There is no heading here on purpose: the `.tsc`/`.wad` carry none, and the direction is whatever the two
+ *  endpoints say. His ACT's own project file (`.tap`) does keep a `direction`, because that is an authoring
+ *  input it turns into endpoints — a different thing from what the simulator reads. */
+export interface AirportRunway {
+  /** Stable across reorder and delete — same contract as AirportPad.id. */
+  id: string;
+  /** Exactly two, in the order they are written as end 1 and end 2. */
+  ends: [AirportRunwayEnd, AirportRunwayEnd];
+  /** Metres, and here it really is the full width (not a radius): his reference airports carry 40. */
+  width: number;
+}
+
+/** A glider AEROTOW start: where the glider stands to be pulled into the air by the DR400 (forum #237).
+ *
+ *  ★ THIS ONE LIVES ONLY IN THE `.wad`. "The code lines for this submenu only appear in the WAD" — so
+ *  unlike a pad or a stand there is nothing to write into the `.tsc`, and lon/lat/heading all go through
+ *  the projection. Independent of whether the airport has a runway at all; usually it sits on one, or on
+ *  its extension when the runway is too short.
+ *
+ *  The NAME should match the runway it belongs to ("26"), but that is the user's job: "the user must enter
+ *  this himself, PCT does not need to worry about it." No deriving it from a nearby runway.
+ *
+ *  The file also carries a `waypoints` list, which his own example leaves empty and marks DEFAULT. PCT
+ *  writes the empty list and offers nothing for it. */
+export interface AirportAerotow {
+  id: string;
+  /** Shown in LOCATION; free text, conventionally the runway's identifier. */
+  name: string;
+  /** Where the GLIDER stands, degrees. */
+  position: LonLat;
+  /** TRUE compass degrees — the pull direction. Converted to radians for the `.wad`, like every other
+   *  heading in the model. */
+  heading: number;
+}
+
+/** A glider WINCH LAUNCH start (forum #238). Also `.wad`-only.
+ *
+ *  ★ NO HEADING, and that is the interesting part: "The length and direction then result from the two
+ *  positions GLIDER and WINCH." So this element is defined by a PAIR of points, and the rope — 800 to
+ *  1000 m of it — is the line between them. Storing a heading as well would let the two disagree.
+ *
+ *  ⛔ WINCH LAUNCH DOES NOT CURRENTLY WORK IN FS 4 (forum #229): the glider comes out "twisted in the
+ *  ground". He has reported it to IPACS. PCT can write the block — it is data, and the fault is in the
+ *  simulator — but nothing here can be verified in-sim until that update lands. */
+export interface AirportWinch {
+  id: string;
+  /** Shown in LOCATION. His convention: name it like a runway, "supplemented if necessary by an
+   *  additional letter. However, this is at the discretion of the user." */
+  name: string;
+  /** Where the GLIDER stands, degrees. */
+  position: LonLat;
+  /** Where the WINCH stands, degrees. The far end of the rope. */
+  winch: LonLat;
+  /** How far apart two gliders launched side by side stand, metres — "if two gliders stand next to each
+   *  other, the distance is basically the span". A winch with two ropes starts two gliders at once; FS4
+   *  represents that with this one number. He enters 25, "but each user has to decide for himself". */
+  spacing: number;
+}
+
+/** What a parking position is FOR, written verbatim into the `tags` row of both files.
+ *
+ *  ★ THESE THREE LITERALS ARE THE VOCABULARY, and they are spelled `parked_`, not `parking_`.
+ *  ApfelFlieger's post announcing the submenu (forum #232) writes them as `[parking_ga]` / `[parking_jet]`
+ *  in prose, but every FILE he has sent — his original SCLC, the three flight-test variants, the ACT's own
+ *  output and the new #232 pair — writes `parked_ga`, and his own margin note in the original spells the
+ *  set out: "[parked_ga] = 7.5 M / [parked_jet] = 40 M / [pushback] = PUSH BACK". The files win — and so
+ *  do IPACS's: all three appear verbatim in the airport files shipped with the sim, while `parking_ga`
+ *  appears in none of its 85 749 files.
+ *
+ *  ⚠️ Getting one wrong FAILS SILENTLY — there is no error to read in tm.log. (An earlier note here
+ *  guessed that these were HASHED at load, from the fact that `parked_ga` is not a literal in
+ *  `aerofly_fs_4.exe`. That was wrong, and the correction is worth keeping: the sim never needs the
+ *  literal because BOTH sides are data — the airport names the tag and the aircraft declares what it can
+ *  use, so it only ever compares two strings that came out of files. The `appltsys`/`papi`/`reil` values
+ *  next door ARE in the binary, because those the sim resolves itself.)
+ *
+ *  What the user gets out of each (forum #232): `parked_ga`/`parked_jet` let a COLD & DARK–capable
+ *  aircraft or helicopter be started in a chosen state; `pushback` lets the pushback truck be coupled at
+ *  start. Helicopters may use any of them — that is why the submenu stopped being called "Aircraft"
+ *  (forum #227). */
+export type ParkingType = "parked_ga" | "parked_jet" | "pushback";
+
+/** One parking position: where an aircraft (or helicopter) is parked and can start a flight from.
+ *
+ *  Its own point, exactly like AirportPad and for the same reason (forum #168) — a stand that borrowed an
+ *  XREF's coordinates parks the aircraft inside the building. Repeatable: "any number of parking positions
+ *  can be created" (forum #232; his own SCLC ships three). */
+export interface AirportParking {
+  /** Stable across reorder and delete — same contract as AirportPad.id. */
+  id: string;
+  /** Shown in LOCATION, free text ("Parking_W", "FuelStation"). EMPTY means unnamed and the writer emits
+   *  "Parking", so the sim never shows a blank row. */
+  name: string;
+  position: LonLat; // stand centre
+  heading: number; // TRUE compass degrees, like a pad's
+  /** Metres, and it is a RADIUS: the sim shows the diameter, so 7.5 reads as "15 m". His margin note ties
+   *  the number to the type — 7.5 for GA, 40 for a jet. */
+  size: number;
+  type: ParkingType;
 }
 
 /** The AIRPORT half of a project: everything "Create heliport…" needs that the POI half does not carry.
@@ -232,7 +410,47 @@ export interface ProjectAirport {
   icao: string; // 4-6 chars; lowercase on disk, shown uppercase in the UI (forum #170 EDIT 2)
   name: string; // shown in LOCATION; <= SNAME_MAX or the sim drops the whole airport
   country: string; // two lowercase letters — ALSO a path segment under scenery/airports/
-  pad: AirportPad;
+  /** IATA code, v1.4 (forum #220): "if airports have a IATA code, it is also displayed in FS 4". Its
+   *  own row in the `.wad` and empty in every file PCT has written so far, hence optional. */
+  iata?: string;
+  /** The AIRPORT's own point, v1.4 — independent of any pad.
+   *
+   *  ApfelFlieger asked for the split in #15 and then SHIPPED it: his older hand-built `.wad` carried
+   *  the FIRST HELIPAD's projected position (verified exact — it was an unexplained oddity in our notes
+   *  for days), while the #220/#221 files carry the airport's own `-70.582247 -33.380724` even though
+   *  that project has three pads. So the coupling was an artefact of his manual method, not a rule.
+   *
+   *  ABSENT ≡ the first pad's position, which is exactly how v1.2/v1.3 behaved — so a migrated project
+   *  keeps writing the same coordinates until someone moves this point on purpose. */
+  position?: LonLat;
+  /** Every helipad, in document order. May be EMPTY: his "(1) DATA" example is a complete airport with
+   *  no pads at all — identity plus a database entry. */
+  pads: AirportPad[];
+  /** Every runway, in document order (forum #217 submenu (4)). Absent ≡ none, same rule as `parkings`
+   *  below and for the same reason: no runways ⇒ no block ⇒ an older project exports the same bytes. */
+  runways?: AirportRunway[];
+  /** Glider AEROTOW and WINCH LAUNCH starts (forum #237/#238), `.wad`-only. Same absent-means-none rule. */
+  aerotows?: AirportAerotow[];
+  winches?: AirportWinch[];
+  /** Every parking position, in document order (forum #232). Absent ≡ none, which is what every project
+   *  written before v1.4 has — and the writers emit no `parking_positions` block at all in that case, so
+   *  those projects keep exporting the same bytes.
+   *
+   *  Unlike `pads` there is no compatibility mirror and none is needed: PCT <= 1.3 parses the airport
+   *  block with a LOOSE schema (verified against the v1.3.2 tag), so it carries this key through a
+   *  load/save round-trip untouched instead of dropping it. */
+  parkings?: AirportParking[];
+  /** ⚠️ COMPATIBILITY MIRROR of `pads[0]` — written, never read by this version.
+   *
+   *  `zProject.parse` THROWS, and `zAirport` before v1.4 required `pad`, so a project that carries only
+   *  `pads` does not merely lose its airport in PCT <= 1.3 — it fails to OPEN AT ALL. Projects get
+   *  shared (that is the whole point of the block: "it can be passed on like a POI"), and Michael tests
+   *  every release, so the common case has to keep working. Mirroring the first pad costs one line and
+   *  buys that: one pad → older PCT opens it and sees exactly what it saw before.
+   *
+   *  Absent when `pads` is empty — an older PCT cannot represent a pad-less airport anyway, and inventing
+   *  a fake pad to keep it loading would put a helipad in the sim that the user never placed. */
+  pad?: AirportPad;
 }
 
 /** The editable working file (`project.json`). */

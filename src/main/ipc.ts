@@ -290,10 +290,12 @@ async function runHeliportInstall(project: Project, opts: HeliportInstallOptions
   const icao = opts.identity.icao.trim().toLowerCase();
   const identity = { ...opts.identity, icao, country: opts.identity.country.trim().toLowerCase() };
 
-  const pad = opts.heliport.pad;
+  const pads = opts.heliport.pads;
+  const pad = pads[0];
   log.info(
     `heliport install "${identity.icao}" (${identity.country}) — ${project.objects.length} objects, ` +
-      `pad ${pad === null ? "at POI anchor" : `${pad.position.lon.toFixed(6)} ${pad.position.lat.toFixed(6)} hdg ${pad.heading}`}, ` +
+      `${pads.length} pad${pads.length === 1 ? "" : "s"}, ` +
+      `first ${pad === undefined ? "at POI anchor" : `${pad.position.lon.toFixed(6)} ${pad.position.lat.toFixed(6)} hdg ${pad.heading}`}, ` +
       `r=${pad?.radius ?? opts.heliport.radiusM ?? "default"} m`,
   );
 

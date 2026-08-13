@@ -4,6 +4,7 @@ import {
   CONFIGURATION_RE,
   firstProjectError,
   isExportablePoiName,
+  LEGACY_PAD_ID,
   migrateProject,
   parseProject,
   parseSettings,
@@ -287,9 +288,177 @@ describe("zProject — the airport block", () => {
     pad: { position: { lon: -70.3130659, lat: -18.4827329 }, heading: 90, radius: 10 },
   };
 
-  it("round-trips a project that has one", () => {
+  // v1.4 (forum #221) made HELICOPTER repeatable, so the single `pad` became a `pads` list. AIRPORT above
+  // is the v1.2/v1.3 shape on purpose: it is what is sitting in users' files today.
+  it("lifts a v1.3 single pad into the pads list, keeping the mirror", () => {
     const p = parseProject({ ...validProject(), airport: AIRPORT });
-    expect(p.airport).toEqual(AIRPORT);
+    expect(p.airport?.pads).toHaveLength(1);
+    expect(p.airport?.pads[0]).toEqual({ id: LEGACY_PAD_ID, name: "", ...AIRPORT.pad });
+    // The mirror is what lets PCT <= 1.3 still open the file after we save it back.
+    expect(p.airport?.pad).toEqual(p.airport?.pads[0]);
+    expect(p.airport?.icao).toBe("shjl");
+  });
+
+  // The migrated id must be FIXED, not minted: migration runs on every open, so a random one would make
+  // the file differ from itself on the next save.
+  it("gives the migrated pad a stable id across repeated opens", () => {
+    const once = parseProject({ ...validProject(), airport: AIRPORT });
+    const twice = parseProject({ ...validProject(), airport: AIRPORT });
+    expect(once.airport?.pads[0]?.id).toBe(twice.airport?.pads[0]?.id);
+    // …and re-opening what we just wrote is a no-op, not a second migration.
+    const again = parseProject({ ...validProject(), airport: once.airport });
+    expect(again.airport).toEqual(once.airport);
+  });
+
+  it("round-trips a project already in the v1.4 shape", () => {
+    const pads = [
+      { id: "pad-1", name: "FATO/TLOF", position: { lon: -70.58, lat: -33.38 }, heading: 70, radius: 5 },
+      { id: "pad-2", name: "Helipad_W1", position: { lon: -70.59, lat: -33.39 }, heading: 250, radius: 5 },
+    ];
+    const airport = { icao: "sclc", name: "Vitacura", country: "cl", iata: "CLC", pads, pad: pads[0] };
+    const p = parseProject({ ...validProject(), airport });
+    expect(p.airport).toEqual(airport);
+  });
+
+  it("accepts an airport with no pads at all", () => {
+    // His "(1) DATA" example is exactly that: identity plus a database entry, no helipad.
+    const p = parseProject({
+      ...validProject(),
+      airport: { icao: "sclc", name: "Vitacura", country: "cl", pads: [] },
+    });
+    expect(p.airport?.pads).toEqual([]);
+  });
+
+  // ── Parking positions (v1.4, forum #232) ───────────────────────────────────────────────────────
+  const STAND = {
+    id: "prk-1",
+    name: "Parking_W",
+    position: { lon: -70.5842423, lat: -33.3806032 },
+    heading: 165,
+    size: 7.5,
+    type: "parked_ga",
+  };
+  const withStands = (parkings: unknown[]): unknown => ({
+    ...validProject(),
+    airport: { icao: "sclc", name: "Vitacura", country: "cl", pads: [], parkings },
+  });
+
+  it("round-trips parking positions", () => {
+    const p = parseProject(withStands([STAND]));
+    expect(p.airport?.parkings).toEqual([STAND]);
+  });
+
+  it("stays ABSENT when the project has none — no empty array written into old files", () => {
+    const p = parseProject({
+      ...validProject(),
+      airport: { icao: "sclc", name: "Vitacura", country: "cl", pads: [] },
+    });
+    expect(p.airport?.parkings).toBeUndefined();
+    expect("parkings" in p.airport!).toBe(false);
+  });
+
+  // ── Runways (v1.4, forum #217 submenu (4)) ─────────────────────────────────────────────────────
+  const RWY_END = {
+    endpoint: { lon: -70.58515, lat: -33.38115 },
+    threshold: { lon: -70.58515, lat: -33.38115 },
+    identifier: "08",
+    appltsys: "none",
+    papi: "none",
+    reil: "none",
+    approach: true,
+    takeoff: true,
+  };
+  const RUNWAY = { id: "rwy-1", ends: [RWY_END, { ...RWY_END, identifier: "26" }], width: 40 };
+  const withRunways = (runways: unknown[]): unknown => ({
+    ...validProject(),
+    airport: { icao: "sclc", name: "Vitacura", country: "cl", pads: [], runways },
+  });
+
+  it("round-trips a runway, and stays absent when there are none", () => {
+    expect(parseProject(withRunways([RUNWAY])).airport?.runways).toEqual([RUNWAY]);
+    const none = parseProject({
+      ...validProject(),
+      airport: { icao: "sclc", name: "Vitacura", country: "cl", pads: [] },
+    });
+    expect("runways" in none.airport!).toBe(false);
+  });
+
+  it("REFUSES a runway that is not a PAIR — the format has no other shape", () => {
+    expect(() => parseProject(withRunways([{ ...RUNWAY, ends: [RWY_END] }]))).toThrow();
+    expect(() => parseProject(withRunways([{ ...RUNWAY, ends: [RWY_END, RWY_END, RWY_END] }]))).toThrow();
+    expect(() => parseProject(withRunways([{ ...RUNWAY, width: 0 }]))).toThrow();
+  });
+
+  it("REFUSES a lighting value the sim does not know", () => {
+    // Same reasoning as the parking tag, with a sharper edge: `reil_omni` is what IPACS's OWN .tap files
+    // say — but a .tap is the authoring format, and that spelling is in none of the sim's binary. Writing
+    // it into a .tsc gives a runway end whose REIL quietly does not exist.
+    for (const bad of [
+      { ...RWY_END, reil: "reil_omni" },
+      { ...RWY_END, appltsys: "ALSF-2" },
+      { ...RWY_END, papi: "center" },
+    ]) {
+      expect(() => parseProject(withRunways([{ ...RUNWAY, ends: [bad, RWY_END] }]))).toThrow();
+    }
+    // …while every value the binary does carry is accepted, FS2 legacy systems included.
+    for (const good of ["std", "alsf-1", "alsf-2", "malsf", "malsr", "calvert", "calvert-2", "odals", "rail", "sals"]) {
+      const ends = [{ ...RWY_END, appltsys: good }, RWY_END];
+      expect(parseProject(withRunways([{ ...RUNWAY, ends }])).airport?.runways?.[0]?.ends[0]?.appltsys).toBe(good);
+    }
+  });
+
+  // ── Glider starts (v1.4, forum #237/#238) ──────────────────────────────────────────────────────
+  const AEROTOW = { id: "ato-1", name: "26", position: { lon: -70.5783, lat: -33.38 }, heading: 260 };
+  const WINCH = {
+    id: "wnc-1",
+    name: "26",
+    position: { lon: -70.57713, lat: -33.3801 },
+    winch: { lon: -70.58609, lat: -33.3811 },
+    spacing: 25,
+  };
+
+  it("round-trips the glider starts, and leaves them absent when there are none", () => {
+    const p = parseProject({
+      ...validProject(),
+      airport: {
+        icao: "sclc",
+        name: "Vitacura",
+        country: "cl",
+        pads: [],
+        aerotows: [AEROTOW],
+        winches: [WINCH],
+      },
+    });
+    expect(p.airport?.aerotows).toEqual([AEROTOW]);
+    expect(p.airport?.winches).toEqual([WINCH]);
+    const none = parseProject({
+      ...validProject(),
+      airport: { icao: "sclc", name: "Vitacura", country: "cl", pads: [] },
+    });
+    expect("aerotows" in none.airport!).toBe(false);
+    expect("winches" in none.airport!).toBe(false);
+  });
+
+  it("REFUSES a winch with no second point or a non-positive spacing", () => {
+    const withWinches = (winches: unknown[]): unknown => ({
+      ...validProject(),
+      airport: { icao: "sclc", name: "Vitacura", country: "cl", pads: [], winches },
+    });
+    const { winch: _dropped, ...noWinch } = WINCH;
+    // The pair IS the element: without the far point there is no direction and no rope length.
+    expect(() => parseProject(withWinches([noWinch]))).toThrow();
+    expect(() => parseProject(withWinches([{ ...WINCH, spacing: 0 }]))).toThrow();
+  });
+
+  it("REJECTS a parking tag the sim would never match", () => {
+    // ★ The one place a typo here can still be caught. `parking_ga` is not a strawman: it is the spelling
+    // ApfelFlieger himself used in the prose of #232, while all of his files — and all of IPACS's — say
+    // `parked_ga`. In the sim the wrong value makes a stand that silently does nothing: no error anywhere.
+    expect(() => parseProject(withStands([{ ...STAND, type: "parking_ga" }]))).toThrow();
+    expect(() => parseProject(withStands([{ ...STAND, type: "" }]))).toThrow();
+    // …and the same refusals the pad radius gets, for the same reason.
+    expect(() => parseProject(withStands([{ ...STAND, size: 0 }]))).toThrow();
+    expect(() => parseProject(withStands([{ ...STAND, id: "" }]))).toThrow();
   });
 
   it("stays optional — a POI-only project is unchanged", () => {

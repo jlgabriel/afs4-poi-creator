@@ -9,49 +9,273 @@
 import { useMemo } from "react";
 import { editorStore, useEditor } from "../state/editorStore";
 import { Thumbnail } from "../catalog/Thumbnail";
-import { HelipadIcon } from "../catalog/categoryIcon";
+import {
+  AerotowIcon,
+  DataIcon,
+  HelipadIcon,
+  ParkingIcon,
+  RunwayIcon,
+  WinchIcon,
+} from "../catalog/categoryIcon";
 import { photoKeyForPlaced as placedPhotoKey } from "../../core/catalog/photoKey";
+import { PARKING_TYPE_LABELS } from "../../core/project/airport";
+import { haversine, initialBearing } from "../../core/geo/geo";
 import { rowInfo } from "./rowInfo";
 
-/** The helipad's row, pinned above the objects (v1.3, forum #173: "which is then listed on the right for
- *  editing"). It is NOT one of the objects and does not join their count — there is exactly one, it never
- *  goes into the cultivation, and Duplicate means nothing for it — so it gets its own row above the list
- *  rather than a place in it. Click selects, double-click flies, and the Inspector shows the heliport. */
-function HelipadRow(): React.ReactElement | null {
+/** The airport's own row — his submenu (1) DATA — pinned above every airport part, because the parts
+ *  belong to it. Present whenever the block is, INCLUDING an airport with no geometry at all: that is a
+ *  legal document (his "(1) DATA" example is identity plus a database entry and nothing else), and it is
+ *  the row that makes such an airport visible instead of a block nobody can see or reach.
+ *
+ *  No double-click-to-fly: the airport's position follows its first helipad and is not a point of its own
+ *  yet (AirportDataFields), so flying "to the airport" would fly to a pad while claiming otherwise. */
+function DataRow(): React.ReactElement | null {
   const airport = useEditor((s) => s.project.airport);
-  const selected = useEditor((s) => s.padSelected);
+  const selected = useEditor((s) => s.airportSelection?.kind === "data");
   if (airport === undefined) return null;
-  const { pad, icao, name } = airport;
+  const { icao, name } = airport;
+  const parts =
+    airport.pads.length +
+    (airport.parkings?.length ?? 0) +
+    (airport.runways?.length ?? 0) +
+    (airport.aerotows?.length ?? 0) +
+    (airport.winches?.length ?? 0);
   return (
     <button
       type="button"
       className={selected ? "pct-placed-row pct-placed-pad sel" : "pct-placed-row pct-placed-pad"}
       aria-pressed={selected}
-      title="The helicopter's start pad"
-      onClick={() => editorStore.getState().selectPad(true)}
-      onDoubleClick={() => editorStore.getState().flyTo(pad.position)}
+      title="The airport itself — its name and code"
+      onClick={() => editorStore.getState().selectAirportPart({ kind: "data" })}
     >
-      <HelipadIcon />
+      <DataIcon />
       <span className="pct-placed-text">
         <span className="pct-placed-name">
-          <span className="pct-placed-label">
-            {name.trim() === "" ? "Start - Helicopter" : name.trim()}
-          </span>
+          <span className="pct-placed-label">{name.trim() === "" ? "Airport" : name.trim()}</span>
           {icao.trim() !== "" && <span className="pct-placed-code">{icao.toUpperCase()}</span>}
         </span>
         <span className="pct-placed-meta">
-          lon {pad.position.lon.toFixed(6)} · lat {pad.position.lat.toFixed(6)} ·{" "}
-          {Math.round(pad.heading)}°
+          {icao.trim() === "" && name.trim() === ""
+            ? "no name or code yet — click to add them"
+            : parts === 0
+              ? "no parts placed yet"
+              : `${parts} ${parts === 1 ? "part" : "parts"}`}
         </span>
       </span>
     </button>
   );
 }
 
+/** One row per helicopter start pad (v1.3, forum #173: "which is then listed on the right for editing";
+ *  a LIST since #221). They are NOT objects and do not join their count — none of them goes into the
+ *  cultivation and Duplicate means nothing for them — so they sit above the list rather than in it.
+ *
+ *  The label is the pad's own name, not the airport's. Through v1.3 it showed the AIRPORT's name and code
+ *  here, which was the same shortcut the pad panel took: with one pad you cannot tell the two apart. With
+ *  three you can, and the airport's name belongs to the Data row above. */
+function HelipadRows(): React.ReactElement | null {
+  const pads = useEditor((s) => s.project.airport?.pads);
+  const selectedId = useEditor((s) =>
+    s.airportSelection?.kind === "pad" ? s.airportSelection.id : null,
+  );
+  if (pads === undefined || pads.length === 0) return null;
+  return (
+    <>
+      {pads.map((pad) => {
+        const selected = pad.id === selectedId;
+        return (
+          <button
+            key={pad.id}
+            type="button"
+            className={selected ? "pct-placed-row pct-placed-pad sel" : "pct-placed-row pct-placed-pad"}
+            aria-pressed={selected}
+            title="A helicopter start pad"
+            onClick={() => editorStore.getState().selectAirportPart({ kind: "pad", id: pad.id })}
+            onDoubleClick={() => editorStore.getState().flyTo(pad.position)}
+          >
+            <HelipadIcon />
+            <span className="pct-placed-text">
+              <span className="pct-placed-name">
+                <span className="pct-placed-label">
+                  {pad.name.trim() === "" ? "Start - Helicopter" : pad.name.trim()}
+                </span>
+                <span className="pct-placed-code">{pad.radius} m</span>
+              </span>
+              <span className="pct-placed-meta">
+                lon {pad.position.lon.toFixed(6)} · lat {pad.position.lat.toFixed(6)} ·{" "}
+                {Math.round(pad.heading)}°
+              </span>
+            </span>
+          </button>
+        );
+      })}
+    </>
+  );
+}
+
+/** One row per parking position, pinned with the pads above the objects and for the same reasons: a stand
+ *  is not an object, never joins their count, never goes into the cultivation, and Duplicate means
+ *  nothing for it. This was the FIRST of the repeatable kinds to be built ("any number of parking
+ *  positions can be created", forum #232) and the other four followed its shape — the pad last, because
+ *  it was the one that already existed as a singleton. */
+function ParkingRows(): React.ReactElement | null {
+  const parkings = useEditor((s) => s.project.airport?.parkings);
+  const selectedId = useEditor((s) =>
+    s.airportSelection?.kind === "parking" ? s.airportSelection.id : null,
+  );
+  if (parkings === undefined || parkings.length === 0) return null;
+  return (
+    <>
+      {parkings.map((p) => {
+        const selected = p.id === selectedId;
+        return (
+          <button
+            key={p.id}
+            type="button"
+            className={selected ? "pct-placed-row pct-placed-pad sel" : "pct-placed-row pct-placed-pad"}
+            aria-pressed={selected}
+            title="A parking position"
+            onClick={() => editorStore.getState().selectAirportPart({ kind: "parking", id: p.id })}
+            onDoubleClick={() => editorStore.getState().flyTo(p.position)}
+          >
+            <ParkingIcon />
+            <span className="pct-placed-text">
+              <span className="pct-placed-name">
+                <span className="pct-placed-label">
+                  {p.name.trim() === "" ? "Parking" : p.name.trim()}
+                </span>
+                {/* His word, not the file's token — see ParkingFields on why the user never sees
+                    `parked_ga`. */}
+                <span className="pct-placed-code">{PARKING_TYPE_LABELS[p.type]}</span>
+              </span>
+              <span className="pct-placed-meta">
+                lon {p.position.lon.toFixed(6)} · lat {p.position.lat.toFixed(6)} ·{" "}
+                {Math.round(p.heading)}° · {p.size} m
+              </span>
+            </span>
+          </button>
+        );
+      })}
+    </>
+  );
+}
+
+/** One row per runway. Same contract as the stands', and the label is how anyone refers to a runway: its
+ *  two identifiers. Both may be empty — legal, his 0001 sample leaves the second blank. */
+function RunwayRows(): React.ReactElement | null {
+  const runways = useEditor((s) => s.project.airport?.runways);
+  const selectedId = useEditor((s) =>
+    s.airportSelection?.kind === "runway" ? s.airportSelection.id : null,
+  );
+  if (runways === undefined || runways.length === 0) return null;
+  return (
+    <>
+      {runways.map((r) => {
+        const selected = r.id === selectedId;
+        const a = r.ends[0].identifier.trim();
+        const b = r.ends[1].identifier.trim();
+        const label = a === "" && b === "" ? "Runway" : `Runway ${[a, b].filter(Boolean).join(" / ")}`;
+        const lengthM = haversine(r.ends[0].threshold, r.ends[1].threshold);
+        return (
+          <button
+            key={r.id}
+            type="button"
+            className={selected ? "pct-placed-row pct-placed-pad sel" : "pct-placed-row pct-placed-pad"}
+            aria-pressed={selected}
+            title="A runway"
+            onClick={() => editorStore.getState().selectAirportPart({ kind: "runway", id: r.id })}
+            onDoubleClick={() => editorStore.getState().flyTo(r.ends[0].threshold)}
+          >
+            <RunwayIcon />
+            <span className="pct-placed-text">
+              <span className="pct-placed-name">
+                <span className="pct-placed-label">{label}</span>
+                <span className="pct-placed-code">{r.width} m</span>
+              </span>
+              <span className="pct-placed-meta">
+                {lengthM < 10000 ? `${Math.round(lengthM)} m` : `${(lengthM / 1000).toFixed(1)} km`} ·{" "}
+                {String(Math.round(initialBearing(r.ends[0].threshold, r.ends[1].threshold)) % 360).padStart(3, "0")}
+                ° true
+              </span>
+            </span>
+          </button>
+        );
+      })}
+    </>
+  );
+}
+
+/** One row per glider start, aerotows then winch launches. Both `.wad`-only, both repeatable, and both
+ *  named by the user after the runway they serve — an empty name is normal, not a mistake. */
+function GliderRows(): React.ReactElement | null {
+  const aerotows = useEditor((s) => s.project.airport?.aerotows);
+  const winches = useEditor((s) => s.project.airport?.winches);
+  const sel = useEditor((s) => s.airportSelection);
+  const rows: React.ReactElement[] = [];
+
+  for (const a of aerotows ?? []) {
+    const selected = sel?.kind === "aerotow" && sel.id === a.id;
+    rows.push(
+      <button
+        key={a.id}
+        type="button"
+        className={selected ? "pct-placed-row pct-placed-pad sel" : "pct-placed-row pct-placed-pad"}
+        aria-pressed={selected}
+        title="A glider aerotow start"
+        onClick={() => editorStore.getState().selectAirportPart({ kind: "aerotow", id: a.id })}
+        onDoubleClick={() => editorStore.getState().flyTo(a.position)}
+      >
+        <AerotowIcon />
+        <span className="pct-placed-text">
+          <span className="pct-placed-name">
+            <span className="pct-placed-label">
+              {a.name.trim() === "" ? "Aerotow" : `Aerotow ${a.name.trim()}`}
+            </span>
+          </span>
+          <span className="pct-placed-meta">
+            lon {a.position.lon.toFixed(6)} · lat {a.position.lat.toFixed(6)} · {Math.round(a.heading)}°
+          </span>
+        </span>
+      </button>,
+    );
+  }
+
+  for (const w of winches ?? []) {
+    const selected = sel?.kind === "winch" && sel.id === w.id;
+    rows.push(
+      <button
+        key={w.id}
+        type="button"
+        className={selected ? "pct-placed-row pct-placed-pad sel" : "pct-placed-row pct-placed-pad"}
+        aria-pressed={selected}
+        title="A glider winch launch"
+        onClick={() => editorStore.getState().selectAirportPart({ kind: "winch", id: w.id })}
+        onDoubleClick={() => editorStore.getState().flyTo(w.position)}
+      >
+        <WinchIcon />
+        <span className="pct-placed-text">
+          <span className="pct-placed-name">
+            <span className="pct-placed-label">
+              {w.name.trim() === "" ? "Winch launch" : `Winch launch ${w.name.trim()}`}
+            </span>
+            <span className="pct-placed-code">{Math.round(haversine(w.position, w.winch))} m</span>
+          </span>
+          <span className="pct-placed-meta">
+            lon {w.position.lon.toFixed(6)} · lat {w.position.lat.toFixed(6)} · {w.spacing} m apart
+          </span>
+        </span>
+      </button>,
+    );
+  }
+
+  if (rows.length === 0) return null;
+  return <>{rows}</>;
+}
+
 export function PlacedList(): React.ReactElement {
   const objects = useEditor((s) => s.project.objects);
   const selection = useEditor((s) => s.selection);
-  const padSelected = useEditor((s) => s.padSelected);
+  const airportSelected = useEditor((s) => s.airportSelection !== null);
   const catalogIndex = useEditor((s) => s.catalogIndex);
   const airportLightIndex = useEditor((s) => s.airportLightIndex);
   const plantIndex = useEditor((s) => s.plantIndex);
@@ -71,12 +295,13 @@ export function PlacedList(): React.ReactElement {
           >
             Duplicate
           </button>
-          {/* Delete also reaches the pad — deleteSelection removes the airport block when it is the
-              thing selected, so the button follows whatever the panel above is showing. Duplicate does
-              not: a project has one start position. */}
+          {/* Delete also reaches the airport parts — deleteSelection drops whichever one is selected, so
+              the button follows whatever the panel above is showing. On the Data row it deletes the whole
+              airport, geometry and all, which is the only deliberate way to do that. Duplicate does not
+              reach any of them. */}
           <button
             type="button"
-            disabled={!hasSelection && !padSelected}
+            disabled={!hasSelection && !airportSelected}
             title="Delete selection (Del)"
             onClick={() => editorStore.getState().deleteSelection()}
           >
@@ -86,7 +311,11 @@ export function PlacedList(): React.ReactElement {
       </div>
 
       <div className="pct-placed-list">
-        <HelipadRow />
+        <DataRow />
+        <HelipadRows />
+        <RunwayRows />
+        <ParkingRows />
+        <GliderRows />
         {objects.length === 0 ? (
           <p className="pct-empty">No objects yet — click the map to place one.</p>
         ) : (

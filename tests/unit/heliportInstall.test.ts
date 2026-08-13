@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import type { AirportPad, Project, ResolvedXref } from "../../src/core/project/types";
+import type { AirportPad, AirportRunwayEnd, Project, ResolvedXref } from "../../src/core/project/types";
 import { InvalidHeliportIdentityError, planHeliport } from "../../src/core/export/planExport";
 import {
   HELIPORT_README_MARKER,
@@ -51,16 +51,21 @@ const ID = { icao: "pct001", name: "PCT Test Heliport", country: "us" };
 /** The by-hand template shape: no identity, so the files carry `__PLACEHOLDER__` values. */
 const TEMPLATE_SPEC: HeliportSpec = {
   position: { lon: -116.7947, lat: 34.8536 },
-  headingDeg: 40,
-  radiusM: 10,
+  pads: [{ name: "", position: { lon: -116.7947, lat: 34.8536 }, headingDeg: 40, radiusM: 10 }],
   cultivationFileName: "poi",
   anchor: null,
   autoheight: false,
   identity: null,
 };
 /** The pad is its own point now, not a borrowed object (forum #168) — deliberately NOT on the hangar. */
-const PAD: AirportPad = { position: { lon: -116.7962, lat: 34.8541 }, heading: 40, radius: 10 };
-const OPTS = { identity: ID, heliport: { pad: PAD as AirportPad | null } };
+const PAD: AirportPad = {
+  id: "pad-1",
+  name: "",
+  position: { lon: -116.7962, lat: 34.8541 },
+  heading: 40,
+  radius: 10,
+};
+const OPTS = { identity: ID, heliport: { pads: [PAD] as AirportPad[] } };
 
 let tmp: string;
 beforeEach(() => {
@@ -114,6 +119,95 @@ describe("planHeliport", () => {
       "poi.toc",
       "README.txt",
     ]);
+  });
+
+  // ★ REGRESSION. The INSTALL path and the export-TEMPLATE path build their own HeliportSpec, and when
+  // stands were added only the template one got them: "Install HELIPORT…" wrote an airport with the
+  // helipad and silently no parking. Nothing failed — the files were valid, just missing a block — which
+  // is why this is a test and not a code comment. EVERY repeatable element is pinned here, so the next
+  // one cannot be added to one half only.
+  it("writes every repeatable element on the INSTALL path too, not only in the templates", () => {
+    const opts = {
+      ...OPTS,
+      heliport: {
+        ...OPTS.heliport,
+        runways: [
+          {
+            id: "rwy-1",
+            width: 40,
+            ends: [
+              {
+                threshold: { lon: -116.8, lat: 34.85 },
+                identifier: "08",
+                appltsys: "none" as const,
+                papi: "none" as const,
+                reil: "none" as const,
+                approach: true,
+                takeoff: true,
+              },
+              {
+                threshold: { lon: -116.79, lat: 34.855 },
+                identifier: "26",
+                appltsys: "none" as const,
+                papi: "none" as const,
+                reil: "none" as const,
+                approach: true,
+                takeoff: true,
+              },
+            ] as [AirportRunwayEnd, AirportRunwayEnd],
+          },
+        ],
+        aerotows: [
+          {
+            id: "ato-1",
+            name: "26",
+            position: { lon: -116.7975, lat: 34.8548 },
+            heading: 260,
+          },
+        ],
+        winches: [
+          {
+            id: "wnc-1",
+            name: "26",
+            position: { lon: -116.7975, lat: 34.8548 },
+            winch: { lon: -116.807, lat: 34.8525 },
+            spacing: 25,
+          },
+        ],
+        parkings: [
+          {
+            id: "prk-1",
+            name: "Parking_W",
+            position: { lon: -116.7965, lat: 34.8544 },
+            heading: 165,
+            size: 7.5,
+            type: "parked_ga" as const,
+          },
+        ],
+      },
+    };
+    const plan = planHeliport(PROJECT, [HANGAR], opts);
+    for (const rel of ["pct001.tsc", "pct001.wad"]) {
+      const text = plan.files.find((f) => f.relPath === rel)!.content;
+      expect(text).toContain("parking_positions");
+      expect(text).toContain("Parking_W");
+      expect(text).toContain("parked_ga");
+      expect(text).toMatch(/\[08\]/);
+    }
+    // The two files name the runway list differently, so pin each one rather than a shared substring.
+    expect(plan.files.find((f) => f.relPath === "pct001.tsc")!.content).toContain(
+      "[list_tmsimulator_runway][runways]",
+    );
+    expect(plan.files.find((f) => f.relPath === "pct001.wad")!.content).toContain(
+      "[list_tmworld_airport_detailed_rwy_pair][runway_pairs]",
+    );
+    // The glider starts are .wad-only: present there, absent from the .tsc, and that is correct.
+    const wad = plan.files.find((f) => f.relPath === "pct001.wad")!.content;
+    const tsc = plan.files.find((f) => f.relPath === "pct001.tsc")!.content;
+    for (const t of ["glider_aerotows", "glider_winches"]) {
+      expect(wad).toContain(t);
+      expect(tsc).not.toContain(t);
+    }
   });
 
   it("drops the cultivation reference entirely for an empty project", () => {

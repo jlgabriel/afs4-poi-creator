@@ -213,6 +213,30 @@ export const CategoryIcon = memo(function CategoryIcon({
   );
 });
 
+/** The airport's identity — his submenu (1) DATA (v1.4, forum #217/#232). Deliberately NOT a circle like
+ *  the helipad's and the stand's: those two are things you put somewhere on the map, and this one is the
+ *  record behind them. It is drawn as a card with two lines of writing on it, which is what the panel it
+ *  opens actually is — a name and a code. His own description of the submenu is the database entry, and a
+ *  pictogram that promised a point on the map would be promising a gesture this card does not have. */
+export const DataIcon = memo(function DataIcon(): React.ReactElement {
+  return (
+    <svg
+      className="pct-thumb"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <line x1="7" y1="10" x2="17" y2="10" />
+      <line x1="7" y1="14" x2="13" y2="14" />
+    </svg>
+  );
+});
+
 /** The helipad (v1.3). It gets its own export rather than an ICONS entry because it is keyed by nothing
  *  — there is no catalog category behind it; the pad is PCT's own idea of a start position, not an
  *  object from the install. Same 0 0 24 24 line style as every glyph above, deliberately: the first cut
@@ -235,6 +259,91 @@ export const HelipadIcon = memo(function HelipadIcon(): React.ReactElement {
       <line x1="9" y1="8" x2="9" y2="16" />
       <line x1="15" y1="8" x2="15" y2="16" />
       <line x1="9" y1="12" x2="15" y2="12" />
+    </svg>
+  );
+});
+
+/** A parking position (v1.4, forum #232). Same reasoning as HelipadIcon — no catalog category behind it —
+ *  and the same circle, so the two read as siblings in the Airport section. The P is the universal parking
+ *  glyph and needs no translation, which matters for a UI that is English-only for now. */
+export const ParkingIcon = memo(function ParkingIcon(): React.ReactElement {
+  return (
+    <svg
+      className="pct-thumb"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="9" />
+      <path d="M10 16.5V7.5h3.2a2.6 2.6 0 0 1 0 5.2H10" />
+    </svg>
+  );
+});
+
+/** A runway (v1.4, forum #242). Not a circle, because a runway is not a point — the strip in perspective
+ *  is the shape everyone already reads as "runway", and it distinguishes this card from its two round
+ *  siblings at a glance. The dashes are a centre line, which is a liberty: PCT draws no markings. It is a
+ *  pictogram for a menu, not a promise about the output, and the panel says so in words. */
+export const RunwayIcon = memo(function RunwayIcon(): React.ReactElement {
+  return (
+    <svg
+      className="pct-thumb"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M9.5 21 6 3h5.5l3.5 18z" />
+      <path d="M10.4 7.5v2M11 12v2M11.6 16.5v2" />
+    </svg>
+  );
+});
+
+/** An AEROTOW start (v1.4, forum #237): a glider with a rope leading away. The long thin wing is what
+ *  says "glider" at 24 px — a fuselage alone would read as any aircraft. */
+export const AerotowIcon = memo(function AerotowIcon(): React.ReactElement {
+  return (
+    <svg
+      className="pct-thumb"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M3 15h13" />
+      <path d="M9.5 12v6" />
+      <path d="M16 15l5-6" />
+    </svg>
+  );
+});
+
+/** A WINCH LAUNCH (v1.4, forum #238): two points and the rope between them, which is exactly what the
+ *  element is — the only one in the model with no heading of its own. */
+export const WinchIcon = memo(function WinchIcon(): React.ReactElement {
+  return (
+    <svg
+      className="pct-thumb"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <circle cx="5" cy="18" r="2.2" />
+      <circle cx="19" cy="6" r="2.2" />
+      <path d="M6.6 16.4 17.4 7.6" />
     </svg>
   );
 });

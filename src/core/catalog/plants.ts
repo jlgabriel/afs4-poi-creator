@@ -23,6 +23,17 @@
 //   • h####   → the texture's natural height in CENTIMETRES (h1750 = 17.50 m). Range across the real
 //               41: 0.80 m (shrub__i11) … 28.20 m (conifer_forest__i01). CONFIRMED: `tmterrain_trees`
 //               lists exactly these 41 heights, in this order.
+//               ⚠️ THE `h` IS OPTIONAL SINCE 2026-08-12, and not because the format changed — because
+//               IPACS shipped two files without it. The FS4 beta Steam stream added plants, and of
+//               them exactly TWO arrived as `shrub__i16__0150_color` / `shrub__i18__0200_color`
+//               (forum #244, ApfelFlieger's rescan). *Two* out of a larger batch is the tell: a real
+//               convention change would have dropped the `h` from all of them, so this reads as an
+//               upstream typo. PCT tolerates it either way — losing a plant the user can see in the
+//               sim, over a character missing from someone else's filename, is the worse failure.
+//               ⚠️ What is NOT confirmed is that those two digits still mean centimetres. 0150 → 1.50 m
+//               and 0200 → 2.00 m are plausible shrubs, and the field position is unchanged, so that is
+//               what we decode — but the cheap oracle is `tmterrain_trees` in a beta `tm.log`, which
+//               enumerates every plant's height. Ask before treating 1.50/2.00 as verified.
 //
 // Nothing in this file was ever the reason plants didn't render — that was `autoheight` in the `.tsl`
 // (see tslWriter). The author's verdict on the scan + emit was "Claude did not make a mistake".
@@ -51,12 +62,14 @@ export interface PlantBuildResult {
   warnings: string[];
 }
 
-/** `<group>__i<species>__h<centimetres>` plus an optional `_<channel>` suffix.
+/** `<group>__i<species>__[h]<centimetres>` plus an optional `_<channel>` suffix.
  *  `(.+?)` is lazy so the group keeps its own underscores up to the first `__i` ("conifer_forest").
  *  The suffix is optional and ignored: all 41 install files are `_color`, but the sim's texture naming
  *  elsewhere pairs `_color` with a `_light` map, and a second channel for the same plant must not
- *  become a second catalog entry (see the group/species de-dupe below). */
-const PLANT_RE = /^(.+?)__i(\d+)__h(\d+)(?:_[a-z]+)?$/;
+ *  become a second catalog entry (see the group/species de-dupe below).
+ *  `h?` cannot make the parse ambiguous: `\d` never matches `h`, so the optional letter is consumed
+ *  when present and skipped when absent, and all 41 h-bearing names parse exactly as before. */
+const PLANT_RE = /^(.+?)__i(\d+)__h?(\d+)(?:_[a-z]+)?$/;
 
 /** Pretty label: underscores → spaces, title-cased, keeping the species index — `broadleaf__i00` and
  *  `__i01` are different textures of different heights, so the number is meaningful (same rule as
@@ -84,7 +97,7 @@ export function buildPlants(files: PlantFile[]): PlantBuildResult {
       // Tolerance contract (M0 acceptance #4): an unexpected filename is WARNED, never silently
       // dropped. Unlike the airport-light case we cannot include it verbatim — group/species/height
       // are only knowable by parsing the name, and a guessed group would place an invisible plant.
-      warnings.push(`plant texture "${f.base}" doesn't match <group>__i##__h#### — skipped`);
+      warnings.push(`plant texture "${f.base}" doesn't match <group>__i##__[h]#### — skipped`);
       continue;
     }
     const [, group, species, centimetres] = m;

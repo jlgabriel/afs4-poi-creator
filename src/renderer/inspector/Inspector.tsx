@@ -23,8 +23,12 @@ import { directionToWad, formatWad, latToWad, lonToWad } from "../../core/geo/wa
 import { rowAxis } from "../../core/geo/arrange";
 import { editorStore, useEditor } from "../state/editorStore";
 import { HeightControl } from "./HeightControl";
-import { HeliportFields } from "./HeliportFields";
+import { HelipadFields } from "./HelipadFields";
+import { AirportDataFields } from "./AirportDataFields";
 import { NumberInput } from "./NumberInput";
+import { ParkingFields } from "./ParkingFields";
+import { RunwayFields } from "./RunwayFields";
+import { AerotowFields, WinchFields } from "./GliderFields";
 
 /** Object note — local draft committed on blur/Enter (one undo entry, not one per key; Escape reverts).
  *  Empty/whitespace clears the field (mutate.setLabel drops it). Mirrors TopBar's ProjectNameField. */
@@ -785,10 +789,19 @@ function ObjectFields({
 
 export function Inspector(): React.ReactElement {
   const selCount = useEditor((s) => s.selection.length);
-  // The helipad is not in `objects`, so it is not in `selection` either — it has its own flag. Guarded
-  // on the block still existing: undoing the placement leaves padSelected true for one render otherwise,
+  // The helipad is not in `objects`, so it is not in `selection` either — it has its own field. Guarded
+  // on the block still existing: undoing the placement leaves the selection set for one render otherwise,
   // and the panel would be editing an airport that is no longer there.
-  const airport = useEditor((s) => (s.padSelected ? s.project.airport : undefined));
+  const pad = useEditor((s) => {
+    const sel = s.airportSelection;
+    return sel?.kind === "pad" ? s.project.airport?.pads.find((p) => p.id === sel.id) : undefined;
+  });
+  // The airport ITSELF (his submenu (1) DATA), which is the one airport selection that names no part and
+  // so carries no id. Same guard as the others: the block may already be gone while the selection still
+  // points at it for one render.
+  const airportData = useEditor((s) =>
+    s.airportSelection?.kind === "data" ? s.project.airport : undefined,
+  );
   // Select the object REFERENCE directly — stable across unrelated store changes (no re-render on pan).
   const obj = useEditor((s) =>
     s.selection.length === 1 ? s.project.objects.find((o) => o.id === s.selection[0]) : undefined,
@@ -799,14 +812,54 @@ export function Inspector(): React.ReactElement {
   const airportLightMeta = useEditor((s) =>
     obj?.kind === "airport_light" ? s.airportLightIndex.get(obj.typeName) : undefined,
   );
+  // Same guard as the pad's, for the same reason: the stand may already be gone (undo, or a delete from
+  // the list) while the selection still names it for one render.
+  //
+  // Each of these reads the selection into a local first. Not style: `{ kind: "data" }` carries no id, so
+  // `s.airportSelection?.id` inside the callback no longer typechecks — and the local is what lets TS see
+  // that past the kind test there IS one.
+  const parking = useEditor((s) => {
+    const sel = s.airportSelection;
+    return sel?.kind === "parking"
+      ? s.project.airport?.parkings?.find((p) => p.id === sel.id)
+      : undefined;
+  });
+  const runway = useEditor((s) => {
+    const sel = s.airportSelection;
+    return sel?.kind === "runway" ? s.project.airport?.runways?.find((r) => r.id === sel.id) : undefined;
+  });
+  const aerotow = useEditor((s) => {
+    const sel = s.airportSelection;
+    return sel?.kind === "aerotow"
+      ? s.project.airport?.aerotows?.find((a) => a.id === sel.id)
+      : undefined;
+  });
+  const winch = useEditor((s) => {
+    const sel = s.airportSelection;
+    return sel?.kind === "winch" ? s.project.airport?.winches?.find((w) => w.id === sel.id) : undefined;
+  });
   const plantMeta = useEditor((s) => (obj?.kind === "plant" ? s.plantIndex.get(plantKey(obj)) : undefined));
   const resolvedAsl = useEditor((s) => (obj ? s.resolvedElev.get(obj.id) : undefined));
 
   return (
     <aside className="pct-inspector">
       <h2 className="pct-panel-title">Inspector</h2>
-      {airport !== undefined ? (
-        <HeliportFields airport={airport} />
+      {airportData !== undefined ? (
+        <AirportDataFields airport={airportData} />
+      ) : pad !== undefined ? (
+        // Keyed by id like every other repeatable part's panel: the numeric drafts reset when the
+        // selection moves to another pad, and editing THIS one keeps the panel alive.
+        <HelipadFields key={pad.id} pad={pad} />
+      ) : parking !== undefined ? (
+        // Keyed by id for the same reason ObjectFields is: every numeric draft resets when the selection
+        // moves to another stand, but editing THIS one keeps the panel alive.
+        <ParkingFields key={parking.id} parking={parking} />
+      ) : runway !== undefined ? (
+        <RunwayFields key={runway.id} runway={runway} />
+      ) : aerotow !== undefined ? (
+        <AerotowFields key={aerotow.id} aerotow={aerotow} />
+      ) : winch !== undefined ? (
+        <WinchFields key={winch.id} winch={winch} />
       ) : obj ? (
         // Key by id so every draft (numeric fields + the fetch spinner) resets on a selection change;
         // an EDIT to the same object keeps the id, so the panel is not torn down.

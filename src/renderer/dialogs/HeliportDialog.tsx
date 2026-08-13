@@ -11,10 +11,11 @@
 //   • He tests twice, and the first pass is deliberately without reading anything we wrote ("intuitive
 //     - without reading what Claude wrote"). A control you can only find by reading fails that pass.
 //
-// So placing lives in the catalog (AirportSection), editing lives in the Inspector (HeliportFields),
-// and what is left here is the one act that writes outside the project — plus the things that belong to
-// writing and to nothing else: the destination, the overwrite confirmation, the result, and the list of
-// what PCT has already installed with its Uninstall.
+// So placing lives in the catalog (AirportSection), editing lives in the Inspector (HelipadFields for a
+// pad, AirportDataFields for the airport's name and code), and what is left here is the one act that
+// writes outside the project — plus the things that belong to writing and to nothing else: the
+// destination, the overwrite confirmation, the result, and the list of what PCT has already installed
+// with its Uninstall.
 import { useCallback, useEffect, useState } from "react";
 import type { HeliportInstallOptions, InstallResult, InstalledHeliport, PctError } from "../../shared/pctApi";
 import { identityProblemText, validateIdentity } from "../../core/export/heliportTemplate";
@@ -121,8 +122,13 @@ export function HeliportDialog({ onClose }: { onClose: () => void }): React.Reac
     if (!pct || airport === undefined || identity === null || problem !== null) return;
     setError(null);
 
-    const { pad } = airport;
-    if (!(Number.isFinite(pad.radius) && pad.radius > 0)) {
+    if (airport.pads.length === 0) {
+      setError("This airport has no helipad yet. Place one from the catalog first.");
+      return;
+    }
+    // Every pad, not just the first: a bad radius anywhere writes a helipad the sim will not render, and
+    // the count is small enough that checking all of them costs nothing.
+    if (airport.pads.some((p) => !(Number.isFinite(p.radius) && p.radius > 0))) {
       setError("Helipad radius must be a positive number of metres. Fix it in the Inspector.");
       return;
     }
@@ -140,7 +146,19 @@ export function HeliportDialog({ onClose }: { onClose: () => void }): React.Reac
       return;
     }
 
-    const opts: HeliportInstallOptions = { identity, heliport: { pad }, overwrite };
+    const opts: HeliportInstallOptions = {
+      identity,
+      heliport: { pads: airport.pads },
+      overwrite,
+    };
+    // Absent rather than `[]` when there are none: the writers key "emit no block at all" off an empty
+    // list either way, and this keeps the IPC payload of a stand-less project identical to before.
+    if (airport.runways !== undefined) opts.heliport.runways = airport.runways;
+    if (airport.aerotows !== undefined) opts.heliport.aerotows = airport.aerotows;
+    if (airport.winches !== undefined) opts.heliport.winches = airport.winches;
+    if (airport.parkings !== undefined) opts.heliport.parkings = airport.parkings;
+    if (airport.position !== undefined) opts.heliport.position = airport.position;
+    if (airport.iata !== undefined) opts.heliport.iata = airport.iata;
     if (heightMode !== "autoheight" && baseElevation !== undefined) opts.baseElevation = baseElevation;
 
     setBusy(true);
@@ -162,6 +180,9 @@ export function HeliportDialog({ onClose }: { onClose: () => void }): React.Reac
     setError(messageFor(res.error));
   };
 
+  /** What the summary below says about the pads. A pad-less airport is legal in the model (airport.ts)
+   *  and the install refuses it above, so the summary says so rather than crashing on an absent pad. */
+  const pads = airport?.pads ?? [];
   const blocked = airport === undefined || problem !== null || busy || pct === null;
 
   return (
@@ -247,16 +268,23 @@ export function HeliportDialog({ onClose }: { onClose: () => void }): React.Reac
                       <span>{airport.country.trim() || "—"}</span>
                     </li>
                     <li>
-                      <span className="pct-field-meta">Pad</span>
+                      <span className="pct-field-meta">{pads.length === 1 ? "Helipad" : "Helipads"}</span>
                       <span>
-                        {airport.pad.position.lon.toFixed(6)}, {airport.pad.position.lat.toFixed(6)} ·{" "}
-                        {Math.round(airport.pad.heading)}° · {airport.pad.radius} m
+                        {pads.length === 0
+                          ? "—"
+                          : pads.length === 1 && pads[0] !== undefined
+                            ? `${pads[0].position.lon.toFixed(6)}, ${pads[0].position.lat.toFixed(6)} · ${Math.round(pads[0].heading)}° · ${pads[0].radius} m`
+                            : `${pads.length}, all of them installed`}
                       </span>
                     </li>
                   </ul>
                   {problem !== null && (
                     <span className="pct-warn">
-                      {identityProblemText(problem)} Select the helipad and fix it in the Inspector.
+                      {/* "Select the helipad" was the old address of these fields and could be a dead
+                          end: a project whose only airport part was a stand had no helipad to select.
+                          They live in Data now, which is in the list whenever the airport is. */}
+                      {identityProblemText(problem)} Select <strong>Data</strong> in the list on the
+                      right and fix it in the Inspector.
                     </span>
                   )}
                 </div>

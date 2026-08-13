@@ -4,7 +4,18 @@
 // (main process, M1b) should write into `scenery/poi/<folderName>/`. Keeping this pure makes
 // the whole POI package golden-testable byte-for-byte, the way the Race App exporter was.
 
-import type { AirportPad, ExportPlan, LonLat, PoiFile, Project, ResolvedObject } from "../project/types";
+import type {
+  AirportAerotow,
+  AirportPad,
+  AirportParking,
+  AirportRunway,
+  AirportWinch,
+  ExportPlan,
+  LonLat,
+  PoiFile,
+  Project,
+  ResolvedObject,
+} from "../project/types";
 import { centroid, poiFolderName } from "../geo/poiName";
 import { shiftEastNorth } from "../geo/geo";
 import { buildToc } from "./tocWriter";
@@ -19,7 +30,14 @@ import {
   validateIdentity,
   HELIPORT_TSC_FILE,
   HELIPORT_WAD_FILE,
+  type HeliportAerotowSpec,
   type HeliportIdentity,
+  type HeliportPadSpec,
+  type HeliportParkingSpec,
+  type HeliportRunwayEndSpec,
+  type HeliportRunwaySpec,
+  type HeliportSpec,
+  type HeliportWinchSpec,
   type IdentityProblem,
 } from "./heliportTemplate";
 
@@ -54,13 +72,33 @@ export const DEFAULT_PAD_RADIUS_M = 10;
 /** Opt-in heliport templates (forum #160) — and the pad for the real install too. Everything about
  *  IDENTITY stays a placeholder here; see heliportTemplate.ts. */
 export interface HeliportOptions {
-  /** The pad, in the same UNSHIFTED map coordinates the placed objects use — planExport applies the
-   *  project's export shift to it below, so the pad travels with the scene instead of ending up `shift`
+  /** The pads, in the same UNSHIFTED map coordinates the placed objects use — planExport applies the
+   *  project's export shift to them below, so a pad travels with the scene instead of ending up `shift`
    *  metres away from it (the trap the folder-name preview had to be fixed for).
    *
-   *  `null` → a default pad at the POI's own anchor point, facing true north. */
-  pad: AirportPad | null;
-  /** Radius for the `pad: null` case only, metres. Ignored when `pad` is set — that pad carries its own.
+   *  EMPTY → one default pad at the POI's own anchor point, facing true north. That is what a project
+   *  which never placed one gets, and it is why this is not simply "write no pads": a heliport with no
+   *  helipad has nowhere to spawn the helicopter. An airport with deliberately zero pads is a different
+   *  thing and belongs to the AIRPORT menu (forum #219), not to this option. */
+  pads: AirportPad[];
+  /** The parking positions, unshifted like the pads (forum #232). Absent or EMPTY → the writers emit no
+   *  `parking_positions` block, so a project without stands exports the same bytes it always did.
+   *
+   *  Unlike `pads` there is no "empty means one default" rule here, and there must not be: a heliport with
+   *  no helipad has nowhere to spawn the helicopter, whereas an airport with no stand is simply an airport
+   *  with no stand — his own "(1) DATA" and "(2) HELIPADS" examples are exactly that. */
+  parkings?: AirportParking[];
+  /** The runways, unshifted (forum #217 submenu (4)). Absent or EMPTY → no block in either file. */
+  runways?: AirportRunway[];
+  /** The glider starts, unshifted (forum #237/#238). Absent or EMPTY → no block; `.wad`-only. */
+  aerotows?: AirportAerotow[];
+  winches?: AirportWinch[];
+  /** The AIRPORT's own point, unshifted (forum #15/#220 — it is independent of any pad). Absent → the
+   *  first pad's position, which is exactly how v1.2/v1.3 behaved. */
+  position?: LonLat;
+  /** IATA code (forum #220). */
+  iata?: string;
+  /** Radius for the EMPTY-`pads` case only, metres. Ignored when pads are given — each carries its own.
    *  Absent → DEFAULT_PAD_RADIUS_M. */
   radiusM?: number;
 }
@@ -73,18 +111,100 @@ export interface HeliportOptions {
  *  because this will lead to collisions too quickly" — a pad that borrows a mast's coordinates spawns the
  *  helicopter in the mast. The pad is now its own point on the document (types.ts AirportPad); seeding it
  *  from a selection is a copy the UI offers, not a link the exporter follows. */
-function heliportPad(
-  pad: AirportPad | null,
+function shiftPoint(p: LonLat, shift: Project["shift"]): LonLat {
+  return !shift || (shift.east === 0 && shift.north === 0)
+    ? p
+    : shiftEastNorth(p, shift.east, shift.north);
+}
+
+function heliportPads(
+  pads: AirportPad[],
   fallback: LonLat,
   shift: Project["shift"],
   radiusM: number,
-): { position: LonLat; headingDeg: number; radiusM: number } {
-  if (pad === null) return { position: fallback, headingDeg: 0, radiusM };
-  const position =
-    !shift || (shift.east === 0 && shift.north === 0)
-      ? pad.position
-      : shiftEastNorth(pad.position, shift.east, shift.north);
-  return { position, headingDeg: pad.heading, radiusM: pad.radius };
+): HeliportPadSpec[] {
+  // `fallback` is the POI anchor, which is already computed from SHIFTED objects — shifting it again
+  // would move the default pad twice.
+  if (pads.length === 0) return [{ name: "", position: fallback, headingDeg: 0, radiusM }];
+  return pads.map((p) => ({
+    name: p.name,
+    position: shiftPoint(p.position, shift),
+    headingDeg: p.heading,
+    radiusM: p.radius,
+  }));
+}
+
+/** The runways, shifted with the scene — BOTH points of each end, or a displaced threshold would stay
+ *  behind while the pavement moved. */
+function heliportRunways(
+  runways: AirportRunway[] | undefined,
+  shift: Project["shift"],
+): HeliportRunwaySpec[] {
+  return (runways ?? []).map((r) => ({
+    widthM: r.width,
+    ends: r.ends.map((e) => ({
+      // ONE point in the document, BOTH rows in the file (types.ts AirportRunwayEnd, forum #236).
+      endpoint: shiftPoint(e.threshold, shift),
+      threshold: shiftPoint(e.threshold, shift),
+      identifier: e.identifier,
+      appltsys: e.appltsys,
+      papi: e.papi,
+      reil: e.reil,
+      approach: e.approach,
+      takeoff: e.takeoff,
+    })) as [HeliportRunwayEndSpec, HeliportRunwayEndSpec],
+  }));
+}
+
+/** The glider starts, shifted with the scene. The winch gets BOTH of its points moved — shifting only the
+ *  glider would stretch the rope instead of moving the launch. */
+function heliportAerotows(
+  aerotows: AirportAerotow[] | undefined,
+  shift: Project["shift"],
+): HeliportAerotowSpec[] {
+  return (aerotows ?? []).map((a) => ({
+    name: a.name,
+    position: shiftPoint(a.position, shift),
+    headingDeg: a.heading,
+  }));
+}
+
+function heliportWinches(
+  winches: AirportWinch[] | undefined,
+  shift: Project["shift"],
+): HeliportWinchSpec[] {
+  return (winches ?? []).map((w) => ({
+    name: w.name,
+    position: shiftPoint(w.position, shift),
+    winch: shiftPoint(w.winch, shift),
+    spacingM: w.spacing,
+  }));
+}
+
+/** The stands, shifted with the scene. No empty-list fallback on purpose (see HeliportOptions.parkings). */
+function heliportParkings(
+  parkings: AirportParking[] | undefined,
+  shift: Project["shift"],
+): HeliportParkingSpec[] {
+  return (parkings ?? []).map((p) => ({
+    name: p.name,
+    position: shiftPoint(p.position, shift),
+    headingDeg: p.heading,
+    sizeM: p.size,
+    type: p.type,
+  }));
+}
+
+/** Where the airport itself goes. Its own point when the project set one, otherwise the first pad's —
+ *  which keeps a project written before the two were split producing the same coordinates. */
+function heliportPosition(
+  opts: HeliportOptions,
+  pads: HeliportPadSpec[],
+  fallback: LonLat,
+  shift: Project["shift"],
+): LonLat {
+  if (opts.position !== undefined) return shiftPoint(opts.position, shift);
+  return pads[0]?.position ?? fallback;
 }
 
 /** Plan the POI package. `project.reference` sets the folder-name anchor; when null it falls
@@ -126,8 +246,8 @@ export function planExport(
   ];
 
   if (opts.heliport !== undefined) {
-    const pad = heliportPad(
-      opts.heliport.pad,
+    const pads = heliportPads(
+      opts.heliport.pads,
       ref,
       project.shift,
       opts.heliport.radiusM ?? DEFAULT_PAD_RADIUS_M,
@@ -140,10 +260,14 @@ export function planExport(
         "The heliport template was only verified in-sim with baked-asl heights — in Sim-autoheight mode, check the objects' heights after the first flight.",
       );
     }
-    const spec = {
-      position: pad.position,
-      headingDeg: pad.headingDeg,
-      radiusM: pad.radiusM,
+    const spec: HeliportSpec = {
+      position: heliportPosition(opts.heliport, pads, ref, project.shift),
+      pads,
+      runways: heliportRunways(opts.heliport.runways, project.shift),
+      aerotows: heliportAerotows(opts.heliport.aerotows, project.shift),
+      winches: heliportWinches(opts.heliport.winches, project.shift),
+      parkings: heliportParkings(opts.heliport.parkings, project.shift),
+      iata: opts.heliport.iata,
       cultivationFileName: tocFileName,
       anchor,
       autoheight,
@@ -195,8 +319,8 @@ export function planHeliport(
   const tocFileName = objects.length > 0 ? POI_BASENAME : null;
   const anchor = autoheight ? computeAutoheightAnchor(objects) : computeAnchor(objects);
 
-  const pad = heliportPad(
-    opts.heliport.pad,
+  const pads = heliportPads(
+    opts.heliport.pads,
     ref,
     project.shift,
     opts.heliport.radiusM ?? DEFAULT_PAD_RADIUS_M,
@@ -210,10 +334,14 @@ export function planHeliport(
     warnings.push("The heliport has no objects around it — just the pad.");
   }
 
-  const spec = {
-    position: pad.position,
-    headingDeg: pad.headingDeg,
-    radiusM: pad.radiusM,
+  const spec: HeliportSpec = {
+    position: heliportPosition(opts.heliport, pads, ref, project.shift),
+    pads,
+    runways: heliportRunways(opts.heliport.runways, project.shift),
+    aerotows: heliportAerotows(opts.heliport.aerotows, project.shift),
+    winches: heliportWinches(opts.heliport.winches, project.shift),
+    parkings: heliportParkings(opts.heliport.parkings, project.shift),
+    iata: opts.heliport.iata,
     cultivationFileName: tocFileName,
     anchor,
     autoheight,

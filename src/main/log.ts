@@ -218,15 +218,18 @@ export function formatExportSummary(i: {
   target: string;
   overwrite: boolean;
   baseElevation?: number;
-  heliport?: { pad: { position: LonLat; heading: number; radius: number } | null; radiusM?: number };
+  heliport?: { pads: { position: LonLat; heading: number; radius: number }[]; radiusM?: number };
 }): string {
   const h = i.heliport;
+  const first = h?.pads[0];
+  // Only the first pad is spelled out. The line is a one-glance record of what was written, and N pads
+  // would push the interesting fields off the end of it; the count says whether to go looking.
   const pad =
     h === undefined
       ? ""
-      : h.pad === null
+      : first === undefined
         ? `, heliport template (r=${h.radiusM ?? 10} m, pad at POI anchor)`
-        : `, heliport template (r=${h.pad.radius} m, pad ${h.pad.position.lon.toFixed(6)} ${h.pad.position.lat.toFixed(6)} hdg ${h.pad.heading})`;
+        : `, heliport template (${h.pads.length} pad${h.pads.length === 1 ? "" : "s"}, r=${first.radius} m, first ${first.position.lon.toFixed(6)} ${first.position.lat.toFixed(6)} hdg ${first.heading})`;
   return (
     `export "${i.poiName}" — ${i.objects} objects, ${i.heightMode ?? "baked-asl"} mode, ` +
     `target ${i.target}${i.overwrite ? " (overwrite)" : ""}` +

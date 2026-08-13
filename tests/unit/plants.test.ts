@@ -144,6 +144,31 @@ describe("buildPlants — tolerance contract", () => {
     expect(plants[0]).toMatchObject({ group: "broadleaf", species: "00", naturalHeight: 17.5 });
   });
 
+  it("accepts the two FS4-beta names that arrived without the `h` (forum #244)", () => {
+    // Verbatim off ApfelFlieger's rescan: the beta Steam stream added plants and exactly two of them
+    // are missing the `h` before the centimetres. Before this, PCT warned and dropped both — the user
+    // could see the plants in the sim and not place them.
+    const { plants, warnings } = buildPlants([
+      { base: "shrub__i16__0150_color" },
+      { base: "shrub__i18__0200_color" },
+    ]);
+    expect(warnings).toEqual([]);
+    expect(plants).toMatchObject([
+      { group: "shrub", species: "16", naturalHeight: 1.5, category: "plants/shrub" },
+      { group: "shrub", species: "18", naturalHeight: 2 },
+    ]);
+  });
+
+  it("still parses the h-form identically — the optional letter is not a wildcard", () => {
+    // The regression that would hide in `h?`: if the letter could be absorbed by the group or the
+    // species, an h-name and its h-less twin would decode to different heights. They must not.
+    const withH = buildPlants([{ base: "shrub__i16__h0150_color" }]).plants[0];
+    const withoutH = buildPlants([{ base: "shrub__i16__0150_color" }]).plants[0];
+    expect(withH).toEqual(withoutH);
+    // And a letter that is NOT the height marker still fails, rather than being silently eaten.
+    expect(buildPlants([{ base: "shrub__i16__x0150_color" }]).warnings).toHaveLength(1);
+  });
+
   it("returns an empty catalog (no throw) for an install with no plants folder", () => {
     expect(buildPlants([])).toEqual({ plants: [], warnings: [] });
   });
