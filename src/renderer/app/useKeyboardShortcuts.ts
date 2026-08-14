@@ -5,7 +5,7 @@
 // actions (→ commit → mutate.ts), keeping the map's O(changed) footprint diff intact.
 import { useEffect } from "react";
 import { editorStore } from "../state/editorStore";
-import { arrowToVector, isEditableTarget, lifecycleShortcut } from "./keyboard";
+import { arrowToVector, hasDeletable, isEditableTarget, lifecycleShortcut } from "./keyboard";
 import { doNew, doOpen, doSave, doSaveAs } from "./commands";
 
 export function useKeyboardShortcuts(): void {
@@ -54,7 +54,15 @@ export function useKeyboardShortcuts(): void {
       if (e.key === "Delete" || e.key === "Backspace") {
         // macOS laptops send Backspace for their only delete key (P1-6). Consume it only when there's
         // something to delete, so a bare Backspace isn't swallowed (and never triggers history back-nav).
-        if (store.selection.length === 0) return;
+        //
+        // ★ ASK ABOUT BOTH SELECTIONS, or the key is dead on half the app (forum #253, refined in #258:
+        // "the DELETE key still works on the objects, but not on the elements from the airfield").
+        // Selecting an airport part EMPTIES `selection` and fills `airportSelection` — the two are
+        // mutually exclusive by design (store.ts, selectAirportPart) — so a guard that counts only
+        // `selection` returns before ever reaching deleteSelection, which has handled both since v1.4.
+        // The Delete BUTTON never had this bug because it asks `!hasSelection && !airportSelected`;
+        // `hasDeletable` is that same question, asked once and testable.
+        if (!hasDeletable(store.selection, store.airportSelection)) return;
         e.preventDefault();
         store.deleteSelection();
         return;

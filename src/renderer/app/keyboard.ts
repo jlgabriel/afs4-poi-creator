@@ -10,6 +10,19 @@ export function isEditableTarget(el: EventTarget | null): boolean {
   return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || node.isContentEditable === true;
 }
 
+/** Does Delete/Backspace have anything to act on? It has to ask about BOTH selections, because they are
+ *  mutually exclusive: selecting an airport part empties `selection` and fills `airportSelection`
+ *  (store.ts, selectAirportPart). Asking only about `selection` is exactly what left the key dead on
+ *  every airport element in v1.4.0 — "the DELETE key still works on the objects, but not on the elements
+ *  from the airfield" (forum #253, refined in #258) — while the Delete BUTTON, which asks about both,
+ *  went on working. Named rather than inlined in the hook so the regression has a test of its own.
+ *
+ *  `object | null` rather than the store's AirportSelection: this file stays import-free on purpose, and
+ *  the only thing the guard needs to know is whether there is one. */
+export function hasDeletable(selection: readonly string[], airportSelection: object | null): boolean {
+  return selection.length > 0 || airportSelection !== null;
+}
+
 export interface NudgeVec {
   deltaM: number;
   bearingDeg: number; // compass, clockwise, 0 = North (matches PlacedXref.direction + geo.destination)
