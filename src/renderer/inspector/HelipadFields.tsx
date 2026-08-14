@@ -32,7 +32,7 @@ export function HelipadFields({ pad }: { pad: AirportPad }): React.ReactElement 
     // both edges of the panel while the object panels sat inset — spotted on screen, not by a test.
     <div className="pct-inspector-body">
       <div className="pct-field-title">
-        {pad.name.trim() === "" ? "Start - Helicopter" : pad.name.trim()}
+        {pad.name.trim() === "" ? "Helipad" : pad.name.trim()}
       </div>
 
       <div className="pct-field pct-field-col">
@@ -121,8 +121,8 @@ export function HelipadFields({ pad }: { pad: AirportPad }): React.ReactElement 
           release the way a new user would. Without it, "where did the code go" is a question the panel
           invites and does not answer. */}
       <span className="pct-field-meta">
-        The airport&apos;s name, code and Install button are in <strong>Data</strong>, at the top of the
-        list on the right.
+        The airport&apos;s name, code and Install button are in <strong>Airport</strong>, at the top of
+        the list on the right.
       </span>
     </div>
   );

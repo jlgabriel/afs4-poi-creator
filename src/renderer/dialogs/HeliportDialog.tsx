@@ -240,7 +240,7 @@ export function HeliportDialog({ onClose }: { onClose: () => void }): React.Reac
                   somewhere.
                 </p>
                 <span className="pct-field-meta">
-                  Place it from <strong>Start - Helicopter</strong> in the catalog, then click the map —
+                  Place it from <strong>Helipad</strong> in the catalog, then click the map —
                   the same way you place anything else. It appears in the list on the right, and its code
                   and name go in the Inspector.
                 </span>
@@ -282,8 +282,8 @@ export function HeliportDialog({ onClose }: { onClose: () => void }): React.Reac
                     <span className="pct-warn">
                       {/* "Select the helipad" was the old address of these fields and could be a dead
                           end: a project whose only airport part was a stand had no helipad to select.
-                          They live in Data now, which is in the list whenever the airport is. */}
-                      {identityProblemText(problem)} Select <strong>Data</strong> in the list on the
+                          They live in the Airport row now, which is in the list whenever the airport is. */}
+                      {identityProblemText(problem)} Select <strong>Airport</strong> in the list on the
                       right and fix it in the Inspector.
                     </span>
                   )}

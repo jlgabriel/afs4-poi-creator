@@ -332,9 +332,11 @@ export interface AirportAerotow {
  *  positions GLIDER and WINCH." So this element is defined by a PAIR of points, and the rope — 800 to
  *  1000 m of it — is the line between them. Storing a heading as well would let the two disagree.
  *
- *  ⛔ WINCH LAUNCH DOES NOT CURRENTLY WORK IN FS 4 (forum #229): the glider comes out "twisted in the
- *  ground". He has reported it to IPACS. PCT can write the block — it is data, and the fault is in the
- *  simulator — but nothing here can be verified in-sim until that update lands. */
+ *  ✅ FIXED IN FS 4 (forum #261, 2026-08-13). Through v1.4.0 this block carried a ⛔: the glider came out
+ *  "twisted in the ground" (#229), so nothing written here could be confirmed in-sim. He reported the bug
+ *  to IPACS and reported the repair to us — "In the FS 4 the winch is repaired, so the warning can already
+ *  go away". The two user-facing warnings are gone with it (AirportSection, GliderFields). What has still
+ *  never been done is an in-sim gate of a PCT winch launch, which is now possible for the first time. */
 export interface AirportWinch {
   id: string;
   /** Shown in LOCATION. His convention: name it like a runway, "supplemented if necessary by an
