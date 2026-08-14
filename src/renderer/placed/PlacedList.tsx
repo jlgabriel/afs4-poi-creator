@@ -97,7 +97,7 @@ function HelipadRows(): React.ReactElement | null {
             <span className="pct-placed-text">
               <span className="pct-placed-name">
                 <span className="pct-placed-label">
-                  {pad.name.trim() === "" ? "Start - Helicopter" : pad.name.trim()}
+                  {pad.name.trim() === "" ? "Helipad" : pad.name.trim()}
                 </span>
                 <span className="pct-placed-code">{pad.radius} m</span>
               </span>

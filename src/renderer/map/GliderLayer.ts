@@ -12,9 +12,9 @@
 //              positions GLIDER and WINCH", so the rope (800–1000 m of it) IS the geometry, and storing a
 //              heading beside it would let the two disagree. Same shape as a runway, one dimension poorer.
 //
-// ⛔ WINCH LAUNCH DOES NOT CURRENTLY WORK IN FS 4 (forum #229) — the glider comes out twisted in the
-// ground, and he has reported it to IPACS. PCT writes the block because it is data and the fault is
-// downstream, but nothing drawn here can be confirmed in the simulator until that fix lands.
+// ✅ WINCH LAUNCH IS REPAIRED IN FS 4 (forum #261) — it came out twisted in the ground through v1.4.0
+// (#229), which is why this file carried a ⛔ and why the shape drawn here had never been confirmed
+// against the simulator. He reported both the bug and the fix; the warnings in the UI went with it.
 //
 // The three contracts every layer here keeps: reference-diff sync, layer-local drag preview with exactly
 // one commit on release, and select on the shape's own `click` while `mousedown` starts the drag — never

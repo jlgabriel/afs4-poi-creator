@@ -129,7 +129,12 @@ export function AirportSection(): React.ReactElement {
           >
             <DataIcon />
             <span className="pct-obj-text">
-              <span className="pct-obj-name">Data</span>
+              {/* "Airport", not "Data" (#255). His rule: "The elements in the right column must always
+                  have the same main name as in the left column to avoid confusion" — the placed row and
+                  the inspector both say Airport, so this card had to. He weighed and rejected the other
+                  way out of the mismatch ("Airport - Data" · "Airport - Helipad" …) as too much. "data"
+                  stays a search term below, since that is what the submenu was called for two versions. */}
+              <span className="pct-obj-name">Airport</span>
               <span className="pct-obj-cat">
                 {!hasAirport
                   ? "name and code for your airport"
@@ -150,7 +155,9 @@ export function AirportSection(): React.ReactElement {
           >
             <HelipadIcon />
             <span className="pct-obj-text">
-              <span className="pct-obj-name">Start - Helicopter</span>
+              {/* "Helipad" (#256), which also settles the question left open in #227 — singular, not
+                  "Helipads", and the same word in the placed row and the panel. */}
+              <span className="pct-obj-name">Helipad</span>
               {/* It said "already placed · click the map to move it" until #221 made the element
                   repeatable. A card that still said that would be describing the v1.3 model, and the
                   count is the thing that tells you it is not. */}
@@ -233,12 +240,13 @@ export function AirportSection(): React.ReactElement {
             <WinchIcon />
             <span className="pct-obj-text">
               <span className="pct-obj-name">Winch Launch</span>
-              {/* The subtitle carries the warning, because this is where someone decides to build one.
-                  The bug is Aerofly's and he reported it himself (#229) — see WinchFields. */}
+              {/* The warning this subtitle carried from v1.4.0 is gone: he reported the bug to IPACS
+                  himself (#229) and reported the fix himself too — "In the FS 4 the winch is repaired,
+                  so the warning can already go away" (#261). */}
               <span className="pct-obj-cat">
                 {winchCount === 0
-                  ? "lays out a rope · broken in FS 4 today"
-                  : `${winchCount} placed · broken in FS 4 today`}
+                  ? "lays out a rope · drag its two ends"
+                  : `${winchCount} placed · lays out a rope you then drag`}
               </span>
             </span>
           </button>

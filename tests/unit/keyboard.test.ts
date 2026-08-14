@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   arrowToVector,
+  hasDeletable,
   isEditableTarget,
   lifecycleShortcut,
 } from "../../src/renderer/app/keyboard";
@@ -18,6 +19,29 @@ describe("isEditableTarget — the P1-4 focus guard", () => {
     expect(isEditableTarget({ tagName: "BUTTON" } as unknown as EventTarget)).toBe(false);
     expect(isEditableTarget(null)).toBe(false);
     expect(isEditableTarget({} as unknown as EventTarget)).toBe(false);
+  });
+});
+
+describe("hasDeletable — the guard in front of Del (forum #253 → #258)", () => {
+  it("is true for a placed-object selection", () => {
+    expect(hasDeletable(["obj-1"], null)).toBe(true);
+    expect(hasDeletable(["obj-1", "obj-2"], null)).toBe(true);
+  });
+
+  // ★ THE REGRESSION. Selecting an airport part EMPTIES `selection` and fills `airportSelection`, so a
+  // guard that counted only `selection` returned before deleteSelection ever ran and Del was dead on all
+  // six airport elements while it still worked on objects — which is precisely how he described it.
+  it("is true for every airport part, whose selection leaves `selection` empty", () => {
+    expect(hasDeletable([], { kind: "data" })).toBe(true);
+    expect(hasDeletable([], { kind: "pad", id: "p1" })).toBe(true);
+    expect(hasDeletable([], { kind: "parking", id: "s1" })).toBe(true);
+    expect(hasDeletable([], { kind: "runway", id: "r1" })).toBe(true);
+    expect(hasDeletable([], { kind: "aerotow", id: "a1" })).toBe(true);
+    expect(hasDeletable([], { kind: "winch", id: "w1" })).toBe(true);
+  });
+
+  it("is false only when nothing at all is selected — a bare Backspace stays unswallowed", () => {
+    expect(hasDeletable([], null)).toBe(false);
   });
 });
 

@@ -110,14 +110,9 @@ export function WinchFields({ winch }: { winch: AirportWinch }): React.ReactElem
         {winch.name.trim() === "" ? "Winch launch" : `Winch launch ${winch.name.trim()}`}
       </div>
 
-      {/* ⛔ Not a caveat we invented: he reported it to IPACS himself (#229). Saying it here is the only
-          honest thing to do — otherwise someone builds a winch launch, flies it, sees the glider come out
-          twisted in the ground and concludes PCT wrote it wrong. */}
-      <p className="pct-warn">
-        Winch launches do not work in the current Aerofly FS 4 — the glider starts twisted into the ground.
-        The bug is Aerofly's and IPACS have been told. PCT writes the data correctly; it will work when
-        they fix it.
-      </p>
+      {/* ✅ The warning that stood here through v1.4.0 is gone. It was never a caveat we invented — he
+          reported the bug to IPACS himself (#229) — and it is retired on his word too: "In the FS 4 the
+          winch is repaired, so the warning can already go away" (#261). */}
 
       <div className="pct-field pct-field-col">
         <span className="pct-field-label">Winch launch — two points, no heading</span>

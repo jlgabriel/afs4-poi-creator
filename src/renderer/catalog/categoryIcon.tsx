@@ -287,7 +287,11 @@ export const ParkingIcon = memo(function ParkingIcon(): React.ReactElement {
 /** A runway (v1.4, forum #242). Not a circle, because a runway is not a point — the strip in perspective
  *  is the shape everyone already reads as "runway", and it distinguishes this card from its two round
  *  siblings at a glance. The dashes are a centre line, which is a liberty: PCT draws no markings. It is a
- *  pictogram for a menu, not a promise about the output, and the panel says so in words. */
+ *  pictogram for a menu, not a promise about the output, and the panel says so in words.
+ *
+ *  ★ IT LEANS THE OTHER WAY SINCE v1.4.1 (#253a): "it bothers me that it goes from top left to bottom
+ *  right. I think it's better from bottom left to top right." Mirrored about x=12, dashes included — the
+ *  same drawing, read the way a heading is read. */
 export const RunwayIcon = memo(function RunwayIcon(): React.ReactElement {
   return (
     <svg
@@ -300,14 +304,21 @@ export const RunwayIcon = memo(function RunwayIcon(): React.ReactElement {
       strokeLinejoin="round"
       aria-hidden="true"
     >
-      <path d="M9.5 21 6 3h5.5l3.5 18z" />
-      <path d="M10.4 7.5v2M11 12v2M11.6 16.5v2" />
+      <path d="M14.5 21 18 3h-5.5l-3.5 18z" />
+      <path d="M13.6 7.5v2M13 12v2M12.4 16.5v2" />
     </svg>
   );
 });
 
-/** An AEROTOW start (v1.4, forum #237): a glider with a rope leading away. The long thin wing is what
- *  says "glider" at 24 px — a fuselage alone would read as any aircraft. */
+/** An AEROTOW start (v1.4, forum #237; redrawn v1.4.1, #261).
+ *
+ *  ★ THE RULE FOR BOTH GLIDER ICONS IS HIS, and he found it by looking at the map: "I noticed that the
+ *  symbol for WINCH LAUNCH actually corresponds to how it looks on the map. Therefore, I suggest doing it
+ *  at AEROTOW exactly like this." The v1.4.0 drawing — a glider seen from above with a rope leading off —
+ *  was a picture of the THING; these two are pictures of what the element LOOKS LIKE ON THE MAP, which is
+ *  what the user is about to see. His spec, to the degree: "small circle at the bottom left, from there
+ *  starting line at an angle of 20° upwards" — the circle is the glider's point, the line is the rope the
+ *  layer draws 60 m in the tug's direction. */
 export const AerotowIcon = memo(function AerotowIcon(): React.ReactElement {
   return (
     <svg
@@ -320,15 +331,21 @@ export const AerotowIcon = memo(function AerotowIcon(): React.ReactElement {
       strokeLinejoin="round"
       aria-hidden="true"
     >
-      <path d="M3 15h13" />
-      <path d="M9.5 12v6" />
-      <path d="M16 15l5-6" />
+      <circle cx="5" cy="18" r="2.2" />
+      {/* Leaves the circle exactly on its rim at −20° and holds that angle to the far edge. */}
+      <path d="M7.07 17.25 21 12.18" />
     </svg>
   );
 });
 
-/** A WINCH LAUNCH (v1.4, forum #238): two points and the rope between them, which is exactly what the
- *  element is — the only one in the model with no heading of its own. */
+/** A WINCH LAUNCH (v1.4, forum #238; adjusted v1.4.1, #261): two points and the rope between them, which
+ *  is exactly what the element is — the only one in the model with no heading of its own.
+ *
+ *  ★ THE TWO ENDS ARE NO LONGER INTERCHANGEABLE. Two identical circles said "a rope between two points"
+ *  but not which end was which; his adjustment names them by shape: "the small circle on the left remains,
+ *  on the right comes at the same height a small square (= winch), both are connected with a horizontal
+ *  line". Same instinct as the ruler's diamond and triangle (#264) — tell two ends apart by SHAPE, never
+ *  by colour. Horizontal, not diagonal, because a winch launch on the map is a straight pull. */
 export const WinchIcon = memo(function WinchIcon(): React.ReactElement {
   return (
     <svg
@@ -341,9 +358,9 @@ export const WinchIcon = memo(function WinchIcon(): React.ReactElement {
       strokeLinejoin="round"
       aria-hidden="true"
     >
-      <circle cx="5" cy="18" r="2.2" />
-      <circle cx="19" cy="6" r="2.2" />
-      <path d="M6.6 16.4 17.4 7.6" />
+      <circle cx="5" cy="12" r="2.2" />
+      <path d="M7.2 12h9.4" />
+      <rect x="16.6" y="9.8" width="4.4" height="4.4" />
     </svg>
   );
 });

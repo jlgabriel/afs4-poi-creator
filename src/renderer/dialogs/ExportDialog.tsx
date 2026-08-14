@@ -388,8 +388,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }): React.ReactE
                     <>
                       <span className="pct-field-meta">
                         Helipad at the POI anchor, facing true north. Place one from{" "}
-                        <strong>Start - Helicopter</strong> in the catalog to put it where you want
-                        instead.
+                        <strong>Helipad</strong> in the catalog to put it where you want instead.
                       </span>
                       <label className="pct-shift-cell">
                         <span className="pct-field-meta">Pad radius — metres</span>
