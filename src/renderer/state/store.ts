@@ -45,7 +45,13 @@ import {
 import { destination } from "../../core/geo/geo";
 import { lineUp, spaceEvenly } from "../../core/geo/arrange";
 import { DEFAULT_PAD_RADIUS_M } from "../../core/export/planExport";
-import { airportIsBlank } from "../../core/project/airport";
+import {
+  aerotowsOf,
+  airportIsBlank,
+  parkingsOf,
+  runwaysOf,
+  winchesOf,
+} from "../../core/project/airport";
 import * as mutate from "../../core/project/mutate";
 
 export type Camera = Project["camera"];
@@ -743,6 +749,56 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
         // and the placed list, so this was a live footgun, not a theoretical one. One key for the whole
         // gesture is the fix; a single-object selection is just the N=1 case.
         nudgeSelection: (deltaM, bearingDeg) => {
+          // ★ THE ARROWS REACH THE AIRPORT TOO (v1.5). Through v1.4 this walked `selection` only, and
+          // selecting an airport part EMPTIES that list (selectAirportPart) — so the arrows moved objects
+          // and did nothing at all to a pad, a stand, a runway or a glider start. Same blind spot the
+          // DELETE key had (#253 → #258, fixed in 1.4.1); unlike Delete this never worked, so it is a gap
+          // rather than a regression, and it needs a move path per kind rather than one guard.
+          //
+          // Each kind reuses its own move action, so a nudge coalesces with a drag of the SAME part and
+          // with nothing else — nudging one stand and then another stays two undo entries.
+          //
+          // The two-point elements move WHOLE, both ends by the same offset, which is what dragging their
+          // body already does. Nudging one end of a runway would be a different gesture with no key for
+          // the other end.
+          const sel = get().airportSelection;
+          if (sel !== null) {
+            const a = get().project.airport;
+            if (a === undefined) return;
+            const to = (p: LonLat): LonLat => destination(p, deltaM, bearingDeg);
+            const self = get();
+            if (sel.kind === "data") {
+              // Only when it HAS a point. An identity-only airport has nothing to nudge, and inventing
+              // one from an arrow key would be the fallback #255 removed, coming back through the door.
+              if (a.position !== undefined) self.moveAirportPosition(to(a.position));
+              return;
+            }
+            if (sel.kind === "pad") {
+              const pad = a.pads.find((p) => p.id === sel.id);
+              if (pad !== undefined) self.moveAirportPad(sel.id, to(pad.position));
+              return;
+            }
+            if (sel.kind === "parking") {
+              const stand = parkingsOf(a).find((p) => p.id === sel.id);
+              if (stand !== undefined) self.moveAirportParking(sel.id, to(stand.position));
+              return;
+            }
+            if (sel.kind === "runway") {
+              const rwy = runwaysOf(a).find((r) => r.id === sel.id);
+              if (rwy !== undefined) {
+                self.moveAirportRunway(sel.id, to(rwy.ends[0].threshold), to(rwy.ends[1].threshold));
+              }
+              return;
+            }
+            if (sel.kind === "aerotow") {
+              const tow = aerotowsOf(a).find((t) => t.id === sel.id);
+              if (tow !== undefined) self.moveAirportAerotow(sel.id, to(tow.position));
+              return;
+            }
+            const winch = winchesOf(a).find((w) => w.id === sel.id);
+            if (winch !== undefined) self.moveAirportWinch(sel.id, to(winch.position), to(winch.winch));
+            return;
+          }
           const ids = get().selection;
           if (ids.length === 0) return;
           commitCoalesced("selection:pos", (proj) =>

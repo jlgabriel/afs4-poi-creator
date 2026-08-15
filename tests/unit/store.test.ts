@@ -1263,3 +1263,92 @@ describe("setSelectionRotation", () => {
     expect((o[1] as PlacedXref).direction).toBe(10);
   });
 });
+
+// ── The arrow keys reach the airport (v1.5) ─────────────────────────────────────────────────────────
+//
+// Through v1.4 nudgeSelection walked `selection` only, and selecting an airport part EMPTIES that list,
+// so the arrows moved objects and did nothing at all to a pad, a stand, a runway or a glider start. The
+// same blind spot the DELETE key had (#253 → #258); unlike Delete this never worked, so it is a gap
+// rather than a regression. Every kind gets its own move path, hence a case each.
+describe("store — nudging the airport parts", () => {
+  const NORTH = 0;
+  const arm = (store: ReturnType<typeof makeStore>["store"], kind: "helipad" | "parking" | "aerotow"): void => {
+    store.getState().armPlacement(kind === "parking" ? { kind, parkingType: "parked_ga" } : { kind });
+  };
+
+  it("moves a helipad, a stand and an aerotow by the metres asked for", () => {
+    for (const kind of ["helipad", "parking", "aerotow"] as const) {
+      const { store } = makeStore();
+      arm(store, kind);
+      store.getState().placeAt({ lon: 10, lat: 48 });
+      store.getState().nudgeSelection(5, NORTH);
+      const a = store.getState().project.airport!;
+      const at =
+        kind === "helipad"
+          ? a.pads[0]!.position
+          : kind === "parking"
+            ? a.parkings![0]!.position
+            : a.aerotows![0]!.position;
+      near(haversine({ lon: 10, lat: 48 }, at), 5, 0.5);
+      near(initialBearing({ lon: 10, lat: 48 }, at), NORTH, 1);
+    }
+  });
+
+  it("moves a runway WHOLE — both thresholds, length and bearing unchanged", () => {
+    const { store } = makeStore();
+    const id = placeRunwayAt(store, 10, 48);
+    const before = store.getState().project.airport!.runways!.find((r) => r.id === id)!;
+    const len = haversine(before.ends[0].threshold, before.ends[1].threshold);
+    const dir = initialBearing(before.ends[0].threshold, before.ends[1].threshold);
+    store.getState().nudgeSelection(5, 90);
+    const after = store.getState().project.airport!.runways!.find((r) => r.id === id)!;
+    near(haversine(before.ends[0].threshold, after.ends[0].threshold), 5, 0.5);
+    near(haversine(before.ends[1].threshold, after.ends[1].threshold), 5, 0.5);
+    near(haversine(after.ends[0].threshold, after.ends[1].threshold), len, 0.5);
+    near(initialBearing(after.ends[0].threshold, after.ends[1].threshold), dir, 0.5);
+  });
+
+  it("moves a winch launch WHOLE — the rope does not stretch", () => {
+    const { store } = makeStore();
+    const id = placeWinchAt(store, 10, 48);
+    const before = store.getState().project.airport!.winches!.find((w) => w.id === id)!;
+    const rope = haversine(before.position, before.winch);
+    store.getState().nudgeSelection(5, 90);
+    const after = store.getState().project.airport!.winches!.find((w) => w.id === id)!;
+    near(haversine(before.position, after.position), 5, 0.5);
+    near(haversine(after.position, after.winch), rope, 0.5);
+  });
+
+  it("moves the AIRPORT's own point when that is what is selected", () => {
+    const { store } = makeStore();
+    arm(store, "helipad");
+    store.getState().placeAt({ lon: 10, lat: 48 });
+    store.getState().selectAirportPart({ kind: "data" });
+    store.getState().nudgeSelection(5, NORTH);
+    const a = store.getState().project.airport!;
+    near(haversine({ lon: 10, lat: 48 }, a.position!), 5, 0.5);
+    // …and the pad it was seeded from stayed put. The freeze holds under the keyboard too.
+    expect(a.pads[0]!.position).toEqual({ lon: 10, lat: 48 });
+  });
+
+  it("does nothing on an airport that has no point to nudge", () => {
+    // An arrow key must not invent the coordinate #255 took out of the model.
+    const { store } = makeStore();
+    store.getState().createAirport();
+    store.getState().nudgeSelection(5, NORTH);
+    expect(store.getState().project.airport!.position).toBeUndefined();
+  });
+});
+
+function placeRunwayAt(store: ReturnType<typeof makeStore>["store"], lon: number, lat: number): string {
+  store.getState().armPlacement({ kind: "runway" });
+  store.getState().placeAt({ lon, lat });
+  const sel = store.getState().airportSelection!;
+  return "id" in sel ? sel.id : "";
+}
+function placeWinchAt(store: ReturnType<typeof makeStore>["store"], lon: number, lat: number): string {
+  store.getState().armPlacement({ kind: "winch" });
+  store.getState().placeAt({ lon, lat });
+  const sel = store.getState().airportSelection!;
+  return "id" in sel ? sel.id : "";
+}

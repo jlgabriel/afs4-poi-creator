@@ -5,7 +5,7 @@
 // actions (→ commit → mutate.ts), keeping the map's O(changed) footprint diff intact.
 import { useEffect } from "react";
 import { editorStore } from "../state/editorStore";
-import { arrowToVector, hasDeletable, isEditableTarget, lifecycleShortcut } from "./keyboard";
+import { arrowToVector, hasSelection, isEditableTarget, lifecycleShortcut } from "./keyboard";
 import { doNew, doOpen, doSave, doSaveAs } from "./commands";
 
 export function useKeyboardShortcuts(): void {
@@ -61,8 +61,8 @@ export function useKeyboardShortcuts(): void {
         // mutually exclusive by design (store.ts, selectAirportPart) — so a guard that counts only
         // `selection` returns before ever reaching deleteSelection, which has handled both since v1.4.
         // The Delete BUTTON never had this bug because it asks `!hasSelection && !airportSelected`;
-        // `hasDeletable` is that same question, asked once and testable.
-        if (!hasDeletable(store.selection, store.airportSelection)) return;
+        // `hasSelection` is that same question, asked once and testable.
+        if (!hasSelection(store.selection, store.airportSelection)) return;
         e.preventDefault();
         store.deleteSelection();
         return;
@@ -79,7 +79,9 @@ export function useKeyboardShortcuts(): void {
       }
 
       const vec = arrowToVector(e.key, e.shiftKey);
-      if (vec !== null && store.selection.length > 0) {
+      // The same guard Delete uses, for the same reason: an airport part leaves `selection` empty, so
+      // counting only that list is what kept the arrows off every airport element until v1.5.
+      if (vec !== null && hasSelection(store.selection, store.airportSelection)) {
         e.preventDefault(); // else arrows scroll the panels
         // ONE call for the whole selection: looping per object made each keypress push N undo entries,
         // because the store's coalescing key alternated between them and never engaged (Fable I4).
