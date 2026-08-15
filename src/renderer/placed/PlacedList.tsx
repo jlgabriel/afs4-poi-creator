@@ -276,6 +276,7 @@ export function PlacedList(): React.ReactElement {
   const objects = useEditor((s) => s.project.objects);
   const selection = useEditor((s) => s.selection);
   const airportSelected = useEditor((s) => s.airportSelection !== null);
+  const pendingAirportDelete = useEditor((s) => s.pendingAirportDelete);
   const catalogIndex = useEditor((s) => s.catalogIndex);
   const airportLightIndex = useEditor((s) => s.airportLightIndex);
   const plantIndex = useEditor((s) => s.plantIndex);
@@ -296,16 +297,26 @@ export function PlacedList(): React.ReactElement {
             Duplicate
           </button>
           {/* Delete also reaches the airport parts — deleteSelection drops whichever one is selected, so
-              the button follows whatever the panel above is showing. On the Data row it deletes the whole
-              airport, geometry and all, which is the only deliberate way to do that. Duplicate does not
-              reach any of them. */}
+              the button follows whatever the panel above is showing. On the Airport row it deletes the
+              whole airport, geometry and all, which is the only deliberate way to do that. Duplicate does
+              not reach any of them.
+
+              ★ AND ON THAT ROW IT ASKS FIRST (#253c). The label is the question, so the second press is
+              answering something rather than repeating something — his "only with another click can it
+              really be deleted". The note beside it lives in the Airport panel, which is what the
+              Inspector is showing whenever this state can be reached. */}
           <button
             type="button"
             disabled={!hasSelection && !airportSelected}
-            title="Delete selection (Del)"
+            className={pendingAirportDelete ? "pct-danger" : undefined}
+            title={
+              pendingAirportDelete
+                ? "Press again to delete the airport and everything in it"
+                : "Delete selection (Del)"
+            }
             onClick={() => editorStore.getState().deleteSelection()}
           >
-            Delete
+            {pendingAirportDelete ? "Really delete?" : "Delete"}
           </button>
         </div>
       </div>

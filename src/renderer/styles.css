@@ -1080,6 +1080,15 @@ body {
   opacity: 0.45;
   cursor: default;
 }
+/* The armed second press of a delete that asks first (#253c) — only the airport's. It has to look
+   different from the button it was a moment ago, or "Really delete?" reads as the same control and the
+   user clicks straight through the question they were asked. */
+.pct-placed-actions button.pct-danger {
+  border-color: #b45309;
+  background: #fffbeb;
+  color: #b45309;
+  font-weight: 600;
+}
 .pct-placed-list {
   flex: 1 1 auto;
   overflow: auto;

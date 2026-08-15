@@ -338,20 +338,65 @@ describe("placeAt — the helipad (v1.3)", () => {
     expect(a?.pads).toHaveLength(0);
   });
 
-  it("Delete on DATA removes the whole airport, geometry and all", () => {
+  it("Delete on the AIRPORT asks once, then removes it all (#253c)", () => {
     const { store } = makeStore();
     store.getState().armPlacement({ kind: "helipad" });
     store.getState().placeAt({ lon: 10, lat: 48 });
     store.getState().setAirportIdentity({ icao: "pct001", name: "Roof", country: "cl" });
 
     store.getState().selectAirportPart({ kind: "data" });
+    // ★ The FIRST press changes nothing but the question. "if you have entered a lot and are not paying
+    // attention, everything is gone with one blow" — so it is not gone until the second one.
+    store.getState().deleteSelection();
+    expect(store.getState().pendingAirportDelete).toBe(true);
+    expect(store.getState().project.airport).toMatchObject({ icao: "pct001" });
+
     store.getState().deleteSelection();
     expect(store.getState().project.airport).toBeUndefined();
     expect(store.getState().airportSelection).toBeNull();
+    expect(store.getState().pendingAirportDelete).toBe(false);
 
     store.getState().undo(); // one commit, so the pad comes back with the identity
     expect(store.getState().project.airport).toMatchObject({ icao: "pct001", name: "Roof" });
     expect(store.getState().project.airport?.pads).toHaveLength(1);
+  });
+
+  it("★ pointing at anything else answers no — the arming never outlives its subject", () => {
+    const { store } = makeStore();
+    store.getState().armPlacement({ kind: "helipad" });
+    store.getState().placeAt({ lon: 10, lat: 48 });
+    const padId = (store.getState().airportSelection as { id: string }).id;
+    // Named, so that losing its last pad does NOT take the block with it (airportIsBlank) — otherwise
+    // this test could not tell "the pad was deleted" from "the airport's armed delete fired".
+    store.getState().setAirportIdentity({ icao: "pct001", name: "Roof", country: "cl" });
+
+    store.getState().selectAirportPart({ kind: "data" });
+    store.getState().deleteSelection(); // armed
+    expect(store.getState().pendingAirportDelete).toBe(true);
+
+    // Select the pad instead, then press Del: it must delete THE PAD, not fire the airport's armed
+    // delete. Without the reset, a question the user walked away from would be answered by the next
+    // keystroke, on something else.
+    store.getState().selectAirportPart({ kind: "pad", id: padId });
+    expect(store.getState().pendingAirportDelete).toBe(false);
+    store.getState().deleteSelection();
+    expect(store.getState().project.airport).toBeDefined();
+    expect(store.getState().project.airport?.pads).toHaveLength(0);
+  });
+
+  it("asks only for the AIRPORT — every other part still goes on the first press", () => {
+    for (const place of ["helipad", "parking", "runway", "aerotow", "winch"] as const) {
+      const { store } = makeStore();
+      store
+        .getState()
+        .armPlacement(place === "parking" ? { kind: place, parkingType: "parked_ga" } : { kind: place });
+      store.getState().placeAt({ lon: 10, lat: 48 });
+      store.getState().setAirportIdentity({ icao: "pct001", name: "Roof", country: "cl" });
+      store.getState().deleteSelection();
+      expect(store.getState().pendingAirportDelete).toBe(false);
+      // The identity survives, so the block is still there — the part went on one press.
+      expect(store.getState().project.airport).toMatchObject({ icao: "pct001" });
+    }
   });
 
   it("the Data card makes an empty airport and selects it, without placing anything", () => {

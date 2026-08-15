@@ -278,6 +278,18 @@ export interface EditorState {
   // The airport part the Inspector is showing — see AirportSelection for why it is its own field and
   // why a runway end is not in it. Mutually exclusive with `selection`.
   airportSelection: AirportSelection | null;
+  /** A delete of the AIRPORT that has been asked for once and not yet confirmed (forum #253c).
+   *
+   *  ★ ONLY THE AIRPORT GETS THIS, which is his instruction word for word: "Before deleting DATA (and
+   *  only for this) a note must appear that then everything will be deleted and only with another click
+   *  can it really be deleted." He grants that the cascade is correct — "without DATA the other does not
+   *  exist" — and the danger is not that it is wrong, it is that it is silent: "if you have entered a lot
+   *  and are not paying attention, everything is gone with one blow."
+   *
+   *  Ephemeral, like every other selection field: it never reaches the document, never enters undo, and
+   *  is dropped by any change of selection, so an arming that the user walked away from cannot fire later
+   *  on something else. */
+  pendingAirportDelete: boolean;
   placing: PlacingSpec | null; // what click-to-place is armed for (xref / airport_light / light / helipad)
   filter: Filter;
   mapView: Camera; // the LIVE camera; stamped into the document only at save
@@ -550,6 +562,7 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
           redoStack: [],
           selection: [],
           airportSelection: null,
+          pendingAirportDelete: false,
           placing: null,
           resolvedElev: new Map(),
           pendingRecovery: null, // a fresh document clears any recovery banner
@@ -576,6 +589,7 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
         redoStack: [],
         selection: [],
         airportSelection: null,
+        pendingAirportDelete: false,
         placing: null,
         filter: { query: "", category: null },
         mapView: deps.initialProject.camera,
@@ -629,9 +643,14 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
           set((s) => ({
             selection: additive ? [...new Set([...s.selection, ...ids])] : [...ids],
             airportSelection: null,
+            pendingAirportDelete: false,
           })),
-        clearSelection: () => set({ selection: [], airportSelection: null }),
-        selectAirportPart: (sel) => set({ airportSelection: sel, selection: [] }),
+        // Every selection write clears the pending delete: pointing at something else is the plainest
+        // possible "no", and an arming that outlived its subject would fire on the next thing selected.
+        clearSelection: () =>
+          set({ selection: [], airportSelection: null, pendingAirportDelete: false }),
+        selectAirportPart: (sel) =>
+          set({ airportSelection: sel, selection: [], pendingAirportDelete: false }),
         armPlacement: (name) => set({ placing: name }),
         setFilter: (patch) => set((s) => ({ filter: { ...s.filter, ...patch } })),
 
@@ -725,7 +744,7 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
           // cleared by hand here — this is the one selection write that does not go through `select()`,
           // and without it, dropping an object while the pad was selected left the Inspector showing the
           // heliport while `selection` pointed at the new object. Caught in the preview harness.
-          set({ selection: [id], airportSelection: null });
+          set({ selection: [id], airportSelection: null, pendingAirportDelete: false });
         },
 
         moveObject: (id, p) => {
@@ -1024,12 +1043,21 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
           // throw away the identity beside it.
           if (airportSelection !== null) {
             const sel = airportSelection;
+            // ★ THE AIRPORT ASKS TWICE (#253c). The first Del arms; the second one, and only the second,
+            // goes through. Nothing else on the map does this, and nothing else should: a stand takes one
+            // click to make again, whereas the airport takes every element with it. Ctrl+Z would undo it,
+            // but "undo exists" is not an answer to a deletion the user did not see coming — and he says
+            // himself that not everyone knows the shortcut is there (#253c, the visible-undo half).
+            if (sel.kind === "data" && !get().pendingAirportDelete) {
+              set({ pendingAirportDelete: true });
+              return;
+            }
             commit((proj) => {
               const next = removeAirportPart(proj, sel);
               const a = next.airport;
               return a !== undefined && airportIsBlank(a) ? mutate.setAirport(next, null) : next;
             });
-            set({ airportSelection: null });
+            set({ airportSelection: null, pendingAirportDelete: false });
             return;
           }
           if (selection.length === 0) return;

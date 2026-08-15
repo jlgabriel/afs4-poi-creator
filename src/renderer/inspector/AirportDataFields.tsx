@@ -72,12 +72,31 @@ export function AirportDataFields({ airport }: { airport: ProjectAirport }): Rea
   // Hoisted so TypeScript keeps the narrowing inside the two onCommit closures below.
   const point = airport.position;
   const armed = useEditor((s) => s.placing?.kind === "airport");
+  const pendingDelete = useEditor((s) => s.pendingAirportDelete);
+  const parts =
+    airport.pads.length +
+    (airport.parkings?.length ?? 0) +
+    (airport.runways?.length ?? 0) +
+    (airport.aerotows?.length ?? 0) +
+    (airport.winches?.length ?? 0);
 
   return (
     <div className="pct-inspector-body">
       <div className="pct-field-title">
         {airport.name.trim() === "" ? "Airport" : airport.name.trim()}
       </div>
+
+      {/* ★ THE NOTE HE ASKED FOR (#253c): "Before deleting DATA (and only for this) a note must appear
+          that then everything will be deleted and only with another click can it really be deleted." It
+          sits at the TOP of the panel, above everything, because it is answering a key that was already
+          pressed — a warning further down the panel would be a warning the user scrolls to after the
+          fact. The count is the part that makes it worth reading. */}
+      {pendingDelete && (
+        <p className="pct-warn">
+          Delete this airport{parts > 0 ? ` and its ${parts} ${parts === 1 ? "element" : "elements"}` : ""}?
+          Press Delete again, or click anything else to keep it.
+        </p>
+      )}
 
       <div className="pct-field pct-field-col">
         <span className="pct-field-label">Airport — what this becomes in Aerofly</span>
