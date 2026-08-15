@@ -84,6 +84,11 @@ export type PlacingSpec =
   // behaves like a runway — one click lays the whole rope out and disarms.
   | { kind: "aerotow" }
   | { kind: "winch" }
+  // v1.5 (forum #255): the AIRPORT's own point. "The coordinates of the airport must be possible for the
+  // user both by clicking on the map and by entering the two fields LON and LAT" — this is the first
+  // half. It is the odd one of the set in that it MOVES the one airport rather than adding anything, so
+  // it is armed only while the airport has no point of its own; once it has one, it is a thing you drag.
+  | { kind: "airport" }
   // `naturalHeight` rides along rather than being looked up at place time. The palette has the
   // CatalogPlant in hand when it arms, so carrying it removes the only path where a plant could be
   // created with height 0 — the one value that may mean "invisible" (see mutate.createPlant).
@@ -346,6 +351,9 @@ export interface EditorState {
   //    so it makes the block (when there is none) and selects it, which is the whole gesture.
   setAirportIata: (iata: string) => void;
   createAirport: () => void;
+  //    The AIRPORT's own point (forum #255). It takes no id because there is one airport per project,
+  //    and it is the only airport mutation the MAP drives as well as the Inspector.
+  moveAirportPosition: (position: LonLat) => void;
   //    v1.4 parking positions (forum #232). Every one takes an id: there has never been a one-stand UI,
   //    so letting it default would only hide a caller that forgot which stand it meant (mutate.ts).
   moveAirportParking: (id: string, position: LonLat) => void;
@@ -631,6 +639,14 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
           // SCLC ships three). Through v1.3 this called `placeAirportPad`, which MOVED the single pad on a
           // second drop and then disarmed, because a second pad was not a thing that could exist. Now it
           // behaves like a stand: drop, select the new one, stay armed for the next.
+          // The airport's own point (#255). It creates nothing: the block already exists by the time this
+          // can be armed, and all the click does is put its coordinate somewhere. Disarms, because there
+          // is one airport and a second click would only move what the first one placed.
+          if (spec.kind === "airport") {
+            commit((proj) => mutate.setAirportPosition(proj, p));
+            set({ placing: null, selection: [], airportSelection: { kind: "data" } });
+            return;
+          }
           if (spec.kind === "helipad") {
             const padId = deps.newId();
             commit((proj) => mutate.addAirportPad(proj, p, DEFAULT_PAD_RADIUS_M, undefined, padId));
@@ -820,6 +836,10 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
           }
           set({ selection: [], airportSelection: { kind: "data" } });
         },
+        // Coalesced like every other drag, and id-less like the pad's keys used to be — for the same
+        // reason they could be: there is exactly one of this thing in a project.
+        moveAirportPosition: (position) =>
+          commitCoalesced("airport:position", (proj) => mutate.setAirportPosition(proj, position)),
 
         // Every coalesce key carries the STAND'S ID. Without it, dragging stand A and then stand B would
         // fold into one undo entry and a single Ctrl+Z would put both back — the pad's keys can be

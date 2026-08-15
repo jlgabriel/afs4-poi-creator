@@ -15,6 +15,7 @@ import { tileSourceFor } from "./tileProviders";
 import { FootprintLayer } from "./FootprintLayer";
 import { HelipadLayer } from "./HelipadLayer";
 import { ParkingLayer } from "./ParkingLayer";
+import { AirportLayer } from "./AirportLayer";
 import { RunwayLayer } from "./RunwayLayer";
 import { GliderLayer } from "./GliderLayer";
 
@@ -95,6 +96,14 @@ export function MapView(): React.ReactElement {
       onSelect: (kind, id) => editorStore.getState().selectAirportPart({ kind, id }),
     });
 
+    // The airport's own point (v1.5, forum #255). Created LAST so Leaflet stacks it on top: it is one
+    // small symbol sitting over whatever the airport is made of, and being under a runway strip would
+    // put it out of reach of the cursor.
+    const airport = new AirportLayer(map, {
+      onMove: (p) => editorStore.getState().moveAirportPosition(p),
+      onSelect: () => editorStore.getState().selectAirportPart({ kind: "data" }),
+    });
+
     // Paint now, then re-paint whenever objects / catalog / selection change — subscribed OUTSIDE
     // React so drag and undo never wait on a render.
     const paint = (): void => {
@@ -128,6 +137,10 @@ export function MapView(): React.ReactElement {
           ? { kind: sel.kind, id: sel.id }
           : null,
       );
+      // `position` and not airportPosition(): the fallback to pads[0] is what #255 asks us to stop, and
+      // drawing a ⊕ on a point the airport does not actually own would put the old behaviour back on
+      // screen after taking it out of the model.
+      airport.sync(s.project.airport?.position ?? null, sel?.kind === "data");
     };
     paint();
     const unsub = editorStore.subscribe(
@@ -188,6 +201,7 @@ export function MapView(): React.ReactElement {
       unsub();
       unsubCamera();
       unsubTiles();
+      airport.destroy();
       glider.destroy();
       parking.destroy();
       helipad.destroy();

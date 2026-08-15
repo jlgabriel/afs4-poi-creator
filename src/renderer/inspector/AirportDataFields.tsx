@@ -22,10 +22,13 @@
 import { useEffect, useState } from "react";
 import type { ProjectAirport } from "../../core/project/types";
 import type { IcaoStatus } from "../../shared/pctApi";
-import { airportPosition } from "../../core/project/airport";
+import { clampLonLat } from "../../core/project/schemas";
 import { identityProblemText, validateIdentity, SNAME_MAX } from "../../core/export/heliportTemplate";
-import { editorStore } from "../state/editorStore";
+import { editorStore, useEditor } from "../state/editorStore";
+import { NumberInput } from "./NumberInput";
 import { getPct } from "../app/pct";
+
+const fmtDeg = (n: number): string => n.toFixed(6);
 
 /** Ask the dialog to open. Same channel the photo menu uses for Settings (`pct:open-settings`): the
  *  dialog's open flag is AppShell's local state and this panel is not its child, so a window event is
@@ -66,7 +69,9 @@ export function AirportDataFields({ airport }: { airport: ProjectAirport }): Rea
   const problem = validateIdentity(identity);
   const status = useIcaoStatus(identity.icao, problem !== "icao-format");
   const replacing = status.ours.length > 0;
-  const where = airportPosition(airport);
+  // Hoisted so TypeScript keeps the narrowing inside the two onCommit closures below.
+  const point = airport.position;
+  const armed = useEditor((s) => s.placing?.kind === "airport");
 
   return (
     <div className="pct-inspector-body">
@@ -80,6 +85,60 @@ export function AirportDataFields({ airport }: { airport: ProjectAirport }): Rea
           Needed before you can install it; not needed to place or move anything on the map.
         </span>
       </div>
+
+      {/* ★ LON/LAT SITS HERE, DIRECTLY UNDER THE DESCRIPTION, because that is exactly where it sits in the
+          helipad's panel, the stand's and the aerotow's. Forum #253d: "It bothers me when the LAYOUT of the
+          data constantly changes during a quick change between individual elements, when they are actually
+          always comparable fields. The best example of this is for me LON LAT, because they could actually
+          always be in the same place regardless of the element." The other panels already agreed with each
+          other — this one was the outlier, and it had no coordinates on it at all. */}
+      {point !== undefined ? (
+        <>
+          <div className="pct-field pct-field-row">
+            <label className="pct-field-col">
+              <span className="pct-field-label">Lon</span>
+              <NumberInput
+                value={point.lon}
+                format={fmtDeg}
+                onCommit={(lon) => store().moveAirportPosition(clampLonLat({ lon, lat: point.lat }))}
+                ariaLabel="Airport longitude"
+              />
+            </label>
+            <label className="pct-field-col">
+              <span className="pct-field-label">Lat</span>
+              <NumberInput
+                value={point.lat}
+                format={fmtDeg}
+                onCommit={(lat) => store().moveAirportPosition(clampLonLat({ lon: point.lon, lat }))}
+                ariaLabel="Airport latitude"
+              />
+            </label>
+          </div>
+          {/* Said once, here, because it is the rule that changed in 1.5 and the one thing about this
+              field a 1.4 user would get wrong. */}
+          <span className="pct-field-meta">
+            Drag the ⊕ on the map, or type here. It stays where you put it — moving a helipad or a runway
+            does not move the airport.
+          </span>
+        </>
+      ) : (
+        <div className="pct-field pct-field-col">
+          <span className="pct-field-label">Lon / Lat</span>
+          <span className="pct-field-meta">
+            Not on the map yet. The first element you place gives the airport its point — or put it down
+            yourself and it stays there.
+          </span>
+          <button
+            type="button"
+            aria-pressed={armed}
+            onClick={() =>
+              editorStore.getState().armPlacement(armed ? null : { kind: "airport" })
+            }
+          >
+            {armed ? "Click the map…" : "Put it on the map"}
+          </button>
+        </div>
+      )}
 
       <label className="pct-field pct-field-col">
         <span className="pct-field-label">Name — shown in LOCATION</span>
@@ -157,20 +216,10 @@ export function AirportDataFields({ airport }: { airport: ProjectAirport }): Rea
         </span>
       </label>
 
-      {/* Read-only on purpose. The airport's own point is a separate field in the model (his #15: the
-          airport and the helipad should not share one position), but nothing places or drags it yet, so
-          this says where the writers will put the airport rather than offering a box whose number would
-          move nothing on the map. */}
-      <div className="pct-field pct-field-col">
-        <span className="pct-field-label">Position</span>
-        <span className="pct-field-meta">
-          {where === null
-            ? "Nothing placed yet — the airport takes its position from your first helipad, or from the centre of the scene."
-            : airport.position !== undefined
-              ? `lon ${where.lon.toFixed(6)} · lat ${where.lat.toFixed(6)}`
-              : `lon ${where.lon.toFixed(6)} · lat ${where.lat.toFixed(6)} — following the first helipad.`}
-        </span>
-      </div>
+      {/* The read-only "Position" block that stood here through v1.4 is gone. It existed because the
+          model had a point the UI could neither set nor draw, so all it could honestly do was report
+          which fallback the writers would take. Both halves of that are now real: the field above sets
+          it and the map draws it. */}
 
       {/* The one act that writes outside the project. It stays in a dialog because that is where the
           things that belong to WRITING live: the destination, the installed list with Uninstall, the
