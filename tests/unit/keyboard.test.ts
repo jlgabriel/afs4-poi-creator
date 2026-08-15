@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   arrowToVector,
-  hasDeletable,
+  hasSelection,
   isEditableTarget,
   lifecycleShortcut,
 } from "../../src/renderer/app/keyboard";
@@ -22,26 +22,26 @@ describe("isEditableTarget — the P1-4 focus guard", () => {
   });
 });
 
-describe("hasDeletable — the guard in front of Del (forum #253 → #258)", () => {
+describe("hasSelection — the guard in front of Del AND the arrows (#253 → #258)", () => {
   it("is true for a placed-object selection", () => {
-    expect(hasDeletable(["obj-1"], null)).toBe(true);
-    expect(hasDeletable(["obj-1", "obj-2"], null)).toBe(true);
+    expect(hasSelection(["obj-1"], null)).toBe(true);
+    expect(hasSelection(["obj-1", "obj-2"], null)).toBe(true);
   });
 
   // ★ THE REGRESSION. Selecting an airport part EMPTIES `selection` and fills `airportSelection`, so a
   // guard that counted only `selection` returned before deleteSelection ever ran and Del was dead on all
   // six airport elements while it still worked on objects — which is precisely how he described it.
   it("is true for every airport part, whose selection leaves `selection` empty", () => {
-    expect(hasDeletable([], { kind: "data" })).toBe(true);
-    expect(hasDeletable([], { kind: "pad", id: "p1" })).toBe(true);
-    expect(hasDeletable([], { kind: "parking", id: "s1" })).toBe(true);
-    expect(hasDeletable([], { kind: "runway", id: "r1" })).toBe(true);
-    expect(hasDeletable([], { kind: "aerotow", id: "a1" })).toBe(true);
-    expect(hasDeletable([], { kind: "winch", id: "w1" })).toBe(true);
+    expect(hasSelection([], { kind: "data" })).toBe(true);
+    expect(hasSelection([], { kind: "pad", id: "p1" })).toBe(true);
+    expect(hasSelection([], { kind: "parking", id: "s1" })).toBe(true);
+    expect(hasSelection([], { kind: "runway", id: "r1" })).toBe(true);
+    expect(hasSelection([], { kind: "aerotow", id: "a1" })).toBe(true);
+    expect(hasSelection([], { kind: "winch", id: "w1" })).toBe(true);
   });
 
   it("is false only when nothing at all is selected — a bare Backspace stays unswallowed", () => {
-    expect(hasDeletable([], null)).toBe(false);
+    expect(hasSelection([], null)).toBe(false);
   });
 });
 

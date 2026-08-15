@@ -1,6 +1,8 @@
 // TopBar.tsx — the spanning top bar (design §5): brand · editable project name · dirty dot ·
-// [New][Open][Save] │ [Export POI…] │ [Rescan]. (Settings is M2 — hidden, see below.) Undo/redo and edit verbs are keyboard-only
-// (added in M1e-5c), not buttons. New/Open/Save delegate to app/commands.ts; Export/Rescan are handed
+// [New][Open][Save] │ [Undo][Redo] │ [Export POI…] │ [Rescan]. (Settings is M2 — hidden, see below.)
+// Undo/redo were keyboard-only from M1e-5c until v1.5, when ApfelFlieger pointed out the obvious (#253c):
+// a shortcut nobody can see is a feature only its author has. The other edit verbs are still chords.
+// New/Open/Save delegate to app/commands.ts; Export/Rescan are handed
 // down as callbacks by AppShell (wired in M1e-5f / M1e-5e) so the button is disabled until its step
 // lands. IPC-backed buttons disable in the browser preview (no bridge).
 import { useState } from "react";
@@ -122,6 +124,10 @@ export function TopBar({ onExport, onHeliport, onRescan, onSettings }: TopBarPro
   const dirty = useEditor((s) => s.dirty);
   const objCount = useEditor((s) => s.project.objects.length);
   const projectPath = useEditor((s) => s.projectPath);
+  // Depth, not the arrays: subscribing to the stacks themselves would re-render the whole toolbar on
+  // every commit, and all the buttons need to know is whether there is one.
+  const canUndo = useEditor((s) => s.undoStack.length > 0);
+  const canRedo = useEditor((s) => s.redoStack.length > 0);
   const pct = hasPct();
 
   return (
@@ -153,6 +159,33 @@ export function TopBar({ onExport, onHeliport, onRescan, onSettings }: TopBarPro
         title={pct ? "Save under a new file" : NO_PCT}
       >
         Save As…
+      </button>
+
+      {/* ★ UNDO AND REDO ARE BUTTONS SINCE v1.5 (forum #253c). They have worked as chords since M1e-5c
+          and the toolbar comment above still says "keyboard-only, not buttons" for a reason that stopped
+          holding the moment someone tested PCT without reading anything: "In addition, there should
+          somehow be a visible function of being able to take a step back. CMD+Z works, which is very
+          good, but not all users know that."
+
+          A shortcut nobody can see is a feature only the author has. These sit beside Save because that
+          is the group of things that act on the DOCUMENT as a whole, and they disable when their stack is
+          empty — which is also the only readout in the window of whether there is anything to go back to. */}
+      <span className="pct-divider" />
+      <button
+        type="button"
+        onClick={() => editorStore.getState().undo()}
+        disabled={!canUndo}
+        title={canUndo ? "Undo (Ctrl+Z)" : "Nothing to undo"}
+      >
+        ↶ Undo
+      </button>
+      <button
+        type="button"
+        onClick={() => editorStore.getState().redo()}
+        disabled={!canRedo}
+        title={canRedo ? "Redo (Ctrl+Shift+Z)" : "Nothing to redo"}
+      >
+        ↷ Redo
       </button>
 
       <span className="pct-divider" />

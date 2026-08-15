@@ -723,6 +723,35 @@ describe("planExport — heliport option", () => {
     expect(Number(valuesOf(tsc, "radius")[0])).toBe(PAD.radius);
   });
 
+  // ★★ THE MIGRATION'S PROMISE, held here instead of only asserted in a comment (schemas.ts,
+  // migratePosition). From v1.5 the airport carries its own point (#255) and opening an older project
+  // seeds that point from pads[0] — the value the exporter was already resolving to. The two routes
+  // through heliportPosition are different lines of code, so if they disagreed by so much as a rounding
+  // step, every project made before 1.5 would quietly move the first time it was opened.
+  it("a seeded position writes the same bytes as the pad fallback it replaces", () => {
+    const followed = planExport(PROJECT, [HANGAR], { heliport: { pads: [PAD] } });
+    const seeded = planExport(PROJECT, [HANGAR], {
+      heliport: { pads: [PAD], position: PAD.position },
+    });
+    const fileOf = (p: typeof followed, rel: string): string =>
+      p.files.find((f) => f.relPath === rel)!.content;
+    expect(fileOf(seeded, HELIPORT_TSC_FILE)).toBe(fileOf(followed, HELIPORT_TSC_FILE));
+    expect(fileOf(seeded, HELIPORT_WAD_FILE)).toBe(fileOf(followed, HELIPORT_WAD_FILE));
+  });
+
+  it("…and still does under an export shift, which is where the two routes could diverge", () => {
+    // The explicit point goes through shiftPoint here; the fallback reads a pad that was shifted a few
+    // lines earlier. Shifting once each is the whole requirement, and shifting twice is the bug.
+    const shifted = { ...PROJECT, shift: { east: 50, north: -30 } };
+    const followed = planExport(shifted, [HANGAR], { heliport: { pads: [PAD] } });
+    const seeded = planExport(shifted, [HANGAR], {
+      heliport: { pads: [PAD], position: PAD.position },
+    });
+    const wadOf = (p: typeof followed): string =>
+      p.files.find((f) => f.relPath === HELIPORT_WAD_FILE)!.content;
+    expect(wadOf(seeded)).toBe(wadOf(followed));
+  });
+
   // ★ forum #168: "the functional starting position for Helicopter should be independent of XREF objects
   // because this will lead to collisions too quickly". v1.1 copied a placed object's coordinates, so the
   // helicopter spawned inside whatever the pad had been aimed at. The pad must be able to sit where no

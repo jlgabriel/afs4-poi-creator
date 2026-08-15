@@ -310,14 +310,61 @@ describe("zProject — the airport block", () => {
     expect(again.airport).toEqual(once.airport);
   });
 
-  it("round-trips a project already in the v1.4 shape", () => {
+  it("round-trips a project already in the v1.4 shape, freezing its point on the way", () => {
     const pads = [
       { id: "pad-1", name: "FATO/TLOF", position: { lon: -70.58, lat: -33.38 }, heading: 70, radius: 5 },
       { id: "pad-2", name: "Helipad_W1", position: { lon: -70.59, lat: -33.39 }, heading: 250, radius: 5 },
     ];
     const airport = { icao: "sclc", name: "Vitacura", country: "cl", iata: "CLC", pads, pad: pads[0] };
     const p = parseProject({ ...validProject(), airport });
-    expect(p.airport).toEqual(airport);
+    // Everything it had, unchanged...
+    expect(p.airport).toMatchObject(airport);
+    // ...plus the point it was ALREADY at. Up to v1.4.1 the airport followed pads[0]; from v1.5 it has
+    // a point of its own (#255), so the file has to be handed the one it was effectively using or the
+    // airport would move the first time someone dragged that pad.
+    expect(p.airport!.position).toEqual({ lon: -70.58, lat: -33.38 });
+  });
+
+  it("seeds the point from the LEGACY single pad too", () => {
+    // A v1.2/v1.3 file: one `pad`, no `pads`. Both migrations have to run, in that order.
+    const pad = { position: { lon: 10, lat: 48 }, heading: 70, radius: 5 };
+    const p = parseProject({
+      ...validProject(),
+      airport: { icao: "sclc", name: "Vitacura", country: "cl", pad },
+    });
+    expect(p.airport!.pads).toHaveLength(1);
+    expect(p.airport!.position).toEqual({ lon: 10, lat: 48 });
+  });
+
+  it("leaves a point the user already set alone", () => {
+    const pads = [{ id: "pad-1", name: "", position: { lon: 10, lat: 48 }, heading: 0, radius: 5 }];
+    const mine = { lon: 11, lat: 49 };
+    const p = parseProject({
+      ...validProject(),
+      airport: { icao: "sclc", name: "V", country: "cl", pads, pad: pads[0], position: mine },
+    });
+    expect(p.airport!.position).toEqual(mine);
+  });
+
+  it("gives no point to an airport that has no pads to take one from", () => {
+    // His "(1) DATA" example. There is nothing to freeze, and the exporter's own fallback is still the
+    // honest answer — inventing a coordinate here would be PCT deciding where the airfield is.
+    const p = parseProject({
+      ...validProject(),
+      airport: { icao: "sclc", name: "V", country: "cl", pads: [] },
+    });
+    expect(p.airport!.position).toBeUndefined();
+  });
+
+  it("is idempotent — parsing a migrated project again changes nothing", () => {
+    // Migration runs on every open, so a file that has been through it once must be a fixed point.
+    const pad = { position: { lon: 10, lat: 48 }, heading: 70, radius: 5 };
+    const once = parseProject({
+      ...validProject(),
+      airport: { icao: "sclc", name: "V", country: "cl", pad },
+    });
+    const again = parseProject({ ...validProject(), airport: once.airport });
+    expect(again.airport).toEqual(once.airport);
   });
 
   it("accepts an airport with no pads at all", () => {

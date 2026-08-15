@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Catalog, PlacedXref, Project } from "../../src/core/project/types";
 import {
+  NEW_ELEMENT_BEARING_DEG,
   NEW_RUNWAY_LENGTH_M,
   NEW_WINCH_ROPE_M,
   createEditorStore,
@@ -337,20 +338,65 @@ describe("placeAt — the helipad (v1.3)", () => {
     expect(a?.pads).toHaveLength(0);
   });
 
-  it("Delete on DATA removes the whole airport, geometry and all", () => {
+  it("Delete on the AIRPORT asks once, then removes it all (#253c)", () => {
     const { store } = makeStore();
     store.getState().armPlacement({ kind: "helipad" });
     store.getState().placeAt({ lon: 10, lat: 48 });
     store.getState().setAirportIdentity({ icao: "pct001", name: "Roof", country: "cl" });
 
     store.getState().selectAirportPart({ kind: "data" });
+    // ★ The FIRST press changes nothing but the question. "if you have entered a lot and are not paying
+    // attention, everything is gone with one blow" — so it is not gone until the second one.
+    store.getState().deleteSelection();
+    expect(store.getState().pendingAirportDelete).toBe(true);
+    expect(store.getState().project.airport).toMatchObject({ icao: "pct001" });
+
     store.getState().deleteSelection();
     expect(store.getState().project.airport).toBeUndefined();
     expect(store.getState().airportSelection).toBeNull();
+    expect(store.getState().pendingAirportDelete).toBe(false);
 
     store.getState().undo(); // one commit, so the pad comes back with the identity
     expect(store.getState().project.airport).toMatchObject({ icao: "pct001", name: "Roof" });
     expect(store.getState().project.airport?.pads).toHaveLength(1);
+  });
+
+  it("★ pointing at anything else answers no — the arming never outlives its subject", () => {
+    const { store } = makeStore();
+    store.getState().armPlacement({ kind: "helipad" });
+    store.getState().placeAt({ lon: 10, lat: 48 });
+    const padId = (store.getState().airportSelection as { id: string }).id;
+    // Named, so that losing its last pad does NOT take the block with it (airportIsBlank) — otherwise
+    // this test could not tell "the pad was deleted" from "the airport's armed delete fired".
+    store.getState().setAirportIdentity({ icao: "pct001", name: "Roof", country: "cl" });
+
+    store.getState().selectAirportPart({ kind: "data" });
+    store.getState().deleteSelection(); // armed
+    expect(store.getState().pendingAirportDelete).toBe(true);
+
+    // Select the pad instead, then press Del: it must delete THE PAD, not fire the airport's armed
+    // delete. Without the reset, a question the user walked away from would be answered by the next
+    // keystroke, on something else.
+    store.getState().selectAirportPart({ kind: "pad", id: padId });
+    expect(store.getState().pendingAirportDelete).toBe(false);
+    store.getState().deleteSelection();
+    expect(store.getState().project.airport).toBeDefined();
+    expect(store.getState().project.airport?.pads).toHaveLength(0);
+  });
+
+  it("asks only for the AIRPORT — every other part still goes on the first press", () => {
+    for (const place of ["helipad", "parking", "runway", "aerotow", "winch"] as const) {
+      const { store } = makeStore();
+      store
+        .getState()
+        .armPlacement(place === "parking" ? { kind: place, parkingType: "parked_ga" } : { kind: place });
+      store.getState().placeAt({ lon: 10, lat: 48 });
+      store.getState().setAirportIdentity({ icao: "pct001", name: "Roof", country: "cl" });
+      store.getState().deleteSelection();
+      expect(store.getState().pendingAirportDelete).toBe(false);
+      // The identity survives, so the block is still there — the part went on one press.
+      expect(store.getState().project.airport).toMatchObject({ icao: "pct001" });
+    }
   });
 
   it("the Data card makes an empty airport and selects it, without placing anything", () => {
@@ -531,11 +577,14 @@ describe("store — runways", () => {
     const r = st.project.airport!.runways![0];
     expect(r.ends[0].threshold).toEqual({ lon: 10, lat: 48 });
     expect(r.width).toBe(40);
-    // End 2 lands a default length due east. The bearing is what makes the strip readable at once; the
-    // IDENTIFIERS stay empty on purpose — naming a runway 09/27 would be a claim about the real world
-    // that a default heading cannot make.
+    // End 2 lands a default length due NORTH (#253b: the map is north-south oriented and he finds it
+    // easier to turn an element into place from there), and 200 m away rather than a kilometre (#258: a
+    // short strip is one drag to fix, a strip off the edge of the map is two zoom changes).
+    // The IDENTIFIERS stay empty on purpose in either direction — naming a runway 18/36 would be a claim
+    // about the real world that a default heading cannot make.
     near(haversine(r.ends[0].threshold, r.ends[1].threshold), NEW_RUNWAY_LENGTH_M, 1);
-    near(initialBearing(r.ends[0].threshold, r.ends[1].threshold), 90, 0.5);
+    expect(NEW_RUNWAY_LENGTH_M).toBe(200);
+    near(initialBearing(r.ends[0].threshold, r.ends[1].threshold), NEW_ELEMENT_BEARING_DEG, 0.5);
     expect([r.ends[0].identifier, r.ends[1].identifier]).toEqual(["", ""]);
     // A fresh end is unlit and usable both ways — the defaults every end in his files carries.
     expect(r.ends[0]).toMatchObject({ appltsys: "none", papi: "none", reil: "none", approach: true, takeoff: true });
@@ -654,8 +703,11 @@ describe("store — glider starts", () => {
     const w = st.project.airport!.winches![0];
     expect(w.position).toEqual({ lon: 10, lat: 48 });
     expect(w.spacing).toBe(25); // his number: "basically the span"
+    // The rope keeps its length — 900 m is HIS figure for what a winch launch is, not a shape PCT
+    // invented, so #258's "make it shorter" does not reach it. Only the bearing changed (#253b).
     near(haversine(w.position, w.winch), NEW_WINCH_ROPE_M, 1); // inside his 800–1000 m
-    near(initialBearing(w.position, w.winch), 90, 0.5);
+    expect(NEW_WINCH_ROPE_M).toBe(900);
+    near(initialBearing(w.position, w.winch), NEW_ELEMENT_BEARING_DEG, 0.5);
   });
 
   it("dragging the rope moves BOTH points by the same offset, as one undo entry", () => {
@@ -1256,3 +1308,92 @@ describe("setSelectionRotation", () => {
     expect((o[1] as PlacedXref).direction).toBe(10);
   });
 });
+
+// ── The arrow keys reach the airport (v1.5) ─────────────────────────────────────────────────────────
+//
+// Through v1.4 nudgeSelection walked `selection` only, and selecting an airport part EMPTIES that list,
+// so the arrows moved objects and did nothing at all to a pad, a stand, a runway or a glider start. The
+// same blind spot the DELETE key had (#253 → #258); unlike Delete this never worked, so it is a gap
+// rather than a regression. Every kind gets its own move path, hence a case each.
+describe("store — nudging the airport parts", () => {
+  const NORTH = 0;
+  const arm = (store: ReturnType<typeof makeStore>["store"], kind: "helipad" | "parking" | "aerotow"): void => {
+    store.getState().armPlacement(kind === "parking" ? { kind, parkingType: "parked_ga" } : { kind });
+  };
+
+  it("moves a helipad, a stand and an aerotow by the metres asked for", () => {
+    for (const kind of ["helipad", "parking", "aerotow"] as const) {
+      const { store } = makeStore();
+      arm(store, kind);
+      store.getState().placeAt({ lon: 10, lat: 48 });
+      store.getState().nudgeSelection(5, NORTH);
+      const a = store.getState().project.airport!;
+      const at =
+        kind === "helipad"
+          ? a.pads[0]!.position
+          : kind === "parking"
+            ? a.parkings![0]!.position
+            : a.aerotows![0]!.position;
+      near(haversine({ lon: 10, lat: 48 }, at), 5, 0.5);
+      near(initialBearing({ lon: 10, lat: 48 }, at), NORTH, 1);
+    }
+  });
+
+  it("moves a runway WHOLE — both thresholds, length and bearing unchanged", () => {
+    const { store } = makeStore();
+    const id = placeRunwayAt(store, 10, 48);
+    const before = store.getState().project.airport!.runways!.find((r) => r.id === id)!;
+    const len = haversine(before.ends[0].threshold, before.ends[1].threshold);
+    const dir = initialBearing(before.ends[0].threshold, before.ends[1].threshold);
+    store.getState().nudgeSelection(5, 90);
+    const after = store.getState().project.airport!.runways!.find((r) => r.id === id)!;
+    near(haversine(before.ends[0].threshold, after.ends[0].threshold), 5, 0.5);
+    near(haversine(before.ends[1].threshold, after.ends[1].threshold), 5, 0.5);
+    near(haversine(after.ends[0].threshold, after.ends[1].threshold), len, 0.5);
+    near(initialBearing(after.ends[0].threshold, after.ends[1].threshold), dir, 0.5);
+  });
+
+  it("moves a winch launch WHOLE — the rope does not stretch", () => {
+    const { store } = makeStore();
+    const id = placeWinchAt(store, 10, 48);
+    const before = store.getState().project.airport!.winches!.find((w) => w.id === id)!;
+    const rope = haversine(before.position, before.winch);
+    store.getState().nudgeSelection(5, 90);
+    const after = store.getState().project.airport!.winches!.find((w) => w.id === id)!;
+    near(haversine(before.position, after.position), 5, 0.5);
+    near(haversine(after.position, after.winch), rope, 0.5);
+  });
+
+  it("moves the AIRPORT's own point when that is what is selected", () => {
+    const { store } = makeStore();
+    arm(store, "helipad");
+    store.getState().placeAt({ lon: 10, lat: 48 });
+    store.getState().selectAirportPart({ kind: "data" });
+    store.getState().nudgeSelection(5, NORTH);
+    const a = store.getState().project.airport!;
+    near(haversine({ lon: 10, lat: 48 }, a.position!), 5, 0.5);
+    // …and the pad it was seeded from stayed put. The freeze holds under the keyboard too.
+    expect(a.pads[0]!.position).toEqual({ lon: 10, lat: 48 });
+  });
+
+  it("does nothing on an airport that has no point to nudge", () => {
+    // An arrow key must not invent the coordinate #255 took out of the model.
+    const { store } = makeStore();
+    store.getState().createAirport();
+    store.getState().nudgeSelection(5, NORTH);
+    expect(store.getState().project.airport!.position).toBeUndefined();
+  });
+});
+
+function placeRunwayAt(store: ReturnType<typeof makeStore>["store"], lon: number, lat: number): string {
+  store.getState().armPlacement({ kind: "runway" });
+  store.getState().placeAt({ lon, lat });
+  const sel = store.getState().airportSelection!;
+  return "id" in sel ? sel.id : "";
+}
+function placeWinchAt(store: ReturnType<typeof makeStore>["store"], lon: number, lat: number): string {
+  store.getState().armPlacement({ kind: "winch" });
+  store.getState().placeAt({ lon, lat });
+  const sel = store.getState().airportSelection!;
+  return "id" in sel ? sel.id : "";
+}

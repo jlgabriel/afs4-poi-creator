@@ -54,7 +54,13 @@ import {
   updateAirportAerotow,
   updateAirportWinch,
 } from "../../src/core/project/mutate";
-import { aerotowsOf, parkingsOf, runwaysOf, winchesOf } from "../../src/core/project/airport";
+import {
+  aerotowsOf,
+  airportPosition,
+  parkingsOf,
+  runwaysOf,
+  winchesOf,
+} from "../../src/core/project/airport";
 import type {
   AirportPad,
   ParkingType,
@@ -592,6 +598,9 @@ describe("the airport block", () => {
         name: "",
         country: "",
         pads: [],
+        // The first element SEEDS the airport's own point (#255). Identity is still not invented —
+        // a coordinate is where the thing is, a code is a claim about the world.
+        position: HERE,
         parkings: [{ id: "prk-1", name: "", position: HERE, heading: 0, size: 7.5, type: "parked_ga" }],
       });
     });
@@ -647,5 +656,64 @@ describe("the airport block", () => {
       const p = withStand();
       expect(p.airport!.pad).toEqual(PAD);
     });
+  });
+});
+
+// ── The airport's own point: SEEDED once, then FROZEN (forum #255) ──────────────────────────────────
+//
+// His third reason is the behavioural one and the only one a test can hold: "the airfield coordinates
+// must not change if any other element changes coordinates." Everything below is that sentence.
+describe("the airport's own point", () => {
+  const A = { lon: -70.58, lat: -33.38 };
+  const B = { lon: -70.59, lat: -33.39 };
+
+  it("is seeded by whichever element is placed first — all five kinds seed it", () => {
+    expect(addAirportPad(baseProject(), A, 10, LATER, "p1").airport!.position).toEqual(A);
+    expect(addAirportParking(baseProject(), A, "parked_ga", LATER, "s1").airport!.position).toEqual(A);
+    expect(addAirportAerotow(baseProject(), A, LATER, "t1").airport!.position).toEqual(A);
+    // The two-point elements seed from the end the CLICK put down, not from the far end the app invented.
+    expect(addAirportWinch(baseProject(), A, B, LATER, "w1").airport!.position).toEqual(A);
+    expect(addAirportRunway(baseProject(), A, B, { id: "r1" }, LATER).airport!.position).toEqual(A);
+  });
+
+  it("is NOT re-seeded by the second element, of any kind", () => {
+    let p = addAirportPad(baseProject(), A, 10, LATER, "p1");
+    p = addAirportPad(p, B, 10, LATER, "p2");
+    p = addAirportParking(p, B, "parked_ga", LATER, "s1");
+    p = addAirportRunway(p, B, A, { id: "r1" }, LATER);
+    expect(p.airport!.position).toEqual(A);
+  });
+
+  it("★ does not move when the pad it was seeded from moves — the whole point of #255", () => {
+    let p = addAirportPad(baseProject(), A, 10, LATER, "p1");
+    p = moveAirportPad(p, B, LATER, "p1");
+    expect(p.airport!.pads[0]!.position).toEqual(B); // the pad went
+    expect(p.airport!.position).toEqual(A); // the airport stayed
+  });
+
+  it("★ does not move when the pad it was seeded from is DELETED", () => {
+    // The nastier half of the old behaviour: with the fallback, deleting pad 1 teleported the airport to
+    // whichever pad happened to become first, and nothing on screen said so.
+    let p = addAirportPad(baseProject(), A, 10, LATER, "p1");
+    p = addAirportPad(p, B, 10, LATER, "p2");
+    p = removeAirportPad(p, "p1", LATER);
+    expect(p.airport!.pads).toHaveLength(1);
+    expect(p.airport!.position).toEqual(A);
+  });
+
+  it("moves when the USER moves it, and can be cleared back to following", () => {
+    let p = addAirportPad(baseProject(), A, 10, LATER, "p1");
+    p = setAirportPosition(p, B, LATER);
+    expect(p.airport!.position).toEqual(B);
+    p = setAirportPosition(p, null, LATER);
+    expect(p.airport!.position).toBeUndefined();
+    // Cleared, it falls back to the first pad again — the pre-1.5 behaviour, still reachable.
+    expect(airportPosition(p.airport!)).toEqual(A);
+  });
+
+  it("stays absent on an identity-only airport, which has nothing to be seeded from", () => {
+    const p = setAirport(baseProject(), { icao: "sclc", name: "V", country: "cl", pads: [] }, LATER);
+    expect(p.airport!.position).toBeUndefined();
+    expect(airportPosition(p.airport!)).toBeNull();
   });
 });

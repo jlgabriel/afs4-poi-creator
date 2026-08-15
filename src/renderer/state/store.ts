@@ -45,7 +45,13 @@ import {
 import { destination } from "../../core/geo/geo";
 import { lineUp, spaceEvenly } from "../../core/geo/arrange";
 import { DEFAULT_PAD_RADIUS_M } from "../../core/export/planExport";
-import { airportIsBlank } from "../../core/project/airport";
+import {
+  aerotowsOf,
+  airportIsBlank,
+  parkingsOf,
+  runwaysOf,
+  winchesOf,
+} from "../../core/project/airport";
 import * as mutate from "../../core/project/mutate";
 
 export type Camera = Project["camera"];
@@ -84,6 +90,11 @@ export type PlacingSpec =
   // behaves like a runway — one click lays the whole rope out and disarms.
   | { kind: "aerotow" }
   | { kind: "winch" }
+  // v1.5 (forum #255): the AIRPORT's own point. "The coordinates of the airport must be possible for the
+  // user both by clicking on the map and by entering the two fields LON and LAT" — this is the first
+  // half. It is the odd one of the set in that it MOVES the one airport rather than adding anything, so
+  // it is armed only while the airport has no point of its own; once it has one, it is a thing you drag.
+  | { kind: "airport" }
   // `naturalHeight` rides along rather than being looked up at place time. The palette has the
   // CatalogPlant in hand when it arms, so carrying it removes the only path where a plant could be
   // created with height 0 — the one value that may mean "invisible" (see mutate.createPlant).
@@ -143,17 +154,41 @@ export const DEFAULT_CAMERA: Camera = { lon: 0, lat: 20, zoom: 2 };
  *  passes this instead. */
 export const AIRPORT_ZOOM = 13;
 
+/** The bearing every two-point airport element is laid out along when it is dropped, degrees true.
+ *
+ *  ★ NORTH, and it is his rule (forum #253b): "The map section in the PCT is north-south oriented. I
+ *  recommend this orientation when inserting all elements of the MENU AIRPORT" — because it sits well
+ *  against the map, and because "most users like me should think compass-oriented and I find it easier
+ *  to turn the elements in the right direction from a north-south orientation."
+ *
+ *  The one-point elements already obeyed it without anyone deciding to: a pad, a stand and an aerotow all
+ *  come out of mutate.ts at `heading: 0`. Only the two that a single click lays out WHOLE had a bearing of
+ *  their own, and both pointed east. */
+export const NEW_ELEMENT_BEARING_DEG = 0;
+
 /** How long a freshly dropped runway is, metres, before the user drags either threshold. A starting value
- *  in a field the user edits, not a measurement: 1 km is a small field's strip, long enough to see and
- *  grab both ends at the zoom you place things at, short enough not to run off the screen. The direction
- *  is due east, so the strip reads as the 09/27 a runway most often is — but PCT does NOT fill the
- *  identifiers in from it (mutate.addAirportRunway leaves them empty, which is legal and is what his 0001
- *  sample does): naming a runway is a claim about the real world that a default heading cannot make. */
-export const NEW_RUNWAY_LENGTH_M = 1000;
+ *  in a field the user edits, not a measurement.
+ *
+ *  ★ 200, DOWN FROM 1000 (forum #258). His argument is about which mistake is cheaper to undo: "It is much
+ *  easier for the user to lengthen a short runway than to first get out of the map and then get back in
+ *  with a shortened runway." A kilometre of strip runs off the screen at the zoom people actually place
+ *  things at, and recovering from that costs two zoom changes; a short one costs one drag. His own words
+ *  for the target: the runway should not leave the map section, and "a length of e.g. 200 m is sufficient".
+ *
+ *  PCT still does NOT fill the identifiers in from the bearing (mutate.addAirportRunway leaves them empty,
+ *  which is legal and is what his 0001 sample does): naming a runway is a claim about the real world that
+ *  a default heading cannot make. That was true when the default pointed east and it is true pointing
+ *  north — nothing here means the strip is 18/36. */
+export const NEW_RUNWAY_LENGTH_M = 200;
 
 /** How much rope a freshly dropped winch launch starts with, metres. His range: "the distance between the
  *  glider and the winch is 800 to 1000 m", so the middle of it — and, like the runway's default length, a
- *  starting value the user then drags, not a measurement. Due east for the same reason. */
+ *  starting value the user then drags.
+ *
+ *  ⚠️ NOT shortened alongside the runway, and the difference is deliberate. #258 is about a runway, whose
+ *  length PCT invents outright; the rope's length is a figure HE gave for what a winch launch actually is.
+ *  Cutting it to fit the viewport would trade a number that means something for one that only looks tidy.
+ *  If he asks for it too, it is one constant. */
 export const NEW_WINCH_ROPE_M = 900;
 
 const capUndo = (stack: Project[]): Project[] =>
@@ -243,6 +278,18 @@ export interface EditorState {
   // The airport part the Inspector is showing — see AirportSelection for why it is its own field and
   // why a runway end is not in it. Mutually exclusive with `selection`.
   airportSelection: AirportSelection | null;
+  /** A delete of the AIRPORT that has been asked for once and not yet confirmed (forum #253c).
+   *
+   *  ★ ONLY THE AIRPORT GETS THIS, which is his instruction word for word: "Before deleting DATA (and
+   *  only for this) a note must appear that then everything will be deleted and only with another click
+   *  can it really be deleted." He grants that the cascade is correct — "without DATA the other does not
+   *  exist" — and the danger is not that it is wrong, it is that it is silent: "if you have entered a lot
+   *  and are not paying attention, everything is gone with one blow."
+   *
+   *  Ephemeral, like every other selection field: it never reaches the document, never enters undo, and
+   *  is dropped by any change of selection, so an arming that the user walked away from cannot fire later
+   *  on something else. */
+  pendingAirportDelete: boolean;
   placing: PlacingSpec | null; // what click-to-place is armed for (xref / airport_light / light / helipad)
   filter: Filter;
   mapView: Camera; // the LIVE camera; stamped into the document only at save
@@ -322,6 +369,9 @@ export interface EditorState {
   //    so it makes the block (when there is none) and selects it, which is the whole gesture.
   setAirportIata: (iata: string) => void;
   createAirport: () => void;
+  //    The AIRPORT's own point (forum #255). It takes no id because there is one airport per project,
+  //    and it is the only airport mutation the MAP drives as well as the Inspector.
+  moveAirportPosition: (position: LonLat) => void;
   //    v1.4 parking positions (forum #232). Every one takes an id: there has never been a one-stand UI,
   //    so letting it default would only hide a caller that forgot which stand it meant (mutate.ts).
   moveAirportParking: (id: string, position: LonLat) => void;
@@ -512,6 +562,7 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
           redoStack: [],
           selection: [],
           airportSelection: null,
+          pendingAirportDelete: false,
           placing: null,
           resolvedElev: new Map(),
           pendingRecovery: null, // a fresh document clears any recovery banner
@@ -538,6 +589,7 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
         redoStack: [],
         selection: [],
         airportSelection: null,
+        pendingAirportDelete: false,
         placing: null,
         filter: { query: "", category: null },
         mapView: deps.initialProject.camera,
@@ -591,9 +643,14 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
           set((s) => ({
             selection: additive ? [...new Set([...s.selection, ...ids])] : [...ids],
             airportSelection: null,
+            pendingAirportDelete: false,
           })),
-        clearSelection: () => set({ selection: [], airportSelection: null }),
-        selectAirportPart: (sel) => set({ airportSelection: sel, selection: [] }),
+        // Every selection write clears the pending delete: pointing at something else is the plainest
+        // possible "no", and an arming that outlived its subject would fire on the next thing selected.
+        clearSelection: () =>
+          set({ selection: [], airportSelection: null, pendingAirportDelete: false }),
+        selectAirportPart: (sel) =>
+          set({ airportSelection: sel, selection: [], pendingAirportDelete: false }),
         armPlacement: (name) => set({ placing: name }),
         setFilter: (patch) => set((s) => ({ filter: { ...s.filter, ...patch } })),
 
@@ -607,6 +664,14 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
           // SCLC ships three). Through v1.3 this called `placeAirportPad`, which MOVED the single pad on a
           // second drop and then disarmed, because a second pad was not a thing that could exist. Now it
           // behaves like a stand: drop, select the new one, stay armed for the next.
+          // The airport's own point (#255). It creates nothing: the block already exists by the time this
+          // can be armed, and all the click does is put its coordinate somewhere. Disarms, because there
+          // is one airport and a second click would only move what the first one placed.
+          if (spec.kind === "airport") {
+            commit((proj) => mutate.setAirportPosition(proj, p));
+            set({ placing: null, selection: [], airportSelection: { kind: "data" } });
+            return;
+          }
           if (spec.kind === "helipad") {
             const padId = deps.newId();
             commit((proj) => mutate.addAirportPad(proj, p, DEFAULT_PAD_RADIUS_M, undefined, padId));
@@ -624,16 +689,16 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
             return;
           }
           // A runway is TWO points, and this is the one card whose click does not put a thing under the
-          // cursor so much as start one: end 1 lands on the click, end 2 a default length due east, and
-          // both are then draggable. Placement DISARMS — dropping runway after runway on top of each
-          // other is not a gesture anyone wants, and the next thing you do is always adjust this one.
+          // cursor so much as start one: end 1 lands on the click, end 2 a default length due NORTH
+          // (#253b), and both are then draggable. Placement DISARMS — dropping runway after runway on top
+          // of each other is not a gesture anyone wants, and the next thing you do is always adjust this one.
           if (spec.kind === "runway") {
             const rwyId = deps.newId();
             commit((proj) =>
               mutate.addAirportRunway(
                 proj,
                 p,
-                destination(p, NEW_RUNWAY_LENGTH_M, 90),
+                destination(p, NEW_RUNWAY_LENGTH_M, NEW_ELEMENT_BEARING_DEG),
                 { id: rwyId },
                 undefined,
               ),
@@ -649,12 +714,18 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
             return;
           }
           // A winch launch is a PAIR of points — a runway's gesture: the click lays the whole rope out,
-          // the winch end goes a default distance due east, and placement disarms so the next thing you
-          // do is drag one of the two ends.
+          // the winch end goes a default distance due NORTH (#253b), and placement disarms so the next
+          // thing you do is drag one of the two ends.
           if (spec.kind === "winch") {
             const winchId = deps.newId();
             commit((proj) =>
-              mutate.addAirportWinch(proj, p, destination(p, NEW_WINCH_ROPE_M, 90), undefined, winchId),
+              mutate.addAirportWinch(
+                proj,
+                p,
+                destination(p, NEW_WINCH_ROPE_M, NEW_ELEMENT_BEARING_DEG),
+                undefined,
+                winchId,
+              ),
             );
             set({ placing: null, selection: [], airportSelection: { kind: "winch", id: winchId } });
             return;
@@ -673,7 +744,7 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
           // cleared by hand here — this is the one selection write that does not go through `select()`,
           // and without it, dropping an object while the pad was selected left the Inspector showing the
           // heliport while `selection` pointed at the new object. Caught in the preview harness.
-          set({ selection: [id], airportSelection: null });
+          set({ selection: [id], airportSelection: null, pendingAirportDelete: false });
         },
 
         moveObject: (id, p) => {
@@ -697,6 +768,56 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
         // and the placed list, so this was a live footgun, not a theoretical one. One key for the whole
         // gesture is the fix; a single-object selection is just the N=1 case.
         nudgeSelection: (deltaM, bearingDeg) => {
+          // ★ THE ARROWS REACH THE AIRPORT TOO (v1.5). Through v1.4 this walked `selection` only, and
+          // selecting an airport part EMPTIES that list (selectAirportPart) — so the arrows moved objects
+          // and did nothing at all to a pad, a stand, a runway or a glider start. Same blind spot the
+          // DELETE key had (#253 → #258, fixed in 1.4.1); unlike Delete this never worked, so it is a gap
+          // rather than a regression, and it needs a move path per kind rather than one guard.
+          //
+          // Each kind reuses its own move action, so a nudge coalesces with a drag of the SAME part and
+          // with nothing else — nudging one stand and then another stays two undo entries.
+          //
+          // The two-point elements move WHOLE, both ends by the same offset, which is what dragging their
+          // body already does. Nudging one end of a runway would be a different gesture with no key for
+          // the other end.
+          const sel = get().airportSelection;
+          if (sel !== null) {
+            const a = get().project.airport;
+            if (a === undefined) return;
+            const to = (p: LonLat): LonLat => destination(p, deltaM, bearingDeg);
+            const self = get();
+            if (sel.kind === "data") {
+              // Only when it HAS a point. An identity-only airport has nothing to nudge, and inventing
+              // one from an arrow key would be the fallback #255 removed, coming back through the door.
+              if (a.position !== undefined) self.moveAirportPosition(to(a.position));
+              return;
+            }
+            if (sel.kind === "pad") {
+              const pad = a.pads.find((p) => p.id === sel.id);
+              if (pad !== undefined) self.moveAirportPad(sel.id, to(pad.position));
+              return;
+            }
+            if (sel.kind === "parking") {
+              const stand = parkingsOf(a).find((p) => p.id === sel.id);
+              if (stand !== undefined) self.moveAirportParking(sel.id, to(stand.position));
+              return;
+            }
+            if (sel.kind === "runway") {
+              const rwy = runwaysOf(a).find((r) => r.id === sel.id);
+              if (rwy !== undefined) {
+                self.moveAirportRunway(sel.id, to(rwy.ends[0].threshold), to(rwy.ends[1].threshold));
+              }
+              return;
+            }
+            if (sel.kind === "aerotow") {
+              const tow = aerotowsOf(a).find((t) => t.id === sel.id);
+              if (tow !== undefined) self.moveAirportAerotow(sel.id, to(tow.position));
+              return;
+            }
+            const winch = winchesOf(a).find((w) => w.id === sel.id);
+            if (winch !== undefined) self.moveAirportWinch(sel.id, to(winch.position), to(winch.winch));
+            return;
+          }
           const ids = get().selection;
           if (ids.length === 0) return;
           commitCoalesced("selection:pos", (proj) =>
@@ -790,6 +911,10 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
           }
           set({ selection: [], airportSelection: { kind: "data" } });
         },
+        // Coalesced like every other drag, and id-less like the pad's keys used to be — for the same
+        // reason they could be: there is exactly one of this thing in a project.
+        moveAirportPosition: (position) =>
+          commitCoalesced("airport:position", (proj) => mutate.setAirportPosition(proj, position)),
 
         // Every coalesce key carries the STAND'S ID. Without it, dragging stand A and then stand B would
         // fold into one undo entry and a single Ctrl+Z would put both back — the pad's keys can be
@@ -918,12 +1043,21 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
           // throw away the identity beside it.
           if (airportSelection !== null) {
             const sel = airportSelection;
+            // ★ THE AIRPORT ASKS TWICE (#253c). The first Del arms; the second one, and only the second,
+            // goes through. Nothing else on the map does this, and nothing else should: a stand takes one
+            // click to make again, whereas the airport takes every element with it. Ctrl+Z would undo it,
+            // but "undo exists" is not an answer to a deletion the user did not see coming — and he says
+            // himself that not everyone knows the shortcut is there (#253c, the visible-undo half).
+            if (sel.kind === "data" && !get().pendingAirportDelete) {
+              set({ pendingAirportDelete: true });
+              return;
+            }
             commit((proj) => {
               const next = removeAirportPart(proj, sel);
               const a = next.airport;
               return a !== undefined && airportIsBlank(a) ? mutate.setAirport(next, null) : next;
             });
-            set({ airportSelection: null });
+            set({ airportSelection: null, pendingAirportDelete: false });
             return;
           }
           if (selection.length === 0) return;
