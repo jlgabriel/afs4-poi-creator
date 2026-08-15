@@ -353,7 +353,13 @@ export function planHeliport(
     );
   }
   if (objects.length === 0) {
-    warnings.push("The heliport has no objects around it — just the pad.");
+    // "just the pad" stopped being true the moment an airport could be installed without one (#255), and
+    // paired with the warning above it read as a contradiction: no helipad, and also just the pad.
+    warnings.push(
+      pads.length === 0
+        ? "The airport has no objects around it either — this installs the bare airfield data."
+        : "The heliport has no objects around it — just the pad.",
+    );
   }
 
   const spec: HeliportSpec = {
