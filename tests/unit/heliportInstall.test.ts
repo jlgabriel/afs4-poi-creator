@@ -234,11 +234,31 @@ describe("planHeliport", () => {
     expect(tsc).toContain("[icao][PCT001]");
   });
 
-  it("says out loud that a pad-less airport starts nothing", () => {
-    // Nobody has flown one. An empty LOCATION entry must not read as a PCT bug.
+  // ⛔ GATED 2026-08-14 and REFUSED BY THE SIMULATOR. PCT wrote the pad-less airport #255 asked for and
+  // FS 4 answered: "no valid runway or helipad defined. invalid airport 'PCT No Pad'", with the airport
+  // count unmoved at 8141. The floor is one HELIPAD or one RUNWAY — its words, so a stand does not count.
+  it("warns when there is neither a helipad nor a runway, which Aerofly refuses", () => {
     const opts = { identity: ID, heliport: { pads: [], position: PAD.position } };
     const plan = planHeliport(PROJECT, [HANGAR], opts);
-    expect(plan.warnings.some((w) => w.includes("no helipad"))).toBe(true);
+    expect(plan.warnings.some((w) => w.includes("at least one of the two"))).toBe(true);
+  });
+
+  it("does NOT warn for an airport that has a runway but no helipad — that one is legal", () => {
+    // And this is the case the no-inventing change is actually for: it used to get a helipad the user
+    // never placed.
+    const runway = {
+      id: "rwy-1",
+      ends: [
+        { threshold: { lon: -116.8, lat: 34.85 }, identifier: "", appltsys: "none", papi: "none", reil: "none", approach: true, takeoff: true },
+        { threshold: { lon: -116.79, lat: 34.85 }, identifier: "", appltsys: "none", papi: "none", reil: "none", approach: true, takeoff: true },
+      ] as [AirportRunwayEnd, AirportRunwayEnd],
+      width: 40,
+    };
+    const opts = { identity: ID, heliport: { pads: [], runways: [runway], position: PAD.position } };
+    const plan = planHeliport(PROJECT, [HANGAR], opts);
+    expect(plan.warnings.some((w) => w.includes("at least one of the two"))).toBe(false);
+    const tsc = plan.files.find((f) => f.relPath === "pct001.tsc")!.content;
+    expect(tsc).not.toContain("[tmsimulator_helipad][element]");
   });
 
   it("still gives the export TEMPLATE its default pad — the two callers want opposite things", () => {

@@ -138,6 +138,16 @@ export function HeliportDialog({ onClose }: { onClose: () => void }): React.Reac
       setError("This airport has no point on the map yet. Set it in the Airport panel, then install.");
       return;
     }
+    // ⛔ THE FLOOR IS AEROFLY'S, and it was measured rather than assumed (gate 2026-08-14). #255 asked for
+    // an airport that installs with nothing else entered; PCT wrote exactly that and the simulator threw
+    // it out: "no valid runway or helipad defined. invalid airport 'PCT No Pad'", with the airport count
+    // unmoved. Its own words name the two that count — a parking position or a glider start does not.
+    if (airport.pads.length === 0 && (airport.runways ?? []).length === 0) {
+      setError(
+        "Aerofly needs at least one helipad or one runway — it rejects an airport with neither. Place one from the catalog, then install.",
+      );
+      return;
+    }
     // Every pad, not just the first: a bad radius anywhere writes a helipad the sim will not render, and
     // the count is small enough that checking all of them costs nothing.
     if (airport.pads.some((p) => !(Number.isFinite(p.radius) && p.radius > 0))) {

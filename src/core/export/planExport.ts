@@ -344,12 +344,22 @@ export function planHeliport(
       "Heliports were only verified in-sim with baked-asl heights — in Sim-autoheight mode, check the objects' heights after the first flight.",
     );
   }
-  if (pads.length === 0) {
-    // Not a refusal — it is what he asked for, and his reason is that installing the bare airfield is how
-    // you find out whether FS 4 already knows it. But nobody has flown one yet, so say so rather than let
-    // an empty LOCATION entry read as a PCT bug.
+  // ⛔ NOT "installable with nothing at all" — GATED AND REFUSED, 2026-08-14. #255 asked for an airport
+  // that installs alone, and PCT wrote one: identity, a coordinate, five empty lists. FS 4 read it and
+  // threw it out by name:
+  //
+  //     ERROR: (no valid runway or helipad defined. invalid airport 'PCT No Pad'.
+  //             tsc_file='…/pct002.tsc')
+  //
+  // The count stayed at 8141. So the floor is the simulator's, not ours, and it is exactly one HELIPAD or
+  // one RUNWAY — its own words, which also means a stand or a glider start does not satisfy it.
+  //
+  // What survives from the change is the part that was right for a different reason: PCT no longer
+  // INVENTS a helipad for an airport that has none. An airport with a runway and no helipad is legal, and
+  // used to get a pad the user never placed.
+  if (pads.length === 0 && (opts.heliport.runways ?? []).length === 0) {
     warnings.push(
-      "This airport has no helipad, so nothing starts on it yet — it installs as a database entry you can find in LOCATION.",
+      "Aerofly rejects an airport with no helipad and no runway — it needs at least one of the two.",
     );
   }
   if (objects.length === 0) {
