@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Catalog, PlacedXref, Project } from "../../src/core/project/types";
 import {
+  NEW_ELEMENT_BEARING_DEG,
   NEW_RUNWAY_LENGTH_M,
   NEW_WINCH_ROPE_M,
   createEditorStore,
@@ -531,11 +532,14 @@ describe("store — runways", () => {
     const r = st.project.airport!.runways![0];
     expect(r.ends[0].threshold).toEqual({ lon: 10, lat: 48 });
     expect(r.width).toBe(40);
-    // End 2 lands a default length due east. The bearing is what makes the strip readable at once; the
-    // IDENTIFIERS stay empty on purpose — naming a runway 09/27 would be a claim about the real world
-    // that a default heading cannot make.
+    // End 2 lands a default length due NORTH (#253b: the map is north-south oriented and he finds it
+    // easier to turn an element into place from there), and 200 m away rather than a kilometre (#258: a
+    // short strip is one drag to fix, a strip off the edge of the map is two zoom changes).
+    // The IDENTIFIERS stay empty on purpose in either direction — naming a runway 18/36 would be a claim
+    // about the real world that a default heading cannot make.
     near(haversine(r.ends[0].threshold, r.ends[1].threshold), NEW_RUNWAY_LENGTH_M, 1);
-    near(initialBearing(r.ends[0].threshold, r.ends[1].threshold), 90, 0.5);
+    expect(NEW_RUNWAY_LENGTH_M).toBe(200);
+    near(initialBearing(r.ends[0].threshold, r.ends[1].threshold), NEW_ELEMENT_BEARING_DEG, 0.5);
     expect([r.ends[0].identifier, r.ends[1].identifier]).toEqual(["", ""]);
     // A fresh end is unlit and usable both ways — the defaults every end in his files carries.
     expect(r.ends[0]).toMatchObject({ appltsys: "none", papi: "none", reil: "none", approach: true, takeoff: true });
@@ -654,8 +658,11 @@ describe("store — glider starts", () => {
     const w = st.project.airport!.winches![0];
     expect(w.position).toEqual({ lon: 10, lat: 48 });
     expect(w.spacing).toBe(25); // his number: "basically the span"
+    // The rope keeps its length — 900 m is HIS figure for what a winch launch is, not a shape PCT
+    // invented, so #258's "make it shorter" does not reach it. Only the bearing changed (#253b).
     near(haversine(w.position, w.winch), NEW_WINCH_ROPE_M, 1); // inside his 800–1000 m
-    near(initialBearing(w.position, w.winch), 90, 0.5);
+    expect(NEW_WINCH_ROPE_M).toBe(900);
+    near(initialBearing(w.position, w.winch), NEW_ELEMENT_BEARING_DEG, 0.5);
   });
 
   it("dragging the rope moves BOTH points by the same offset, as one undo entry", () => {

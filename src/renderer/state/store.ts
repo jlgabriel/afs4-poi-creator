@@ -143,17 +143,41 @@ export const DEFAULT_CAMERA: Camera = { lon: 0, lat: 20, zoom: 2 };
  *  passes this instead. */
 export const AIRPORT_ZOOM = 13;
 
+/** The bearing every two-point airport element is laid out along when it is dropped, degrees true.
+ *
+ *  ★ NORTH, and it is his rule (forum #253b): "The map section in the PCT is north-south oriented. I
+ *  recommend this orientation when inserting all elements of the MENU AIRPORT" — because it sits well
+ *  against the map, and because "most users like me should think compass-oriented and I find it easier
+ *  to turn the elements in the right direction from a north-south orientation."
+ *
+ *  The one-point elements already obeyed it without anyone deciding to: a pad, a stand and an aerotow all
+ *  come out of mutate.ts at `heading: 0`. Only the two that a single click lays out WHOLE had a bearing of
+ *  their own, and both pointed east. */
+export const NEW_ELEMENT_BEARING_DEG = 0;
+
 /** How long a freshly dropped runway is, metres, before the user drags either threshold. A starting value
- *  in a field the user edits, not a measurement: 1 km is a small field's strip, long enough to see and
- *  grab both ends at the zoom you place things at, short enough not to run off the screen. The direction
- *  is due east, so the strip reads as the 09/27 a runway most often is — but PCT does NOT fill the
- *  identifiers in from it (mutate.addAirportRunway leaves them empty, which is legal and is what his 0001
- *  sample does): naming a runway is a claim about the real world that a default heading cannot make. */
-export const NEW_RUNWAY_LENGTH_M = 1000;
+ *  in a field the user edits, not a measurement.
+ *
+ *  ★ 200, DOWN FROM 1000 (forum #258). His argument is about which mistake is cheaper to undo: "It is much
+ *  easier for the user to lengthen a short runway than to first get out of the map and then get back in
+ *  with a shortened runway." A kilometre of strip runs off the screen at the zoom people actually place
+ *  things at, and recovering from that costs two zoom changes; a short one costs one drag. His own words
+ *  for the target: the runway should not leave the map section, and "a length of e.g. 200 m is sufficient".
+ *
+ *  PCT still does NOT fill the identifiers in from the bearing (mutate.addAirportRunway leaves them empty,
+ *  which is legal and is what his 0001 sample does): naming a runway is a claim about the real world that
+ *  a default heading cannot make. That was true when the default pointed east and it is true pointing
+ *  north — nothing here means the strip is 18/36. */
+export const NEW_RUNWAY_LENGTH_M = 200;
 
 /** How much rope a freshly dropped winch launch starts with, metres. His range: "the distance between the
  *  glider and the winch is 800 to 1000 m", so the middle of it — and, like the runway's default length, a
- *  starting value the user then drags, not a measurement. Due east for the same reason. */
+ *  starting value the user then drags.
+ *
+ *  ⚠️ NOT shortened alongside the runway, and the difference is deliberate. #258 is about a runway, whose
+ *  length PCT invents outright; the rope's length is a figure HE gave for what a winch launch actually is.
+ *  Cutting it to fit the viewport would trade a number that means something for one that only looks tidy.
+ *  If he asks for it too, it is one constant. */
 export const NEW_WINCH_ROPE_M = 900;
 
 const capUndo = (stack: Project[]): Project[] =>
@@ -624,16 +648,16 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
             return;
           }
           // A runway is TWO points, and this is the one card whose click does not put a thing under the
-          // cursor so much as start one: end 1 lands on the click, end 2 a default length due east, and
-          // both are then draggable. Placement DISARMS — dropping runway after runway on top of each
-          // other is not a gesture anyone wants, and the next thing you do is always adjust this one.
+          // cursor so much as start one: end 1 lands on the click, end 2 a default length due NORTH
+          // (#253b), and both are then draggable. Placement DISARMS — dropping runway after runway on top
+          // of each other is not a gesture anyone wants, and the next thing you do is always adjust this one.
           if (spec.kind === "runway") {
             const rwyId = deps.newId();
             commit((proj) =>
               mutate.addAirportRunway(
                 proj,
                 p,
-                destination(p, NEW_RUNWAY_LENGTH_M, 90),
+                destination(p, NEW_RUNWAY_LENGTH_M, NEW_ELEMENT_BEARING_DEG),
                 { id: rwyId },
                 undefined,
               ),
@@ -649,12 +673,18 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
             return;
           }
           // A winch launch is a PAIR of points — a runway's gesture: the click lays the whole rope out,
-          // the winch end goes a default distance due east, and placement disarms so the next thing you
-          // do is drag one of the two ends.
+          // the winch end goes a default distance due NORTH (#253b), and placement disarms so the next
+          // thing you do is drag one of the two ends.
           if (spec.kind === "winch") {
             const winchId = deps.newId();
             commit((proj) =>
-              mutate.addAirportWinch(proj, p, destination(p, NEW_WINCH_ROPE_M, 90), undefined, winchId),
+              mutate.addAirportWinch(
+                proj,
+                p,
+                destination(p, NEW_WINCH_ROPE_M, NEW_ELEMENT_BEARING_DEG),
+                undefined,
+                winchId,
+              ),
             );
             set({ placing: null, selection: [], airportSelection: { kind: "winch", id: winchId } });
             return;
