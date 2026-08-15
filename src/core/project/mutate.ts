@@ -401,6 +401,25 @@ function withPadMirror(airport: ProjectAirport): ProjectAirport {
   return airport.pad === first ? airport : { ...airport, pad: first };
 }
 
+/** Seed the AIRPORT's own point the first time the block gains any geometry — and never again.
+ *
+ *  ★ THE FREEZE IS THE WHOLE POINT (forum #255). Of his three reasons for wanting the airport to carry
+ *  its own coordinate, the third is the one that decides behaviour: "the airfield coordinates must not
+ *  change if any other element changes coordinates." Through v1.4 the airport had no point of its own in
+ *  practice — `airportPosition` fell through to `pads[0]`, so dragging the first helipad dragged the
+ *  airport with it, and deleting that helipad teleported the airport to whichever pad became first.
+ *
+ *  What replaces it is NOT "type coordinates before anything works". The first element placed hands the
+ *  airport a starting point — the same point it would have ended up at anyway — and from that moment the
+ *  two are independent: the element moves, the airport stays.
+ *
+ *  Idempotent on purpose. An airport that already has a `position` is left alone, no matter where that
+ *  position came from: seeded here, migrated out of an older file, typed into the Inspector or dragged on
+ *  the map. That is what makes this safe to call from every path that adds geometry. */
+function seededPosition(airport: ProjectAirport, position: LonLat): ProjectAirport {
+  return airport.position === undefined ? { ...airport, position } : airport;
+}
+
 /** Adopt (or drop, with `null`) the whole airport block. The dialog's writer: identity plus pads in one
  *  commit, because the user typed them together. Absent ≡ "this project is POI-only" — the same
  *  absent-means-default rule `shift` and `heightMode` follow, so a project that never opened the
@@ -495,7 +514,7 @@ export function addAirportPad(
     airport === undefined
       ? { icao: "", name: "", country: "", pads: [pad] }
       : { ...airport, pads: [...airport.pads, pad] };
-  return { ...project, airport: withPadMirror(next), modifiedAt: now };
+  return { ...project, airport: withPadMirror(seededPosition(next, position)), modifiedAt: now };
 }
 
 /** Drop a pad by id. A pad-less airport stays a valid block — his "(1) DATA" example is an airport with
@@ -603,7 +622,8 @@ export function addAirportRunway(
     airport === undefined
       ? { icao: "", name: "", country: "", pads: [], runways: [runway] }
       : { ...airport, runways: [...runwaysOf(airport), runway] };
-  return { ...project, airport: next, modifiedAt: now };
+  // Threshold 1 is the end that lands under the cursor, so it is the point the user actually chose.
+  return { ...project, airport: seededPosition(next, threshold1), modifiedAt: now };
 }
 
 /** Drop a runway by id. */
@@ -711,7 +731,7 @@ export function addAirportAerotow(
     airport === undefined
       ? { icao: "", name: "", country: "", pads: [], aerotows: [aerotow] }
       : { ...airport, aerotows: [...aerotowsOf(airport), aerotow] };
-  return { ...project, airport: next, modifiedAt: now };
+  return { ...project, airport: seededPosition(next, position), modifiedAt: now };
 }
 
 /** APPEND a winch launch. `winch` is the far end of the rope — 800 to 1000 m away in his description, and
@@ -737,7 +757,8 @@ export function addAirportWinch(
     airport === undefined
       ? { icao: "", name: "", country: "", pads: [], winches: [w] }
       : { ...airport, winches: [...winchesOf(airport), w] };
-  return { ...project, airport: next, modifiedAt: now };
+  // The GLIDER end, not the winch: that is the one the click put down and the one he calls the start.
+  return { ...project, airport: seededPosition(next, position), modifiedAt: now };
 }
 
 export function removeAirportAerotow(project: Project, aerotowId: string, now = nowIso()): Project {
@@ -848,7 +869,7 @@ export function addAirportParking(
     airport === undefined
       ? { icao: "", name: "", country: "", pads: [], parkings: [parking] }
       : { ...airport, parkings: [...parkingsOf(airport), parking] };
-  return { ...project, airport: next, modifiedAt: now };
+  return { ...project, airport: seededPosition(next, position), modifiedAt: now };
 }
 
 /** Drop a stand by id. Removing the last one leaves `parkings: []` rather than deleting the key: the

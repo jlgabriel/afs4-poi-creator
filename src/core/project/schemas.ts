@@ -369,13 +369,41 @@ export const LEGACY_PAD_ID = "pad-1";
  *
  *  The migrated pad gets an EMPTY name on purpose: the writer renders an unnamed pad as "FATO/TLOF",
  *  which is the literal v1.2/v1.3 hard-coded, so an existing project keeps producing the same files. */
-function migrateAirport(airport: unknown): unknown {
-  if (!isRecord(airport)) return airport;
+function migratePads(airport: Record<string, unknown>): Record<string, unknown> {
   if (Array.isArray(airport.pads)) return airport;
   const legacy = airport.pad;
   if (!isRecord(legacy)) return { ...airport, pads: [] };
   const pad = { id: LEGACY_PAD_ID, name: "", ...legacy };
   return { ...airport, pads: [pad], pad };
+}
+
+/** Every version up to v1.4.1 left `position` unset and let the airport FOLLOW its first pad
+ *  (airport.ts airportPosition). From v1.5 the airport carries its own point and stops following anything
+ *  (forum #255: "the airfield coordinates must not change if any other element changes coordinates"), so
+ *  an older file has to be given the point it was effectively already at.
+ *
+ *  ★ IT MUST BE THE FIRST PAD'S, and nothing cleverer, because that is what the writers were resolving to
+ *  a second ago. Both routes end in `shiftPoint(…, shift)` — explicit position and pad fallback alike — so
+ *  a migrated project exports the same bytes it did before it was opened. The only file that changes is
+ *  the project.json, which gains one key.
+ *
+ *  Runs for BOTH shapes, which is why it is not folded into migratePads: a v1.4 project already has
+ *  `pads` and returns from that function untouched, and it needs this just as much as a v1.3 one does.
+ *
+ *  An airport with no pads at all is left alone — it had no point to freeze, and the exporter's own
+ *  fallback (the POI anchor) is still the honest answer for it. */
+function migratePosition(airport: Record<string, unknown>): Record<string, unknown> {
+  if (airport.position !== undefined) return airport;
+  const first = Array.isArray(airport.pads) ? (airport.pads[0] as unknown) : undefined;
+  if (!isRecord(first) || !isRecord(first.position)) return airport;
+  // Copied, not aliased: two names for one object in a document that is edited by replacement is a trap
+  // waiting for whoever writes the next mutation.
+  return { ...airport, position: { ...first.position } };
+}
+
+function migrateAirport(airport: unknown): unknown {
+  if (!isRecord(airport)) return airport;
+  return migratePosition(migratePads(airport));
 }
 
 /** Normalise an older/other project shape up to the current version. Anything other than the current
