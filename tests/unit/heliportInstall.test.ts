@@ -5,9 +5,14 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import os from "node:os";
 import path from "node:path";
 import type { AirportPad, AirportRunwayEnd, Project, ResolvedXref } from "../../src/core/project/types";
-import { InvalidHeliportIdentityError, planHeliport } from "../../src/core/export/planExport";
+import {
+  InvalidHeliportIdentityError,
+  planExport,
+  planHeliport,
+} from "../../src/core/export/planExport";
 import {
   HELIPORT_README_MARKER,
+  HELIPORT_TSC_FILE,
   buildHeliportTsc,
   buildHeliportWad,
   heliportFolderName,
@@ -208,6 +213,40 @@ describe("planHeliport", () => {
       expect(wad).toContain(t);
       expect(tsc).not.toContain(t);
     }
+  });
+
+  // ★★ INSTALLABLE ALONE (v1.5, forum #255). "When all data entries for an airport are made, it must
+  // already be able to be installed alone - even if no other element for this airport has yet been
+  // entered." Through v1.4 an empty pad list was silently replaced by ONE invented pad at the POI anchor,
+  // which was right for the opt-in heliport TEMPLATE — a template with no helipad has nowhere to spawn a
+  // helicopter — and wrong here: it wrote a helipad the user never placed into a file they are installing
+  // precisely to see what FS 4 already knows about the code.
+  it("writes NO helipad when the project has none, instead of inventing one", () => {
+    const opts = { identity: ID, heliport: { pads: [], position: PAD.position } };
+    const plan = planHeliport(PROJECT, [HANGAR], opts);
+    const tsc = plan.files.find((f) => f.relPath === "pct001.tsc")!.content;
+    const wad = plan.files.find((f) => f.relPath === "pct001.wad")!.content;
+    // The LISTS are still written — they are DEFAULT rows in his own files (#217/#236) — but empty.
+    expect(tsc).toContain("[list_tmsimulator_helipad][helipads][]");
+    expect(tsc).not.toContain("[tmsimulator_helipad][element]");
+    expect(wad).not.toContain("[tmworld_airport_detailed_helipad][element]");
+    // And the identity is all there, which is the point of installing it at all.
+    expect(tsc).toContain("[icao][PCT001]");
+  });
+
+  it("says out loud that a pad-less airport starts nothing", () => {
+    // Nobody has flown one. An empty LOCATION entry must not read as a PCT bug.
+    const opts = { identity: ID, heliport: { pads: [], position: PAD.position } };
+    const plan = planHeliport(PROJECT, [HANGAR], opts);
+    expect(plan.warnings.some((w) => w.includes("no helipad"))).toBe(true);
+  });
+
+  it("still gives the export TEMPLATE its default pad — the two callers want opposite things", () => {
+    // The guard on the split: fixing the install must not quietly change the #160 template, which has
+    // been shipping an invented pad since v1.1 and is a different object with a different job.
+    const plan = planExport(PROJECT, [HANGAR], { heliport: { pads: [] } });
+    const tsc = plan.files.find((f) => f.relPath === HELIPORT_TSC_FILE)!.content;
+    expect(tsc).toContain("[tmsimulator_helipad][element]");
   });
 
   it("drops the cultivation reference entirely for an empty project", () => {

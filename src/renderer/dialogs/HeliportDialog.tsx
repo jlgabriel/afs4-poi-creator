@@ -111,10 +111,14 @@ export function HeliportDialog({ onClose }: { onClose: () => void }): React.Reac
     };
   }, [pct, identity?.icao, problem, installedKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  /** Send the user to place a pad: arm the catalog's card and get out of the way, because the map is
-   *  behind this. The whole point of v1.3 is that this is the same gesture as placing anything else. */
+  /** Send the user to put the AIRPORT down: arm the placement and get out of the way, because the map is
+   *  behind this. The whole point of v1.3 is that this is the same gesture as placing anything else.
+   *
+   *  It armed a HELIPAD until v1.5, back when a heliport needed one to exist. Since #255 the thing an
+   *  install cannot do without is the airport's own point, so that is what this offers to go and set. */
   const goPlace = (): void => {
-    editorStore.getState().armPlacement({ kind: "helipad" });
+    editorStore.getState().createAirport();
+    editorStore.getState().armPlacement({ kind: "airport" });
     onClose();
   };
 
@@ -122,8 +126,16 @@ export function HeliportDialog({ onClose }: { onClose: () => void }): React.Reac
     if (!pct || airport === undefined || identity === null || problem !== null) return;
     setError(null);
 
-    if (airport.pads.length === 0) {
-      setError("This airport has no helipad yet. Place one from the catalog first.");
+    // ★ NO LONGER "you need a helipad" (v1.5, forum #255). He asked for the opposite: "When all data
+    // entries for an airport are made, it must already be able to be installed alone - even if no other
+    // element for this airport has yet been entered", because installing the bare airfield is how you
+    // find out whether FS 4 already knows it and where it thinks it is.
+    //
+    // What IS required is a point. An airport with no coordinates would be written at the POI anchor, and
+    // for a project with no objects either that anchor is 0/0 — an airfield in the Gulf of Guinea, filed
+    // under the user's own country code. Refusing is the only honest answer, and it is one click to fix.
+    if (airport.position === undefined) {
+      setError("This airport has no point on the map yet. Set it in the Airport panel, then install.");
       return;
     }
     // Every pad, not just the first: a bad radius anywhere writes a helipad the sim will not render, and
@@ -231,21 +243,25 @@ export function HeliportDialog({ onClose }: { onClose: () => void }): React.Reac
               placed around the pad. It does not replace the POI export — it is a second, separate copy.
             </p>
 
-            {airport === undefined ? (
-              // Nothing to install. Rather than offering to make one here — which is the modal-shaped
-              // habit v1.3 is undoing — point at the card that makes it and step aside.
+            {airport === undefined || airport.position === undefined ? (
+              // Nothing that can be installed yet. Rather than offering to fix it here — which is the
+              // modal-shaped habit v1.3 is undoing — point at the gesture that fixes it and step aside.
+              //
+              // ★ THE MISSING THING IS THE POINT, NOT A HELIPAD (v1.5, #255). An airport with no helipad
+              // installs perfectly well now, and he wants it to: it is how you learn what FS 4 already
+              // has. An airport with no coordinates is the one that cannot be written.
               <div className="pct-field pct-field-col">
                 <p className="pct-empty">
-                  This project has no helipad yet. A heliport needs one: the helicopter has to start
-                  somewhere.
+                  This airport is not on the map yet. Every other field can wait; this one cannot, because
+                  it is where Aerofly will put the airfield.
                 </p>
                 <span className="pct-field-meta">
-                  Place it from <strong>Helipad</strong> in the catalog, then click the map —
-                  the same way you place anything else. It appears in the list on the right, and its code
-                  and name go in the Inspector.
+                  Place any element and the airport takes its point from it, or set it yourself — click
+                  the map, or type LON and LAT in the <strong>Airport</strong> panel. It stays where you
+                  put it.
                 </span>
                 <button type="button" className="pct-primary" onClick={goPlace}>
-                  Place a helipad
+                  Put the airport on the map
                 </button>
               </div>
             ) : (

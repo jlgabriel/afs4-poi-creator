@@ -117,7 +117,28 @@ function shiftPoint(p: LonLat, shift: Project["shift"]): LonLat {
     : shiftEastNorth(p, shift.east, shift.north);
 }
 
-function heliportPads(
+/** The pads exactly as the project has them: shifted with the scene, nothing invented. What the AIRPORT
+ *  install writes — including, since v1.5, none at all. */
+function mapPads(pads: AirportPad[], shift: Project["shift"]): HeliportPadSpec[] {
+  return pads.map((p) => ({
+    name: p.name,
+    position: shiftPoint(p.position, shift),
+    headingDeg: p.heading,
+    radiusM: p.radius,
+  }));
+}
+
+/** The TEMPLATE's pads (the opt-in `.txt` pair, forum #160): the same, except that an EMPTY list becomes
+ *  one default pad at the POI's own anchor, facing true north.
+ *
+ *  ★ THE TWO CALLERS WANT OPPOSITE THINGS, and the difference is not an oversight — the note this
+ *  function grew out of called it two versions ago: a heliport TEMPLATE with no helipad has nowhere to
+ *  spawn the helicopter, so a project that never placed one still gets something usable. An AIRPORT with
+ *  deliberately zero pads is a different object, and forum #255 asks for it by name: "When all data
+ *  entries for an airport are made, it must already be able to be installed alone - even if no other
+ *  element for this airport has yet been entered." Inventing a pad there would write a helipad the user
+ *  never placed into a file they are installing to find out what FS 4 already knows. */
+function templatePads(
   pads: AirportPad[],
   fallback: LonLat,
   shift: Project["shift"],
@@ -126,12 +147,7 @@ function heliportPads(
   // `fallback` is the POI anchor, which is already computed from SHIFTED objects — shifting it again
   // would move the default pad twice.
   if (pads.length === 0) return [{ name: "", position: fallback, headingDeg: 0, radiusM }];
-  return pads.map((p) => ({
-    name: p.name,
-    position: shiftPoint(p.position, shift),
-    headingDeg: p.heading,
-    radiusM: p.radius,
-  }));
+  return mapPads(pads, shift);
 }
 
 /** The runways, shifted with the scene — BOTH points of each end, or a displaced threshold would stay
@@ -246,7 +262,8 @@ export function planExport(
   ];
 
   if (opts.heliport !== undefined) {
-    const pads = heliportPads(
+    // The TEMPLATE: an empty pad list still gets one, at the anchor. See templatePads.
+    const pads = templatePads(
       opts.heliport.pads,
       ref,
       project.shift,
@@ -319,15 +336,20 @@ export function planHeliport(
   const tocFileName = objects.length > 0 ? POI_BASENAME : null;
   const anchor = autoheight ? computeAutoheightAnchor(objects) : computeAnchor(objects);
 
-  const pads = heliportPads(
-    opts.heliport.pads,
-    ref,
-    project.shift,
-    opts.heliport.radiusM ?? DEFAULT_PAD_RADIUS_M,
-  );
+  // The AIRPORT install writes what the project has and invents nothing (#255: "it must already be able
+  // to be installed alone - even if no other element for this airport has yet been entered").
+  const pads = mapPads(opts.heliport.pads, project.shift);
   if (autoheight) {
     warnings.push(
       "Heliports were only verified in-sim with baked-asl heights — in Sim-autoheight mode, check the objects' heights after the first flight.",
+    );
+  }
+  if (pads.length === 0) {
+    // Not a refusal — it is what he asked for, and his reason is that installing the bare airfield is how
+    // you find out whether FS 4 already knows it. But nobody has flown one yet, so say so rather than let
+    // an empty LOCATION entry read as a PCT bug.
+    warnings.push(
+      "This airport has no helipad, so nothing starts on it yet — it installs as a database entry you can find in LOCATION.",
     );
   }
   if (objects.length === 0) {
