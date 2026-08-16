@@ -23,17 +23,21 @@ import { haversine, initialBearing } from "../../core/geo/geo";
 import { rowInfo } from "./rowInfo";
 
 /** The airport's own row — his submenu (1) DATA — pinned above every airport part, because the parts
- *  belong to it. Present whenever the block is, INCLUDING an airport with no geometry at all: that is a
- *  legal document (his "(1) DATA" example is identity plus a database entry and nothing else), and it is
- *  the row that makes such an airport visible instead of a block nobody can see or reach.
+ *  belong to it. Present whenever the block is, INCLUDING an airport with no geometry at all: PCT will
+ *  not INSTALL that (Aerofly rejects it outright — "no valid runway or helipad defined"), but it is a
+ *  perfectly ordinary thing to have half-built on the map, and since #278 it is what you are left with
+ *  after deleting your last helipad. The row is what keeps such an airport visible and reachable instead
+ *  of a block nobody can see.
  *
- *  No double-click-to-fly: the airport's position follows its first helipad and is not a point of its own
- *  yet (AirportDataFields), so flying "to the airport" would fly to a pad while claiming otherwise. */
+ *  Double-click flies to it, like every other row here — the airport has had a point of its own since
+ *  v1.5 (#255). Before that its position followed the first helipad, so flying "to the airport" would
+ *  have flown to a pad while claiming otherwise, and this row deliberately had no fly-to at all. */
 function DataRow(): React.ReactElement | null {
   const airport = useEditor((s) => s.project.airport);
   const selected = useEditor((s) => s.airportSelection?.kind === "data");
   if (airport === undefined) return null;
   const { icao, name } = airport;
+  const point = airport.position;
   const parts =
     airport.pads.length +
     (airport.parkings?.length ?? 0) +
@@ -47,6 +51,9 @@ function DataRow(): React.ReactElement | null {
       aria-pressed={selected}
       title="The airport itself — its name and code"
       onClick={() => editorStore.getState().selectAirportPart({ kind: "data" })}
+      onDoubleClick={() => {
+        if (point !== undefined) editorStore.getState().flyTo(point);
+      }}
     >
       <DataIcon />
       <span className="pct-placed-text">
@@ -322,9 +329,14 @@ export function PlacedList(): React.ReactElement {
       </div>
 
       <div className="pct-placed-list">
+        {/* ★ THIS ORDER IS HALF OF A PAIR (#277). It must match the catalog's Airport section card for
+            card — he caught PARKING and RUNWAY sitting in opposite places in the two columns and asked
+            for one sequence: "I suggest that the sequences in both columns remain identical." The order
+            itself is his too, chosen as "the one that an average user expects". Changing it here without
+            changing AirportSection.tsx re-creates exactly the bug he reported. */}
         <DataRow />
-        <HelipadRows />
         <RunwayRows />
+        <HelipadRows />
         <ParkingRows />
         <GliderRows />
         {objects.length === 0 ? (
