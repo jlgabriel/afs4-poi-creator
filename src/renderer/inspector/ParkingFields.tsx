@@ -16,6 +16,7 @@ import type { AirportParking, ParkingType } from "../../core/project/types";
 import { PARKING_TYPES, PARKING_TYPE_LABELS } from "../../core/project/airport";
 import { clampLonLat } from "../../core/project/schemas";
 import { editorStore } from "../state/editorStore";
+import { Help } from "./HelpNote";
 import { NumberInput } from "./NumberInput";
 
 const fmtDeg = (n: number): string => n.toFixed(6);
@@ -31,10 +32,12 @@ export function ParkingFields({ parking }: { parking: AirportParking }): React.R
       </div>
 
       <div className="pct-field pct-field-col">
-        <span className="pct-field-label">Parking position — where an aircraft starts</span>
-        <span className="pct-field-meta">
-          Drag the violet circle on the map to move it, and its cyan grip to turn it. It is its own
-          point, not one of your objects, so nothing spawns inside a building.
+        <span className="pct-field-label">
+          Parking position — where an aircraft starts
+          <Help>
+            Drag the violet circle on the map to move it, and its cyan grip to turn it. It is its own
+            point, not one of your objects, so nothing spawns inside a building.
+          </Help>
         </span>
       </div>
 
@@ -65,7 +68,12 @@ export function ParkingFields({ parking }: { parking: AirportParking }): React.R
 
       <div className="pct-field pct-field-row">
         <label className="pct-field-col">
-          <span className="pct-field-label">Heading — true</span>
+          <span className="pct-field-label">
+            Heading — true
+            {/* Measured in-sim 2026-07-31 for the pad, and it is the same field: we write TRUE and the
+                sim's menu shows MAGNETIC. */}
+            <Help>Aerofly shows this heading as MAGNETIC, so expect it to read a few degrees off.</Help>
+          </span>
           <NumberInput
             value={parking.heading}
             onCommit={(heading) => store().rotateAirportParking(id, heading)}
@@ -73,7 +81,12 @@ export function ParkingFields({ parking }: { parking: AirportParking }): React.R
           />
         </label>
         <label className="pct-field-col">
-          <span className="pct-field-label">Size — m</span>
+          <span className="pct-field-label">
+            Size — m
+            <Help>
+              This is a radius — the sim shows {parking.size} m as {Math.round(parking.size * 2)} m.
+            </Help>
+          </span>
           <NumberInput
             value={parking.size}
             onCommit={(size) => store().setAirportParkingSize(id, size)}
@@ -81,15 +94,12 @@ export function ParkingFields({ parking }: { parking: AirportParking }): React.R
           />
         </label>
       </div>
-      {/* Measured in-sim 2026-07-31 for the pad, and it is the same field: we write TRUE and the sim's
-          menu shows MAGNETIC. Said once, here, rather than left to be discovered by a few degrees. */}
-      <span className="pct-field-meta">
-        Aerofly shows this heading as MAGNETIC, so expect it to read a few degrees off. Size{" "}
-        {parking.size} m is a radius — the sim shows it as {Math.round(parking.size * 2)} m.
-      </span>
 
       <label className="pct-field pct-field-col">
-        <span className="pct-field-label">Name — shown in LOCATION</span>
+        <span className="pct-field-label">
+          Name — shown in LOCATION
+          <Help>Leave it empty and Aerofly shows the stand as &ldquo;Parking&rdquo;.</Help>
+        </span>
         <input
           className="pct-text"
           value={parking.name}
@@ -97,11 +107,16 @@ export function ParkingFields({ parking }: { parking: AirportParking }): React.R
           aria-label="Parking name"
           onChange={(e) => store().setAirportParkingName(id, e.target.value)}
         />
-        <span className="pct-field-meta">Leave it empty and Aerofly shows the stand as "Parking".</span>
       </label>
 
       <label className="pct-field pct-field-col">
-        <span className="pct-field-label">Type</span>
+        <span className="pct-field-label">
+          Type
+          <Help>
+            Which aircraft Aerofly parks here. Changing it resizes the stand, unless you have already
+            typed a size of your own.
+          </Help>
+        </span>
         <select
           className="pct-num"
           value={parking.type}
@@ -114,10 +129,6 @@ export function ParkingFields({ parking }: { parking: AirportParking }): React.R
             </option>
           ))}
         </select>
-        <span className="pct-field-meta">
-          Which aircraft Aerofly parks here. Changing it resizes the stand, unless you have already typed
-          a size of your own.
-        </span>
       </label>
     </div>
   );

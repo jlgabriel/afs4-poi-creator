@@ -25,6 +25,7 @@ import type { IcaoStatus } from "../../shared/pctApi";
 import { clampLonLat } from "../../core/project/schemas";
 import { identityProblemText, validateIdentity, SNAME_MAX } from "../../core/export/heliportTemplate";
 import { editorStore, useEditor } from "../state/editorStore";
+import { Help } from "./HelpNote";
 import { NumberInput } from "./NumberInput";
 import { getPct } from "../app/pct";
 
@@ -99,9 +100,11 @@ export function AirportDataFields({ airport }: { airport: ProjectAirport }): Rea
       )}
 
       <div className="pct-field pct-field-col">
-        <span className="pct-field-label">Airport — what this becomes in Aerofly</span>
-        <span className="pct-field-meta">
-          Needed before you can install it; not needed to place or move anything on the map.
+        <span className="pct-field-label">
+          Airport — what this becomes in Aerofly
+          <Help>
+            Needed before you can install it; not needed to place or move anything on the map.
+          </Help>
         </span>
       </div>
 
@@ -115,7 +118,16 @@ export function AirportDataFields({ airport }: { airport: ProjectAirport }): Rea
         <>
           <div className="pct-field pct-field-row">
             <label className="pct-field-col">
-              <span className="pct-field-label">Lon</span>
+              {/* The note is on LON alone, not on both: two question marks side by side on one pair of
+                  coordinates would read as two different explanations. It is the rule that changed in
+                  1.5 and the one thing about this field a 1.4 user would get wrong. */}
+              <span className="pct-field-label">
+                Lon
+                <Help>
+                  Drag the ⊕ on the map, or type here. It stays where you put it — moving a helipad or a
+                  runway does not move the airport.
+                </Help>
+              </span>
               <NumberInput
                 value={point.lon}
                 format={fmtDeg}
@@ -133,12 +145,6 @@ export function AirportDataFields({ airport }: { airport: ProjectAirport }): Rea
               />
             </label>
           </div>
-          {/* Said once, here, because it is the rule that changed in 1.5 and the one thing about this
-              field a 1.4 user would get wrong. */}
-          <span className="pct-field-meta">
-            Drag the ⊕ on the map, or type here. It stays where you put it — moving a helipad or a runway
-            does not move the airport.
-          </span>
         </>
       ) : (
         <div className="pct-field pct-field-col">
@@ -219,7 +225,10 @@ export function AirportDataFields({ airport }: { airport: ProjectAirport }): Rea
       </label>
 
       <label className="pct-field pct-field-col">
-        <span className="pct-field-label">Country code</span>
+        <span className="pct-field-label">
+          Country code
+          <Help>It picks the folder your airport is installed into, the way Aerofly files its own.</Help>
+        </span>
         <input
           className="pct-num"
           value={airport.country}
@@ -230,9 +239,6 @@ export function AirportDataFields({ airport }: { airport: ProjectAirport }): Rea
         {airport.country.trim() !== "" && problem === "country-format" && (
           <span className="pct-warn">{identityProblemText("country-format")}</span>
         )}
-        <span className="pct-field-meta">
-          It picks the folder your airport is installed into, the way Aerofly files its own.
-        </span>
       </label>
 
       {/* The read-only "Position" block that stood here through v1.4 is gone. It existed because the

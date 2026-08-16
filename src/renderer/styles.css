@@ -812,6 +812,47 @@ body {
   font-size: 12px;
   color: #64748b;
 }
+/* The Inspector's folded notes (forum #275, see inspector/HelpNote.tsx). A 14 px ring beside an 11 px
+   label: big enough to hit, small enough that a panel of six fields does not read as a panel of six
+   buttons. It has to spell out its own font and letter-spacing because it sits inside .pct-field-label,
+   which is uppercase and tracked out — and so does the note, or the explanation would shout. */
+.pct-help {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  margin-left: 5px;
+  padding: 0;
+  border: 1px solid #cbd5e1;
+  border-radius: 50%;
+  background: #ffffff;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0;
+  vertical-align: middle;
+  cursor: pointer;
+}
+.pct-help:hover {
+  border-color: #94a3b8;
+  color: #0f172a;
+}
+.pct-help[aria-expanded="true"] {
+  border-color: #94a3b8;
+  background: #e2e8f0;
+  color: #0f172a;
+}
+.pct-help-note {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+  color: #64748b;
+}
 .pct-warn {
   color: #b45309;
 }
