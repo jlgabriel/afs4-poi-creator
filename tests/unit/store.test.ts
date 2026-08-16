@@ -310,13 +310,20 @@ describe("placeAt — the helipad (v1.3)", () => {
     expect(store.getState().airportSelection).toBeNull();
   });
 
-  it("Delete on the pad of a never-named airport takes the block with it", () => {
+  // ★ #278, and it inverts what this test asserted through v1.5. Deleting the only pad of an airport
+  // nobody had named used to take the block with it; his words: "that must not be. As long as the PCT is
+  // only in the labour process ... only the affected elements themselves may change." His own case was
+  // exactly this one — "AIRPORT DATA and 1x HELIPAD" — and it also has to hold for an airport that was
+  // never touched at all, since placing a pad is one of the five things that CREATES the block.
+  it("Delete on the pad KEEPS the block, even unnamed (#278)", () => {
     const { store } = makeStore();
     store.getState().armPlacement({ kind: "helipad" });
     store.getState().placeAt({ lon: 10, lat: 48 });
 
     store.getState().deleteSelection();
-    expect(store.getState().project.airport).toBeUndefined();
+    const airport = store.getState().project.airport;
+    expect(airport).toBeDefined();
+    expect(airport?.pads).toHaveLength(0);
     expect(store.getState().airportSelection).toBeNull();
 
     store.getState().undo();
@@ -500,16 +507,35 @@ describe("store — parking positions", () => {
     expect(store.getState().airportSelection).toBeNull();
   });
 
-  it("deleting the LAST part of a never-named airport takes the block with it", () => {
+  // The stand's half of the same inversion (#278). The runway is the case he actually named second —
+  // "AIRPORT DATA and 1x RUNWAY" — but the rule is about the LAST part, whichever kind it was, so the
+  // cheapest way to hold it is the kind whose helper is already here.
+  it("deleting the LAST part KEEPS the block, even unnamed (#278)", () => {
     const { store } = makeStore();
     const a = placeStand(store, 10, 48);
 
     store.getState().selectAirportPart({ kind: "parking", id: a });
     store.getState().deleteSelection();
-    expect(store.getState().project.airport).toBeUndefined();
+    const airport = store.getState().project.airport;
+    expect(airport).toBeDefined();
+    expect(airport?.parkings ?? []).toHaveLength(0);
 
     store.getState().undo(); // one commit, so the stand comes back
     expect(store.getState().project.airport?.parkings).toHaveLength(1);
+  });
+
+  // ★ The one deletion that still cascades, and the reason the rule above is not just "never cascade":
+  // Del on the AIRPORT row means the airport, and it asks first. Without this test, a future reading of
+  // #278 as "nothing ever takes anything with it" would quietly disarm the only deliberate way to throw
+  // an airport away.
+  it("Del on the AIRPORT still takes its parts with it (#278 does not touch this)", () => {
+    const { store } = makeStore();
+    placeStand(store, 10, 48);
+
+    store.getState().selectAirportPart({ kind: "data" });
+    store.getState().deleteSelection(); // arms
+    store.getState().deleteSelection(); // and this one goes through
+    expect(store.getState().project.airport).toBeUndefined();
   });
 
   // The dead end the DATA submenu was built to close: placing a stand creates the airport block, and
@@ -657,12 +683,16 @@ describe("store — runways", () => {
     expect(airport.pads).toHaveLength(1);
   });
 
-  it("deleting the only runway takes the airport block with it", () => {
+  // ★ HIS SECOND CASE, WORD FOR WORD (#278): "AIRPORT DATA and 1x RUNWAY ... If now the RUNWAY (2. Case),
+  // AIRPORT DATA will also be automatically deleted. But that must not be." Through v1.5 it did.
+  it("deleting the only runway KEEPS the airport block (#278)", () => {
     const { store } = makeStore();
     const id = placeRunway(store, 10, 48);
     store.getState().selectAirportPart({ kind: "runway", id });
     store.getState().deleteSelection();
-    expect(store.getState().project.airport).toBeUndefined();
+    const airport = store.getState().project.airport;
+    expect(airport).toBeDefined();
+    expect(airport?.runways ?? []).toHaveLength(0);
   });
 });
 

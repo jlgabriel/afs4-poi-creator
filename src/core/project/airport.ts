@@ -50,40 +50,15 @@ export function winchesOf(airport: ProjectAirport | undefined): AirportWinch[] {
   return airport?.winches ?? [];
 }
 
-/** Whether the airport block holds no geometry at all: no pads, no stands, no runways, no glider starts.
- *
- *  Not the same as "the writers would emit nothing": an identity-only airport is still a legal DOCUMENT —
- *  his "(1) DATA" example is exactly that — which is why this lives here as a UI question and not as a
- *  validation rule. */
-export function airportIsEmpty(airport: ProjectAirport): boolean {
-  return (
-    airport.pads.length === 0 &&
-    parkingsOf(airport).length === 0 &&
-    runwaysOf(airport).length === 0 &&
-    aerotowsOf(airport).length === 0 &&
-    winchesOf(airport).length === 0
-  );
-}
-
-/** Whether the block holds nothing at all — no geometry AND nothing typed into it. This is what the UI
- *  treats as "the airport is gone": deleting the last part of a never-named airport takes the block with
- *  it, which is what v1.3's Del-on-the-pad felt like when a pad was all an airport could hold.
- *
- *  ★ WHY THE IDENTITY IS PART OF THE TEST, since v1.4's DATA submenu (forum #217/#232). Before it, the
- *  identity could only be reached through the pad's panel, so a block with no geometry was a block the
- *  user could neither see nor edit and dropping it was a kindness. The Data row changes that: an
- *  identity-only airport now has a row, a panel and a Del of its own. Keeping the old test would mean
- *  deleting the last stand silently threw away a code the user had typed — and undo is not an answer to
- *  a deletion nobody asked for. */
-export function airportIsBlank(airport: ProjectAirport): boolean {
-  return (
-    airportIsEmpty(airport) &&
-    airport.icao.trim() === "" &&
-    airport.name.trim() === "" &&
-    airport.country.trim() === "" &&
-    (airport.iata ?? "").trim() === ""
-  );
-}
+// ⛔ `airportIsEmpty` / `airportIsBlank` LIVED HERE AND ARE GONE (#278). They answered one question —
+// "has this airport been reduced to nothing?" — for one caller, the Del handler, which used it to drop
+// the whole block when its last part went. He asked us to stop: "As long as the PCT is only in the
+// labour process ... only the affected elements themselves may change." With that rule gone there is no
+// caller left, and the pair is not worth keeping warm: the check the app actually needs is not "is this
+// empty" but Aerofly's own floor, one helipad or one runway, and the install already asks it in those
+// words (renderer/dialogs/HeliportDialog). Deleting them here rather than leaving them unused is the
+// house rule — an accessor nobody calls, with a docblock that states a rule the app no longer follows,
+// is how the next reader gets misled.
 
 /** How far apart two side-by-side gliders stand on a winch launch, metres. His number: "When I enter a
  *  value here, it is usually [25], but each user has to decide for himself" — a glider's span. */
