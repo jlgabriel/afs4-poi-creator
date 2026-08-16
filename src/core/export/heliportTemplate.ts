@@ -1,18 +1,16 @@
-// heliportTemplate.ts — the POI's optional `heliport.tsc.txt` / `heliport.wad.txt` pair: two TEMPLATES a
-// user can turn into a real AFS4 heliport by hand (forum #160, ApfelFlieger).
+// heliportTemplate.ts — the `.tsc` / `.wad` pair that IS an Aerofly airport: what PCT writes into
+// scenery/airports/<country>/ when you press "Install HELIPORT…".
 //
-// WHY TEMPLATES AND NOT AN AIRPORT. A user `.tsc` whose `icao` collides with a base airport SILENTLY
-// REPLACES it — the only trace is one line in tm.log — and POIs get shared, so PCT cannot validate an
-// ICAO on a machine it has never seen. That is the whole reason PCT does not write airports. These files
-// dodge it by construction:
-//
-//   • PCT never picks an identity. `icao` / `name` / `country` ship as `__PLACEHOLDER__` text; the person
-//     who fills them in is the same person who moves the folder into scenery/airports.
-//   • The `.txt` suffix makes them INERT wherever they sit. (Measured 2026-07-31: a `.tsc`+`.wad` dropped
-//     into scenery/poi/ is not read AT ALL — the sim's `airports=` count did not move and the 36-char
-//     `sname` that makes it log `airport name … too long` for files under scenery/airports/ stayed silent.
-//     So even the bare names were safe; `.txt` costs the user nothing — Michael's own recipe already ends
-//     in "rename the files to the airport code" — and it survives a sim update changing that.)
+// ⛔ THE NAME IS HISTORY, AND SO IS HALF THE FILE'S ORIGINAL JOB. It was born as two TEMPLATES (forum
+// #160): the same two files, with `__PLACEHOLDER__` for the identity and a `.txt` suffix that made them
+// inert, dropped inside a POI folder for the user to finish by hand. That was PCT working around its own
+// rule — a user `.tsc` whose `icao` collides with a base airport SILENTLY REPLACES it, with one line in
+// tm.log as the only trace, and POIs get shared, so PCT must not pick an ICAO for a file it does not
+// install. v1.3 answered that properly instead: PCT installs the airport itself, having checked the code
+// against every airport on THIS machine at the moment of writing. The templates outlived their reason,
+// and #278 removed them — "it could be that a user thinks that a POI with TSC and WAD files could also be
+// directly useable as an airfield". Everything below is unchanged; only the caller that wanted blanks is
+// gone. (The filename stays: renaming it would churn a file whose bytes have flown.)
 //
 // PROVENANCE. Every tag, and the order, is copied from a heliport that WORKS: ApfelFlieger's `de0869`
 // (forum #113 / thread 28713 #78), then flown end-to-end at KDAG on 2026-07-31 with these exact contents
@@ -30,21 +28,16 @@ import { lonToWad, latToWad, directionToWad, formatWad } from "../geo/wad";
 import { headingToDirection } from "../geo/orientation";
 import { ANCHOR_GEOMETRY, type Anchor } from "./plantAnchor";
 
-/** The two template filenames. `.txt` on purpose (see the header); the user renames them to `<icao>.tsc`
- *  and `<icao>.wad`, which their recipe has them doing anyway. */
-export const HELIPORT_TSC_FILE = "heliport.tsc.txt";
-export const HELIPORT_WAD_FILE = "heliport.wad.txt";
-
 /** Longest `sname` the sim accepts. It REJECTS THE WHOLE AIRPORT above the limit, with
  *  `ERROR: (airport name '…' too long. tsc='…')` — three of IPACS's own files trip it. The exact cut is
  *  somewhere in [30, 34] (30 loads, 35 fails), so the templates tell the user 29 and stay clear of it. */
 export const SNAME_MAX = 29;
 
-/** Placeholders the TEMPLATE writes. Michael's own blank templates mark fields with two underscores; same
- *  convention, so someone who has seen his files recognises these. */
-const ICAO = "__ICAO__";
-const AIRPORT_NAME = "__AIRPORT_NAME__";
-const COUNTRY = "__COUNTRY__";
+// ⛔ THE `__ICAO__` / `__AIRPORT_NAME__` / `__COUNTRY__` PLACEHOLDERS LIVED HERE AND ARE GONE (#278).
+// They were the whole point of the template: PCT wrote them because PCT must never pick an identity for
+// files it does not install. Every file this module writes today is one PCT installs itself, with an
+// identity the user typed and PCT checked against the codes on this machine — so there is nothing left
+// to leave blank for somebody to fill in later.
 
 /** What makes a heliport an AIRPORT rather than a template: the identity a user types into "Create
  *  heliport…". PCT still does not invent any of it — but it does refuse a bad one (validateIdentity) and,
@@ -224,13 +217,13 @@ export interface HeliportSpec {
   anchor: Anchor | null;
   /** The project's height mode, mirrored onto the cultivation reference. */
   autoheight: boolean;
-  /** null → the TEMPLATE: `__PLACEHOLDER__` identity and the four manual steps at the top. Set → a real
-   *  airport PCT is about to install itself. Same tags either way; only the values and the header differ,
-   *  so there is exactly one description of this format in the codebase. */
-  identity?: HeliportIdentity | null;
+  /** The airport PCT is about to install. REQUIRED since #278 — it used to be optional, and absent meant
+   *  "write `__PLACEHOLDER__` in these three rows", which is what the POI's `.txt` templates did with it.
+   *  There is no template any more, so there is no such thing as a spec without an identity. */
+  identity: HeliportIdentity;
 }
 
-/** The three identity values as they go into the files: the real ones, or the placeholders.
+/** The three identity values as they go into the files.
  *
  *  ★ THE CODE GOES IN CAPITALS, the disk stays lowercase. ApfelFlieger, forum #172: the
  *  `<[…][icao][ABCD]>` rows in BOTH files "must be entered as capital letters in order to be displayed
@@ -245,8 +238,7 @@ export interface HeliportSpec {
  *  "that is Aerofly, not you": the blank row in LOCATION's search. That is now the first suspect, and it
  *  reads off one install without flying — see the note in the dialog. */
 function identityValues(spec: HeliportSpec): { icao: string; name: string; country: string } {
-  const id = spec.identity ?? null;
-  if (id === null) return { icao: ICAO, name: AIRPORT_NAME, country: COUNTRY };
+  const id = spec.identity;
   return { icao: id.icao.toUpperCase(), name: sanitizeValue(id.name).trim(), country: id.country };
 }
 
@@ -465,7 +457,7 @@ function parkingBlock(parkings: HeliportParkingSpec[], wad: boolean): string[] {
   return block(listType, "parking_positions", "", elements);
 }
 
-/** `heliport.tsc.txt` — the place: identity, the functional pads, and the pointer to the POI's own `poi.toc`. */
+/** `<icao>.tsc` — the place: identity, the functional pads, and the pointer to the POI's own `poi.toc`. */
 export function buildHeliportTsc(spec: HeliportSpec): string {
   const pos = `${fmtLonLat(spec.position.lon)} ${fmtLonLat(spec.position.lat)}`;
   const v = identityValues(spec);
@@ -560,7 +552,7 @@ const WAD_BANNER: string[] = [
   "",
 ];
 
-/** `heliport.wad.txt` — the entry in FS4's world airport database: what puts the heliport on the map, in
+/** `<icao>.wad` — the entry in FS4's world airport database: what puts the heliport on the map, in
  *  the flight planner and in "nearest". Its coordinates are NOT degrees; they are the projected 0–65536
  *  grid (core/geo/wad.ts), which is the tedious part PCT is here to do. */
 export function buildHeliportWad(spec: HeliportSpec): string {
@@ -675,31 +667,7 @@ export function heliportInstalledReadme(id: HeliportIdentity, projectName: strin
   ].join("\n");
 }
 
-/** The lines README.txt gains when the templates ship. The steps live HERE and not inside the two files
- *  because nothing may precede the root tag of a `.tsc` (see NO_HEADER) — and these files become a `.tsc`
- *  the moment the user finishes step 3. */
-export function heliportReadmeLines(): string[] {
-  return [
-    "HELIPORT TEMPLATE (advanced)",
-    "",
-    `  ${HELIPORT_TSC_FILE} and ${HELIPORT_WAD_FILE} turn this POI into a heliport you`,
-    "  can start a flight from. Aerofly ignores them as they are. To finish them by hand:",
-    "",
-    "   1. Move this whole folder out of  scenery/poi/  and into  scenery/airports/",
-    "      A layout that works:  scenery/airports/<country>/<this folder>/",
-    `   2. Replace ${ICAO}, ${AIRPORT_NAME} and ${COUNTRY} in BOTH files.`,
-    "      The code must be 4-6 characters and FREE on the machine that installs this: an existing",
-    "      code REPLACES that airport, leaving only a line in tm.log. Check it in Aerofly's LOCATION",
-    `      menu first. The name must be ${SNAME_MAX} characters or fewer, or the airport is dropped whole.`,
-    "      Type the code IN CAPITALS inside both files - FS 4 displays the airport by that row.",
-    "   3. Rename both files to  <code>.tsc  and  <code>.wad  - dropping the .txt. These two go in",
-    "      LOWERCASE, like every other file name under scenery/airports.",
-    "   4. Delete poi.tsl. The .tsc takes its place. Keep poi.toc and any pct_anchor files.",
-    "",
-    "  Do not add anything above the first  <[file]  line of either file: Aerofly refuses to load a",
-    "  .tsc that does not start with it, and says so only in tm.log.",
-    "",
-    "  PCT can do all of this for you - see Install HELIPORT in the app.",
-    "",
-  ];
-}
+// ⛔ `heliportReadmeLines` STOOD HERE (#278). It was the four-step recipe a POI's README carried when the
+// templates were exported with it: move the folder to scenery/airports, replace the three placeholders,
+// rename both files, delete poi.tsl. Its own last line already said where this was going —
+// "PCT can do all of this for you - see Install HELIPORT in the app" — and that is now the only way.
