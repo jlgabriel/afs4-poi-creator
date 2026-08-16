@@ -158,6 +158,24 @@ body {
   user-select: none;
 }
 
+/* The winch drum on the map (forum #278): "The symbol at the position of the winch must be rectangular
+   instead of a round circle." It is a divIcon rather than a Leaflet vector because Leaflet has no square
+   in pixels — see GliderLayer. Unlike the pad's H this one IS the click target, so it keeps its pointer
+   events and wears the same grab cursor as everything else you can drag. The colours are written inline
+   by the layer, which owns the palette; only the geometry lives here. */
+.pct-winch-glyph {
+  background: none;
+  border: none;
+}
+.pct-winch-box {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  border: 2px solid;
+  cursor: grab;
+}
+
 /* Side panels. */
 .pct-catalog,
 .pct-inspector,
