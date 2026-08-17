@@ -797,6 +797,19 @@ body {
   flex-direction: column;
   gap: 4px;
 }
+/* ★ A FIELD IS NOT A CELL. `.pct-field-col`'s `flex: 1 1 0` exists for a CELL inside a `.pct-field-row` —
+   it is what makes Lon and Lat split the row's width evenly (see the min-width note above). On a
+   TOP-LEVEL `.pct-field`, which sits in the panel's own flex COLUMN, that same rule reads as "grow
+   vertically", so every such block stretched to swallow the panel's leftover height.
+
+   It was always there — Michael's own v1.5.0 screenshot has the gap under the helipad's paragraph — but
+   it stayed invisible while the blocks were full of prose. Folding the notes away behind a `?` (#275)
+   turned it into a gap around NOTHING, which is exactly what Juan caught: "todo el espacio donde ira la
+   explicacion esta en blanco, entonces no se gana nada con ocultarla". Measured on the winch panel: the
+   intro block was 69 px tall for one 16 px line, and the two field blocks 69 px for 51 px of content. */
+.pct-field.pct-field-col {
+  flex: none;
+}
 .pct-field-title {
   font-weight: 600;
   font-size: 14px;
