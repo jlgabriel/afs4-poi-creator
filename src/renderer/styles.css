@@ -138,12 +138,16 @@ body {
    so the rotation is written inline by the layer and this only has to make it legible over satellite
    imagery, which is what the dark shadow is for. pointer-events:none so the glyph never eats the drag on
    the circle underneath it. */
-.pct-helipad-glyph {
+/* The stand's P (forum #283) shares the H's geometry and legibility, and differs only in that the layer
+   never writes a rotation onto it — see ParkingLayer.layoutGlyph for why. */
+.pct-helipad-glyph,
+.pct-parking-glyph {
   background: none;
   border: none;
   pointer-events: none;
 }
-.pct-helipad-h {
+.pct-helipad-h,
+.pct-parking-p {
   width: 24px;
   height: 24px;
   line-height: 24px;
