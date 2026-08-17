@@ -1,6 +1,15 @@
 import { describe, it, expect } from "vitest";
-import { WAD_LAT_K, WAD_SPAN, directionToWad, formatWad, latToWad, lonToWad } from "../../src/core/geo/wad";
+import {
+  WAD_LAT_K,
+  WAD_SPAN,
+  directionToWad,
+  formatWad,
+  headingToWadDirection,
+  latToWad,
+  lonToWad,
+} from "../../src/core/geo/wad";
 import { headingToDirection } from "../../src/core/geo/orientation";
+import { buildHeliportWad } from "../../src/core/export/heliportTemplate";
 
 // GROUND TRUTH — ApfelFlieger's hand-built `de0869.wad` (forum #113, in _local_reference). He wrote the
 // degrees; the sim reads the projected pair. If PCT is going to show a user the number to paste, it has
@@ -61,5 +70,36 @@ describe("WAD conversion — display contract", () => {
   it("always prints ten decimals, like the files do", () => {
     expect(formatWad(0)).toBe("0.0000000000");
     expect(formatWad(WAD_SPAN)).toBe("65536.0000000000");
+  });
+});
+
+// Forum #284: the Inspector now shows these values beside the LON/LAT and HEADING fields of all six
+// Airport submenus, so a user can copy them. That makes the read-out and the WRITER two mouths on one
+// number, and a heading is where they could disagree without either looking wrong — hence one function.
+describe("WAD conversion — heading, the composed form the Inspector shows", () => {
+  it("is the raw direction in radians, not the heading in radians", () => {
+    // The two agree only at 45°, which is exactly why a "simplification" here would look plausible.
+    expect(headingToWadDirection(111)).toBe(directionToWad(headingToDirection(111)));
+    expect(formatWad(headingToWadDirection(111))).toBe("5.9166661643");
+    expect(headingToWadDirection(0)).not.toBeCloseTo(directionToWad(0), 6);
+    expect(headingToWadDirection(45)).toBeCloseTo(directionToWad(45), 12); // the one coincidence
+  });
+
+  it("is the same string the .wad file gets — the read-out cannot drift from the writer", () => {
+    const at = { lon: 11.82883, lat: 49.23516 };
+    const wad = buildHeliportWad({
+      position: at,
+      pads: [{ name: "", position: at, headingDeg: 111, radiusM: 10 }],
+      aerotows: [{ name: "26", position: at, headingDeg: 111 }],
+      cultivationFileName: null,
+      anchor: null,
+      autoheight: false,
+      identity: { icao: "pct001", name: "Readout", country: "de" },
+    });
+    // The pad's and the aerotow's `direction` rows, and the position the airport row carries — every one
+    // of them a string the Inspector now prints beside the field the user typed.
+    expect(wad).toContain(formatWad(headingToWadDirection(111)));
+    expect(wad).toContain(formatWad(lonToWad(at.lon)));
+    expect(wad).toContain(formatWad(latToWad(at.lat)));
   });
 });

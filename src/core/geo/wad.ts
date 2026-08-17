@@ -16,6 +16,7 @@
 // files, where the tangent latitude beats a Mercator hypothesis 46 to 1 — and they reproduce his own
 // hand-built `de0869.wad` to all ten printed decimals. Both facts are documented in
 // `reference/AFS4_KNOWLEDGE_BASE_EN.md` §12.
+import { headingToDirection } from "./orientation";
 
 /** Grid span of the `.wad` coordinate system: the full 360° of longitude / 180° of latitude. */
 export const WAD_SPAN = 65536;
@@ -25,6 +26,10 @@ export const WAD_SPAN = 65536;
 export const WAD_LAT_K = 2.3311223704144;
 
 const norm360 = (deg: number): number => ((deg % 360) + 360) % 360;
+
+// The one import this module makes, and only to COMPOSE with — `headingToWadDirection` below. The
+// heading↔direction mapping itself is calibrated against the sim and stays in orientation.ts.
+
 
 /** Longitude in degrees → its `.wad` value. Linear: −180 → 0, 0 → 32768, +180 → 65536. */
 export function lonToWad(lonDeg: number): number {
@@ -44,6 +49,17 @@ export function latToWad(latDeg: number): number {
  *  heading mapping stays in exactly one place. */
 export function directionToWad(directionDeg: number): number {
   return (norm360(directionDeg) * Math.PI) / 180;
+}
+
+/** A COMPASS HEADING, the thing the Inspector's fields actually hold, → the `.wad` direction in radians.
+ *
+ *  It exists because there are now two callers that must agree to the last digit: the writer that puts
+ *  the number in the file, and the read-out that shows the user the number to paste (forum #284,
+ *  inspector/WadReadout.tsx). Spelled out at both call sites, the day someone "simplified" one of them to
+ *  `directionToWad(heading)` would be the day PCT started printing a plausible wrong number — the two
+ *  agree only at 45°. The calibrated mapping still lives in exactly one place; this only composes it. */
+export function headingToWadDirection(headingDeg: number): number {
+  return directionToWad(headingToDirection(headingDeg));
 }
 
 /** Decimals used to print every `.wad` value. Matches the ten that IPACS's own files carry, so what the

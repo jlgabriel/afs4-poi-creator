@@ -24,8 +24,7 @@
 
 import type { ApproachLightSystem, LonLat, PapiSide, ParkingType, ReilKind } from "../project/types";
 import { tag, block, fmtLonLat, fmtNum, sanitizeValue } from "../tm/tmEmit";
-import { lonToWad, latToWad, directionToWad, formatWad } from "../geo/wad";
-import { headingToDirection } from "../geo/orientation";
+import { lonToWad, latToWad, formatWad, headingToWadDirection } from "../geo/wad";
 import { ANCHOR_GEOMETRY, type Anchor } from "./plantAnchor";
 
 /** Longest `sname` the sim accepts. It REJECTS THE WHOLE AIRPORT above the limit, with
@@ -413,7 +412,7 @@ function gliderBlocks(aerotows: HeliportAerotowSpec[], winches: HeliportWinchSpe
       block("tmworld_airport_detailed_glider_aerotow", "element", String(i), [
         tag("string8", "name", sanitizeValue(a.name).trim()),
         tag("vector2_float64", "position", wad(a.position)),
-        tag("float64", "direction", formatWad(directionToWad(headingToDirection(a.headingDeg)))),
+        tag("float64", "direction", formatWad(headingToWadDirection(a.headingDeg))),
         // An empty LIST as a single line, which is the form his own file uses for it.
         tag("list_vector2_float64", "waypoints", ""),
       ]),
@@ -446,7 +445,7 @@ function parkingBlock(parkings: HeliportParkingSpec[], wad: boolean): string[] {
           : `${fmtLonLat(p.position.lon)} ${fmtLonLat(p.position.lat)}`,
       ),
       wad
-        ? tag("float64", "direction", formatWad(directionToWad(headingToDirection(p.headingDeg))))
+        ? tag("float64", "direction", formatWad(headingToWadDirection(p.headingDeg)))
         : tag("float64", "heading", fmtNum(p.headingDeg)),
       tag("float64", "size", fmtNum(p.sizeM)),
       tag("string8", "name", parkingName(p)),
@@ -568,7 +567,7 @@ export function buildHeliportWad(spec: HeliportSpec): string {
       ),
       tag("float64", "radius", fmtNum(p.radiusM)),
       // The .wad stores the same rotation as the .toc, in RADIANS — hence the trip through headingToDirection.
-      tag("float64", "direction", formatWad(directionToWad(headingToDirection(p.headingDeg)))),
+      tag("float64", "direction", formatWad(headingToWadDirection(p.headingDeg))),
       tag("float64", "height", "0"),
     ]),
   );
