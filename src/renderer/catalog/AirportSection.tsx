@@ -104,18 +104,16 @@ export function AirportSection(): React.ReactElement {
   // ★ IT ARMS ONLY WHILE THERE IS NOWHERE TO GO. An airport that already has its ⊕ opens its panel and
   // stays put: the card is the way BACK to the identity fields, and re-arming would turn every visit into
   // a chance to move the airport with a stray click. The panel keeps its own button for that.
-  const startAirport = useCallback(() => {
-    const st = editorStore.getState();
-    // Same toggle as the other five: pressing an armed card is how you change your mind.
-    if (st.placing?.kind === "airport") {
-      st.armPlacement(null);
-      return;
-    }
-    st.createAirport(); // makes the block if there is none; opens its panel either way
-    if (editorStore.getState().project.airport?.position === undefined) {
-      st.armPlacement({ kind: "airport" });
-    }
-  }, []);
+  //
+  // ★★ AND WHILE IT ARMS, IT OPENS NOTHING (#282). He ran all six cards side by side on a fresh project
+  // and found this one alone: "5x PCT behaves identically … 1x it is different — in the submenu Airport",
+  // where the Inspector came up on the FIRST click instead of waiting for the map. His argument is the one
+  // that has decided every call like this: "the more uniform PCT works, the easier it is for the user and
+  // the less needs to be explained in the instructions."
+  //
+  // The decision itself lives in the store (`startAirportCard`) rather than here: it has changed in three
+  // consecutive releases, and a component is the one place in this app a test cannot reach it.
+  const startAirport = useCallback(() => editorStore.getState().startAirportCard(), []);
 
   const armPad = useCallback(() => {
     const cur = editorStore.getState().placing;

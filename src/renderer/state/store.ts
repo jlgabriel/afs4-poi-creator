@@ -362,7 +362,11 @@ export interface EditorState {
   //    could not fill. `createAirport` is the Data card's click: unlike the other five it places nothing,
   //    so it makes the block (when there is none) and selects it, which is the whole gesture.
   setAirportIata: (iata: string) => void;
-  createAirport: () => void;
+  //    `select` is what forum #282 turns on: the card may need the BLOCK without opening its panel.
+  createAirport: (opts?: { select?: boolean }) => void;
+  //    The Airport CARD's whole gesture, in one place because it is a three-way decision (toggle off /
+  //    arm / re-open) that #282 changed and that a component cannot be tested through.
+  startAirportCard: () => void;
   //    The AIRPORT's own point (forum #255). It takes no id because there is one airport per project,
   //    and it is the only airport mutation the MAP drives as well as the Inspector.
   moveAirportPosition: (position: LonLat) => void;
@@ -899,11 +903,36 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
           commitCoalesced("airport:identity", (proj) => mutate.setAirportIata(proj, iata)),
         // NOT coalesced and not a placement: it either makes an empty block or does nothing, and then
         // selects it either way, so clicking Data on an airport that already exists just opens its panel.
-        createAirport: () => {
+        createAirport: (opts) => {
           if (get().project.airport === undefined) {
             commit((proj) => mutate.setAirport(proj, { icao: "", name: "", country: "", pads: [] }));
           }
-          set({ selection: [], airportSelection: { kind: "data" } });
+          // ★ SELECTING IS NOW OPTIONAL (#282). It used to be the whole point of this action, back when
+          // the card placed nothing; since #273 the card also arms a map click, and Michael's six-run
+          // comparison caught the inconsistency that left behind — five cards wait for the map before the
+          // Inspector wakes up, and this one did not. The default stays `true` so the placed row, the
+          // dialog and every existing caller mean what they always meant.
+          if (opts?.select ?? true) set({ selection: [], airportSelection: { kind: "data" } });
+        },
+        // ★ WHAT THE AIRPORT CARD DOES, and the third spelling of it in three versions — which is why it
+        // is here and not in the component. v1.4: make the block and open its panel. v1.5/#273: also arm
+        // a map click, because "2x CLICK = 1x HAPPY". v1.6/#282: and while it is armed, open NOTHING —
+        // he ran all six cards side by side and this was the one that behaved differently. The block is
+        // still made on the click (four fields someone may want to type first, and Escape must leave an
+        // airport you can still name); PlacedList draws its row the moment it exists, so the identity
+        // fields are one click away by the same route every other placed thing uses.
+        startAirportCard: () => {
+          const st = get();
+          // Pressing an armed card is how you change your mind — the same toggle as the other five.
+          if (st.placing?.kind === "airport") {
+            set({ placing: null });
+            return;
+          }
+          // An airport that already has its ⊕ does not re-arm: the card is the way BACK to the identity
+          // fields, and arming would make every visit a chance to move it with a stray click.
+          const placed = st.project.airport?.position !== undefined;
+          get().createAirport({ select: placed });
+          if (!placed) set({ placing: { kind: "airport" } });
         },
         // Coalesced like every other drag, and id-less like the pad's keys used to be — for the same
         // reason they could be: there is exactly one of this thing in a project.

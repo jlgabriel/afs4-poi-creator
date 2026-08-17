@@ -416,6 +416,55 @@ describe("placeAt — the helipad (v1.3)", () => {
     expect(st.project.objects).toHaveLength(0);
   });
 
+  // ── forum #282: the Airport CARD, which is not the same thing as `createAirport` ──
+  //
+  // He ran all six submenus side by side on a fresh project and found exactly one difference: "5x PCT
+  // behaves identically … 1x it is different — in the submenu Airport", where the INSPECTOR came up on
+  // the first click while the other five wait for the map. His reason for closing the gap is the one that
+  // has decided every call like this: "the more uniform PCT works, the less needs to be explained".
+  it("the Airport card arms the map and opens NOTHING — like the other five", () => {
+    const { store } = makeStore();
+    store.getState().startAirportCard();
+    const st = store.getState();
+    expect(st.placing).toEqual({ kind: "airport" }); // a map click is coming…
+    expect(st.airportSelection).toBeNull(); // …and until it lands, no panel
+    // The BLOCK is still made on this click, so Escape leaves an airport you can still name — and so the
+    // placed list has a row to offer as the way back to the identity fields.
+    expect(st.project.airport).toMatchObject({ icao: "", name: "", country: "" });
+  });
+
+  it("…and the map click is what opens the panel", () => {
+    const { store } = makeStore();
+    store.getState().startAirportCard();
+    store.getState().placeAt({ lon: 10, lat: 48 });
+    const st = store.getState();
+    expect(st.airportSelection).toEqual({ kind: "data" });
+    expect(st.placing).toBeNull(); // there is one airport; a second click would only move it
+    expect(st.project.airport?.position).toEqual({ lon: 10, lat: 48 });
+  });
+
+  it("pressing the armed card again disarms it, and still opens nothing", () => {
+    const { store } = makeStore();
+    store.getState().startAirportCard();
+    store.getState().startAirportCard();
+    expect(store.getState().placing).toBeNull();
+    expect(store.getState().airportSelection).toBeNull();
+  });
+
+  it("but an airport that already has its point opens its panel and does NOT re-arm", () => {
+    // The card is the way BACK to the identity fields once there is nowhere to place. Arming here would
+    // make every visit a chance to move the airport with a stray click.
+    const { store } = makeStore();
+    store.getState().startAirportCard();
+    store.getState().placeAt({ lon: 10, lat: 48 });
+    store.getState().selectAirportPart(null);
+
+    store.getState().startAirportCard();
+    expect(store.getState().airportSelection).toEqual({ kind: "data" });
+    expect(store.getState().placing).toBeNull();
+    expect(store.getState().project.airport?.position).toEqual({ lon: 10, lat: 48 });
+  });
+
   it("the Data card on an existing airport only re-selects it — no second block, no new commit", () => {
     const { store } = makeStore();
     store.getState().armPlacement({ kind: "helipad" });
