@@ -17,6 +17,7 @@
 import type { AirportPad } from "../../core/project/types";
 import { clampLonLat } from "../../core/project/schemas";
 import { editorStore, useEditor } from "../state/editorStore";
+import { Help } from "./HelpNote";
 import { NumberInput } from "./NumberInput";
 
 const fmtDeg = (n: number): string => n.toFixed(6);
@@ -36,13 +37,15 @@ export function HelipadFields({ pad }: { pad: AirportPad }): React.ReactElement 
       </div>
 
       <div className="pct-field pct-field-col">
-        <span className="pct-field-label">Helipad — where the helicopter starts</span>
-        {/* The gesture this sentence promises is the gesture the layer implements: click to select,
-            THEN the grip appears. It used to be there always, which stopped being tenable at three pads
-            — and a panel that promised a grip you could not see would be a bug the prose invented. */}
-        <span className="pct-field-meta">
-          Drag the white circle on the map to move it, and — once it is selected — its cyan grip to turn
-          it. It is its own point, not one of your objects, so nothing spawns inside a building.
+        <span className="pct-field-label">
+          Helipad — where the helicopter starts
+          {/* The gesture this sentence promises is the gesture the layer implements: click to select,
+              THEN the grip appears. It used to be there always, which stopped being tenable at three pads
+              — and a panel that promised a grip you could not see would be a bug the prose invented. */}
+          <Help>
+            Drag the white circle on the map to move it, and — once it is selected — its cyan grip to
+            turn it. It is its own point, not one of your objects, so nothing spawns inside a building.
+          </Help>
         </span>
       </div>
 
@@ -69,7 +72,12 @@ export function HelipadFields({ pad }: { pad: AirportPad }): React.ReactElement 
 
       <div className="pct-field pct-field-row">
         <label className="pct-field-col">
-          <span className="pct-field-label">Heading — true</span>
+          <span className="pct-field-label">
+            Heading — true
+            {/* Measured in-sim 2026-07-31: we wrote heading 40 and the sim's menu showed 028 — 40 minus
+                the local magnetic variation. So the field is TRUE and the sim's panel is magnetic. */}
+            <Help>Aerofly shows this heading as MAGNETIC, so expect it to read a few degrees off.</Help>
+          </span>
           <NumberInput
             value={pad.heading}
             onCommit={(heading) => store().rotateAirportPad(id, heading)}
@@ -77,7 +85,14 @@ export function HelipadFields({ pad }: { pad: AirportPad }): React.ReactElement 
           />
         </label>
         <label className="pct-field-col">
-          <span className="pct-field-label">Size — m</span>
+          <span className="pct-field-label">
+            Size — m
+            {/* ★ The one note here that carries a LIVE number, and it stays folded anyway: the surprise is
+                the radius/diameter convention, not the arithmetic, and the value is right beside it. */}
+            <Help>
+              This is a radius — the sim shows {pad.radius} m as {Math.round(pad.radius * 2)} m.
+            </Help>
+          </span>
           <NumberInput
             value={pad.radius}
             onCommit={(radius) => store().setAirportPadRadius(id, radius)}
@@ -85,19 +100,16 @@ export function HelipadFields({ pad }: { pad: AirportPad }): React.ReactElement 
           />
         </label>
       </div>
-      {/* Measured in-sim 2026-07-31: we wrote heading 40 and the sim's menu showed 028 — 40 minus the
-          local magnetic variation. So the field is TRUE and the sim's panel is magnetic. */}
-      <span className="pct-field-meta">
-        Aerofly shows this heading as MAGNETIC, so expect it to read a few degrees off. Size {pad.radius}{" "}
-        m is a radius — the sim shows it as {Math.round(pad.radius * 2)} m.
-      </span>
 
       {/* #221: "the name can be freely assigned". It is what LOCATION shows for the pad, and with several
           pads it is the only thing that tells them apart in the list — which is why it arrives with the
           repeat and not before. Empty is normal: the writers render an unnamed pad as FATO/TLOF, the
           literal v1.2 and v1.3 always wrote, so an old project still exports the same bytes. */}
       <label className="pct-field pct-field-col">
-        <span className="pct-field-label">Name — shown in LOCATION</span>
+        <span className="pct-field-label">
+          Name — shown in LOCATION
+          <Help>Leave it empty and Aerofly shows the pad as &ldquo;FATO/TLOF&rdquo;.</Help>
+        </span>
         <input
           className="pct-text"
           value={pad.name}
@@ -105,9 +117,6 @@ export function HelipadFields({ pad }: { pad: AirportPad }): React.ReactElement 
           aria-label="Helipad name"
           onChange={(e) => store().setAirportPadName(id, e.target.value)}
         />
-        <span className="pct-field-meta">
-          Leave it empty and Aerofly shows the pad as &ldquo;FATO/TLOF&rdquo;.
-        </span>
       </label>
 
       {heightMode === "autoheight" && (
@@ -119,11 +128,19 @@ export function HelipadFields({ pad }: { pad: AirportPad }): React.ReactElement 
 
       {/* One line, because the fields that used to be below this one are gone and Michael tests every
           release the way a new user would. Without it, "where did the code go" is a question the panel
-          invites and does not answer. */}
-      <span className="pct-field-meta">
-        The airport&apos;s name, code and Install button are in <strong>Airport</strong>, at the top of
-        the list on the right.
-      </span>
+          invites and does not answer.
+
+          ★ IT KEEPS ITS OWN LABEL rather than hiding behind another panel's question mark: someone
+          looking for the ICAO field does not know to press a "?" on the pad to be told it is elsewhere. */}
+      <div className="pct-field pct-field-col">
+        <span className="pct-field-label">
+          Where is the airport code?
+          <Help>
+            The airport&apos;s name, code and Install button are in <strong>Airport</strong>, at the top
+            of the list on the right.
+          </Help>
+        </span>
+      </div>
     </div>
   );
 }

@@ -15,6 +15,7 @@ import type { AirportAerotow, AirportWinch } from "../../core/project/types";
 import { clampLonLat } from "../../core/project/schemas";
 import { haversine, initialBearing } from "../../core/geo/geo";
 import { editorStore } from "../state/editorStore";
+import { Help } from "./HelpNote";
 import { NumberInput } from "./NumberInput";
 
 const fmtDeg = (n: number): string => n.toFixed(6);
@@ -31,10 +32,21 @@ export function AerotowFields({ aerotow }: { aerotow: AirportAerotow }): React.R
       </div>
 
       <div className="pct-field pct-field-col">
-        <span className="pct-field-label">Aerotow — where the glider waits</span>
-        <span className="pct-field-meta">
-          The DR400 pulls it into the air along the heading. Drag the pink dot or its rope on the map, and
-          the cyan grip to turn it.
+        <span className="pct-field-label">
+          Aerotow — where the glider waits
+          <Help>
+            The DR400 pulls it into the air along the heading. Drag the pink dot or its rope on the map,
+            and the cyan grip to turn it.
+          </Help>
+        </span>
+        {/* His own note (#237): a glider start does not need a runway, and when the strip is too short
+            the tow starts on its extension. Worth keeping, because the obvious assumption is the
+            opposite — it moved up here from the foot of the panel when the notes folded. */}
+        <span className="pct-field-label">
+          Does it need a runway?
+          <Help>
+            No. It usually sits on one, or on its extension when the runway is too short.
+          </Help>
         </span>
       </div>
 
@@ -64,19 +76,22 @@ export function AerotowFields({ aerotow }: { aerotow: AirportAerotow }): React.R
       </div>
 
       <label className="pct-field pct-field-col">
-        <span className="pct-field-label">Heading — true</span>
+        <span className="pct-field-label">
+          Heading — true
+          <Help>Aerofly shows this as MAGNETIC, so expect it to read a few degrees off.</Help>
+        </span>
         <NumberInput
           value={aerotow.heading}
           onCommit={(heading) => store().rotateAirportAerotow(id, heading)}
           ariaLabel="Aerotow heading, true degrees"
         />
-        <span className="pct-field-meta">
-          Aerofly shows this as MAGNETIC, so expect it to read a few degrees off.
-        </span>
       </label>
 
       <label className="pct-field pct-field-col">
-        <span className="pct-field-label">Name — shown in LOCATION</span>
+        <span className="pct-field-label">
+          Name — shown in LOCATION
+          <Help>Usually the runway this start belongs to. PCT does not guess it for you.</Help>
+        </span>
         <input
           className="pct-text"
           value={aerotow.name}
@@ -84,17 +99,7 @@ export function AerotowFields({ aerotow }: { aerotow: AirportAerotow }): React.R
           aria-label="Aerotow name"
           onChange={(e) => store().setAirportAerotowName(id, e.target.value)}
         />
-        <span className="pct-field-meta">
-          Usually the runway this start belongs to. PCT does not guess it for you.
-        </span>
       </label>
-
-      {/* His own note (#237): a glider start does not need a runway, and when the strip is too short the
-          tow starts on its extension. Worth saying, because the obvious assumption is the opposite. */}
-      <span className="pct-field-meta">
-        A glider start does not need a runway. It usually sits on one, or on its extension when the runway
-        is too short.
-      </span>
     </div>
   );
 }
@@ -115,10 +120,15 @@ export function WinchFields({ winch }: { winch: AirportWinch }): React.ReactElem
           winch is repaired, so the warning can already go away" (#261). */}
 
       <div className="pct-field pct-field-col">
-        <span className="pct-field-label">Winch launch — two points, no heading</span>
-        <span className="pct-field-meta">
-          The rope runs from the glider to the winch, and its length and direction are whatever those two
-          points say. Drag either pink dot, or the rope between them.
+        <span className="pct-field-label">
+          Winch launch — two points, no heading
+          {/* ★ THIS SENTENCE IS A TEST, and it caught a real bug once: it promises "drag either pink dot,
+              or the rope between them", and the rope shipped without a mousedown. Folding it does not
+              retire the promise — GliderLayer still has to keep it. */}
+          <Help>
+            The rope runs from the glider to the winch, and its length and direction are whatever those
+            two points say. Drag either pink dot, the square winch, or the rope between them.
+          </Help>
         </span>
       </div>
 
@@ -180,20 +190,25 @@ export function WinchFields({ winch }: { winch: AirportWinch }): React.ReactElem
       </span>
 
       <label className="pct-field pct-field-col">
-        <span className="pct-field-label">Glider spacing — m</span>
+        <span className="pct-field-label">
+          Glider spacing — m
+          <Help>
+            A two-rope winch launches two gliders side by side; this is how far apart they stand —
+            basically a wingspan. His own value is 25.
+          </Help>
+        </span>
         <NumberInput
           value={winch.spacing}
           onCommit={(spacing) => store().setAirportWinchSpacing(id, spacing)}
           ariaLabel="Winch glider spacing, metres"
         />
-        <span className="pct-field-meta">
-          A two-rope winch launches two gliders side by side; this is how far apart they stand —
-          basically a wingspan. His own value is 25.
-        </span>
       </label>
 
       <label className="pct-field pct-field-col">
-        <span className="pct-field-label">Name — shown in LOCATION</span>
+        <span className="pct-field-label">
+          Name — shown in LOCATION
+          <Help>Usually the runway this start belongs to, with a letter added if it needs one.</Help>
+        </span>
         <input
           className="pct-text"
           value={winch.name}
@@ -201,9 +216,6 @@ export function WinchFields({ winch }: { winch: AirportWinch }): React.ReactElem
           aria-label="Winch launch name"
           onChange={(e) => store().setAirportWinchName(id, e.target.value)}
         />
-        <span className="pct-field-meta">
-          Usually the runway this start belongs to, with a letter added if it needs one.
-        </span>
       </label>
     </div>
   );

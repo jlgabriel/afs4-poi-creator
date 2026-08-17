@@ -47,6 +47,9 @@ const COLOR_HANDLE = "#06b6d4";
 const SNAP_DEG = 5;
 const MARK_PX = 6; // the glider itself is a POINT fixture, so pixels, not metres — a 10 m glider is
 // invisible at the zoom an airport is laid out at (the same call FootprintLayer makes for a light).
+/** The winch drum's side, in pixels. Matched to the glider dot's DIAMETER (2 × MARK_PX) so the two ends
+ *  of a launch read as the same weight — a square that circumscribed the circle would look bigger. */
+const WINCH_BOX_PX = 2 * MARK_PX;
 /** How much rope to draw for an aerotow. His figure; the file stores no length, only the heading. */
 const AEROTOW_ROPE_M = 60;
 const HANDLE_MARGIN_M = 25; // gap between the rope's end and the rotate grip
@@ -66,7 +69,12 @@ interface WinchEntry {
   model: AirportWinch;
   selected: boolean;
   mark: L.CircleMarker; // the glider
-  far: L.CircleMarker; // the winch itself
+  // ★ THE ONLY SQUARE ON THIS MAP, and a Marker rather than a Path for that reason (#278): "The symbol at
+  // the position of the winch must be rectangular instead of a round circle." Leaflet's vector shapes are
+  // circles and lat/lng polygons — a rectangle drawn in degrees would grow and shrink with the zoom,
+  // while the glider dot beside it stayed 12 px. So it is a divIcon, the way AirportLayer draws its ⊕ and
+  // HelipadLayer its H, and it is styled through setIcon instead of setStyle.
+  far: L.Marker; // the winch itself: a drum, and it looks like one
   rope: L.Polyline;
 }
 
@@ -189,6 +197,19 @@ export class GliderLayer {
     });
   }
 
+  /** The winch drum. Not draggable in Leaflet's sense — the launch has its own drag machinery below, and
+   *  handing this one end to Leaflet would give it a different feel from the glider and the rope. */
+  private winchBoxAt(p: LonLat, selected: boolean): L.Marker {
+    return L.marker(toLatLng(p), {
+      icon: winchIcon(selected),
+      keyboard: false,
+      bubblingMouseEvents: false,
+      // Markers already sit above the vector panes; this only orders it against the pads and stands, the
+      // way AirportLayer orders its ⊕ — the rope runs right into this square and must not cover it.
+      zIndexOffset: 400,
+    });
+  }
+
   private ropeLine(a: LonLat, b: LonLat, selected: boolean): L.Polyline {
     return L.polyline([toLatLng(a), toLatLng(b)], {
       color: selected ? GLIDER_SELECTED : GLIDER_STROKE,
@@ -232,7 +253,7 @@ export class GliderLayer {
   private buildWinch(w: AirportWinch, selected: boolean): WinchEntry {
     const rope = this.ropeLine(w.position, w.winch, selected).addTo(this.group);
     const mark = this.markerAt(w.position, selected).addTo(this.group);
-    const far = this.markerAt(w.winch, selected).addTo(this.group);
+    const far = this.winchBoxAt(w.winch, selected).addTo(this.group);
     for (const shape of [rope, mark, far]) shape.on("click", () => this.cb.onSelect("winch", w.id));
     mark.on("mousedown", (e: L.LeafletMouseEvent) => this.grabWinch(w.id, "glider", e));
     far.on("mousedown", (e: L.LeafletMouseEvent) => this.grabWinch(w.id, "winch", e));
@@ -274,7 +295,7 @@ export class GliderLayer {
   private restyleWinch(e: WinchEntry): void {
     const fill = e.selected ? GLIDER_SELECTED : GLIDER_STROKE;
     e.mark.setStyle({ fillColor: fill });
-    e.far.setStyle({ fillColor: fill });
+    e.far.setIcon(winchIcon(e.selected)); // a divIcon has no setStyle — the colour is in the html
     e.rope.setStyle({ color: fill, weight: e.selected ? 3 : 2 });
   }
 
@@ -430,4 +451,18 @@ export class GliderLayer {
     }
     if (d.heading !== d.startHeading) this.cb.onRotateAerotow(d.id, d.heading);
   };
+}
+
+/** The drum, drawn as a square (#278). Module-level and rebuilt on every restyle rather than mutated,
+ *  which is what a divIcon costs and what AirportLayer's ⊕ already pays: the colour lives in the html,
+ *  so changing it means a new icon. The casing is the same dark ring the glider dot wears, so the two
+ *  ends of a launch stay legible over satellite imagery. */
+function winchIcon(selected: boolean): L.DivIcon {
+  const fill = selected ? GLIDER_SELECTED : GLIDER_STROKE;
+  return L.divIcon({
+    className: "pct-winch-glyph",
+    html: `<span class="pct-winch-box" style="background:${fill};border-color:${GLIDER_CASING}"></span>`,
+    iconSize: [WINCH_BOX_PX, WINCH_BOX_PX],
+    iconAnchor: [WINCH_BOX_PX / 2, WINCH_BOX_PX / 2],
+  });
 }

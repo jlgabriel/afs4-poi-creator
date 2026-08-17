@@ -6,12 +6,10 @@ import type {
   ResolvedXref,
   ResolvedPlant,
 } from "../../src/core/project/types";
-import { planExport } from "../../src/core/export/planExport";
+import { planExport, planHeliport } from "../../src/core/export/planExport";
 import {
   buildHeliportTsc,
   buildHeliportWad,
-  HELIPORT_TSC_FILE,
-  HELIPORT_WAD_FILE,
   type HeliportRunwayEndSpec,
   type HeliportSpec,
 } from "../../src/core/export/heliportTemplate";
@@ -45,6 +43,9 @@ const SPEC: HeliportSpec = {
   cultivationFileName: "poi",
   anchor: null,
   autoheight: false,
+  // Required since #278 took the templates away — a spec without an identity used to mean "write the
+  // placeholders", and there is nothing left that wants them. These are the flown file's own values.
+  identity: { icao: "pct001", name: "PCT Test Helipad", country: "us" },
 };
 
 /** Every node with this `name`, at any depth. (tmParser's own findAll matches on TYPE, and `child` only
@@ -614,12 +615,16 @@ describe("heliport template — the full row set", () => {
   });
 });
 
-describe("heliport template — structure", () => {
-  it("names no airport: every identity field is a placeholder", () => {
+describe("heliport files — structure", () => {
+  // ⛔ THIS USED TO ASSERT THE OPPOSITE: "names no airport: every identity field is a placeholder". That
+  // was the templates' defining property — PCT must not pick an ICAO for a file it does not install — and
+  // #278 removed the only writer that ever wanted it. What is left is the rule that always mattered, and
+  // it is enforced a layer up: planHeliport throws unless validateIdentity passes.
+  it("carries the identity it was given, in capitals, in both files", () => {
     for (const text of [buildHeliportTsc(SPEC), buildHeliportWad(SPEC)]) {
-      expect(valuesOf(text, "icao")).toEqual(["__ICAO__"]);
-      expect(valuesOf(text, "country")).toEqual(["__COUNTRY__"]);
-      expect(text).toContain("__AIRPORT_NAME__");
+      expect(valuesOf(text, "icao")).toEqual(["PCT001"]);
+      expect(valuesOf(text, "country")).toEqual(["us"]);
+      expect(text).toContain("PCT Test Helipad");
     }
   });
 
@@ -700,22 +705,37 @@ const PAD: AirportPad = {
 
 const relPaths = (p: { files: { relPath: string }[] }): string[] => p.files.map((f) => f.relPath);
 
-describe("planExport — heliport option", () => {
-  it("changes nothing when the option is absent", () => {
+/** The identity every install below is written under. `planHeliport` refuses a spec without one. */
+const ID = { icao: "pct001", name: "KDAG test", country: "us" };
+const TSC = "pct001.tsc";
+const WAD = "pct001.wad";
+const fileOf = (p: { files: { relPath: string; content: string }[] }, rel: string): string =>
+  p.files.find((f) => f.relPath === rel)!.content;
+
+// ★ A POI IS A POI (#278). The option that let one carry `heliport.tsc.txt` + `heliport.wad.txt` is gone
+// without replacement — "it could be that a user thinks that a POI with TSC and WAD files could also be
+// directly useable as an airfield" — so the plan has exactly three files and there is no longer a
+// parameter that could add a fourth.
+describe("planExport — a POI carries no airport files", () => {
+  it("writes the three POI files and nothing else", () => {
     const plan = planExport(PROJECT, [HANGAR]);
     expect(relPaths(plan)).toEqual(["poi.tsl", "poi.toc", "README.txt"]);
-    expect(plan.files.find((f) => f.relPath === "README.txt")!.content).not.toContain("Heliport");
   });
 
-  it("adds exactly the two templates, and says so in the README", () => {
-    const plan = planExport(PROJECT, [HANGAR], { heliport: { pads: [] } });
-    expect(relPaths(plan)).toEqual(["poi.tsl", "poi.toc", "README.txt", HELIPORT_TSC_FILE, HELIPORT_WAD_FILE]);
-    expect(plan.files.find((f) => f.relPath === "README.txt")!.content).toContain(HELIPORT_TSC_FILE);
+  it("says nothing about heliports in the README either", () => {
+    const readme = fileOf(planExport(PROJECT, [HANGAR]), "README.txt");
+    expect(readme).not.toContain("HELIPORT TEMPLATE");
+    expect(readme).not.toContain(".tsc");
   });
+});
 
+// The geometry these tests hold used to be reached through the export templates, which were the cheapest
+// way to call the writers. They are the INSTALL's business now, and always were — the shift traps below
+// are the ones that put a helipad `shift` metres from the objects it belongs among.
+describe("planHeliport — pads, stands and the export shift", () => {
   it("writes the project's own pad — position, TRUE heading and radius", () => {
-    const plan = planExport(PROJECT, [HANGAR], { heliport: { pads: [PAD] } });
-    const tsc = plan.files.find((f) => f.relPath === HELIPORT_TSC_FILE)!.content;
+    const plan = planHeliport(PROJECT, [HANGAR], { identity: ID, heliport: { pads: [PAD] } });
+    const tsc = fileOf(plan, TSC);
     const [lon, lat] = valuesOf(tsc, "position")[0].split(" ").map(Number);
     expect(lon).toBeCloseTo(PAD.position.lon, 7);
     expect(lat).toBeCloseTo(PAD.position.lat, 7);
@@ -729,27 +749,25 @@ describe("planExport — heliport option", () => {
   // through heliportPosition are different lines of code, so if they disagreed by so much as a rounding
   // step, every project made before 1.5 would quietly move the first time it was opened.
   it("a seeded position writes the same bytes as the pad fallback it replaces", () => {
-    const followed = planExport(PROJECT, [HANGAR], { heliport: { pads: [PAD] } });
-    const seeded = planExport(PROJECT, [HANGAR], {
+    const followed = planHeliport(PROJECT, [HANGAR], { identity: ID, heliport: { pads: [PAD] } });
+    const seeded = planHeliport(PROJECT, [HANGAR], {
+      identity: ID,
       heliport: { pads: [PAD], position: PAD.position },
     });
-    const fileOf = (p: typeof followed, rel: string): string =>
-      p.files.find((f) => f.relPath === rel)!.content;
-    expect(fileOf(seeded, HELIPORT_TSC_FILE)).toBe(fileOf(followed, HELIPORT_TSC_FILE));
-    expect(fileOf(seeded, HELIPORT_WAD_FILE)).toBe(fileOf(followed, HELIPORT_WAD_FILE));
+    expect(fileOf(seeded, TSC)).toBe(fileOf(followed, TSC));
+    expect(fileOf(seeded, WAD)).toBe(fileOf(followed, WAD));
   });
 
   it("…and still does under an export shift, which is where the two routes could diverge", () => {
     // The explicit point goes through shiftPoint here; the fallback reads a pad that was shifted a few
     // lines earlier. Shifting once each is the whole requirement, and shifting twice is the bug.
     const shifted = { ...PROJECT, shift: { east: 50, north: -30 } };
-    const followed = planExport(shifted, [HANGAR], { heliport: { pads: [PAD] } });
-    const seeded = planExport(shifted, [HANGAR], {
+    const followed = planHeliport(shifted, [HANGAR], { identity: ID, heliport: { pads: [PAD] } });
+    const seeded = planHeliport(shifted, [HANGAR], {
+      identity: ID,
       heliport: { pads: [PAD], position: PAD.position },
     });
-    const wadOf = (p: typeof followed): string =>
-      p.files.find((f) => f.relPath === HELIPORT_WAD_FILE)!.content;
-    expect(wadOf(seeded)).toBe(wadOf(followed));
+    expect(fileOf(seeded, WAD)).toBe(fileOf(followed, WAD));
   });
 
   // ★ forum #168: "the functional starting position for Helicopter should be independent of XREF objects
@@ -757,10 +775,9 @@ describe("planExport — heliport option", () => {
   // helicopter spawned inside whatever the pad had been aimed at. The pad must be able to sit where no
   // object is — and deleting every object must not move it.
   it("is independent of the placed objects", () => {
-    const withPad = planExport(PROJECT, [HANGAR], { heliport: { pads: [PAD] } });
-    const empty = planExport(PROJECT, [], { heliport: { pads: [PAD] } });
-    const padOf = (p: typeof withPad): string =>
-      valuesOf(p.files.find((f) => f.relPath === HELIPORT_TSC_FILE)!.content, "position")[0];
+    const withPad = planHeliport(PROJECT, [HANGAR], { identity: ID, heliport: { pads: [PAD] } });
+    const empty = planHeliport(PROJECT, [], { identity: ID, heliport: { pads: [PAD] } });
+    const padOf = (p: typeof withPad): string => valuesOf(fileOf(p, TSC), "position")[0];
     expect(padOf(empty)).toBe(padOf(withPad));
     // …and it is nowhere near the one object in the scene.
     const [lon] = padOf(withPad).split(" ").map(Number);
@@ -772,23 +789,17 @@ describe("planExport — heliport option", () => {
     // it is supposed to be standing among.
     const shifted = { ...PROJECT, shift: { east: 50, north: 0 } };
     const at: AirportPad = { id: "pad-1", name: "", position: HANGAR.position, heading: 40, radius: 10 };
-    const plan = planExport(shifted, [HANGAR], { heliport: { pads: [at] } });
-    const tsc = plan.files.find((f) => f.relPath === HELIPORT_TSC_FILE)!.content;
-    const [lon] = valuesOf(tsc, "position")[0].split(" ").map(Number);
+    const plan = planHeliport(shifted, [HANGAR], { identity: ID, heliport: { pads: [at] } });
+    const [lon] = valuesOf(fileOf(plan, TSC), "position")[0].split(" ").map(Number);
     expect(lon).toBeGreaterThan(HANGAR.position.lon); // 50 m east
-    const toc = plan.files.find((f) => f.relPath === "poi.toc")!.content;
-    const [objLon] = valuesOf(toc, "position")[0].split(" ").map(Number);
+    const [objLon] = valuesOf(fileOf(plan, "poi.toc"), "position")[0].split(" ").map(Number);
     expect(lon).toBeCloseTo(objLon, 7); // …and by exactly as much as the object beside it
   });
 
-  it("falls back to the POI anchor, facing true north, when there is no pad", () => {
-    const plan = planExport(PROJECT, [HANGAR], { heliport: { pads: [], radiusM: 15 } });
-    const tsc = plan.files.find((f) => f.relPath === HELIPORT_TSC_FILE)!.content;
-    expect(Number(valuesOf(tsc, "heading")[0])).toBe(0);
-    expect(Number(valuesOf(tsc, "radius")[0])).toBe(15);
-    const [lon] = valuesOf(tsc, "position")[0].split(" ").map(Number);
-    expect(lon).toBeCloseTo(HANGAR.position.lon, 7); // the centroid of a one-object scene
-  });
+  // ⛔ "falls back to the POI anchor, facing true north, when there is no pad" STOOD HERE. That was
+  // `templatePads`, the one place PCT ever INVENTED a helipad: a heliport template with none had nowhere
+  // to spawn the helicopter. The install has always refused to invent one (#255 asks for the bare airfield
+  // by name), and with the template gone nothing does — heliportInstall.test.ts holds that line.
 
   it("moves the STANDS with the scene too, and writes no block without them", () => {
     // Same trap as the pad: a stand read unshifted parks the aircraft `shift` metres from the apron it
@@ -802,18 +813,20 @@ describe("planExport — heliport option", () => {
       size: 7.5,
       type: "parked_ga",
     };
-    const plan = planExport(shifted, [HANGAR], { heliport: { pads: [PAD], parkings: [stand] } });
-    const tsc = plan.files.find((f) => f.relPath === HELIPORT_TSC_FILE)!.content;
+    const plan = planHeliport(shifted, [HANGAR], {
+      identity: ID,
+      heliport: { pads: [PAD], parkings: [stand] },
+    });
+    const tsc = fileOf(plan, TSC);
     const [standLon] = valuesOf(tsc, "position").slice(-1)[0]!.split(" ").map(Number);
-    const toc = plan.files.find((f) => f.relPath === "poi.toc")!.content;
-    const [objLon] = valuesOf(toc, "position")[0].split(" ").map(Number);
+    const [objLon] = valuesOf(fileOf(plan, "poi.toc"), "position")[0].split(" ").map(Number);
     expect(standLon).toBeCloseTo(objLon, 7);
     expect(valuesOf(tsc, "tags")).toEqual(["parked_ga"]);
 
     // With no stands the list is still written, and empty (#236).
-    const none = planExport(PROJECT, [HANGAR], { heliport: { pads: [PAD] } });
-    for (const f of [HELIPORT_TSC_FILE, HELIPORT_WAD_FILE]) {
-      const list = nodesByName(parseTm(none.files.find((x) => x.relPath === f)!.content), "parking_positions");
+    const none = planHeliport(PROJECT, [HANGAR], { identity: ID, heliport: { pads: [PAD] } });
+    for (const f of [TSC, WAD]) {
+      const list = nodesByName(parseTm(fileOf(none, f)), "parking_positions");
       expect(list).toHaveLength(1);
       expect(list[0]!.children).toEqual([]);
     }
@@ -821,9 +834,9 @@ describe("planExport — heliport option", () => {
 
   it("warns that autoheight was never gated, but still writes the files", () => {
     const auto = { ...PROJECT, heightMode: "autoheight" as const };
-    const plan = planExport(auto, [PALM], { heliport: { pads: [] } });
+    const plan = planHeliport(auto, [PALM], { identity: ID, heliport: { pads: [PAD] } });
     expect(plan.warnings.some((w) => w.includes("baked-asl"))).toBe(true);
-    expect(relPaths(plan)).toContain(HELIPORT_TSC_FILE);
+    expect(relPaths(plan)).toContain(TSC);
   });
 });
 
@@ -863,7 +876,7 @@ describe("heliport template — the Informations banner", () => {
   it("still parses to the same values it always did", () => {
     // The banner must be commentary, not content: comments and blank lines are skipped by the reader,
     // so every tag survives the reshuffle unchanged.
-    expect(valuesOf(tsc, "icao")).toEqual(["__ICAO__"]);
+    expect(valuesOf(tsc, "icao")).toEqual(["PCT001"]);
     expect(Number(valuesOf(tsc, "heading")[0])).toBe(FLOWN.headingDeg);
     expect(Number(valuesOf(tsc, "radius")[0])).toBe(FLOWN.radiusM);
     expect(valuesOf(tsc, "coordinate_system")).toEqual(["flat"]);

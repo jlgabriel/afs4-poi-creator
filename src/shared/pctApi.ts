@@ -119,16 +119,15 @@ export interface IcaoStatus {
 }
 
 /** Everything the `.tsc`/`.wad` pair needs that is not identity, in UNSHIFTED map coordinates — main hands
- *  it straight to planExport, which applies the export shift so all of it travels with the scene.
+ *  it straight to planHeliport, which applies the export shift so all of it travels with the scene.
  *
- *  ★ One type, used by BOTH the install path and the export-templates path. They were two identical inline
- *  shapes until `parkings` had to be added to each, which is the standing invitation to add the next field
- *  to only one of them.
+ *  ★ It used to serve TWO paths, the install and the POI's opt-in `.txt` templates. The templates are gone
+ *  (forum #278) and with them `radiusM`, which only ever fed the template's invented default pad.
  *
  *  `pads` — each its OWN point, never a reference to a placed object, so the helicopter cannot spawn inside
- *  the XREF it borrowed coordinates from (forum #168). EMPTY = one default pad at the POI's anchor, facing
- *  true north, at `radiusM`. `runways` / `parkings` — EMPTY/absent write no block at all (forum
- *  #217/#232). `position` — the airport's own point (forum #15/#220), absent = the first pad's. */
+ *  the XREF it borrowed coordinates from (forum #168). EMPTY writes no helipad, which is legal for an
+ *  airport that has a runway (forum #255). `runways` / `parkings` — EMPTY/absent write no block at all
+ *  (forum #217/#232). `position` — the airport's own point (forum #15/#220), absent = the first pad's. */
 export interface HeliportFileOptions {
   pads: AirportPad[];
   runways?: AirportRunway[];
@@ -137,7 +136,6 @@ export interface HeliportFileOptions {
   parkings?: AirportParking[];
   position?: LonLat;
   iata?: string;
-  radiusM?: number;
 }
 
 /** "Create heliport…": the POI becomes a real airport PCT writes into scenery/airports/<country>/.
@@ -158,8 +156,8 @@ export interface ExportOptions {
   // terrain-relative height against this one value; when absent, main uses the elevation provider
   // and may return a `needs-elevation` envelope the renderer answers by re-exporting WITH a base.
   baseElevation?: number;
-  // Opt-in heliport templates (forum #160). Absent = the POI is exported exactly as before.
-  heliport?: HeliportFileOptions;
+  // ⛔ `heliport` lived here and is gone (forum #278): a POI export used to be able to carry an opt-in
+  // pair of heliport `.txt` templates. A POI is a POI now, and an airport is installed by its own call.
 }
 
 /** Async (IPC). Implemented in preload/index.ts, handled in main/ipc.ts. Fallible methods return a

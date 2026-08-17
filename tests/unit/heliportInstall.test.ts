@@ -5,14 +5,9 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import os from "node:os";
 import path from "node:path";
 import type { AirportPad, AirportRunwayEnd, Project, ResolvedXref } from "../../src/core/project/types";
-import {
-  InvalidHeliportIdentityError,
-  planExport,
-  planHeliport,
-} from "../../src/core/export/planExport";
+import { InvalidHeliportIdentityError, planHeliport } from "../../src/core/export/planExport";
 import {
   HELIPORT_README_MARKER,
-  HELIPORT_TSC_FILE,
   buildHeliportTsc,
   buildHeliportWad,
   heliportFolderName,
@@ -53,14 +48,15 @@ const PROJECT: Project = {
 };
 
 const ID = { icao: "pct001", name: "PCT Test Heliport", country: "us" };
-/** The by-hand template shape: no identity, so the files carry `__PLACEHOLDER__` values. */
-const TEMPLATE_SPEC: HeliportSpec = {
+/** A spec built by hand, to reach the writers without going through the planner. It used to be called
+ *  TEMPLATE_SPEC and carried `identity: null` — the by-hand `.txt` pair, removed in #278. */
+const BARE_SPEC: HeliportSpec = {
   position: { lon: -116.7947, lat: 34.8536 },
   pads: [{ name: "", position: { lon: -116.7947, lat: 34.8536 }, headingDeg: 40, radiusM: 10 }],
   cultivationFileName: "poi",
   anchor: null,
   autoheight: false,
-  identity: null,
+  identity: ID,
 };
 /** The pad is its own point now, not a borrowed object (forum #168) — deliberately NOT on the hangar. */
 const PAD: AirportPad = {
@@ -261,13 +257,9 @@ describe("planHeliport", () => {
     expect(tsc).not.toContain("[tmsimulator_helipad][element]");
   });
 
-  it("still gives the export TEMPLATE its default pad — the two callers want opposite things", () => {
-    // The guard on the split: fixing the install must not quietly change the #160 template, which has
-    // been shipping an invented pad since v1.1 and is a different object with a different job.
-    const plan = planExport(PROJECT, [HANGAR], { heliport: { pads: [] } });
-    const tsc = plan.files.find((f) => f.relPath === HELIPORT_TSC_FILE)!.content;
-    expect(tsc).toContain("[tmsimulator_helipad][element]");
-  });
+  // ⛔ "still gives the export TEMPLATE its default pad — the two callers want opposite things" stood
+  // here, guarding the split between an install that writes no helipad and a template that invented one.
+  // There is one caller now (#278), and it is the one that invents nothing.
 
   it("drops the cultivation reference entirely for an empty project", () => {
     const plan = planHeliport(PROJECT, [], OPTS);
@@ -511,8 +503,8 @@ describe("★ nothing may precede the root <[file] tag", () => {
     }
   });
 
-  it("holds for the by-hand templates too — the user renames them INTO a .tsc", () => {
-    for (const text of [buildHeliportTsc(TEMPLATE_SPEC), buildHeliportWad(TEMPLATE_SPEC)]) {
+  it("holds for a spec that never went through the planner", () => {
+    for (const text of [buildHeliportTsc(BARE_SPEC), buildHeliportWad(BARE_SPEC)]) {
       expect(startsClean(text)).toBe(true);
     }
   });

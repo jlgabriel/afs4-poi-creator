@@ -29,6 +29,7 @@ import { APPROACH_LIGHT_SYSTEMS, PAPI_SIDES, REIL_KINDS } from "../../core/proje
 import { clampLonLat } from "../../core/project/schemas";
 import { haversine, initialBearing } from "../../core/geo/geo";
 import { editorStore } from "../state/editorStore";
+import { Help } from "./HelpNote";
 import { NumberInput } from "./NumberInput";
 
 const fmtDeg = (n: number): string => n.toFixed(6);
@@ -201,21 +202,35 @@ export function RunwayFields({ runway }: { runway: AirportRunway }): React.React
       <div className="pct-field-title">{titleFor(runway)}</div>
 
       <div className="pct-field pct-field-col">
-        <span className="pct-field-label">Runway</span>
-        <span className="pct-field-meta">
-          Drag either white threshold handle on the map. The two points ARE the runway — its length and
-          direction are whatever they say, which is why there is no heading to type.
+        <span className="pct-field-label">
+          Runway
+          <Help>
+            Drag either white threshold handle on the map. The two points ARE the runway — its length and
+            direction are whatever they say, which is why there is no heading to type.
+          </Help>
+        </span>
+        {/* His demarcation from the ACT, in short (#242). It stays near the top, where someone forms an
+            expectation about what they are building, rather than at the foot of a panel they may never
+            scroll to. */}
+        <span className="pct-field-label">
+          What PCT writes
+          <Help>
+            The runway&apos;s data, not its asphalt: no markings, no centre line, no surface. Aerofly
+            draws the ground — this tells it where the runway is and how to use it.
+          </Help>
         </span>
       </div>
 
       <label className="pct-field pct-field-col">
-        <span className="pct-field-label">Width — m</span>
+        <span className="pct-field-label">
+          Width — m
+          <Help>Aerofly uses this for automatic landings.</Help>
+        </span>
         <NumberInput
           value={runway.width}
           onCommit={(width) => store().setAirportRunwayWidth(runway.id, width)}
           ariaLabel="Runway width, metres"
         />
-        <span className="pct-field-meta">Aerofly uses this for automatic landings.</span>
       </label>
 
       {/* Derived and read-only. Neither number is in the file — the format carries no length and no
@@ -229,13 +244,6 @@ export function RunwayFields({ runway }: { runway: AirportRunway }): React.React
 
       <EndBlock runwayId={runway.id} end={a} index={0} />
       <EndBlock runwayId={runway.id} end={b} index={1} />
-
-      {/* His demarcation from the ACT, in short (#242). Said here because this is where someone forms an
-          expectation about what they are building. */}
-      <span className="pct-field-meta">
-        PCT writes the runway's data, not its asphalt: no markings, no centre line, no surface. Aerofly
-        draws the ground — this tells it where the runway is and how to use it.
-      </span>
     </div>
   );
 }

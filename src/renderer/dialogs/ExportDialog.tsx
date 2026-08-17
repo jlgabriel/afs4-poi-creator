@@ -116,10 +116,6 @@ export function ExportDialog({ onClose }: { onClose: () => void }): React.ReactE
   // inspector reacts immediately. (Unlike slug/shift, which stay local drafts until export.)
   const heightMode = useEditor((s) => s.project.heightMode) ?? "baked-asl";
   const mapView = useEditor((s) => s.mapView);
-  // The project's helipad, if it has one — set in "Create heliport…" and drawn on the map. The templates
-  // describe THAT pad, so the two routes can never disagree about where the helicopter starts.
-  const storeAirport = useEditor((s) => s.project.airport);
-  const padCount = storeAirport?.pads.length ?? 0;
 
   const [slug, setSlug] = useState(storePoiName);
   const [refMode, setRefMode] = useState<"auto" | "map">(storeRef !== null ? "map" : "auto");
@@ -128,8 +124,6 @@ export function ExportDialog({ onClose }: { onClose: () => void }): React.ReactE
   const autoheight = heightMode === "autoheight";
   const [shiftEast, setShiftEast] = useState(storeShift?.east ?? 0);
   const [shiftNorth, setShiftNorth] = useState(storeShift?.north ?? 0);
-  const [heliport, setHeliport] = useState(false);
-  const [padRadius, setPadRadius] = useState(10);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<InstallResult | null>(null);
@@ -217,24 +211,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }): React.ReactE
       return;
     }
 
-    if (heliport && !(Number.isFinite(padRadius) && padRadius > 0)) {
-      setError("Helipad radius must be a positive number of metres.");
-      return;
-    }
-
     const opts: ExportOptions = { target, overwrite: false };
-    // The project's own pad (v1.2) wins over anything typed here — it is the one the map draws and the
-    // one "Create heliport…" installs, so the template must not describe a different helipad from the
-    // real thing. Only a project that has never opened that dialog falls back to the radius field.
-    if (heliport) {
-      opts.heliport = { pads: storeAirport?.pads ?? [], radiusM: padRadius };
-      if (storeAirport?.runways !== undefined) opts.heliport.runways = storeAirport.runways;
-      if (storeAirport?.aerotows !== undefined) opts.heliport.aerotows = storeAirport.aerotows;
-      if (storeAirport?.winches !== undefined) opts.heliport.winches = storeAirport.winches;
-      if (storeAirport?.parkings !== undefined) opts.heliport.parkings = storeAirport.parkings;
-      if (storeAirport?.position !== undefined) opts.heliport.position = storeAirport.position;
-      if (storeAirport?.iata !== undefined) opts.heliport.iata = storeAirport.iata;
-    }
     // Autoheight is fully offline: the sim resolves the terrain, so a base elevation has no meaning (main
     // ignores it too). Baked-asl passes it through as the offline/manual fallback.
     if (!autoheight && baseElevation !== undefined) opts.baseElevation = baseElevation;
@@ -368,45 +345,18 @@ export function ExportDialog({ onClose }: { onClose: () => void }): React.ReactE
               </div>
             </div>
 
-            {/* Two extra TEXT files, ignored by Aerofly as they are (they end in .txt), that the user can
-                turn into a real heliport by hand. PCT never picks an ICAO — see core/export/heliportTemplate.ts. */}
-            <div className="pct-field pct-field-col">
-              <span className="pct-field-label">Heliport template (advanced)</span>
-              <label className="pct-radio">
-                <input type="checkbox" checked={heliport} onChange={(e) => setHeliport(e.target.checked)} />
-                Also write heliport.tsc.txt + heliport.wad.txt
-              </label>
-              {heliport && (
-                <>
-                  {padCount > 0 ? (
-                    <span className="pct-field-meta">
-                      Uses this project&apos;s{" "}
-                      {padCount === 1 ? "helipad — the white circle" : `${padCount} helipads — the white circles`}{" "}
-                      on the map. Drag one to move it, or select it to edit it in the Inspector.
-                    </span>
-                  ) : (
-                    <>
-                      <span className="pct-field-meta">
-                        Helipad at the POI anchor, facing true north. Place one from{" "}
-                        <strong>Helipad</strong> in the catalog to put it where you want instead.
-                      </span>
-                      <label className="pct-shift-cell">
-                        <span className="pct-field-meta">Pad radius — metres</span>
-                        <NumberInput
-                          value={padRadius}
-                          onCommit={setPadRadius}
-                          ariaLabel="Helipad radius, metres"
-                        />
-                      </label>
-                    </>
-                  )}
-                  <span className="pct-field-meta">
-                    Aerofly ignores both files until you move the folder to scenery/airports, fill in the
-                    airport code, name and country, and rename them. The steps are inside each file.
-                  </span>
-                </>
-              )}
-            </div>
+            {/* ⛔ "HELIPORT TEMPLATE (ADVANCED)" STOOD HERE AND HE ASKED FOR IT GONE (#278), with a red
+                frame drawn around it in his screenshot: "The red-framed function is actually a good idea -
+                but it still needs to be deleted. In a comparable case, IPACS has very urgently requested to
+                avoid non-specialist TXT files. In the present case, it could be that a user thinks that a
+                POI with TSC and WAD files could also be directly useable as an airfield. => Please delete
+                the framed function without replacement."
+
+                It was the ancestor of "Install HELIPORT…" (forum #160), from a version of PCT that could
+                not write into scenery/airports at all — so it wrote the airport files INTO the POI with a
+                .txt suffix and told the user how to finish the job by hand. That has been a real button
+                since v1.3, which left this one putting airport files in the one place an airport cannot
+                live. Deleted, not hidden: the writers behind it are the install's, untouched. */}
 
             <div className="pct-field pct-field-col">
               <span className="pct-field-label">Destination</span>

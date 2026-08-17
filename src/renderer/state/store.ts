@@ -45,13 +45,7 @@ import {
 import { destination } from "../../core/geo/geo";
 import { lineUp, spaceEvenly } from "../../core/geo/arrange";
 import { DEFAULT_PAD_RADIUS_M } from "../../core/export/planExport";
-import {
-  aerotowsOf,
-  airportIsBlank,
-  parkingsOf,
-  runwaysOf,
-  winchesOf,
-} from "../../core/project/airport";
+import { aerotowsOf, parkingsOf, runwaysOf, winchesOf } from "../../core/project/airport";
 import * as mutate from "../../core/project/mutate";
 
 export type Camera = Project["camera"];
@@ -1032,15 +1026,25 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
 
         deleteSelection: () => {
           const { selection, airportSelection } = get();
-          // Del removes the airport part that is selected — and only that part. Through v1.3 this branch
-          // deleted the WHOLE airport block, which was right when a pad was all an airport could hold and
-          // is wrong the moment a stand exists beside it.
+          // Del removes the airport part that is selected — and ONLY that part. That has been true of the
+          // parts since v1.4; since #278 it is true of the block too.
           //
-          // What survives from v1.3 is the FELT behaviour: deleting the last part of an airport nobody
-          // ever named takes the block with it. It stops there — an airport with a code typed into it
-          // survives losing its last stand, because since the DATA submenu that airport still has a row,
-          // a panel and a Del of its own (airport.ts, airportIsBlank). Deleting a pad is not a request to
-          // throw away the identity beside it.
+          // ★ THE BLOCK NO LONGER GOES WITH ITS LAST PART. Through v1.5 an airport nobody had named
+          // disappeared when its last piece did — v1.3's felt behaviour, from when a pad was all an
+          // airport could hold. He walked into it with the two smallest airports there are, "AIRPORT DATA
+          // and 1x HELIPAD" and "AIRPORT DATA and 1x RUNWAY": deleting the one element took the airport
+          // with it. "But that must not be. As long as the PCT is only in the labour process, i.e. the
+          // user enters or deletes elements again, only the affected elements themselves may change."
+          //
+          // He also said where the check belongs instead: "Only when the design process is completed by
+          // the actions SAVE or INSTALL INTO AFS4, the plausibility takes place, whether an airport has
+          // AIRPORT DATA and at least HELIPAD or RUNWAYS." Install asks exactly that already, and asks it
+          // as AEROFLY'S floor rather than ours — "no valid runway or helipad defined", measured in the
+          // gate of 2026-08-14 (HeliportDialog). Save stays silent on purpose: half-built work has to be
+          // saveable, so the plausibility there would be a warning with nothing to warn about yet.
+          //
+          // Deleting the AIRPORT ITSELF still takes everything with it. That is what Del on the Airport
+          // row means, it is the only deliberate way to do it, and it is the one that asks first.
           if (airportSelection !== null) {
             const sel = airportSelection;
             // ★ THE AIRPORT ASKS TWICE (#253c). The first Del arms; the second one, and only the second,
@@ -1052,11 +1056,7 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
               set({ pendingAirportDelete: true });
               return;
             }
-            commit((proj) => {
-              const next = removeAirportPart(proj, sel);
-              const a = next.airport;
-              return a !== undefined && airportIsBlank(a) ? mutate.setAirport(next, null) : next;
-            });
+            commit((proj) => removeAirportPart(proj, sel));
             set({ airportSelection: null, pendingAirportDelete: false });
             return;
           }

@@ -15,8 +15,7 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync, rmSync, cpSync, cop
 import os from "node:os";
 import path from "node:path";
 import type { ExportPlan, Project } from "../core/project/types";
-import { DEFAULT_PAD_RADIUS_M, planExport } from "../core/export/planExport";
-import { directionToHeading } from "../core/geo/orientation";
+import { planExport } from "../core/export/planExport";
 import {
   NeedsElevationError,
   UnsupportedInAutoheightError,
@@ -33,12 +32,9 @@ interface Args {
   out: string;
   baseElevation: number | null;
   baseElevationRaw?: string; // kept only to quote the bad value back in the error
-  // Heliport templates. `--heliport` alone uses the project's own pad (v1.2's airport block) or, failing
-  // that, the POI anchor at radius 10 m; the optional value is the radius in metres, and --helipad-object
-  // names the placed object the pad COPIES its position/heading from (a copy, not a binding — #168).
-  heliport: boolean;
-  heliportRadius: number;
-  heliportObjectId: string | null;
+  // ⛔ --heliport / --heliport-radius / --helipad-object ARE GONE (forum #278). They existed to drive the
+  // opt-in `heliport.tsc.txt` + `heliport.wad.txt` pair inside a POI folder, and that pair was removed
+  // without replacement — see planExport. This CLI writes POIs; airports are installed from the app.
 }
 
 function parseArgs(argv: string[]): Args {
@@ -46,23 +42,13 @@ function parseArgs(argv: string[]): Args {
     install: false,
     out: "build",
     baseElevation: null,
-    heliport: false,
-    heliportRadius: DEFAULT_PAD_RADIUS_M,
-    heliportObjectId: null,
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--install") args.install = true;
     else if (a === "--afs4-dir") args.afs4Dir = argv[++i];
     else if (a === "--out") args.out = argv[++i];
-    else if (a === "--heliport") args.heliport = true;
-    else if (a === "--heliport-radius") {
-      args.heliport = true;
-      args.heliportRadius = Number(argv[++i]);
-    } else if (a === "--helipad-object") {
-      args.heliport = true;
-      args.heliportObjectId = argv[++i];
-    } else if (a === "--base-elevation") {
+    else if (a === "--base-elevation") {
       args.baseElevationRaw = argv[++i];
       args.baseElevation = Number(args.baseElevationRaw);
     } else if (!a.startsWith("--") && !args.project) args.project = a;
@@ -110,13 +96,8 @@ function main(): number {
   const args = parseArgs(process.argv.slice(2));
   if (!args.project) {
     console.error(
-      "Usage: npm run export -- <project.json> [--install] [--afs4-dir <dir>] [--out <dir>] [--base-elevation <m>]\n" +
-        "                          [--heliport] [--heliport-radius <m>] [--helipad-object <object id>]",
+      "Usage: npm run export -- <project.json> [--install] [--afs4-dir <dir>] [--out <dir>] [--base-elevation <m>]",
     );
-    return 2;
-  }
-  if (args.heliport && !(Number.isFinite(args.heliportRadius) && args.heliportRadius > 0)) {
-    console.error(`ERROR: --heliport-radius expects a positive number in metres, got ${args.heliportRadius}.`);
     return 2;
   }
   // `Number("584m")` / a missing value → NaN, which sailed straight through resolveHeightsFlat and got
@@ -162,34 +143,7 @@ function main(): number {
     throw e;
   }
 
-  // The pads. The project's own (v1.2's airport block) win, ALL of them — a project can hold several
-  // since forum #221, and taking only the first here would have dropped the rest without a word.
-  // `--helipad-object` is the older way of saying "put it where that object is", kept because the gate
-  // scripts use it; it COPIES the object's position and heading into a pad of its own rather than
-  // leaving the pad bound to the object (forum #168: a bound pad spawns the helicopter inside the XREF
-  // it borrowed its coordinates from), and it REPLACES the list, because naming one object is naming
-  // one pad.
-  let pads = project.airport?.pads ?? [];
-  if (args.heliportObjectId !== null) {
-    const o = project.objects.find((x) => x.id === args.heliportObjectId);
-    if (o === undefined) {
-      console.error(`ERROR: --helipad-object "${args.heliportObjectId}" is not an object in this project.`);
-      return 1;
-    }
-    const heading =
-      o.kind === "xref" ? directionToHeading(o.direction) : o.kind === "airport_light" ? o.orientation : 0;
-    // Built here and thrown away — it is never stored, so the id only has to be non-empty, and a fixed
-    // one keeps two runs of the same command byte-identical.
-    pads = [{ id: "cli-pad", name: "", position: o.position, heading, radius: args.heliportRadius }];
-  } else if (args.heliportRadius !== DEFAULT_PAD_RADIUS_M) {
-    // An explicit --heliport-radius overrides the stored one — on EVERY pad, since the flag names a size
-    // and not a pad. Silently resizing only the first would be the same bug in a smaller place.
-    pads = pads.map((p) => ({ ...p, radius: args.heliportRadius }));
-  }
-
-  const plan = planExport(project, resolved, {
-    heliport: args.heliport ? { pads, radiusM: args.heliportRadius } : undefined,
-  });
+  const plan = planExport(project, resolved);
   for (const w of plan.warnings) console.warn(`WARNING: ${w}`);
 
   // Guard the folder name before it is ever used as a path to write into or delete.

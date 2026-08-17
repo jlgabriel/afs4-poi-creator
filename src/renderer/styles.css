@@ -158,6 +158,24 @@ body {
   user-select: none;
 }
 
+/* The winch drum on the map (forum #278): "The symbol at the position of the winch must be rectangular
+   instead of a round circle." It is a divIcon rather than a Leaflet vector because Leaflet has no square
+   in pixels — see GliderLayer. Unlike the pad's H this one IS the click target, so it keeps its pointer
+   events and wears the same grab cursor as everything else you can drag. The colours are written inline
+   by the layer, which owns the palette; only the geometry lives here. */
+.pct-winch-glyph {
+  background: none;
+  border: none;
+}
+.pct-winch-box {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  border: 2px solid;
+  cursor: grab;
+}
+
 /* Side panels. */
 .pct-catalog,
 .pct-inspector,
@@ -779,6 +797,19 @@ body {
   flex-direction: column;
   gap: 4px;
 }
+/* ★ A FIELD IS NOT A CELL. `.pct-field-col`'s `flex: 1 1 0` exists for a CELL inside a `.pct-field-row` —
+   it is what makes Lon and Lat split the row's width evenly (see the min-width note above). On a
+   TOP-LEVEL `.pct-field`, which sits in the panel's own flex COLUMN, that same rule reads as "grow
+   vertically", so every such block stretched to swallow the panel's leftover height.
+
+   It was always there — Michael's own v1.5.0 screenshot has the gap under the helipad's paragraph — but
+   it stayed invisible while the blocks were full of prose. Folding the notes away behind a `?` (#275)
+   turned it into a gap around NOTHING, which is exactly what Juan caught: "todo el espacio donde ira la
+   explicacion esta en blanco, entonces no se gana nada con ocultarla". Measured on the winch panel: the
+   intro block was 69 px tall for one 16 px line, and the two field blocks 69 px for 51 px of content. */
+.pct-field.pct-field-col {
+  flex: none;
+}
 .pct-field-title {
   font-weight: 600;
   font-size: 14px;
@@ -792,6 +823,47 @@ body {
 }
 .pct-field-meta {
   font-size: 12px;
+  color: #64748b;
+}
+/* The Inspector's folded notes (forum #275, see inspector/HelpNote.tsx). A 14 px ring beside an 11 px
+   label: big enough to hit, small enough that a panel of six fields does not read as a panel of six
+   buttons. It has to spell out its own font and letter-spacing because it sits inside .pct-field-label,
+   which is uppercase and tracked out — and so does the note, or the explanation would shout. */
+.pct-help {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  margin-left: 5px;
+  padding: 0;
+  border: 1px solid #cbd5e1;
+  border-radius: 50%;
+  background: #ffffff;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0;
+  vertical-align: middle;
+  cursor: pointer;
+}
+.pct-help:hover {
+  border-color: #94a3b8;
+  color: #0f172a;
+}
+.pct-help[aria-expanded="true"] {
+  border-color: #94a3b8;
+  background: #e2e8f0;
+  color: #0f172a;
+}
+.pct-help-note {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
   color: #64748b;
 }
 .pct-warn {
