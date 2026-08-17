@@ -31,6 +31,7 @@ import { haversine, initialBearing } from "../../core/geo/geo";
 import { editorStore } from "../state/editorStore";
 import { Help } from "./HelpNote";
 import { NumberInput } from "./NumberInput";
+import { WadPosition } from "./WadReadout";
 
 const fmtDeg = (n: number): string => n.toFixed(6);
 /** Display only — see the header. The token on disk is always the lower-case one. */
@@ -112,6 +113,10 @@ function EndBlock({
           />
         </label>
       </div>
+      {/* Per END, because a runway's coordinates are its two thresholds and the file carries them as two
+          separate positions. There is no heading row to sit under: the direction is derived from the pair
+          and PCT deliberately shows no field for it. */}
+      <WadPosition position={end.threshold} />
 
       <label className="pct-field pct-field-col">
         <span className="pct-field-label">Approach lighting</span>
@@ -222,10 +227,9 @@ export function RunwayFields({ runway }: { runway: AirportRunway }): React.React
       </div>
 
       <label className="pct-field pct-field-col">
-        <span className="pct-field-label">
-          Width — m
-          <Help>Aerofly uses this for automatic landings.</Help>
-        </span>
+        {/* The note that hung off this label is gone (#286). What Aerofly does with the width is
+            background, and background is the manual's job now. */}
+        <span className="pct-field-label">Width — m</span>
         <NumberInput
           value={runway.width}
           onCommit={(width) => store().setAirportRunwayWidth(runway.id, width)}

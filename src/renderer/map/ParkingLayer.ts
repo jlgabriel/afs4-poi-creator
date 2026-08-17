@@ -43,6 +43,10 @@ const COLOR_HANDLE = "#06b6d4"; // the same cyan grip the footprints and the pad
 const SNAP_DEG = 5; // Shift-snap, as everywhere else
 /** Gap in metres between the stand's rim and its rotate grip, so the grip never overlaps what it turns. */
 const HANDLE_MARGIN_M = 6;
+/** Don't draw the P until the stand's on-screen radius reaches this many pixels — the pad's threshold,
+ *  for the pad's reason: at world zoom a 7.5 m stand is one pixel and a fixed-size glyph over it reads
+ *  as a label pinned to the ocean. */
+const P_MIN_PX = 14;
 
 const toLatLng = (p: LonLat): L.LatLngExpression => [p.lat, p.lon];
 
@@ -53,6 +57,7 @@ interface Entry {
   casing: L.Circle;
   ring: L.Circle;
   tick: L.Polyline;
+  glyph?: L.Marker; // the P — present only while the stand is big enough on screen to hold it
   handle?: L.CircleMarker; // present only while selected
 }
 
@@ -71,11 +76,14 @@ export class ParkingLayer {
   ) {
     this.group = L.layerGroup().addTo(map);
     this.map.on("mousemove", this.onMouseMove);
+    // Whether the P fits is a function of the zoom and nothing else, so the zoom is what re-asks.
+    this.map.on("zoomend", this.onZoomEnd);
     document.addEventListener("mouseup", this.onMouseUp);
   }
 
   destroy(): void {
     this.map.off("mousemove", this.onMouseMove);
+    this.map.off("zoomend", this.onZoomEnd);
     document.removeEventListener("mouseup", this.onMouseUp);
     if (this.drag) this.map.dragging.enable();
     this.drag = null;
@@ -118,6 +126,7 @@ export class ParkingLayer {
     this.group.removeLayer(e.casing);
     this.group.removeLayer(e.ring);
     this.group.removeLayer(e.tick);
+    if (e.glyph) this.group.removeLayer(e.glyph);
     if (e.handle) this.group.removeLayer(e.handle);
     this.entries.delete(id);
   }
@@ -155,9 +164,54 @@ export class ParkingLayer {
     }).addTo(this.group);
 
     const entry: Entry = { parking: p, selected, casing, ring, tick };
+    this.layoutGlyph(entry);
     if (selected) this.addHandle(entry);
     return entry;
   }
+
+  /** A stand's on-screen radius in pixels — how the P decides whether it fits. */
+  private radiusPx(p: AirportParking): number {
+    const c = this.map.latLngToLayerPoint(toLatLng(p.position));
+    const edge = this.map.latLngToLayerPoint(toLatLng(destination(p.position, p.size, 90)));
+    return Math.abs(edge.x - c.x);
+  }
+
+  /** Create, move or drop one stand's P (forum #283). His words: "PARKING POSITION should definitely also
+   *  receive a labelling, I suggest 'P'" — the counterpart to the pad's H, which he had just approved in
+   *  the same post.
+   *
+   *  ★ IT DOES NOT TURN, and that is the one place it departs from the H. The H turns because a real
+   *  helipad's H is painted along the approach AND because it is the pad's only heading readout. Neither
+   *  holds here: a stand already draws an explicit heading tick, so a turning glyph would say twice what
+   *  the tick says once — and an H upside down still reads as an H, while a P does not. */
+  private layoutGlyph(e: Entry, at?: LonLat): void {
+    const where = at ?? e.parking.position;
+    if (this.radiusPx(e.parking) < P_MIN_PX) {
+      if (e.glyph !== undefined) {
+        this.group.removeLayer(e.glyph);
+        e.glyph = undefined;
+      }
+      return;
+    }
+    if (e.glyph === undefined) {
+      e.glyph = L.marker(toLatLng(where), {
+        icon: L.divIcon({
+          html: `<div class="pct-parking-p">P</div>`,
+          className: "pct-parking-glyph",
+          iconSize: [24, 24],
+          iconAnchor: [12, 12],
+        }),
+        interactive: false, // the glyph never eats the drag on the ring underneath it
+        keyboard: false,
+      }).addTo(this.group);
+      return;
+    }
+    e.glyph.setLatLng(toLatLng(where));
+  }
+
+  private onZoomEnd = (): void => {
+    for (const e of this.entries.values()) this.layoutGlyph(e);
+  };
 
   private addHandle(e: Entry): void {
     const p = e.parking;
@@ -225,6 +279,7 @@ export class ParkingLayer {
     e.casing.setLatLng(toLatLng(at));
     e.ring.setLatLng(toLatLng(at));
     e.tick.setLatLngs([toLatLng(at), toLatLng(tipAt(e.parking, at, heading))]);
+    this.layoutGlyph(e, at);
     e.handle?.setLatLng(toLatLng(gripAt(e.parking, at, heading)));
   }
 

@@ -18,6 +18,7 @@ import { clampLonLat } from "../../core/project/schemas";
 import { editorStore } from "../state/editorStore";
 import { Help } from "./HelpNote";
 import { NumberInput } from "./NumberInput";
+import { WadHeading, WadPosition } from "./WadReadout";
 
 const fmtDeg = (n: number): string => n.toFixed(6);
 
@@ -65,6 +66,7 @@ export function ParkingFields({ parking }: { parking: AirportParking }): React.R
           />
         </label>
       </div>
+      <WadPosition position={parking.position} />
 
       <div className="pct-field pct-field-row">
         <label className="pct-field-col">
@@ -94,10 +96,12 @@ export function ParkingFields({ parking }: { parking: AirportParking }): React.R
           />
         </label>
       </div>
+      {/* Under the row, for the reason HelipadFields spells out: the chip needs the full width. */}
+      <WadHeading heading={parking.heading} />
 
       <label className="pct-field pct-field-col">
         <span className="pct-field-label">
-          Name — shown in LOCATION
+          Name
           <Help>Leave it empty and Aerofly shows the stand as &ldquo;Parking&rdquo;.</Help>
         </span>
         <input

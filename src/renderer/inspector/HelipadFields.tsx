@@ -19,6 +19,7 @@ import { clampLonLat } from "../../core/project/schemas";
 import { editorStore, useEditor } from "../state/editorStore";
 import { Help } from "./HelpNote";
 import { NumberInput } from "./NumberInput";
+import { WadHeading, WadPosition } from "./WadReadout";
 
 const fmtDeg = (n: number): string => n.toFixed(6);
 
@@ -69,6 +70,7 @@ export function HelipadFields({ pad }: { pad: AirportPad }): React.ReactElement 
           />
         </label>
       </div>
+      <WadPosition position={pad.position} />
 
       <div className="pct-field pct-field-row">
         <label className="pct-field-col">
@@ -100,6 +102,10 @@ export function HelipadFields({ pad }: { pad: AirportPad }): React.ReactElement 
           />
         </label>
       </div>
+      {/* Under the ROW, not inside the heading's half of it: a 16-digit chip in a 130 px column would
+          have to ellipsise the number this line exists to let you read. Size has no .wad form — it is
+          plain metres in the file — so nothing is missing beside it. */}
+      <WadHeading heading={pad.heading} />
 
       {/* #221: "the name can be freely assigned". It is what LOCATION shows for the pad, and with several
           pads it is the only thing that tells them apart in the list — which is why it arrives with the
@@ -107,7 +113,7 @@ export function HelipadFields({ pad }: { pad: AirportPad }): React.ReactElement 
           literal v1.2 and v1.3 always wrote, so an old project still exports the same bytes. */}
       <label className="pct-field pct-field-col">
         <span className="pct-field-label">
-          Name — shown in LOCATION
+          Name
           <Help>Leave it empty and Aerofly shows the pad as &ldquo;FATO/TLOF&rdquo;.</Help>
         </span>
         <input

@@ -27,6 +27,7 @@ import { identityProblemText, validateIdentity, SNAME_MAX } from "../../core/exp
 import { editorStore, useEditor } from "../state/editorStore";
 import { Help } from "./HelpNote";
 import { NumberInput } from "./NumberInput";
+import { WadPosition } from "./WadReadout";
 import { getPct } from "../app/pct";
 
 const fmtDeg = (n: number): string => n.toFixed(6);
@@ -145,6 +146,7 @@ export function AirportDataFields({ airport }: { airport: ProjectAirport }): Rea
               />
             </label>
           </div>
+          <WadPosition position={point} />
         </>
       ) : (
         <div className="pct-field pct-field-col">
@@ -166,7 +168,7 @@ export function AirportDataFields({ airport }: { airport: ProjectAirport }): Rea
       )}
 
       <label className="pct-field pct-field-col">
-        <span className="pct-field-label">Name — shown in LOCATION</span>
+        <span className="pct-field-label">Name</span>
         <input
           className="pct-text"
           value={airport.name}
@@ -175,8 +177,11 @@ export function AirportDataFields({ airport }: { airport: ProjectAirport }): Rea
           aria-label="Airport name"
           onChange={(e) => store().setAirportIdentity({ name: e.target.value })}
         />
+        {/* The counter stays, the sentence that used to follow it does not (#285). The input is capped at
+            SNAME_MAX anyway, so the limit is enforced whether or not the panel explains itself — and what
+            Aerofly does past it belongs to the manual, not to a line under every keystroke. */}
         <span className="pct-field-meta">
-          {airport.name.trim().length}/{SNAME_MAX} — Aerofly drops the whole airport above its limit.
+          {airport.name.trim().length}/{SNAME_MAX}
         </span>
       </label>
 

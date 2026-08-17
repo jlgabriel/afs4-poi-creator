@@ -17,6 +17,7 @@ import { haversine, initialBearing } from "../../core/geo/geo";
 import { editorStore } from "../state/editorStore";
 import { Help } from "./HelpNote";
 import { NumberInput } from "./NumberInput";
+import { WadHeading, WadPosition } from "./WadReadout";
 
 const fmtDeg = (n: number): string => n.toFixed(6);
 const bearing = (deg: number): string => String(Math.round(deg) % 360).padStart(3, "0");
@@ -74,6 +75,7 @@ export function AerotowFields({ aerotow }: { aerotow: AirportAerotow }): React.R
           />
         </label>
       </div>
+      <WadPosition position={aerotow.position} />
 
       <label className="pct-field pct-field-col">
         <span className="pct-field-label">
@@ -86,10 +88,11 @@ export function AerotowFields({ aerotow }: { aerotow: AirportAerotow }): React.R
           ariaLabel="Aerotow heading, true degrees"
         />
       </label>
+      <WadHeading heading={aerotow.heading} />
 
       <label className="pct-field pct-field-col">
         <span className="pct-field-label">
-          Name — shown in LOCATION
+          Name
           <Help>Usually the runway this start belongs to. PCT does not guess it for you.</Help>
         </span>
         <input
@@ -156,6 +159,7 @@ export function WinchFields({ winch }: { winch: AirportWinch }): React.ReactElem
           />
         </label>
       </div>
+      <WadPosition position={winch.position} />
 
       <div className="pct-field pct-field-row">
         <label className="pct-field-col">
@@ -181,6 +185,9 @@ export function WinchFields({ winch }: { winch: AirportWinch }): React.ReactElem
           />
         </label>
       </div>
+      {/* Both ends get one. A winch launch has no heading field — "the length and direction then result
+          from the two positions" (#238) — so the pair of positions IS everything the file carries. */}
+      <WadPosition position={winch.winch} />
 
       {/* Derived, read-only, and worth the line: his range for a real winch launch is 800–1000 m, and the
           rope length is the one thing here you cannot read off either coordinate pair. */}
@@ -192,9 +199,12 @@ export function WinchFields({ winch }: { winch: AirportWinch }): React.ReactElem
       <label className="pct-field pct-field-col">
         <span className="pct-field-label">
           Glider spacing — m
+          {/* "His own value is 25" left with the other background notes (#284). It was a note from
+              ApfelFlieger to us that had leaked onto the screen, in the third person, where nobody using
+              PCT knows who "he" is. What the field MEANS is not background, so that half stays. */}
           <Help>
             A two-rope winch launches two gliders side by side; this is how far apart they stand —
-            basically a wingspan. His own value is 25.
+            basically a wingspan.
           </Help>
         </span>
         <NumberInput
@@ -206,7 +216,7 @@ export function WinchFields({ winch }: { winch: AirportWinch }): React.ReactElem
 
       <label className="pct-field pct-field-col">
         <span className="pct-field-label">
-          Name — shown in LOCATION
+          Name
           <Help>Usually the runway this start belongs to, with a letter added if it needs one.</Help>
         </span>
         <input
