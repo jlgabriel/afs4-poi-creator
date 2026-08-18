@@ -37,6 +37,7 @@
 import * as L from "leaflet";
 import type { AirportPad, LonLat } from "../../core/project/types";
 import { destination, initialBearing, wrapLon } from "../../core/geo/geo";
+import { glyphPx } from "./glyph";
 import { snapAngle } from "./rotate";
 
 export interface HelipadCallbacks {
@@ -239,10 +240,16 @@ export class HelipadLayer {
     }
     // The H turns WITH the pad — a helipad's H is painted along the approach, so a pad heading 090 shows
     // an H lying on its side. That is also the cheapest readout of the heading at a glance.
-    const html = `<div class="pct-helipad-h" style="transform:rotate(${rot}deg)">H</div>`;
+    //
+    // ★ AND IT IS SIZED FROM THE PAD, not from the screen (v1.8) — see glyph.ts. The icon box is 0×0 and
+    // the letter centres itself with translate(-50%,-50%), because a fixed box cannot hold a letter whose
+    // size changes with the zoom.
+    const size = glyphPx(this.radiusPx(p));
+    const style = `font-size:${size}px;transform:translate(-50%,-50%) rotate(${rot}deg)`;
+    const html = `<div class="pct-helipad-h" style="${style}">H</div>`;
     if (e.glyph === undefined) {
       e.glyph = L.marker(toLatLng(where), {
-        icon: L.divIcon({ html, className: "pct-helipad-glyph", iconSize: [24, 24], iconAnchor: [12, 12] }),
+        icon: L.divIcon({ html, className: "pct-helipad-glyph", iconSize: [0, 0], iconAnchor: [0, 0] }),
         interactive: false,
         keyboard: false,
       }).addTo(this.group);
@@ -250,7 +257,7 @@ export class HelipadLayer {
     }
     e.glyph.setLatLng(toLatLng(where));
     const el = e.glyph.getElement()?.firstElementChild as HTMLElement | undefined;
-    if (el) el.style.transform = `rotate(${rot}deg)`;
+    if (el) el.setAttribute("style", style);
   }
 
   private onZoomEnd = (): void => {

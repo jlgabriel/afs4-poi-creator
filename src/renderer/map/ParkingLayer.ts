@@ -22,6 +22,7 @@
 import * as L from "leaflet";
 import type { AirportParking, LonLat } from "../../core/project/types";
 import { destination, initialBearing, wrapLon } from "../../core/geo/geo";
+import { glyphPx } from "./glyph";
 import { snapAngle } from "./rotate";
 
 export interface ParkingCallbacks {
@@ -197,14 +198,18 @@ export class ParkingLayer {
       }
       return;
     }
-    const html = `<div class="pct-parking-p" style="transform:rotate(${rot}deg)">P</div>`;
+    // Sized from the stand, like the pad's H — the same glyphPx, deliberately, so a P and an H beside
+    // each other are the same letter at the same scale (glyph.ts).
+    const size = glyphPx(this.radiusPx(e.parking));
+    const style = `font-size:${size}px;transform:translate(-50%,-50%) rotate(${rot}deg)`;
+    const html = `<div class="pct-parking-p" style="${style}">P</div>`;
     if (e.glyph === undefined) {
       e.glyph = L.marker(toLatLng(where), {
         icon: L.divIcon({
           html,
           className: "pct-parking-glyph",
-          iconSize: [24, 24],
-          iconAnchor: [12, 12],
+          iconSize: [0, 0],
+          iconAnchor: [0, 0],
         }),
         interactive: false, // the glyph never eats the drag on the ring underneath it
         keyboard: false,
@@ -213,7 +218,7 @@ export class ParkingLayer {
     }
     e.glyph.setLatLng(toLatLng(where));
     const el = e.glyph.getElement()?.firstElementChild as HTMLElement | undefined;
-    if (el) el.style.transform = `rotate(${rot}deg)`;
+    if (el) el.setAttribute("style", style);
   }
 
   private onZoomEnd = (): void => {
