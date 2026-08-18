@@ -1047,8 +1047,20 @@ body {
 .pct-wad-under {
   display: flex;
   align-items: center;
-  gap: 4px;
+  /* `.pct-field-row`'s gap, deliberately, not a tighter one: these read-outs sit UNDER Lon and Lat and
+     have to line up with the fields they belong to (#295). */
+  gap: 8px;
   margin-top: 2px;
+}
+/* One read-out = its own tag AND its own value (#295). The tag used to sit once at the head of the line,
+   which on a pair reads as a label for the left number only — "on the left is '.wad' and on the right
+   not". Two identical items, each half the width, is the shape that cannot be misread. */
+.pct-wad-item {
+  flex: 1 1 0;
+  min-width: 0; /* same reason as .pct-wad-cell's: a 16-digit value must be allowed to shrink */
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 .pct-wad-tag {
   flex: 0 0 auto;
