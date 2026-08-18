@@ -263,7 +263,7 @@ function GliderRows(): React.ReactElement | null {
         <span className="pct-placed-text">
           <span className="pct-placed-name">
             <span className="pct-placed-label">
-              {w.name.trim() === "" ? "Winch launch" : `Winch launch ${w.name.trim()}`}
+              {w.name.trim() === "" ? "Winch Launch" : `Winch Launch ${w.name.trim()}`}
             </span>
             <span className="pct-placed-code">{Math.round(haversine(w.position, w.winch))} m</span>
           </span>

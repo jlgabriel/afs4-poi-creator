@@ -1,5 +1,5 @@
 // heliportTemplate.ts — the `.tsc` / `.wad` pair that IS an Aerofly airport: what PCT writes into
-// scenery/airports/<country>/ when you press "Install HELIPORT…".
+// scenery/airports/<country>/ when you press "Export /airports…".
 //
 // ⛔ THE NAME IS HISTORY, AND SO IS HALF THE FILE'S ORIGINAL JOB. It was born as two TEMPLATES (forum
 // #160): the same two files, with `__PLACEHOLDER__` for the identity and a `.txt` suffix that made them
@@ -660,7 +660,7 @@ export function heliportInstalledReadme(id: HeliportIdentity, projectName: strin
     "airport installed on this machine at the moment this was written. That check cannot speak for",
     "anyone else's machine - if you pass this folder on, the code has to be free there too.",
     "",
-    "To remove it: PCT's Install HELIPORT dialog lists installed heliports with an Uninstall button,",
+    "To remove it: PCT's Export /airports dialog lists what it wrote, with an Uninstall button,",
     "or just delete this folder. Nothing outside it was touched.",
     "",
   ].join("\n");
@@ -670,3 +670,4 @@ export function heliportInstalledReadme(id: HeliportIdentity, projectName: strin
 // templates were exported with it: move the folder to scenery/airports, replace the three placeholders,
 // rename both files, delete poi.tsl. Its own last line already said where this was going —
 // "PCT can do all of this for you - see Install HELIPORT in the app" — and that is now the only way.
+// (That button is called "Export /airports…" since v1.8, forum #296.)

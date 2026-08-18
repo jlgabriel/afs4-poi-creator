@@ -22,6 +22,7 @@
 import * as L from "leaflet";
 import type { AirportParking, LonLat } from "../../core/project/types";
 import { destination, initialBearing, wrapLon } from "../../core/geo/geo";
+import { glyphPx } from "./glyph";
 import { snapAngle } from "./rotate";
 
 export interface ParkingCallbacks {
@@ -180,12 +181,16 @@ export class ParkingLayer {
    *  receive a labelling, I suggest 'P'" — the counterpart to the pad's H, which he had just approved in
    *  the same post.
    *
-   *  ★ IT DOES NOT TURN, and that is the one place it departs from the H. The H turns because a real
-   *  helipad's H is painted along the approach AND because it is the pad's only heading readout. Neither
-   *  holds here: a stand already draws an explicit heading tick, so a turning glyph would say twice what
-   *  the tick says once — and an H upside down still reads as an H, while a P does not. */
-  private layoutGlyph(e: Entry, at?: LonLat): void {
+   *  ★ AND IT TURNS WITH THE STAND (#295). v1.7 shipped it upright and fixed, arguing that the stand
+   *  already draws a heading tick and that a P upside down stops reading as a P. He overruled it, and his
+   *  third reason is the one that settles it: "if a user positions several HELIPAD and PARKING POSITIONs
+   *  side by side or even alternately, then it irritates when some letters are vertical and others are
+   *  not." A marking belongs to the object, not to the screen — his first reason, and the one that makes
+   *  this a rule rather than a preference — and a 17 px letter is a better heading readout than a hairline
+   *  tick, not a duplicate of one. So: the pad's call, the pad's transform, for the pad's reason. */
+  private layoutGlyph(e: Entry, at?: LonLat, heading?: number): void {
     const where = at ?? e.parking.position;
+    const rot = heading ?? e.parking.heading;
     if (this.radiusPx(e.parking) < P_MIN_PX) {
       if (e.glyph !== undefined) {
         this.group.removeLayer(e.glyph);
@@ -193,13 +198,18 @@ export class ParkingLayer {
       }
       return;
     }
+    // Sized from the stand, like the pad's H — the same glyphPx, deliberately, so a P and an H beside
+    // each other are the same letter at the same scale (glyph.ts).
+    const size = glyphPx(this.radiusPx(e.parking));
+    const style = `font-size:${size}px;transform:translate(-50%,-50%) rotate(${rot}deg)`;
+    const html = `<div class="pct-parking-p" style="${style}">P</div>`;
     if (e.glyph === undefined) {
       e.glyph = L.marker(toLatLng(where), {
         icon: L.divIcon({
-          html: `<div class="pct-parking-p">P</div>`,
+          html,
           className: "pct-parking-glyph",
-          iconSize: [24, 24],
-          iconAnchor: [12, 12],
+          iconSize: [0, 0],
+          iconAnchor: [0, 0],
         }),
         interactive: false, // the glyph never eats the drag on the ring underneath it
         keyboard: false,
@@ -207,6 +217,8 @@ export class ParkingLayer {
       return;
     }
     e.glyph.setLatLng(toLatLng(where));
+    const el = e.glyph.getElement()?.firstElementChild as HTMLElement | undefined;
+    if (el) el.setAttribute("style", style);
   }
 
   private onZoomEnd = (): void => {
@@ -279,7 +291,7 @@ export class ParkingLayer {
     e.casing.setLatLng(toLatLng(at));
     e.ring.setLatLng(toLatLng(at));
     e.tick.setLatLngs([toLatLng(at), toLatLng(tipAt(e.parking, at, heading))]);
-    this.layoutGlyph(e, at);
+    this.layoutGlyph(e, at, heading);
     e.handle?.setLatLng(toLatLng(gripAt(e.parking, at, heading)));
   }
 

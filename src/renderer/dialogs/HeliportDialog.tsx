@@ -1,4 +1,4 @@
-// HeliportDialog.tsx — "Install into AFS4": write the open project into scenery/airports/ as a real
+// HeliportDialog.tsx — "Export /airports": write the open project into scenery/airports/ as a real
 // heliport you can start a flight from.
 //
 // ★ WHAT v1.3 TOOK OUT OF HERE, and why (forum #173, ApfelFlieger). Through v1.2 this dialog was the
@@ -40,7 +40,7 @@ function InstalledHeliports({ refreshKey }: { refreshKey: number }): React.React
 
   const remove = async (h: InstalledHeliport): Promise<void> => {
     if (!pct) return;
-    if (!window.confirm(`Remove the heliport ${h.icao.toUpperCase()}? This deletes its airport folder.`)) {
+    if (!window.confirm(`Remove the airport ${h.icao.toUpperCase()}? This deletes its folder under /airports.`)) {
       return;
     }
     const res = await pct.uninstallHeliport(h.country, h.folderName);
@@ -52,7 +52,7 @@ function InstalledHeliports({ refreshKey }: { refreshKey: number }): React.React
 
   return (
     <div className="pct-installed">
-      <div className="pct-field-label">Heliports installed by PCT</div>
+      <div className="pct-field-label">Airports PCT wrote to /airports</div>
       <ul className="pct-installed-list">
         {rows.map((h) => (
           <li key={`${h.country}/${h.folderName}`} className="pct-installed-row">
@@ -71,7 +71,7 @@ function InstalledHeliports({ refreshKey }: { refreshKey: number }): React.React
 
 function messageFor(error: PctError): string {
   return error.code === "folder-exists"
-    ? `A heliport folder "${error.folderName}" already exists.`
+    ? `An airport folder "${error.folderName}" already exists.`
     : error.message;
 }
 
@@ -193,7 +193,7 @@ export function HeliportDialog({ onClose }: { onClose: () => void }): React.Reac
       return;
     }
     if (res.error.code === "folder-exists" && !overwrite) {
-      if (window.confirm(`A heliport folder "${res.error.folderName}" already exists.\n\nReplace it?`)) {
+      if (window.confirm(`An airport folder "${res.error.folderName}" already exists.\n\nReplace it?`)) {
         return install(true);
       }
       setError(`Kept the existing "${res.error.folderName}".`);
@@ -208,10 +208,11 @@ export function HeliportDialog({ onClose }: { onClose: () => void }): React.Reac
   const blocked = airport === undefined || problem !== null || busy || pct === null;
 
   return (
-    <div className="pct-modal" role="dialog" aria-label="Install heliport" aria-modal="true">
+    <div className="pct-modal" role="dialog" aria-label="Export to /airports" aria-modal="true">
       <div className="pct-modal-card">
         <div className="pct-modal-head">
-          <h2>Install heliport</h2>
+          {/* Named for its destination, like the button that opens it (#296). */}
+          <h2>Export to /airports</h2>
           <button className="pct-close" onClick={onClose} disabled={busy} aria-label="Close">
             ×
           </button>
@@ -219,7 +220,7 @@ export function HeliportDialog({ onClose }: { onClose: () => void }): React.Reac
 
         {result !== null ? (
           <div className="pct-export-done">
-            <p className="pct-ok">Heliport installed to:</p>
+            <p className="pct-ok">Exported to:</p>
             <code className="pct-path">{result.path}</code>
             {result.warnings.length > 0 && (
               <ul className="pct-warnings">
@@ -249,8 +250,9 @@ export function HeliportDialog({ onClose }: { onClose: () => void }): React.Reac
         ) : (
           <>
             <p className="pct-field-meta">
-              Installs this project as an airport you can start a flight from, with every object you
-              placed around the pad. It does not replace the POI export — it is a second, separate copy.
+              Writes this project into <code>…FS 4/scenery/airports</code> as an airport you can start a
+              flight from, with every object you placed around it. It does not replace the <code>/poi</code>
+              export — it is a second, separate copy.
             </p>
 
             {airport === undefined || airport.position === undefined ? (
@@ -332,7 +334,7 @@ export function HeliportDialog({ onClose }: { onClose: () => void }): React.Reac
 
             {error !== null && <p className="pct-warn">{error}</p>}
             {objects.length === 0 && airport !== undefined && (
-              <p className="pct-empty">No objects placed — the heliport would be a bare pad.</p>
+              <p className="pct-empty">No objects placed — the airport would have no scenery around it.</p>
             )}
 
             <InstalledHeliports refreshKey={installedKey} />
@@ -344,7 +346,7 @@ export function HeliportDialog({ onClose }: { onClose: () => void }): React.Reac
               <span className="pct-spacer" />
               {airport !== undefined && (
                 <button className="pct-primary" onClick={() => void install(false)} disabled={blocked}>
-                  {busy ? "Installing…" : replacing ? "Replace in AFS4" : "Install into AFS4"}
+                  {busy ? "Exporting…" : replacing ? "Replace in /airports" : "Export to /airports"}
                 </button>
               )}
             </div>

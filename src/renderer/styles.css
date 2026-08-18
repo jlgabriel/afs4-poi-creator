@@ -145,20 +145,27 @@ body {
   background: none;
   border: none;
   pointer-events: none;
+  overflow: visible; /* the icon box is 0×0 now — the letter lives outside it */
 }
+/* The letter painted on a round airport element. It is positioned by its own CENTRE rather than by a
+   fixed box, because since v1.8 its size follows the circle's on-screen radius (map/glyph.ts) and a
+   24 px box cannot hold a 50 px letter. The layer writes font-size and the full transform inline —
+   translate(-50%,-50%) first, then the heading rotation. */
 .pct-helipad-h,
 .pct-parking-p {
-  width: 24px;
-  height: 24px;
-  line-height: 24px;
-  text-align: center;
+  position: absolute;
+  left: 0;
+  top: 0;
+  line-height: 1;
   color: #ffffff;
-  font-size: 17px;
+  font-size: 17px; /* floor; the layer raises it */
   font-weight: 700;
   font-family: system-ui, sans-serif;
+  /* In em, not px: the casing has to grow with the letter or a 50 px H loses its edge over pale
+     concrete — which is the whole reason the shadow is there. */
   text-shadow:
-    0 0 3px #0f172a,
-    0 0 2px #0f172a;
+    0 0 0.18em #0f172a,
+    0 0 0.12em #0f172a;
   user-select: none;
 }
 
@@ -1047,8 +1054,20 @@ body {
 .pct-wad-under {
   display: flex;
   align-items: center;
-  gap: 4px;
+  /* `.pct-field-row`'s gap, deliberately, not a tighter one: these read-outs sit UNDER Lon and Lat and
+     have to line up with the fields they belong to (#295). */
+  gap: 8px;
   margin-top: 2px;
+}
+/* One read-out = its own tag AND its own value (#295). The tag used to sit once at the head of the line,
+   which on a pair reads as a label for the left number only — "on the left is '.wad' and on the right
+   not". Two identical items, each half the width, is the shape that cannot be misread. */
+.pct-wad-item {
+  flex: 1 1 0;
+  min-width: 0; /* same reason as .pct-wad-cell's: a 16-digit value must be allowed to shrink */
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 .pct-wad-tag {
   flex: 0 0 auto;

@@ -34,21 +34,15 @@ export function AerotowFields({ aerotow }: { aerotow: AirportAerotow }): React.R
 
       <div className="pct-field pct-field-col">
         <span className="pct-field-label">
-          Aerotow — where the glider waits
+          Aerotow
           <Help>
             The DR400 pulls it into the air along the heading. Drag the pink dot or its rope on the map,
             and the cyan grip to turn it.
           </Help>
         </span>
-        {/* His own note (#237): a glider start does not need a runway, and when the strip is too short
-            the tow starts on its extension. Worth keeping, because the obvious assumption is the
-            opposite — it moved up here from the foot of the panel when the notes folded. */}
-        <span className="pct-field-label">
-          Does it need a runway?
-          <Help>
-            No. It usually sits on one, or on its extension when the runway is too short.
-          </Help>
-        </span>
+        {/* ⛔ "Does it need a runway? — No. It usually sits on one, or on its extension when the runway
+            is too short." is struck whole in #289. It was HIS OWN note (#237), kept because the obvious
+            assumption is the opposite one. He is retiring it himself. */}
       </div>
 
       <div className="pct-field pct-field-row">
@@ -115,7 +109,9 @@ export function WinchFields({ winch }: { winch: AirportWinch }): React.ReactElem
   return (
     <div className="pct-inspector-body">
       <div className="pct-field-title">
-        {winch.name.trim() === "" ? "Winch launch" : `Winch launch ${winch.name.trim()}`}
+        {/* Capital L (#290): he ringed the "l" and wrote «"L" in CAPITAL LETTER». The catalog card and
+            the placed list already said Winch Launch; the panel was the odd one out. */}
+        {winch.name.trim() === "" ? "Winch Launch" : `Winch Launch ${winch.name.trim()}`}
       </div>
 
       {/* ✅ The warning that stood here through v1.4.0 is gone. It was never a caveat we invented — he
@@ -124,10 +120,11 @@ export function WinchFields({ winch }: { winch: AirportWinch }): React.ReactElem
 
       <div className="pct-field pct-field-col">
         <span className="pct-field-label">
-          Winch launch — two points, no heading
+          Winch Launch
           {/* ★ THIS SENTENCE IS A TEST, and it caught a real bug once: it promises "drag either pink dot,
               or the rope between them", and the rope shipped without a mousedown. Folding it does not
-              retire the promise — GliderLayer still has to keep it. */}
+              retire the promise — GliderLayer still has to keep it. #290 struck the label's tail
+              ("— two points, no heading") but NOT the note under it, so the promise stays on screen. */}
           <Help>
             The rope runs from the glider to the winch, and its length and direction are whatever those
             two points say. Drag either pink dot, the square winch, or the rope between them.

@@ -25,54 +25,59 @@ import { formatWad, headingToWadDirection, latToWad, lonToWad } from "../../core
  *  does not end up looking like a status board. */
 const COPIED_MS = 900;
 
-/** One value. Double-click copies it, which is the gesture he asked for by name; `user-select: all` in the
- *  stylesheet means a single click also selects the whole number, so Ctrl+C works for anyone who does not
- *  know about the double-click. The chip goes green because a double-click that copies SILENTLY is
- *  indistinguishable from a double-click that did nothing. */
+/** One value, WITH ITS OWN "WAD:" IN FRONT OF IT (#295). v1.7 tagged the ROW instead — one `.wad` at the
+ *  far left — and on a LON/LAT pair that reads as a label for the left number only: "unfortunately it is
+ *  again inharmonious, because on the left is '.wad' and on the right not. => My suggestion is to write in
+ *  all cases (also with HEADING) 'WAD:' in front of each relevant field." So the tag belongs to the VALUE,
+ *  not to the line, and there is exactly one shape for both callers.
+ *
+ *  Double-click copies, which is the gesture he asked for by name; `user-select: all` in the stylesheet
+ *  means a single click also selects the whole number, so Ctrl+C works for anyone who does not know about
+ *  the double-click. The chip goes green because a double-click that copies SILENTLY is indistinguishable
+ *  from a double-click that did nothing. */
 function WadCell({ value, label }: { value: string; label: string }): React.ReactElement {
   const [copied, setCopied] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(timer.current), []);
   return (
-    <code
-      className={copied ? "pct-wad-cell copied" : "pct-wad-cell"}
-      title={`${label}: ${value} — double-click to copy`}
-      aria-label={label}
-      onDoubleClick={() => {
-        // ★ THE GREEN WAITS FOR THE WRITE. Flashing first and asking later makes the chip claim a copy
-        // the clipboard refused — which is exactly what a denied permission does, and it fails as a
-        // rejected promise, not a throw. Caught in the browser preview, where permission IS denied.
-        const write = navigator.clipboard?.writeText(value);
-        if (write === undefined) return;
-        void write.then(
-          () => {
-            setCopied(true);
-            clearTimeout(timer.current);
-            timer.current = setTimeout(() => setCopied(false), COPIED_MS);
-          },
-          () => undefined, // no clipboard here — say nothing rather than lie
-        );
-      }}
-    >
-      {value}
-    </code>
+    <span className="pct-wad-item">
+      <span
+        className="pct-wad-tag"
+        title="The same value in the units FS4 stores inside its world-airport database: longitude and latitude on a 0–65536 projected grid, directions in radians. PCT does not write .wad files — this is a read-out."
+      >
+        WAD:
+      </span>
+      <code
+        className={copied ? "pct-wad-cell copied" : "pct-wad-cell"}
+        title={`${label}: ${value} — double-click to copy`}
+        aria-label={label}
+        onDoubleClick={() => {
+          // ★ THE GREEN WAITS FOR THE WRITE. Flashing first and asking later makes the chip claim a copy
+          // the clipboard refused — which is exactly what a denied permission does, and it fails as a
+          // rejected promise, not a throw. Caught in the browser preview, where permission IS denied.
+          const write = navigator.clipboard?.writeText(value);
+          if (write === undefined) return;
+          void write.then(
+            () => {
+              setCopied(true);
+              clearTimeout(timer.current);
+              timer.current = setTimeout(() => setCopied(false), COPIED_MS);
+            },
+            () => undefined, // no clipboard here — say nothing rather than lie
+          );
+        }}
+      >
+        {value}
+      </code>
+    </span>
   );
 }
 
-/** The tag that says what these numbers ARE. Without it the chips read as a second, mysterious pair of
- *  coordinates — and the panel has no room to spell it out on every row. */
+/** The line under a field row. It carries no tag of its own any more (#295) — every cell brings one — so
+ *  what is left is the ALIGNMENT: its gap is `.pct-field-row`'s, which is what puts the LAT read-out under
+ *  LAT instead of a tag-width to the left of it. */
 function WadRow({ children }: { children: React.ReactNode }): React.ReactElement {
-  return (
-    <div className="pct-wad-under">
-      <span
-        className="pct-wad-tag"
-        title="The same values in the units FS4 stores inside its world-airport database: longitude and latitude on a 0–65536 projected grid, directions in radians. PCT does not write .wad files — this is a read-out."
-      >
-        .wad
-      </span>
-      {children}
-    </div>
-  );
+  return <div className="pct-wad-under">{children}</div>;
 }
 
 /** Goes directly under a LON / LAT field row: one cell per field, in the same order. */
