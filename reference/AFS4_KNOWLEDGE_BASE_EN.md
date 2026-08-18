@@ -5,10 +5,14 @@
 > and its on‑disk format*, not any particular tool.
 >
 > - **Scope:** the simulator and its file format.
-> - **State as of:** 2026‑07. Findings are dated where it matters; verify against your
+> - **State as of:** 2026‑08. Findings are dated where it matters; verify against your
 >   own install before relying on anything. The sim changes between versions, and many
 >   of the behaviors documented here are **undocumented by IPACS** — they can break
 >   without notice.
+>
+> **Revised 2026‑08.** Sections 16‑18 are new — airports that actually load, missions,
+> and the simulator's own executable as a vocabulary oracle — and §2, §3, §4, §7‑§10, §12 and
+> §14 gained a month's findings from building complete airports. New material is dated inline.
 
 ---
 
@@ -17,7 +21,7 @@
 1. [Where everything lives (installation layout)](#1-where-everything-lives)
 2. [The file grammar `<[type][name][value]>`](#2-the-file-grammar)
 3. [`tm.log` — the sim's diagnostic log](#3-tmlog)
-4. [Placement: POI (`.tsl`/`.toc`) vs airport (`.tap`/`.tsc`)](#4-placement-poi-vs-airport)
+4. [Placement: POI (`.tsl`/`.toc`) vs airport (`.tsc`/`.wad`)](#4-placement-poi-vs-airport)
 5. [Built‑in XREF objects (placed by name)](#5-built-in-xref-objects)
 6. [Orientation and headings](#6-orientation-and-headings)
 7. [Heights and autoheight](#7-heights-and-autoheight)
@@ -29,6 +33,9 @@
 13. [Live flight data (UDP / ForeFlight)](#13-live-flight-data-udp)
 14. [3D pipeline (Blender + converter)](#14-3d-pipeline)
 15. [Datasets and external resources](#15-datasets-and-external-resources)
+16. [Airports that actually load](#16-airports-that-actually-load)
+17. [Missions](#17-missions)
+18. [The executable as a vocabulary oracle](#18-the-executable-as-a-vocabulary-oracle)
 
 ---
 
@@ -98,6 +105,22 @@ and blocks nest:
   Strings **don't** survive even `tr -c '[:print:]'`. It's the same container for `.tmb`,
   compiled `.toc`/`.tsc`, `.wad`, and the built‑in POI `.tsl` files.
 - **Trivial runtime discriminator:** first byte `0x3C` → parse it; anything else → opaque.
+
+### ★★★ Nothing may precede the root tag
+
+**A text file must begin with `<[file][][]`.** A ten‑line `//` banner above it makes the parser reject
+the **whole file**, and the only symptom is a single line: `ERROR: (error loading '…/pct002.tsc')`.
+Comments at the END of a tag line are safe — files that fly are full of them — it is only the space
+above the root tag that is fatal.
+
+⚠️ Worth knowing before you debug it: an airport's `.wad` and `.tsc` are read independently, so a
+banner in the `.tsc` alone leaves the ICAO registered in the world database **with no place behind
+it**. The airport half‑exists: it cannot be flown, and it does not even appear in the LOCATION
+search (§16).
+
+★ The lesson underneath is not about banners. A *reader* you patched to accept community files says
+nothing about what the *sim's* parser accepts — fixing your own parser is not permission to write the
+same shape.
 
 ### ★★ How the sim resolves fields
 
@@ -186,6 +209,43 @@ This is **where the user actually spawns, and which way they're facing**. **An a
 spawn point is NOT its reference point (ARP)** — the two can sit a kilometre apart, in
 opposite directions. The log is the only place the real spawn is stated.
 
+### ★★ The oracle is pinned on BOTH sides (canary + positive control)
+
+The schema warning is only half an instrument until you also show it stays **quiet**. In one run,
+inside the same element: two properties that genuinely exist (`tag`, `coordinate_system`) and one
+invented. The real ones produced **no warning**; the invented one did. ⇒ the log **names what it does
+not know and says nothing about what it does**, so a silent field is evidence rather than merely the
+absence of evidence.
+
+The shape of a gate that needs no flight: put a canary property inside **every container you want to
+prove was parsed** — the place, the list element, each file. If a canary speaks, that container was
+read. If a container is rejected whole, its nested canaries go quiet too — which is itself the
+answer.
+
+### ★★ Before reading an absence, prove the stimulus was there
+
+"Zero warnings about airports" means nothing if no airport was loaded that run. A real case: nine
+`tmworld_airport_detailed` warnings had to be attributed or cleared. The first grep returned zero —
+uninformative, because the POI installed at the time had no `.wad` at all. The answer only existed
+once a `.wad` was found on disk, **written earlier than the log**, with the run's own counters
+(`airports=8141`) proving the sim had counted it. Check the file's timestamp against the log's, not
+just that the folder exists today.
+
+### The counters are instruments too
+
+- `scanning airport and poi folders: airports=N` / `available airports: N` — how many airports
+  registered this run. **A rejected airport does not increment them**, which is how you tell
+  "ignored" from "loaded and wrong".
+- `pois_local=N` — ★ **this counts PLACES, not folders**: the install's 449 plus **one per user
+  `.tsl`**, so one POI folder holding four `.tsl` files adds four (§4).
+
+### ⚠️ What the log does NOT report: textures
+
+There is no `ttx '<file>': …` line in `tm.log`. That format string lives in the **content converter**,
+not in the simulator — finding a string inside *a* binary does not tell you *which* binary prints it.
+What the sim reports is failure: `ERROR: (texture '…' not found)`, `remove invalid texture at index
+'diffuse'`. ⇒ for textures, **silence in the log is not a pass**.
+
 ### Other things the log teaches
 
 - `register xref 'X' -> N geometries M materials` ⇒ the sim **loaded** your (text) `.tmb`.
@@ -201,8 +261,9 @@ opposite directions. The log is the only place the real spawn is stated.
 
 ## 4. Placement: POI vs airport
 
-There are two ways to place custom objects in the world. **The POI is the current, standard
-community approach.**
+There are two ways to place custom objects in the world. **The POI is the standard community route
+for scenery; the airport route is what a site needs to own an ICAO, a spawn point and a place on the
+map** (§12, §16).
 
 ### POI (`.tsl` + optional `.toc`) — CURRENT
 
@@ -244,15 +305,58 @@ A POI **does not appear** in AFS4's location search (it's ambient scenery) ⇒ y
 spawning at a nearby airport and flying to the coordinates. ⚠️ AFS4's LOCATION screen
 **does not accept numeric coordinates** either — only an ICAO search or a click on the map —
 so the practical way to reach a known lon/lat is to start from a searchable ICAO nearby.
-**A POI can carry several `.tsl`/`.toc` pairs** (e.g. `pole.*` + `plants.*`) if you ever need
-`autoheight` true and false at the same time.
+**A POI can carry several `.tsl`/`.toc` pairs** — and that is how you get `autoheight` true and
+false in one folder; see below, where it is measured rather than hoped for.
 
-### Airport (`.tap` + `.tsc` + `.wad`) — LEGACY, avoided
+### ★★ SEVERAL `.tsl` in ONE POI folder — and each keeps its own `autoheight`
 
-A folder under `scenery/airports/<region>/<country>/<name>/` with `<ICAO>.tap` (registration)
-+ `<name>.tsc` (`tmsimulator_scenery_place`, a superset of the `.tsl`) + models. Gotchas (all
-found via `tm.log`): the `.tsc` needs ≥1 runway/helipad or it logs `invalid airport` and is
-discarded; `has no wad file` is non‑fatal.
+A `.tsl` can call **exactly one** `.toc` (it changed with FS4, and IPACS has declined to change it
+back), but **a POI folder may hold as many `.tsl`/`.toc` pairs as you like** — community add‑ons ship
+POIs with ten. Measured 2026‑08‑10, twice, without flying:
+
+- **Names are free.** Four places in one folder (`aaa_first`, `poi`, `poi00`, `poi01`), each with its
+  own `.toc`; all eight canaries spoke — four at place level, four inside the `.toc` elements. ⇒
+  **FS4 reads every `.tsl` in the folder, under any name, and each loads its own `.toc`.**
+  `pois_local` rose by four for that one folder (§3).
+- ★★★ **Each place respects its OWN `autoheight`.** Two places in one folder, identical but for the
+  flag: the `false` one kept its written ASL (three conifers left hanging in a column, exactly as
+  written) while the `true` one snapped its plant to the ground. ⇒ the old either/or — **baked‑ASL
+  lights or autoheight plants, never both in one POI** — is a limit of one‑file writers, not of the
+  format (§7, §9).
+
+### What a POI place does NOT have
+
+Both refuted by name in `tm.log`, one run each (§3):
+
+- **`cultivation_files`** is not a member of `tmsimulator_scenery_place_simple` ⇒ a POI cannot carry
+  a list of cultivations; it takes the single string `<[string8u][cultivation][poi]>`. The airport
+  `.tsc` *does* take the list (§16).
+- **`use_height_offset`** is not a member of it either. That lever exists only on the `.tsc`'s
+  `tmsimulator_scenery_cultivation` — there is no POI equivalent (§9).
+
+### ★★ A `.tsc`/`.wad` dropped inside `scenery/poi/` is INERT
+
+Verified 2026‑07‑31 with a control built to make noise: an `sname` of 36 characters, a length the sim
+rejects with an ERROR **that quotes the file's path**. It emitted that error three times for files
+under `scenery/airports/` in the same run, and **never** for the identical file under `scenery/poi/`;
+the counters agreed. ⇒ the sim does not read airport files out of the POI tree. That makes "ship the
+two files inertly beside the POI and let the user move the folder" a safe packaging trick — though
+"today it does not read them" is not "it never will".
+
+### Airport (`.tsc` + `.wad`) — the other route, and it works
+
+A folder under `scenery/airports/…` with `<icao>.tsc` (`tmsimulator_scenery_place`, a superset of the
+`.tsl`) + `<icao>.wad` (the world‑database entry) + whatever cultivation and meshes it uses.
+
+⚠️ **CORRECTION to earlier editions of this document, which called this route legacy and listed a
+`.tap` as part of it.** It is neither. IPACS ships 146 **text** `.tap` files under
+`scenery/airports/`, but a `.tap` is an **authoring project file, not something the simulator
+loads** — a user airport that flies contains no `.tap` at all (§16, §18). And the route is current:
+it is how a site gets an ICAO, a spawn point and a presence on the map, none of which a POI can ever
+have.
+
+Gotchas, all found via `tm.log`: the `.tsc` needs **≥1 runway or helipad** or it is rejected by name
+(§16); `has no wad file` is non‑fatal.
 
 ⚠️★ **A user `.tsc`/`.wad` silently OVERRIDES a base airport by ICAO.** `tm.log` sings it:
 `skipping duplicate place … icao='LSGB' using '<userdir>/…'`. This is by design (it's how
@@ -393,6 +497,34 @@ placed** (invisible sphere) ⇒ the anchor is **necessary**.
   against): LOCATION → move the aircraft to the point → switch to ground (GND) → terrain
   elevation = **ALT − GND**, then read the coordinates off the HUD.
 
+### ★★ Placing a POI correctly is THREE passes, and the third is per object
+
+Measured 2026‑07‑29 by reading the installed `.toc` against the HUD:
+
+1. **Export with whatever an elevation service gives.** At the reference site that baked 585 m and
+   put the whole POI ~3 m underground.
+2. **Write the SIM's own elevation as the site's base.** Also several attempts: 588 overshot
+   (everything floating), 587 landed. ★ The failure here was **parallax** — the elevation had been
+   read while flying *near* the objects, over ground that slopes away. **The reading without
+   parallax is to LAND beside the objects and read ALT with GND at 0.**
+3. **Finish per object** with a terrain‑relative offset, negative included, in as many rounds as the
+   slope needs. One number describes a site, not its gradient.
+
+★★ **The diagnosis is the PATTERN, not the object.** Under a uniform error the SMALL objects vanish
+(a 1.5 m car) while TALL ones merely look squat (a 6.8 m hangar) ⇒ **if the small ones are gone and
+the tall ones survive, the site elevation is wrong, not the objects.** And **half a metre is not
+visible on the object — it is visible in the DETACHED SHADOW**, which is how fine error is caught
+from a distance.
+
+### The ceiling: the mesh itself moves ±1 m
+
+Reported on the forum by the format author (2026‑08‑10) after measuring a deliberately flat heliport:
+**the base height changes by about ±1 m depending where you stand.** ⇒ no height strategy —
+autoheight, a per‑site elevation, an elevation API — can beat that; the last metre is not your error.
+His practical criterion, from someone who tends towards perfection and gave up on this one: height
+accuracy matters **where the user is close**. Cars floating slightly across a large apron: fine. The
+helipad under the skids: exact. **Precision is local, not global.**
+
 ---
 
 ## 8. Plants
@@ -418,6 +550,14 @@ The sim publishes `tmterrain_trees` at startup: **41 plants in 6 groups** (`alle
   coexist in the same log line.
 - Correct `list_plant` types (the spec has them wrong): `vector2_float64` position ·
   `vector2_float32` height_range · `stringt8c` group/species.
+
+### ⚠️ The library is NOT fixed across versions
+
+The 41 above were the count on the reference install. A beta stream in 2026‑08 published **88**
+through the same `tmterrain_trees` block (`alley` 1 · `broadleaf` 43 · `conifer` 14 ·
+`conifer_forest` 3 · `palm` 11 · `shrub` 16) and shipped two files whose names lack the `h` before
+the centimetres; IPACS then **withdrew** the new plants, to reappear later. ⇒ **read the count from
+`tm.log` at run time and parse the filenames leniently. Never hard‑code either.**
 
 ### 🐞 Sim bug: plants BLINK depending on the camera
 
@@ -486,6 +626,15 @@ on a slow cycle (~6 s, A=1 ⇒ 6s/A).
 - **Lights‑only POIs are NOT culled.** A bare baked‑ASL lights POI does render; loose lights
   are simply very small on screen, which reads as absence from any distance.
 
+### `use_height_offset` — and where it does not exist
+
+An airport `.tsc` carries `use_height_offset` on each `tmsimulator_scenery_cultivation`, and one
+place may hold **more than one cultivation** — which is how an airport can put one group of lights on
+the ground and another up in its lamps. **A POI has no equivalent:** the property is refuted by name
+on `tmsimulator_scenery_place_simple`, and a POI place takes a single cultivation *string* (§4). ⇒
+inside a POI the only per‑place height lever is `autoheight` — which, since each place keeps its own
+(§4), is now enough to hold baked‑ASL lights and autoheight plants in one folder.
+
 ---
 
 ## 10. User `.tmb` objects
@@ -536,6 +685,55 @@ text pylons that render each have 1 texture; known‑good dummies ship with a `.
 own dummy **you must also generate a `.ttx`** (compiled binary) — and that only comes from the
 official pipeline (§14). Blender does **not** speak `.tmb`/`.ttx` directly.
 
+### ★★ A user `.tmb` called from a POI's `objects` block: position, and nothing else
+
+The other way to use your own mesh is **inline**, from the `objects` block of the `.tsl`, instead of
+by name from a cultivation. It resolves — **including an opaque binary `.tmb`** — verified
+2026‑08‑09 with a canary in the same element and a deliberately missing geometry as control (the
+control produced `ERROR: (geometry '…' not found)`, so the silence around the good one meant
+something).
+
+What it costs, measured by refutation in `tm.log` — **eight property names across two runs**:
+
+| | XREF (from a cultivation) | inline TMB object (from `objects`) |
+|---|---|---|
+| position / height | ✅ | ✅ |
+| **rotation** | ✅ `direction` | ❌ `direction`, `orientation`, `rotation`, `heading`, `angle`, `yaw` — all refuted |
+| **scale** | ✅ `scale_factor` | ❌ `scale_factor`, `scale` — refuted |
+| on disk | one copy in the XREF folder | one copy **inside every POI that uses it** |
+| hides the autogen object underneath | ❌ | reported yes — **not verified here**, it is a visual question |
+
+⇒ an inline TMB object can plant **a point**. The fields it accepts are `type`, `geometry`,
+`position`, `autoheight_override`, `tag`, `coordinate_system`.
+
+### The exclude object
+
+The one use that needs neither rotation nor scale, and the reason community add‑ons carry these: an
+**exclude** mesh that suppresses the sim's autogenerated buildings and trees where they land on top
+of your scenery — trees on a helipad, masts off the end of a runway. The pattern, as published on
+the forum: one mesh per size (5 / 10 / 20 / 25 / 50 / 100 / 200 / 500 / 999 m), placed **10 m
+underground** with `autoheight_override = -1`, several in a row for a long obstruction:
+
+```
+<[list_tmsimulator_scenery_object][objects][]
+    <[tmsimulator_scenery_object][element][]
+        <[vector3_float64][position]      [0.000000 0.000000 -10.0]>
+        <[int32][autoheight_override]     [-1]>
+        <[string8][geometry]              [exclude…]>
+        <[string8u][tag]                  []>
+        <[string8u][type]                 [object]>
+    >
+>
+```
+
+★ Three details that are not guessable: the negative z, the `element` written **without an index**
+(`[]`, not `[0]`), and `geometry` as `string8` — the last one harmless, since the scalar type tag is
+lax (§2). The same block works in a POI `.tsl` and in an airport `.tsc`.
+
+⚠️ When it is needed is specific, not general: FS4 grows buildings where the photo simply looks
+different, so the cases are "trees exactly on the pad" and "masts at the runway end". If the autogen
+already reads as hangars, it is not in the way.
+
 ---
 
 ## 11. Built-in POIs and landmarks
@@ -554,7 +752,7 @@ official pipeline (§14). Blender does **not** speak `.tmb`/`.ttx` directly.
 
 ## 12. Heliports and `.wad` projection
 
-A heliport is currently hand‑built by adding 3 things on top of a POI:
+A heliport is a POI with three files added on top — flown end to end on 2026‑07‑31 (below):
 
 ```
 <folder>/<icao>.tsc     <- replaces the .tsl as entry point; references the cultivation by name
@@ -584,9 +782,11 @@ direction_WAD = radians( (90 − heading) mod 360 )
 - The direction one is the same formula as §6, but the `.toc` wants it in **degrees** and the
   `.wad` in **radians**. Which means `direction_WAD` is simply the raw `.toc` `direction`
   converted to radians — not a second formula.
-- Since **v0.9.1**, PCT applies all three for you: the Inspector's collapsed **"FS4 internal
-  (.wad)"** block shows the selected object's projected position and its rotation in radians,
-  ready to copy. It is a **read-out only** — PCT still writes no `.wad`/`.tsc`.
+- The three conversions are cheap to implement and easy to check: PCT shows the projected values
+  for whatever is selected, under the LON/LAT and HEADING it came from, and writes them itself when
+  it installs an airport. (Earlier editions of this document said the read‑out was all it did — that
+  stopped being true in **v1.3**, which installs the `.tsc`/`.wad` pair after checking the code
+  against every airport present on that machine.)
 
 ### Useful facts
 
@@ -607,6 +807,73 @@ direction_WAD = radians( (90 − heading) mod 360 )
 - The `.tsc`/`.wad` pair **references nothing from the cultivation** except
   `<[string8][filename][poi]>` — no xref, no height, no catalog. It sits on top of a finished
   POI rather than replacing any part of it.
+
+### ★★ Flown end to end (2026‑07‑31): the heliport IS the POI
+
+Two text files written by hand beside an existing POI, installed as
+`scenery/airports/<continent>/<country>/<slug>/`, and the sim took them at the first attempt:
+
+- **The projection above was CONSUMED, not merely read.** The pad landed exactly where intended,
+  beside the runway of a real airport — the tangent formula, until then validated by *inverting*
+  IPACS's binaries, is now validated by *writing*.
+- **`cultivation_files[]` in the `.tsc` pulled the POI's own `.toc`**: the helicopter appeared
+  surrounded by the POI's hangar, aircraft and palms. **The heliport and the POI are one place**, not
+  two things at the same coordinates.
+- Loose ends closed in the same run: `coordinate_system` = `flat` **loads**; `uid` = 0 is fine; the
+  `airports/<continent>/<country>/<name>/` depth works; a **6‑character ICAO** works.
+- The sim's own panel offered **Ready for departure / Before engine start / Cold and dark** ⇒ it is a
+  first‑class departure location, not merely a place to land.
+
+### ★★ Units and angles, read off the sim's own panel
+
+- **`radius` is METRES.** With `radius 10` the LOCATION panel printed **"Size 66 ft / 20 m"** — which
+  also settles that it is not the dimensionless `scale_factor` of an XREF wearing another name.
+- **`heading` in the `.tsc` is TRUE; the panel displays MAGNETIC.** We wrote 40 and the panel read
+  **028** — 12° being the local magnetic variation, corroborated in the same screenshot by the sim
+  labelling a runway 08 as "Heading 078". ⇒ write true heading verbatim, convert nothing. ★ This was
+  only visible because the probe used a **non‑cardinal** angle; at 0 or 90 the offset would have
+  passed for rounding (§6).
+- **Elevation is computed by the sim.** It was never given one.
+
+### ★★ How your airport appears in LOCATION — and how it does not
+
+**The text search matches the NAME, never the code.** Searching the code found nothing; searching a
+word of the name found it — three separate runs. **And the row comes up BLANK**: correct distance, no
+text, while **the map panel shows your name and your code perfectly.**
+
+The mechanism, confirmed by a second author's screenshots rather than deduced: the LOCATION list
+takes its text from **AFS4's world airport database** (~31 000 entries, far more than the ~8 100
+`.wad` files on disk).
+
+| your ICAO | in the world database? | search row | map panel |
+|---|---|---|---|
+| invented (`PCT001`) | no | **blank** — distance only | your name + your code |
+| real but unbuilt (a small identifier with no `.wad`) | yes | **IPACS's** name for it | your name + your code |
+
+⇒ if the code exists in that database the sim prefers **its** text and ignores yours; if it does not
+exist, there is nothing to print. Two consumers read the same `.wad` and only one of them looks at
+what you wrote.
+
+⚠️ **This has caused three separate false alarms of "it does not work".** An airport that loads and
+flies perfectly *looks* broken if you send someone to the search box. Say it before you send anyone
+there: search by NAME, expect a blank row, trust the map.
+
+★ **Practical consequence, and it is also the safe choice**: prefer a **real** code that has **no
+`.wad`** on disk. It is known to the database (so it looks normal in the search) and there is no
+scenery to destroy — which is exactly why a real, unbuilt heliport code can be reused safely, and why
+an invented one is the case that shows up blank.
+
+❌ **Refuted along the way:** the blank row is **not** an ICAO‑case problem. Reinstalling with the
+code in capitals produced exactly the same blank row.
+
+### ★★ ICAO case: capitals inside the files, lowercase on disk
+
+The `icao` rows in both the `.tsc` and the `.wad` go in **capitals**; filenames and folder names are
+**lowercase**. Verified on disk rather than taken on authority: an IPACS airport folder of lowercase
+`de0025.*` files whose `.tap` carries `<[stringt8c][icao][DE0025]>` beside
+`<[stringt8c][country][de]>`. **Code up, country down, disk down.** The sim compares codes
+**case‑insensitively**, so getting this wrong breaks nothing structurally — which is exactly why the
+mistake can survive two releases unnoticed.
 
 ---
 
@@ -651,6 +918,18 @@ Blender 5.2.0 LTS  +  io_scene_tgi addon (from the SDK zip)  →  .tgi
   with degenerate stitches); `vf_size=8` = pos+normal+uv; the bbox comes from
   `mesh_collision.point_list`. **BUT** see §10: with no `.ttx` the object takes down the POI's
   render ⇒ a usable asset still needs the converter for its texture.
+- **The texture format is a one‑line choice, and it is platform‑specific.** The converter's
+  `texture_base_type` accepts (tokens found in the converter binary itself): `ttx_dxt` · `ttx_bc7` ·
+  `ttx_etc2` · `ttx_astc4x4/5x4/5x5/6x6/8x8` · `ttx_bu*` · `ttc_dxt` / `ttc_etc2`. A `.ttx` built as
+  `ttx_dxt` is **S3TC/DXT1, desktop‑GPU compression** — which mobile GPUs do not implement, so a POI
+  that ships one of these has a desktop‑only asset in it. ⚠️ **But a re‑encode is not free:** our own
+  ASTC 6×6 build of a 16×16 texture, with and *without* mipmaps, **crashed FS4 desktop while loading
+  terrain**, isolated to one variable (the same folder that had flown, byte for byte except the
+  `.ttx`) — while another author's ASTC file of the same 520 bytes loaded fine. Their containers'
+  first 96 bytes were identical and one payload‑size field differed by 3×. ⇒ **the file was ours to
+  get wrong, not the format's to reject**, and matching file SIZE is not matching CONTENT. (Desktop
+  FS4 does contain a software ASTC decoder — the code path exists; that is not the same as "works for
+  POI textures".)
 - **Licensing:** the SDK's "not allowed to distribute" notice covers **the converter `.exe`
   itself**; the `.tmb`/`.ttx` files it produces from your own model are your own authored work.
   Consult the SDK license for the exact terms.
@@ -680,6 +959,200 @@ Blender 5.2.0 LTS  +  io_scene_tgi addon (from the SDK zip)  →  .tgi
   reports. ⚠️ Practical tip: **the forum editor does not render markdown** ⇒ post in **plain
   text** (uppercase headings, `-` bullets; emoji, bare URLs, and `—` do work).
 
+## 16. Airports that actually load
+
+§12 covers the heliport, which is the smallest airport there is. This section is what a month of
+building complete ones (2026‑07 → 2026‑08) added. **A user airport is a `.tsc` + a `.wad`, plus
+whatever cultivation and meshes it uses, under `<user dir>/scenery/airports/`. There is no
+`.tap`** (§4, §18). The depth below that folder is flexible — §12 flew `<continent>/<country>/<name>/`,
+IPACS itself uses `<country>/<icao>/`.
+
+### ★★★ The floor is one RUNWAY or one HELIPAD. Nothing else counts
+
+An airport file with a complete identity, a coordinate, and five well‑formed but **empty** lists is
+**rejected by name**:
+
+```
+ERROR: (no valid runway or helipad defined. invalid airport 'PCT No Pad'.
+        tsc_file='…/scenery/airports/cl/pct002_pct_no_pad/pct002.tsc')
+```
+
+…and `available airports` did not move. The sim parsed the file, named it, and dropped it — the
+loudest answer this log gives. ⇒ **parking stands and glider start positions do not satisfy the
+requirement.** An airport with a runway and no helipad is perfectly legal; one with stands only does
+not exist. (Measured 2026‑08‑14 without flying: a script wrote the folder, the sim was started and
+closed, `tm.log` said the rest.)
+
+### ★★ A place with no `objects` block is a database entry, not a scene
+
+Four runs over the same airport, one variable at a time:
+
+| variant | `objects` block | does its `.toc` load? |
+|---|---|---|
+| the place as written | no | **NO** |
+| + `height`, `tower_position`, `autoheight_method`, `building_textures_folder` | no | **NO** |
+| + `objects` → one tiny anchor mesh (1.9 kB) | yes | **YES** — every xref in it |
+| a full airport with a 657 kB mesh | yes | **YES** |
+
+⇒ **a `tmsimulator_scenery_place` needs at least ONE object whose geometry resolves, or nothing about
+it is drawn — not the ground, and not even its own cultivation.** The runway still works as a
+*database* entry (ATC, map, flight planner, spawn point); there is simply no scenery. The four extra
+scalar fields were not the cause.
+
+⚠️ Honest caveat: the `objects` block and the mesh file arrive together, since one references the
+other. What is proven is *"a place needs an object whose geometry resolves"* — not which half of that
+does the work.
+
+The block that unlocks it — spelling verified in flight:
+
+```
+<[tmsimulator_scenery_objecttmslist][objects][]
+    <[tmsimulator_scenery_object][element][0]
+        <[string8][type]      [object]>
+        <[string8][geometry]  [my_anchor]>
+        <[tmvector3d][position][lon lat alt_msl]>
+    >
+>
+```
+
+⚠️ **Two spellings of the same block are in circulation and both fly**: the airport `.tsc` above uses
+`tmsimulator_scenery_objecttmslist`, while POI `.tsl` files (§4) and the exclude blocks published on
+the forum (§10) use `list_tmsimulator_scenery_object`. Each has been flown where it is shown here;
+what has NOT been tested is swapping them.
+
+⇒ **a complete airport with hangars, a tower and parked aircraft needs no mesh generation at all** —
+XREFs from the catalogue (§5) plus one small anchor. What a mesh buys is the **ground**: without one
+the runway is not drawn, and over photoscenery the result reads as a road rather than an airport.
+
+### What each of the two files carries
+
+They are not redundant — they have different consumers (§12).
+
+| | `.tsc` — `tmsimulator_scenery_place` | `.wad` — `tmworld_airport_detailed` |
+|---|---|---|
+| identity | `icao`, `sname`, `lname`, `country` | `uid`, `icao`, `iata`, `name`, `country`, `tags`… |
+| position | degrees | **projected** (§12) |
+| runways | `runways`, every field suffixed `1`/`2` | `runway_pairs`, an array of exactly two ends |
+| helipads | ✅ | ✅ |
+| parking stands | `parking_positions` | — |
+| glider aerotows / winches | — | **only here** |
+| approach lights, PAPI, REIL | `appltsys1/2`, `papi1/2`, `reil1/2` | — |
+| `approach`, `takeoff`, `elevation` | — | ✅ |
+| scenery | `objects`, `cultivation_files[]` | — |
+
+- **The format has no single‑ended runway.** It is always a pair — suffixed `1`/`2` in the `.tsc`,
+  nested as an array of two in the `.wad`.
+- **`endpoint` ≠ `threshold`**, and both are stored. They coincide unless the threshold is displaced,
+  which is why keeping only one of them loses information the sim will not reconstruct.
+- A `.wad` may be **empty** (`<[file][][]>`, 12 bytes) and still load cleanly (§12): the projection
+  buys presence in the world database, not existence.
+
+### ⚠️ Do not read the airport vocabulary out of a `.tap`
+
+See §18. The `.tap` is the authoring project file, and it is the only airport format IPACS ships **in
+text at scale** (146 of them, against 12 text `.tsc` out of 1569) — which makes it exactly the wrong
+file to copy from. Its vocabulary differs from the one the simulator reads: `reil_omni`/`reil_uni`
+where the `.tsc` wants `omni`/`uni`, `radius` where the `.tsc` says `size`, and a stand type declared
+`<[float64][type]>` while holding a string. Rows written in `.tap` spelling are ignored **in
+silence**.
+
+### Loose facts worth knowing before you debug one
+
+- **The `.tsc` and the `.wad` are read independently.** A `.tsc` the parser rejects (§2) leaves the
+  `.wad`'s ICAO registered with no place behind it: in the database, unflyable, invisible in the
+  LOCATION search.
+- `sname` has a hard length limit and the sim **rejects the whole airport** above it, quoting the file
+  (§12). The cut measured between 30 and 34 characters; IPACS trips it on three of its own.
+- **The only `.tsc` in a standard install that uses `cultivation_files` is a user's.** IPACS packs its
+  own airports differently, so there is **no shipped example to compare against** — which is why these
+  questions had to be bisected rather than looked up.
+- **Glider winch launches were broken in FS4 and were repaired during 2026‑08.** Treat any "feature X
+  does not work" as dated: the sim gets fixed too.
+- ⚠️ **Anything you disable must leave `Documents\Aerofly FS 4\` entirely.** The sim scans
+  recursively, so renaming a folder is not enough, and leaving it in place gives you two `.toc` with
+  the same name. That one costs a flight.
+
+---
+
+## 17. Missions
+
+`missions/*.tmc`, **plain text**, the same `<[file]` container as everything else ⇒ writable with
+whatever emitter you already have.
+
+```
+<install>/missions/custom_missions.tmc         IPACS's 92 missions (1.0 MB, TEXT)
+<install>/missions/custom_flights.tmc  +  tutorial_flights.tmc
+<user dir>/missions/custom_missions_user.tmc   the USER's — FIXED NAME
+```
+
+### ★★ The sim reads ONE user file name, and only that one
+
+A second file (`missions/pct_gate.tmc`) was written and the sim started: `loaded 1 user defined
+missions` (unchanged), **zero** new warnings, **zero** mentions of the file. Had it been read and
+rejected, the schema oracle would have said so (§3). ⇒ **`custom_missions_user.tmc` is the only name
+AFS4 loads**; anything else is ignored whole. Any tool touching missions must therefore
+read‑modify‑write a fixed file that other tools also write.
+
+### ★★ A user mission can start at an arbitrary lon/lat with NO ICAO
+
+```
+<[stringt8c][origin_icao]     []>                       <- EMPTY
+<[tmvector2d][origin_lon_lat] [13.886350 45.889350]>
+<[float64]   [origin_dir]     [301.4124390049686]>
+<[string8]   [flight_setting] [cruise]>
+```
+
+The sim loads it (`loaded 1 user defined missions`, plus warnings about two properties that exist
+only in that file — the oracle proving it was parsed). **None of IPACS's own missions leave
+`origin_icao` empty** (0 of 102 that carry an `origin_lon_lat`); the capability surfaced through
+community tooling, where it is simply what a converted flight plan with no airport in it produces.
+
+`flight_setting`, counted across IPACS's files: `takeoff` 57 · `landing` 35 · `cruise` 6 · `taxi` 4 ·
+`winch_launch` 3 · `aerotow` 3 · `before_start` 1. ⇒ **`takeoff` = ready on the ground**,
+`before_start` = cold and dark on the ground. IPACS also writes `origin_alt`, the origin's elevation.
+
+⇒ **this is the cheap way to stand an aircraft at an arbitrary point** — no ICAO, no `.wad`, no
+`.tsc`, and therefore **no way to overwrite a base airport** (§4). ⚠️ Untested: whether an empty
+`origin_icao` combined with `flight_setting = takeoff` really leaves you on the ground. The run that
+would have shown it never executed, because of the fixed‑name rule above.
+
+---
+
+## 18. The executable as a vocabulary oracle
+
+★★★ **`aerofly_fs_4.exe` carries the tag names and the enum values its parser recognises as plain
+ASCII.** A strings pass — runs of printable bytes above a minimum length, filtered by regex — takes
+about two minutes and answers questions that would otherwise cost a flight, or a forum post and a day
+of waiting.
+
+What one sweep returned, all of it since confirmed by files that load: **field names**
+(`endpoint1`, `threshold1`, `appltsys1/2`, `papi1_glide_slope`, `papi1_spacing`, `reil1/2`, `width`,
+`identifier`, `runway_pair(s)`, `parking_positions`, `start_positions`, `helipads`…), **type names**
+(`tmsimulator_runway`, `tmsimulator_helipad`, `tmworld_airport_detailed_rwy_pair`) and **enum
+values** (the approach‑light systems `std`, `alsf-1`, `alsf-2`, `malsf`, `malsr`, `calvert`,
+`calvert-2`, `odals`, `rail`, `sals`, `none`; `left`/`right`/`both`; `uni`/`omni`).
+
+★ It also carries **log format strings** — e.g.
+`papi '%s':  sign=%.0f  spacing=%.2f  glideslope=%.4f` — which tells you in advance that a given
+feature can be gated by reading `tm.log` instead of flying (§3).
+
+### ★★ What is NOT in the binary is informative too — but not the way you would guess
+
+Some values that appear in IPACS's own airport files are absent from the executable: the parking
+tags (`parked_ga`, `parked_jet`, `pushback`) among them. The tempting conclusion — "so they must be
+hashed" — is wrong. They are absent because **both sides are data**: the airport file names a tag and
+the aircraft declares which tags it uses, so the simulator only ever compares two strings that came
+out of files. The values it resolves itself (the light systems above) are present.
+
+**Rule:** absence from the `.exe` ⇒ the value is *data* ⇒ go looking for it **in the files IPACS
+ships**, and conclude nothing about hashing. Sweeping the ~85 700 files of an install for a literal
+takes about two minutes, skipping `textures/`, `elevation/`, `images/`, `cultivation_textures/` and
+anything over 40 MB.
+
+⚠️ And the counterpart from §3: finding a format string in *a* binary does not tell you *which*
+binary prints it. The converter and the simulator both contain some, and they are not the same
+program.
+
 ---
 
 ## Credits
@@ -692,12 +1165,15 @@ Aerofly FS 4 community**, and it would be wrong not to say so. By their forum ha
   together with a complete, working, hand‑built heliport. The independent check of the
   latitude projection (tangent vs. Mercator, inverted out of 47 binary IPACS `.wad` files)
   was done here, but **the formulas are his**. He also supplied the `.tsl` details in §4 —
-  which fields a POI entry‑point file actually needs, and which ones do nothing.
+  which fields a POI entry‑point file actually needs, and which ones do nothing. Since then: that a
+  POI folder may hold several `.tsl` (§4), that glider aerotows and winches live only in the `.wad`
+  (§16), the ±1 m ceiling of the terrain mesh (§7), and the exclude‑object pattern of §10.
 - **Rodeo** — the public release of the official XREF library described in §15, which is
   where the display names, the taxonomy and the true footprint polygons come from.
-- **Frank Boës (fboes)** — the MIT‑licensed AFS4 airport dataset in §15.
+- **Frank Boës (fboes)** — the MIT‑licensed AFS4 airport dataset in §15. His mission converter is
+  also where the empty `origin_icao` of §17 was first seen in the wild.
 - **chrispriv** — the field report that prompted the lights‑and‑autoheight investigation
-  whose results are in §9.
+  whose results are in §9, and the family of exclude meshes described in §10.
 
 Errors, over‑readings and anything that turns out to be wrong are the author's own, not
 theirs.
