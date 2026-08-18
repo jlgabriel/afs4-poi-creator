@@ -25,7 +25,6 @@ import type { IcaoStatus } from "../../shared/pctApi";
 import { clampLonLat } from "../../core/project/schemas";
 import { identityProblemText, validateIdentity, SNAME_MAX } from "../../core/export/heliportTemplate";
 import { editorStore, useEditor } from "../state/editorStore";
-import { Help } from "./HelpNote";
 import { NumberInput } from "./NumberInput";
 import { WadPosition } from "./WadReadout";
 import { getPct } from "../app/pct";
@@ -100,13 +99,10 @@ export function AirportDataFields({ airport }: { airport: ProjectAirport }): Rea
         </p>
       )}
 
+      {/* The label alone since v1.8 (#285). "— what this becomes in Aerofly" and its note went under the
+          same red line that took the header note off all six submenus. */}
       <div className="pct-field pct-field-col">
-        <span className="pct-field-label">
-          Airport — what this becomes in Aerofly
-          <Help>
-            Needed before you can install it; not needed to place or move anything on the map.
-          </Help>
-        </span>
+        <span className="pct-field-label">Airport</span>
       </div>
 
       {/* ★ LON/LAT SITS HERE, DIRECTLY UNDER THE DESCRIPTION, because that is exactly where it sits in the
@@ -119,16 +115,10 @@ export function AirportDataFields({ airport }: { airport: ProjectAirport }): Rea
         <>
           <div className="pct-field pct-field-row">
             <label className="pct-field-col">
-              {/* The note is on LON alone, not on both: two question marks side by side on one pair of
-                  coordinates would read as two different explanations. It is the rule that changed in
-                  1.5 and the one thing about this field a 1.4 user would get wrong. */}
-              <span className="pct-field-label">
-                Lon
-                <Help>
-                  Drag the ⊕ on the map, or type here. It stays where you put it — moving a helipad or a
-                  runway does not move the airport.
-                </Help>
-              </span>
+              {/* ⛔ The note that stood here — drag the ⊕, it stays where you put it, moving a helipad
+                  does not move the airport — is struck in #285. It was the one thing about this field a
+                  1.4 user would get wrong, and it is the manual's to say now. */}
+              <span className="pct-field-label">Lon</span>
               <NumberInput
                 value={point.lon}
                 format={fmtDeg}
@@ -173,7 +163,7 @@ export function AirportDataFields({ airport }: { airport: ProjectAirport }): Rea
           className="pct-text"
           value={airport.name}
           maxLength={SNAME_MAX}
-          placeholder="e.g. Daggett Helipad"
+          placeholder="1-29 digits (a…z,A…Z,0…9,SPACE)"
           aria-label="Airport name"
           onChange={(e) => store().setAirportIdentity({ name: e.target.value })}
         />
@@ -192,7 +182,7 @@ export function AirportDataFields({ airport }: { airport: ProjectAirport }): Rea
         <input
           className="pct-num"
           value={airport.icao.toUpperCase()}
-          placeholder="4-6 letters or digits, e.g. PCT001"
+          placeholder="4-6 digits (A…Z,0…9)"
           aria-label="Airport code"
           onChange={(e) => store().setAirportIdentity({ icao: e.target.value.trim().toLowerCase() })}
         />
@@ -223,21 +213,18 @@ export function AirportDataFields({ airport }: { airport: ProjectAirport }): Rea
         <input
           className="pct-num"
           value={(airport.iata ?? "").toUpperCase()}
-          placeholder="e.g. SCL"
+          placeholder="3 digits (A…Z)"
           aria-label="IATA code"
           onChange={(e) => store().setAirportIata(e.target.value.trim())}
         />
       </label>
 
       <label className="pct-field pct-field-col">
-        <span className="pct-field-label">
-          Country code
-          <Help>It picks the folder your airport is installed into, the way Aerofly files its own.</Help>
-        </span>
+        <span className="pct-field-label">Country code</span>
         <input
           className="pct-num"
           value={airport.country}
-          placeholder="two letters, e.g. us"
+          placeholder="2 digits (a…z)"
           aria-label="Country code"
           onChange={(e) => store().setAirportIdentity({ country: e.target.value.trim().toLowerCase() })}
         />
@@ -266,11 +253,10 @@ export function AirportDataFields({ airport }: { airport: ProjectAirport }): Rea
           Export /airports…
         </button>
       </div>
-      {problem !== null && (
-        <span className="pct-field-meta">
-          {problem === "name-empty" ? "Add a name before exporting." : identityProblemText(problem)}
-        </span>
-      )}
+      {/* ⛔ The line that sat under this button — "The airport code must be 4 to 6 letters or digits" — is
+          struck in #285, and little is lost with it: the same sentence still appears BESIDE the ICAO field
+          the moment you type something it will not accept, and the export dialog refuses with its own
+          message. What went is the copy that greeted a blank project before anyone had typed anything. */}
     </div>
   );
 }

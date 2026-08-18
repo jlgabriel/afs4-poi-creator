@@ -29,7 +29,6 @@ import { APPROACH_LIGHT_SYSTEMS, PAPI_SIDES, REIL_KINDS } from "../../core/proje
 import { clampLonLat } from "../../core/project/schemas";
 import { haversine, initialBearing } from "../../core/geo/geo";
 import { editorStore } from "../state/editorStore";
-import { Help } from "./HelpNote";
 import { NumberInput } from "./NumberInput";
 import { WadPosition } from "./WadReadout";
 
@@ -75,7 +74,7 @@ function EndBlock({
         <input
           className="pct-num"
           value={end.identifier}
-          placeholder="e.g. 08"
+          placeholder="1-3 digits (0…9,A…Z)"
           aria-label={`Runway end ${index + 1} identifier`}
           onChange={(e) => patch({ identifier: e.target.value })}
         />
@@ -206,24 +205,12 @@ export function RunwayFields({ runway }: { runway: AirportRunway }): React.React
     <div className="pct-inspector-body">
       <div className="pct-field-title">{titleFor(runway)}</div>
 
+      {/* ⛔ Two notes stood here and #286 strikes both under one X: the drag instructions, and "What PCT
+          writes" — his own demarcation from the ACT (#242), that PCT writes the runway's data and not its
+          asphalt. That one is the most quotable sentence in the panel and it is still true; it is the
+          manual's now, like every other header note. */}
       <div className="pct-field pct-field-col">
-        <span className="pct-field-label">
-          Runway
-          <Help>
-            Drag either white threshold handle on the map. The two points ARE the runway — its length and
-            direction are whatever they say, which is why there is no heading to type.
-          </Help>
-        </span>
-        {/* His demarcation from the ACT, in short (#242). It stays near the top, where someone forms an
-            expectation about what they are building, rather than at the foot of a panel they may never
-            scroll to. */}
-        <span className="pct-field-label">
-          What PCT writes
-          <Help>
-            The runway&apos;s data, not its asphalt: no markings, no centre line, no surface. Aerofly
-            draws the ground — this tells it where the runway is and how to use it.
-          </Help>
-        </span>
+        <span className="pct-field-label">Runway</span>
       </div>
 
       <label className="pct-field pct-field-col">

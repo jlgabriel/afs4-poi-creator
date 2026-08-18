@@ -33,13 +33,8 @@ export function ParkingFields({ parking }: { parking: AirportParking }): React.R
       </div>
 
       <div className="pct-field pct-field-col">
-        <span className="pct-field-label">
-          Parking position — where an aircraft starts
-          <Help>
-            Drag the violet circle on the map to move it, and its cyan grip to turn it. It is its own
-            point, not one of your objects, so nothing spawns inside a building.
-          </Help>
-        </span>
+        {/* ⛔ Struck in #288, note and "?" together — the pad's twin, struck the same way. */}
+        <span className="pct-field-label">Parking position</span>
       </div>
 
       <div className="pct-field pct-field-row">
@@ -85,9 +80,9 @@ export function ParkingFields({ parking }: { parking: AirportParking }): React.R
         <label className="pct-field-col">
           <span className="pct-field-label">
             Size — m
-            <Help>
-              This is a radius — the sim shows {parking.size} m as {Math.round(parking.size * 2)} m.
-            </Help>
+            {/* His wording, verbatim (#295) — the pad's twin, and deliberately the SAME sentence: these
+                two fields are one field seen twice, and two spellings of one rule is what he objects to. */}
+            <Help>This is the RADIUS - the map shows DIAMETER (= 2x RADIUS)</Help>
           </span>
           <NumberInput
             value={parking.size}
@@ -107,7 +102,7 @@ export function ParkingFields({ parking }: { parking: AirportParking }): React.R
         <input
           className="pct-text"
           value={parking.name}
-          placeholder="e.g. Parking_W, FuelStation"
+          placeholder="e.g. Parking1"
           aria-label="Parking name"
           onChange={(e) => store().setAirportParkingName(id, e.target.value)}
         />
@@ -116,10 +111,13 @@ export function ParkingFields({ parking }: { parking: AirportParking }): React.R
       <label className="pct-field pct-field-col">
         <span className="pct-field-label">
           Type
-          <Help>
-            Which aircraft Aerofly parks here. Changing it resizes the stand, unless you have already
-            typed a size of your own.
-          </Help>
+          {/* His replacement (#288 — blue frame, arrow pointing at this block). ⚠️ WHAT IT REPLACED, in
+              case he wants it back: "Which aircraft Aerofly parks here. Changing it resizes the stand,
+              unless you have already typed a size of your own." That resize is real — setAirportParkingType
+              does it — and it is the one thing on this panel the app does to a number the user did not
+              touch. His sentence covers the one TYPE whose behaviour is not in its name. Only the German
+              quotation marks he wrote it with are changed, because the rest of this UI is English. */}
+          <Help>&ldquo;Pushback&rdquo; activates the pushback function regardless of size.</Help>
         </span>
         <select
           className="pct-num"

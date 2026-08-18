@@ -38,16 +38,10 @@ export function HelipadFields({ pad }: { pad: AirportPad }): React.ReactElement 
       </div>
 
       <div className="pct-field pct-field-col">
-        <span className="pct-field-label">
-          Helipad — where the helicopter starts
-          {/* The gesture this sentence promises is the gesture the layer implements: click to select,
-              THEN the grip appears. It used to be there always, which stopped being tenable at three pads
-              — and a panel that promised a grip you could not see would be a bug the prose invented. */}
-          <Help>
-            Drag the white circle on the map to move it, and — once it is selected — its cyan grip to
-            turn it. It is its own point, not one of your objects, so nothing spawns inside a building.
-          </Help>
-        </span>
+        {/* ⛔ Struck in #287, note and "?" together. ★ The sentence was also a TEST — it promised "click
+            to select, THEN the grip appears", which is exactly what HelipadLayer implements. Retiring the
+            promise does not retire the behaviour. */}
+        <span className="pct-field-label">Helipad</span>
       </div>
 
       <div className="pct-field pct-field-row">
@@ -91,9 +85,11 @@ export function HelipadFields({ pad }: { pad: AirportPad }): React.ReactElement 
             Size — m
             {/* ★ The one note here that carries a LIVE number, and it stays folded anyway: the surprise is
                 the radius/diameter convention, not the arithmetic, and the value is right beside it. */}
-            <Help>
-              This is a radius — the sim shows {pad.radius} m as {Math.round(pad.radius * 2)} m.
-            </Help>
+            {/* His wording, verbatim (#295): "I did not find the content precise enough or misleading,
+                so I wrote new text suggestions in the blue-framed fields". The live arithmetic went with
+                it — he states the rule rather than the instance, and he says MAP rather than sim, which
+                is the surface the user is looking at while they type. */}
+            <Help>This is the RADIUS - the map shows DIAMETER (= 2x RADIUS)</Help>
           </span>
           <NumberInput
             value={pad.radius}
@@ -119,7 +115,7 @@ export function HelipadFields({ pad }: { pad: AirportPad }): React.ReactElement 
         <input
           className="pct-text"
           value={pad.name}
-          placeholder="e.g. Helipad_W1"
+          placeholder="e.g. Helipad1"
           aria-label="Helipad name"
           onChange={(e) => store().setAirportPadName(id, e.target.value)}
         />
@@ -132,21 +128,10 @@ export function HelipadFields({ pad }: { pad: AirportPad }): React.ReactElement 
         </span>
       )}
 
-      {/* One line, because the fields that used to be below this one are gone and Michael tests every
-          release the way a new user would. Without it, "where did the code go" is a question the panel
-          invites and does not answer.
-
-          ★ IT KEEPS ITS OWN LABEL rather than hiding behind another panel's question mark: someone
-          looking for the ICAO field does not know to press a "?" on the pad to be told it is elsewhere. */}
-      <div className="pct-field pct-field-col">
-        <span className="pct-field-label">
-          Where is the airport code?
-          <Help>
-            The airport&apos;s name, code and Install button are in <strong>Airport</strong>, at the top
-            of the list on the right.
-          </Help>
-        </span>
-      </div>
+      {/* ⛔ "Where is the airport code?" stood here and #287 strikes it whole. It existed because he
+          asked that question himself when the identity fields left this panel in v1.4 — the panel invited
+          it and did not answer. He is striking his own signpost, so the answer now comes from the submenu
+          list itself, where Airport sits at the top. */}
     </div>
   );
 }
