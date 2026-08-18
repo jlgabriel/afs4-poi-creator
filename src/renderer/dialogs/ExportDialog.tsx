@@ -1,6 +1,6 @@
 // ExportDialog.tsx — the export/install dialog (design §5). Slug (live-validated) + anchor
 // (auto-centroid or current map center) + a live folder-name preview that mirrors planExport exactly
-// (poiFolderName(reference ?? centroid(objects), poiName)). A destination radio picks Install into AFS4
+// (poiFolderName(reference ?? centroid(objects), poiName)). A destination radio picks the sim's /poi
 // vs Export to a folder (target "install" | "choose-folder"); a needs-elevation envelope is answered by
 // the inline base-elevation field (offline fallback); a folder-exists refusal offers overwrite. Below
 // the form, a list of PCT-installed POIs with per-row Uninstall (M2g). The chrome is previewable
@@ -367,7 +367,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }): React.ReactE
                   checked={target === "install"}
                   onChange={() => setTarget("install")}
                 />
-                Install into Aerofly FS 4
+                Aerofly FS 4 — …/scenery/poi
               </label>
               <label className="pct-radio">
                 <input
@@ -376,7 +376,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }): React.ReactE
                   checked={target === "choose-folder"}
                   onChange={() => setTarget("choose-folder")}
                 />
-                Export to a folder…
+                A folder I choose…
               </label>
             </div>
 
@@ -410,7 +410,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }): React.ReactE
                 {busy
                   ? "Working…"
                   : target === "install"
-                    ? "Install into AFS4"
+                    ? "Export to /poi"
                     : "Export to folder…"}
               </button>
             </div>

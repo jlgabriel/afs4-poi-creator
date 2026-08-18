@@ -256,13 +256,19 @@ export function AirportDataFields({ airport }: { airport: ProjectAirport }): Rea
           overwrite confirmation and the result. */}
       <div className="pct-modal-actions">
         <span className="pct-spacer" />
-        <button type="button" className="pct-primary" onClick={openInstallDialog}>
-          Install into AFS4…
+        {/* Same act as the toolbar's, so it wears the toolbar's name (#296). */}
+        <button
+          type="button"
+          className="pct-primary"
+          onClick={openInstallDialog}
+          title="Export to '…FS 4/scenery/airports' — an airport you can start a flight from"
+        >
+          Export /airports…
         </button>
       </div>
       {problem !== null && (
         <span className="pct-field-meta">
-          {problem === "name-empty" ? "Add a name before installing." : identityProblemText(problem)}
+          {problem === "name-empty" ? "Add a name before exporting." : identityProblemText(problem)}
         </span>
       )}
     </div>

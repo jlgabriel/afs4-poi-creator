@@ -1,5 +1,5 @@
 // TopBar.tsx — the spanning top bar (design §5): brand · editable project name · dirty dot ·
-// [New][Open][Save] │ [Undo][Redo] │ [Export POI…] │ [Rescan]. (Settings is M2 — hidden, see below.)
+// [New][Open][Save] │ [Undo][Redo] │ [Export /poi…] │ [Rescan]. (Settings is M2 — hidden, see below.)
 // Undo/redo were keyboard-only from M1e-5c until v1.5, when ApfelFlieger pointed out the obvious (#253c):
 // a shortcut nobody can see is a feature only its author has. The other edit verbs are still chords.
 // New/Open/Save delegate to app/commands.ts; Export/Rescan are handed
@@ -189,8 +189,19 @@ export function TopBar({ onExport, onHeliport, onRescan, onSettings }: TopBarPro
       </button>
 
       <span className="pct-divider" />
-      <button type="button" onClick={onExport} disabled={!onExport}>
-        Export POI…
+      {/* ★ THE TWO OUTPUT BUTTONS NAME THEIR DESTINATION (v1.8, forum #296). This one said "Export POI…",
+          and he asked the only question a name like that leaves open: "What is being exported where?" His
+          own answer is that the user does not care what PCT calls its output — only that something is
+          written, and into which of the two folders under the sim's own `scenery`. So the folder IS the
+          name. Short form on the button, where the toolbar has no room for a path; long form in the
+          tooltip, where it does. */}
+      <button
+        type="button"
+        onClick={onExport}
+        disabled={!onExport}
+        title="Export to '…FS 4/scenery/poi' — scenery you fly to"
+      >
+        Export /poi…
       </button>
       {/* The second thing a project can become (forum #160): an airport you can start a flight from,
           installed into scenery/airports. Beside Export because it is a sibling output, not a step of it.
@@ -200,14 +211,20 @@ export function TopBar({ onExport, onHeliport, onRescan, onSettings }: TopBarPro
 
           v1.3 changes the VERB, because the button's job changed: creating the heliport now starts at
           the catalog's Start - Helicopter card (#173), so what is left behind this button is the install.
-          "Create" would now name something that happens somewhere else. */}
+          "Create" would now name something that happens somewhere else.
+
+          v1.8 retires BOTH halves (#296). The noun goes because "only a heliport can be created" stopped
+          being true at v1.4 — runways, parking, aerotow and winch launches all live behind this button
+          now. The verb goes because he no longer wants the two outputs told apart by what they ARE, but
+          by where they LAND. Nothing about the shouting is lost: /airports and /poi differ far more than
+          POI and HELIPORT ever did. */}
       <button
         type="button"
         onClick={onHeliport}
         disabled={!onHeliport || !pct}
-        title={pct ? "Install this project as a heliport you can fly from" : NO_PCT}
+        title={pct ? "Export to '…FS 4/scenery/airports' — an airport you can start a flight from" : NO_PCT}
       >
-        Install HELIPORT…
+        Export /airports…
       </button>
 
       <span className="pct-divider" />
