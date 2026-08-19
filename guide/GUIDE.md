@@ -17,8 +17,8 @@ section stands on its own.
 | 6 | [Heights](#6-heights--the-one-thing-that-isnt-obvious) | The one genuinely fiddly part, with a worked example flown at KDAG. |
 | 7 | [Lights and plants](#7-lights-and-plants) | Why a light shows nothing at noon, and the two fields both called "height". |
 | 8 | [Exporting and installing](#8-exporting-and-installing) | The Export dialog field by field. Uninstalling, and sharing what you made. |
-| 9 | [Heliports](#9-heliports--somewhere-to-fly-from) | Turning the same project into a place Aerofly will let you start a flight from. |
-| 10 | [Cookbook](#10-cookbook--seven-things-worth-building) | Seven scenes worth building, and a starter project to take apart. |
+| 9 | [Airports](#9-airports--somewhere-to-fly-from) | Runways, helipads, stands and glider starts — turning the same project into a place Aerofly will let you start a flight from. |
+| 10 | [Cookbook](#10-cookbook--eight-things-worth-building) | Eight scenes worth building, and a starter project to take apart. |
 | 11 | [Making the catalog yours](#11-making-the-catalog-yours--photos-and-footprints) | Your own photos on the cards, and sizes for the objects the sim doesn't measure. |
 | 12 | [Your own models](#12-your-own-models) | Placing custom XREF objects you've added to the sim. |
 | 13 | [When something goes wrong](#13-when-something-goes-wrong) | Symptom by symptom — and where the log file is. |
@@ -46,10 +46,11 @@ Placed in PCT, on a satellite map. And then the same spot, flown:
 
 That is the whole idea: what you arrange on the map is what you fly through in the sim.
 
-PCT can write that same scene out a second way, as a **heliport** — a small airport of your own that
-Aerofly lists among the places you can start a flight from, with a pad you sit on and everything you
-placed around you. That's [section 9](#9-heliports--somewhere-to-fly-from), and the rest of the guide
-applies to it unchanged: it is the same map, the same objects and the same heights.
+PCT can write that same scene out a second way, as an **airport** — a small airfield of your own that
+Aerofly lists among the places you can start a flight from. A runway, a helipad, a parking stand, a
+glider start: you place them on the same map, in the same way, and the sim lets you begin a flight
+there. That's [section 9](#9-airports--somewhere-to-fly-from), and the rest of the guide applies to it
+unchanged — same map, same objects, same heights.
 
 Three things are worth knowing up front:
 
@@ -58,7 +59,7 @@ Three things are worth knowing up front:
   *names* of the objects you chose — never the objects themselves.
 - **The POIs you make are yours.** They're the program's output, not covered by PCT's license.
   Share them, post them, sell them.
-- **Nothing is permanent.** PCT installs POI and heliport folders, and can uninstall the ones it made.
+- **Nothing is permanent.** PCT installs POI and airport folders, and can uninstall the ones it made.
 
 A stock install gives PCT about **911 objects**, **41 plants** and **22 airport light fixtures** to
 work with, plus a parametric point light of PCT's own.
@@ -126,8 +127,8 @@ and nothing around to hide what you place.
    rectangle drawn at its true size, with a cyan handle showing which way it faces.
 4. **Leave the height alone.** The default is *Terrain*, which means "on the ground here". That's
    what you want.
-5. **Export it.** Click **Export POI…**. Type a POI name — `kdag_first_tower` — leave *Anchor* on
-   *Auto*, leave *Destination* on **Install into Aerofly FS 4**, and click **Install into AFS4**.
+5. **Export it.** Click **Export /poi…**. Type a POI name — `kdag_first_tower` — leave *Anchor* on
+   *Auto*, leave *Destination* on **Aerofly FS 4 — …/scenery/poi**, and click **Export to /poi**.
 6. **Restart Aerofly FS 4** and fly to KDAG.
 
 ![Shot 03 — the tower placed beside the KDAG runway in PCT](images/03_quickstart_map.jpg)
@@ -140,11 +141,11 @@ mid-session. This catches everybody once.
 If you don't see it, jump to section 13 — but the overwhelmingly common cause is simply not having
 restarted the sim.
 
-To take it out again: **Export POI…** → the **Installed POIs** list at the bottom → **Uninstall**.
+To take it out again: **Export /poi…** → the **Installed POIs** list at the bottom → **Uninstall**.
 
 That loop — place, export, restart, look — is the whole of PCT. Everything after this section refines
 it: [section 6](#6-heights--the-one-thing-that-isnt-obvious) for getting things properly onto the
-ground, and [section 10](#10-cookbook--seven-things-worth-building) for ideas about what to build.
+ground, and [section 10](#10-cookbook--eight-things-worth-building) for ideas about what to build.
 
 ---
 
@@ -154,12 +155,16 @@ Four areas, and that's the whole app.
 
 ![Shot 05 — the whole editor: top bar, catalog, map, inspector](images/05_editor_overview.jpg)
 
-**The top bar** holds the project (name, New / Open / Save / Save As…), **Export POI…**,
-**Install HELIPORT…**, **Rescan**, **Settings**, **Help ↗**, the airport search, the **Heights** mode
-switch, the map style switch (Satellite / Streets / Custom), and a running count of what you've
-placed.
+**The top bar** holds the project (name, New / Open / Save / Save As…), **Undo** and **Redo**, the two
+output buttons, **Rescan**, **Settings**, **Help ↗**, the airport search, the **Heights** mode switch,
+the map style switch (Satellite / Streets / Custom), and a running count of what you've placed.
 
-![Shot 14 — the top bar: project, New / Open / Save / Save As…, Export POI…, Install HELIPORT…, Rescan, Settings, Help, the airport search, the Heights switch, the map style switch, and the object count](images/14_topbar.jpg)
+**The two output buttons are named for where they write**, because that is the only difference that
+matters: **Export /poi…** writes scenery you fly to, into `…FS 4/scenery/poi`, and **Export /airports…**
+writes an airfield you can start a flight from, into `…FS 4/scenery/airports`. Sections
+[8](#8-exporting-and-installing) and [9](#9-airports--somewhere-to-fly-from) are one button each.
+
+![Shot 14 — the top bar: project, New / Open / Save / Save As…, Undo, Redo, Export /poi…, Export /airports…, Rescan, Settings, Help, the airport search, the Heights switch, the map style switch, and the object count](images/14_topbar.jpg)
 
 **The Catalog panel**, on the left, is everything you can place, in four collapsible sections:
 
@@ -167,8 +172,9 @@ placed.
   jetways, construction, furniture, people, churches, comm-towers…) and a search box.
 - **Lights** — the sim's 22 airport light fixtures plus a fully parametric point light.
 - **Plants** — 41 trees and shrubs.
-- **Airport** — one card, **Start - Helicopter**: the pad a heliport is built around
-  ([section 9](#9-heliports--somewhere-to-fly-from)).
+- **Airport** — six cards, and none of them is scenery: the airfield itself, a **Runway**, a
+  **Helipad**, a **Parking** stand, an **Aerotow** and a **Winch Launch**
+  ([section 9](#9-airports--somewhere-to-fly-from)).
 
 ![Shot 18 — the Catalog panel as it opens: four sections shut, and their counts](images/18_catalog_collapsed.jpg)
 
@@ -192,18 +198,19 @@ features.
 
 **The Inspector**, on the right, edits whatever is selected: exact coordinates, heading, scale,
 height, a free-text label, and a lock. Select more than one object and it turns into the arrange
-panel instead — section 5; select the helipad and it shows the whole heliport — section 9. Collapsed
-at the bottom, **FS4 internal (.wad)** reads the same position back in the projected units the sim
-uses inside its own airport database; it changes nothing and is there for the few people who
-hand-build heliport files (section 14 says where that's documented).
+panel instead — section 5; select an airport part and it shows that part's own fields — section 9.
+Collapsed at the bottom, **FS4 internal (.wad)** reads the same position back in the projected units
+the sim uses inside its own airport database; it changes nothing and is there for the few people who
+hand-build those files (section 14 says where that's documented). Double-click a `.wad` read-out to
+copy it.
 
 ![Shot 16 — the Inspector with one object selected: the object's name and category, Lon/Lat, Heading °, Scale ×, the Height control, Label, Lock, and the FS4 internal (.wad) row shut at the bottom](images/16_inspector_object.jpg)
 
 Below the Inspector, **the placed list** is everything in the project. Click a row to select it,
 shift-click to add to the selection, **double-click to send the map to it** — handy once a project has
 grown past what fits on screen — and **Duplicate** / **Delete** at the top of the list act on whatever
-is selected. If the project has a helipad, it gets a row of its own pinned above the objects, and
-stays out of their count.
+is selected. Airport parts get rows of their own pinned above the objects — the airport first, then
+its parts in the same order the catalog lists them — and they stay out of the object count.
 
 ![Shot 17 — the placed list: every object in the project, one row selected, with Duplicate and Delete above](images/17_placed_list.jpg)
 
@@ -296,7 +303,7 @@ written across the whole selection:
 | Click a card, then the map | Place. The card stays armed for the next click. |
 | **Esc** | Disarm placement. |
 | Drag an object | Move it. |
-| **Arrow keys** · **Shift** + arrows | Move the selection 0.5 m · 5 m. |
+| **Arrow keys** · **Shift** + arrows | Move the selection 0.5 m · 5 m. Airport parts too (section 9). |
 | Drag the cyan handle · with **Shift** | Rotate freely · snap to 5°. |
 | **R** | Jump to the rotation field and select it. |
 | **Shift**-click | Add to the selection. |
@@ -491,7 +498,8 @@ trunk and nothing else.
 
 ## 8. Exporting and installing
 
-**Export POI…** opens one dialog that does everything.
+**Export /poi…** opens one dialog that does everything. (Its title bar still reads *Export POI* —
+the button was renamed in v1.8 and the dialog has not caught up yet.)
 
 ![Shot 07 — the Export dialog](images/07_export_dialog.jpg)
 
@@ -517,8 +525,9 @@ section 6 is exactly this, measured in flight.
 terrain tiles don't always agree perfectly with satellite imagery: if everything you built lands
 consistently a few metres off in the sim, shift the lot rather than moving every object.
 
-**Destination** — *Install into Aerofly FS 4* writes straight into your `scenery/poi/`. *Export to
-a folder…* writes it somewhere you choose, for sharing or for a manual install.
+**Destination** — *Aerofly FS 4 — …/scenery/poi* writes straight into your `scenery/poi/`, and the
+button at the foot of the dialog reads **Export to /poi**. *A folder I choose…* writes it somewhere
+else — for sharing, or for a manual install — and the button becomes **Export to folder…**.
 
 Then: **restart Aerofly FS 4**. The dialog says so for a reason.
 
@@ -547,142 +556,353 @@ you can start a flight.
 
 ---
 
-## 9. Heliports — somewhere to fly from
+## 9. Airports — somewhere to fly from
 
 A POI is scenery you fly **to**. It appears in the world and that is all it does: Aerofly's
 start-location list never hears about it, so you always begin somewhere else and fly over.
 
-**Install HELIPORT…** writes the same project a second way, as a small airport of your own. It turns
-up in Aerofly's **LOCATION** list, and when you choose it you are sitting on the pad you placed, with
-everything else in the project around you.
+**Export /airports…** writes the same project a second way, as a small airport of your own. It turns up
+in Aerofly's **LOCATION** list, and when you pick it you are standing on your own field with everything
+you placed around you.
 
-![Shot 26 — a project with a heliport in it: the Airport section in the catalog, the pad drawn on the map, the whole heliport in the Inspector, and its row at the top of the placed list](images/26_heliport_editor.jpg)
+![Shot 26 — a project with an airport in it: the Airport section in the catalog, a runway, a helipad, a stand and two glider starts on the map, the airport in the Inspector, and its rows at the top of the placed list](images/26_airport_editor.jpg)
 
-It's the same scene either way — same objects, same headings, same heights. What changes is where it
-gets written (`scenery/airports/` rather than `scenery/poi/`) and that it carries the three things
-Aerofly needs in order to list a place: a code, a name and a country.
+It is the same scene either way — same objects, same headings, same heights. What changes is where it
+gets written (`scenery/airports/` rather than `scenery/poi/`) and that it carries what Aerofly needs in
+order to list a place: a code, a name, a country, and at least one spot to start from.
 
-**Install one or the other, not both.** The heliport takes its own copy of everything you placed, so a
-project installed as a POI *and* as a heliport puts every object into the world twice.
+**Install one or the other, not both.** The airport takes its own copy of everything you placed, so a
+project installed as a POI *and* as an airport puts every object into the world twice.
 
-### 1. Place the pad
+This section is long because there are six pieces to describe. You do not need all six: an airport with
+one helipad on it is a complete, working airport, and that is where most people stop.
 
-Open **Airport** in the catalog, click **Start - Helicopter**, then click the map. It's the same
-gesture as placing a tree or a light, and **Esc** cancels it the same way.
+| | |
+|---|---|
+| [What PCT writes, and what it doesn't](#what-pct-writes-and-what-it-doesnt) | Read this one first. |
+| [The six cards](#the-six-cards) | The rule they share, and the two ways they differ. |
+| [Airport — the name and the code](#airport--the-name-and-the-code) | Identity, and the point the whole field is filed under. |
+| [Runway](#runway) · [Helipad](#helipad) · [Parking](#parking) | The three you are most likely to place. |
+| [Aerotow](#aerotow) · [Winch Launch](#winch-launch) | The two glider starts. |
+| [Installing it](#installing-it) | The dialog, and the one rule Aerofly enforces. |
+| [Finding it in the sim](#finding-it-in-the-sim) | Why the row in LOCATION may come up blank. |
+| [Changing it, and taking it out](#changing-it-and-taking-it-out) | Replacing, uninstalling, sharing. |
 
-![Shot 27 — the Airport section: one card, Start - Helicopter, armed and waiting for a map click](images/27_airport_section.jpg)
+### What PCT writes, and what it doesn't
 
-**There is one pad per project.** Click the card again and the next map click *moves* the pad rather
-than adding a second one. That's the file format's rule and not a simplification: a heliport has
-exactly one master pad — its FATO/TLOF, if you've read the real-world documents.
+Before anything else in this section:
 
-### 2. It's a point of its own
+> **The runway's data, not its asphalt: no markings, no centre line, no surface. Aerofly draws the
+> ground — this tells it where the runway is and how to use it.**
 
-The pad is drawn as a white circle at its true radius, with a tick showing which way it faces and a
-cyan grip to turn it. Drag the circle to move it, drag the grip to turn it, hold **Shift** to snap to
-5° — the same gestures an object has, because it is the same control.
+That sentence is ApfelFlieger's, and it is the one thing to understand about this whole feature. PCT
+does not lay concrete. It writes the *description* of an airfield — where the runway is, which way it
+points, where a helicopter sits, where a glider waits — into the two files Aerofly reads when it builds
+its list of places. What you see under your runway in the sim is whatever the terrain already had
+there.
 
-![Shot 28 — the pad on the map beside the example outpost: the white circle at its real size, the heading tick, and the cyan grip](images/28_helipad_on_map.jpg)
+So the scene you are making is still made of objects: the hangar, the fuel tanks, the windsock,
+the parked aircraft. The airport is what turns that scene into a place the sim will let you *begin* a
+flight at.
 
-It is **not** one of your objects: it never joins the object count, and it takes no height of its own.
-That separation is the reason it exists at all — a start position that was one of the placed objects
-would sooner or later spawn the helicopter inside a building.
+Painting markings on the ground is a different job, done with a different file, and PCT does not do it.
 
-### 3. Its geometry, in the Inspector
+### The six cards
 
-Click the pad on the map, or its row at the top of the placed list, and the whole heliport is in the
-Inspector.
+Open **Airport** in the catalog and there are six.
 
-![Shot 29 — the Inspector on the pad: Lon and Lat, Heading — true, and Radius — m](images/29_heliport_geometry.jpg)
+![Shot 27 — the Airport section: Airport, Runway, Helipad, Parking, Aerotow and Winch Launch, each with a line saying what it does](images/27_airport_section.jpg)
 
-**Lon / Lat** can be typed, and often that is the quicker way round: if you are copying a real
-heliport's published coordinates, click roughly on the map to make the pad exist, then paste the
-numbers in and watch the circle jump to where it belongs.
+All six behave the way the rest of PCT behaves: **click the card to arm it, click the map to drop it,
+Esc to cancel.** Nothing here lives in a dialog, and nothing needs filling in before you can put it on
+the map.
 
-**Heading — true** is a true compass heading, like everything else in PCT. Aerofly's own panel reports
-a heading as **magnetic**, so expect the sim to show yours a few degrees off. That gap is the local
+They differ in exactly two ways, and each card says which it is on its own second line:
+
+- **Three are repeatable and stay armed** — Helipad, Parking, Aerotow. Drop one, drop another, keep
+  going. Each click puts down one more.
+- **Two lay out a whole shape and then disarm** — Runway and Winch Launch. Both are made of *two*
+  points, so the click cannot put the finished thing under the cursor. It drops a starter — a 200 m
+  strip, 900 m of rope, both pointing north — and the next thing you do is drag an end.
+
+**Airport** is the odd one, honestly so: it places no part. It is the airfield itself — its name, its
+code, and the single point the whole thing is filed under. Its card puts that point on the map the
+first time, and after that it is the way back to the identity fields.
+
+**The order is the same in both columns.** Airport · Runway · Helipad · Parking · Aerotow · Winch
+Launch, in the catalog on the left and in the placed list on the right. That is deliberate, and it is
+ApfelFlieger's rule: the sequences match so that finding a thing in one column tells you where it is in
+the other.
+
+On the map each part is drawn at its real size, and each one looks like itself:
+
+![Shot 28 — a whole small airfield on the map: the runway as a strip with a threshold handle at each end, the helipad's white circle, the stand's violet one, the pink dots of the two glider starts with the winch's rope running off down the extended centreline, and the airport's own crosshair in the middle](images/28_airfield_on_map.jpg)
+
+- the **runway** is a strip, with a white handle on each threshold;
+- the **helipad** is a white circle with an **H** in it, the **stand** a violet one with a **P**;
+- the two **glider starts** are pink — the aerotow a dot with a short rope, the winch launch a dot, a
+  long rope and a square at the winch end;
+- the **airport** itself is a crosshair, ⊕, and nothing else on the map looks like it.
+
+Everything a project has placed is at its true size, so the pad really is that small next to the
+runway. Zoom in and the letters appear; zoom out far enough and they go away again rather than
+turning into labels floating over the ocean.
+
+![Shot 39 — the placed list: the airport's own row at the top, then its five parts in the same order as the catalog, then the objects](images/39_placed_list_airport.jpg)
+
+Airport parts get their own rows above the objects, and they **stay out of the object count** — they
+are not scenery. Click a row to select it, **double-click to send the map to it**, and the **arrow
+keys** nudge a selected part the same 0.5 m and 5 m they nudge an object. **Delete** removes the
+selected part; on the airport's own row it asks first, because deleting the airport takes every part
+with it.
+
+**A small `?` beside a field opens a note about it.** The panels below are described here in full, so
+you should not need them — but they are there, on the field, at the moment you are looking at it.
+Warnings, live read-outs and anything explaining why a field is missing never fold away.
+
+### Airport — the name and the code
+
+![Shot 30 — the Inspector on the airport itself: Lon and Lat, Name with its counter, ICAO code with its availability check, the optional IATA code, Country code, and the Export /airports… button](images/30_inspector_airport.jpg)
+
+This panel is what makes an airfield installable. **None of it is needed to place or move anything on
+the map** — you can build a whole field and never open it. Only the install needs it.
+
+**Name** is free text, up to **29 characters**, and PCT counts them for you. The limit is Aerofly's and
+it is unforgiving: past 29 the sim does not truncate the name, it **drops the entire airport**, without
+a message. PCT writes the same name into three places in the files it generates, so there is one box
+here rather than three.
+
+**ICAO code** is four to six letters or digits. It has to be one your Aerofly is not already using, and
+PCT checks every airport in your install as you type: **Free on this machine**, or a warning. Take the
+warning seriously — installing over an existing code does not merge with that airport, it makes it
+disappear. Invented codes are completely normal here; `PCT001` is as good as anything. (Six characters
+work today because Aerofly accepts them; four is the safe length if you would rather not rely on that.)
+
+**IATA code** is optional, three letters, and nothing else in PCT depends on it. PCT writes it as you
+type it.
+
+**Country code** is two letters — `us`, `de`, `cl`. All it decides is which folder your airport is
+filed under, the way Aerofly files its own: `scenery/airports/de/…`.
+
+**Lon / Lat is the airport's own point**, and it behaves differently from everything else on this
+panel:
+
+- The **first element you place gives it that point** — drop a runway and the airport appears under its
+  west threshold.
+- **After that it stays where it is.** Moving a helipad, dragging a runway end, adding a stand: none of
+  them move the airport. It is sown once and then frozen.
+- You can put it wherever you like — drag the ⊕ on the map, or type the numbers here. The middle of the
+  field is the sensible place, since it is the coordinate Aerofly measures distances to.
+
+That point is the one field the install cannot do without. Everything else can wait.
+
+### Runway
+
+![Shot 31.1 — the Inspector on a runway: its width, the length and both headings read back from the two thresholds, and END 1 with its identifier, coordinates, approach lighting, PAPI and REIL](images/31_inspector_runway_1.jpg)
+
+**The two points ARE the runway.** Drag either white threshold handle on the map and the strip follows.
+Its length and its direction are whatever those two points say, which is why there is no heading to
+type — the line under the width reads them back to you (`695 m long · 080° / 260° true`) as the cheapest
+sanity check on screen. It is how you notice you have just dragged a 12 km runway.
+
+A fresh runway is **200 m long and 40 m wide, pointing north**. Both numbers are starting values: the
+length you fix by dragging, the width you type.
+
+**Width — m** is not cosmetic, even though PCT draws no pavement from it. Aerofly reads it when it flies
+an automatic landing onto your runway.
+
+The two ends are two blocks, **END 1** and **END 2**, either of which can be folded away.
+
+![Shot 31.2 — the same panel scrolled down to END 2](images/31_inspector_runway_2.jpg)
+
+Per end:
+
+- **Identifier** — `08`, `26`, `18L`. One to three characters. Both may be left empty; PCT will not
+  guess them from the heading, because naming a runway is a claim about the real world and a default
+  bearing cannot make it.
+- **Lon / Lat** — that end's threshold, if you would rather type it than drag it.
+- **Approach lighting** — eleven systems, from `NONE` through `MALSF` and `ALSF-2` to the older
+  `CALVERT` and `ODALS`.
+- **PAPI** — none, left, right or both.
+- **REIL** — the runway end identifier lights: none, unidirectional or omnidirectional.
+- **Can land here** / **Can take off here** — both on by default. Turning one off tells Aerofly not to
+  use that end for that.
+
+### Helipad
+
+Where a helicopter flight starts. A pad is drawn as a white circle at its real size, with an **H** in it
+once it is big enough on screen to hold one, a tick showing which way it faces, and — **once you select
+it** — a cyan grip to turn it.
+
+![Shot 29 — a pad and a stand close up: the pad selected, so its ring is amber and its cyan grip is showing, and the stand beside it in violet with its P](images/29_helipad_close.jpg)
+
+Drag the circle to move it, drag the grip to turn it, hold **Shift** to snap to 5°. Same gestures an
+object has, because it is the same control.
+
+It is **not** one of your objects. It never joins the object count and it takes no height of its own,
+and that separation is the reason it exists: a start position that was one of the placed objects would
+sooner or later spawn the helicopter inside a building.
+
+![Shot 32 — the Inspector on one pad: Lon, Lat, Heading — true, Size — m, and Name](images/32_inspector_helipad.jpg)
+
+**Place as many as you like.** Each is its own start position, and the name is what tells them apart.
+
+**Heading — true** is a true compass heading, like everything else in PCT. Aerofly's own panel reports a
+heading as **magnetic**, so expect the sim to show yours a few degrees off. That gap is the local
 magnetic variation; nothing has gone wrong.
 
-**Radius — m** is the pad's radius, and it's what the circle on the map is drawn at. Aerofly reports
-the **diameter** as the pad's *Size*, so a radius of 10 m turns up in the sim as 20 m.
+**Size — m is a radius.** The circle you see on the map is twice that across, which is the thing that
+surprises people. A new pad starts at 10 m, which comfortably clears an EC135's rotor. Aerofly's own
+panel labels the pad's *Size* — we have not measured which of the two figures it reports there, so if
+you need it exact, look in the sim.
 
-### 4. Its identity
+**Name** is free text and may be left empty; an unnamed pad is written as `FATO/TLOF`, which is what
+PCT always wrote before names existed. `Helipad1` is the sort of thing to type. With several pads the
+name is the only thing that distinguishes them in the file, so give them distinct ones.
 
-![Shot 30 — the same panel, scrolled down: Code, Name — shown in LOCATION, Country code, and the Install into AFS4… button](images/30_heliport_identity.jpg)
+Looking for the code, the airport name, or the install button? They are in **Airport**, at the top of
+the list on the right — not here. This panel is the pad.
 
-**Code** — four to six letters or digits. This is an airport code, and it has to be one your Aerofly
-isn't already using. PCT checks every airport in your install as you type and answers either
-**Free on this machine** or a warning. Take the warning seriously: installing over an existing code
-does not merge with that airport, it makes it disappear. Invented codes are completely normal here —
-`PCT001` is as good as anything.
+### Parking
 
-**Name — shown in LOCATION** is what you will search for inside the sim, so make it something you
-would type. **Twenty-nine characters maximum**: above that Aerofly drops the entire airport without
-saying so, which is why PCT counts them for you.
+A stand: somewhere an aircraft is parked and can start a flight from. It is the helipad's twin in
+violet — its own point, not one of your objects, with the same white-circle-and-cyan-grip gestures and
+a **P** in it once it is big enough to show one.
 
-**Country code** is two letters — `us`, `de`, `cl`. All it decides is which folder the heliport is
-filed under.
+![Shot 33 — the Inspector on a stand: Lon, Lat, Heading — true, Size — m, Name, and Type](images/33_inspector_parking.jpg)
 
-None of the three is needed to move the pad around. All three are needed to install it.
+**Size — m is a radius here too**, and the map draws it twice that across.
 
-### 5. Install it
+**Type** is the one field with a side effect. Three choices — **General Aviation**, **Jet**,
+**Pushback** — and PCT starts a new stand on General Aviation, which is the smallest and the common
+case. Changing the type **resizes the stand** (7.5 m for General Aviation, 40 m for the other two)
+*unless you have already typed a size of your own*, in which case your number wins. It is the one place
+in PCT where the app changes a number you did not touch, so it is worth knowing.
 
-**Install into AFS4…** at the foot of the Inspector opens the dialog. So does **Install HELIPORT…** in
-the top bar, which is the way in when nothing is selected.
+**Pushback** is the type whose behaviour is not in its name: it activates the pushback function
+regardless of size.
 
-![Shot 31 — the Install heliport dialog: what is about to be written, and the base elevation](images/31_install_heliport_dialog.jpg)
+**Name** — `Parking1`, `Parking_W`, `FuelStation`. Empty is legal; an unnamed stand is written as
+`Parking`.
+
+### Aerotow
+
+Where a glider waits to be towed into the air by the DR400. One point and a heading: the tow runs along
+that heading. Drag the pink dot or its rope on the map, and the cyan grip to turn it.
+
+![Shot 34 — the Inspector on an aerotow: Lon, Lat, Heading — true, and Name](images/34_inspector_aerotow.jpg)
+
+**Does it need a runway?** No. It usually sits on one, or on the runway's extension when the runway is
+too short — but nothing in the format requires one, and PCT does not.
+
+**Name** is normally the runway the start belongs to — `26`. PCT does not guess it for you: a name
+guessed from the nearest runway would be a claim about which runway this start feeds, and a wrong one
+is worse than an empty box.
+
+### Winch Launch
+
+A glider launched on a cable. Two points — the glider, and the winch at the far end of the rope — and
+**no heading**, because the length and the direction are whatever those two points say. Drag either
+pink dot, the square winch, or the rope between them.
+
+![Shot 35 — the Inspector on a winch launch: the glider's coordinates, the winch's coordinates, the rope length read back, the glider spacing, and the name](images/35_inspector_winch.jpg)
+
+A fresh winch launch lays out **900 m of rope** pointing north, and the read-out under the two coordinate
+pairs gives you the length and the bearing back: `899 m of rope · 260° true. Usually 800–1000 m.` That
+range is what a real winch launch uses.
+
+**Glider spacing — m** is for the two-rope case: a two-rope winch launches two gliders side by side, and
+this is how far apart they stand — basically a wingspan. PCT starts at 25 m, which is ApfelFlieger's own
+figure.
+
+**Name** — the runway again, with a letter added if it needs one: `26`, `26W`.
+
+The winch bug that made this element unusable was fixed by IPACS in Aerofly FS 4 itself, so there is no
+longer anything to warn about here.
+
+### Installing it
+
+**Export /airports…** in the top bar opens the dialog, and so does the button at the foot of the
+**Airport** panel.
+
+![Shot 36 — the Export to /airports dialog: what is about to be written, and the base elevation](images/36_airports_dialog.jpg)
 
 The dialog only writes. Everything under **About to install** is read back from the Inspector rather
-than typed here, so there's exactly one place to correct anything. **Base elevation — m ASL** behaves
-as it does in the Export dialog: blank asks the elevation service, a number of your own wins over it,
-and [section 6](#6-heights--the-one-thing-that-isnt-obvious) is the argument for measuring one. On a
-project set to **Sim autoheight** the field disappears, because the pad follows the sim's terrain.
+than typed here, so there is exactly one place to correct anything.
 
-![Shot 32 — installed, with the folder it went into and what to do next](images/32_heliport_installed.jpg)
+**Base elevation — m ASL** behaves as it does in the Export dialog: blank asks the elevation service, a
+number of your own wins over it, and [section 6](#6-heights--the-one-thing-that-isnt-obvious) is the
+argument for measuring one. On a project set to **Sim autoheight** the field disappears, because
+everything follows the sim's terrain.
+
+**One rule is Aerofly's, and PCT will not let you past it: an airport needs at least one helipad or one
+runway.** With neither, the simulator rejects the whole thing outright — *"no valid runway or helipad
+defined"* — and does not add it to its list. Parking positions and glider starts do not count towards
+that floor, however many you place. PCT refuses the install rather than writing something the sim will
+throw away.
+
+Everything else is optional, including the objects: an airport with nothing around it installs
+perfectly well, and is a reasonable way to find out what Aerofly already has at a spot.
+
+Saving a project has no such rule. A half-built airport is a perfectly ordinary thing to have on the
+map, and **Save** never argues with you about it.
+
+### Finding it in the sim
+
+![Shot 37 — installed, with the folder it went into and what to do next](images/37_airports_done.jpg)
 
 Then **restart Aerofly FS 4**, open **LOCATION**, and **search for the name — not the code.**
 
 Aerofly's location search matches airport *names* only. And the row it hands back can come up
-**blank**: the heliport really is there — its distance is right, and the map panel draws it under your
+**blank**: your airport really is there — its distance is right, and the map panel draws it under your
 own name and code — but that particular list takes its text from the sim's own world database, which
-has never heard of a code you invented. That one is Aerofly, not you. Pick a helicopter, and you start
-on the pad.
+has never heard of a code you invented. That one is Aerofly, not you.
 
-If the blank row bothers you, there's a way around it: use the **real** code of the place you're
+This is the single most common "it didn't work" — including for people who built the feature. If the
+row is blank, look at the map panel, and you will see your airfield sitting exactly where you put it.
+
+If the blank row bothers you, there is a way around it: use the **real** code of the place you are
 building, looked up on ourairports.com or metar-taf.com. The sim's database knows that one, so the
 search row comes back filled in — under *its* name rather than yours. It costs a minute, and it is the
 only difference an invented code makes.
 
+Airports go into your **Documents** folder rather than the sim's install directory:
+`Aerofly FS 4/scenery/airports/<country>/<code>_<name>/`.
+
 ### Changing it, and taking it out
 
 Change anything, install again, and PCT **replaces** what it wrote — the button reads **Replace in
-AFS4** as soon as it recognises the code as one of yours. There's no need to burn a fresh code on
+/airports** as soon as it recognises the code as one of yours. There is no need to burn a fresh code on
 every attempt: build, fly, come back, adjust, install again.
 
-![Shot 33 — the heliports PCT has installed, each with its own Uninstall](images/33_installed_heliports.jpg)
+![Shot 38 — the airports PCT has installed, each with its own Uninstall](images/38_installed_airports.jpg)
 
-The dialog lists what PCT has installed, with **Uninstall** on each. As with POIs, PCT only lists —
-and only removes — folders it made itself, so somebody else's airport can never appear there.
+The dialog lists what PCT has installed, with **Uninstall** on each. As with POIs, PCT only lists — and
+only removes — folders it made itself, so somebody else's airport can never appear in that list.
 
-Heliports go into your **Documents** folder rather than the sim's install directory:
-`Aerofly FS 4/scenery/airports/<country>/<code>_<name>/`. You can zip that folder and hand it over the
-same way you would a POI, as long as its code is not already an airport on the other machine.
+You can zip that folder and hand it over the same way you would a POI, as long as its code is not
+already an airport on the other machine.
 
-### Doing it by hand
+### The numbers underneath
 
-The **Export POI…** dialog carries a checkbox, **Heliport template (advanced)**, that drops two extra
-text files into the POI folder — `heliport.tsc.txt` and `heliport.wad.txt` — with the same projection
-worked out and the identity left blank. They're inert where they land, because they end in `.txt`,
-and the steps for turning them into a working heliport are written inside each file. It predates the
-button above and it's still there, for anyone who'd rather see and edit what gets written.
-[Section 14](#14-where-to-go-next) says where that file format is documented.
+Every coordinate and every heading in these panels carries a small grey **`WAD:`** chip under it: the
+same value in the units Aerofly keeps inside its own world-airport database — a 0–65536 projected grid
+for positions, radians for directions. It changes nothing. It is there because a handful of people
+build these entries by hand and were converting the numbers in a spreadsheet. **Double-click a chip to
+copy it**; it flashes green when the copy has actually happened.
+[Section 14](#14-where-to-go-next) says where that projection is documented.
+
+Older versions of PCT could also drop a pair of `heliport.tsc.txt` / `heliport.wad.txt` templates into
+a POI folder for you to finish by hand. That is gone, at ApfelFlieger's request: a POI folder holding
+files with those names *looks* like an airfield and is not one. Everything it was for, the install
+above now does properly.
 
 ---
 
-## 10. Cookbook — seven things worth building
+## 10. Cookbook — eight things worth building
 
 A map and 850 names is a blank canvas, and a blank canvas is the hardest place to start. Here are
-seven scenes that take minutes and teach the tool. The first three are all rows, because rows are most
+eight scenes that take minutes and teach the tool. The first three are all rows, because rows are most
 of what anyone builds — and the three of them together are a tour of section 5.
 
 **A row of trees along a road.** Place one plant at each end of the stretch and a handful in between:
@@ -720,10 +940,16 @@ yourself a visual reference.
 
 **Somewhere to start the helicopter.** The hospital roof, the oil platform, the ridge-top clearing,
 the pad at the field you fly out of — anywhere Aerofly won't currently let you begin. Drop a
-**Start - Helicopter** pad, put a windsock and a hangar beside it so it looks lived-in, give it a
-name you'd recognise in a list, and install it as a heliport
-([section 9](#9-heliports--somewhere-to-fly-from)). This is the one that changes how you fly rather
+**Helipad**, put a windsock and a hangar beside it so it looks lived-in, fill in a name and a code in
+the **Airport** panel, and export it to `/airports`
+([section 9](#9-airports--somewhere-to-fly-from)). This is the one that changes how you fly rather
 than what you fly past.
+
+**A glider field.** The one scene that uses the parts nobody else uses. Lay a **Runway** along a strip
+of flat grass — 600 m is plenty — put an **Aerotow** at one threshold and a **Winch Launch** beside it
+with its winch 900 m down the field, and park a **Helipad** or a **Parking** stand by the clubhouse you
+build out of a hangar and a couple of cars. Name both glider starts after the runway they belong to.
+Then start a flight there in a glider and get winched off your own field.
 
 **A starter project to open and take apart:** `guide/example/kdag_starter.json` in this repository.
 It's a small desert outpost beside the runway at Barstow-Daggett — a hangar, a windsock, two parked
@@ -826,7 +1052,7 @@ next to them.
   the time.
 - Are you in the right place? The POI folder name encodes its coordinate; fly to what you placed,
   not to where you think you placed it.
-- Check the install actually happened: **Export POI…** → the **Installed POIs** list should show
+- Check the install actually happened: **Export /poi…** → the **Installed POIs** list should show
   your folder.
 
 **I placed a light and see nothing.** Lights only render at night. Set **Visibility group** to
@@ -863,22 +1089,38 @@ want it included.
 list browses about 850. The gap is the flexible-jetway parts, which PCT hides because they only line
 up assembled inside an airport's own scenery. Section 4 has the detail.
 
-**I installed a heliport and can't find it in LOCATION.** Restart the sim first — an airport is read
+**I installed an airport and can't find it in LOCATION.** Restart the sim first — an airport is read
 at startup just like a POI. Then search for the **name**, not the code: Aerofly's location search
-matches names only. If the row that comes back is blank, that is expected for an invented code and the
-heliport is still there — the map panel draws it under your own name and code. Section 9.
+matches names only. If the row that comes back is blank, that is expected for an invented code and your
+airport is still there — the map panel draws it under your own name and code. Section 9.
 
 **PCT says my airport code is already an airport on this machine.** Then it is, and installing over it
 would make that airport disappear, so PCT won't. Pick another code — they're free to invent.
 
-**Install HELIPORT… says the project has no helipad.** Place one first: **Airport → Start -
-Helicopter** in the catalog, then click the map.
+**Export /airports… says Aerofly needs a helipad or a runway.** That is the simulator's own floor, not
+PCT's: an airport with neither is rejected outright and never appears in LOCATION. Place one of the two
+from the catalog and install again. Stands and glider starts don't count towards it.
+
+**Export /airports… says the airport is not on the map yet.** It has no coordinate of its own. Place
+any element and it takes its point from that, or put it down yourself — **Airport** in the catalog,
+then click the map.
+
+**My airport name got cut off, or the airport never appeared at all.** Twenty-nine characters is
+Aerofly's limit, and past it the sim drops the whole airport rather than shortening the name. PCT
+counts them for you under the field.
 
 **The heading the sim shows isn't the one I typed.** PCT's **Heading — true** is true; Aerofly
-reports pad headings as magnetic. The difference is the local magnetic variation.
+reports these headings as magnetic. The difference is the local magnetic variation.
 
-**Everything I built is in the world twice.** The project is installed both as a POI and as a
-heliport, and the heliport carries its own copy of every object. Uninstall one of them.
+**My helipad or my stand came out twice the size I asked for.** **Size — m** is a *radius*. The circle
+on the map is twice that across, and so is the pad.
+
+**I changed a stand's type and its size changed too.** That's the one field in PCT that edits a number
+you didn't touch: General Aviation is 7.5 m and the other two are 40 m, applied only while you have
+never typed a size of your own. Type one and it stops happening.
+
+**Everything I built is in the world twice.** The project is installed both as a POI and as an airport,
+and the airport carries its own copy of every object. Uninstall one of them.
 
 **Something else.** PCT keeps a plain-text log of the session: which folders it used, what the scan
 found, and anything that failed. **Settings → Diagnostics → Open log file**. It's rewritten from
@@ -896,14 +1138,15 @@ https://www.aerofly.com/community/
 **The technical reference.** Building PCT meant working out how Aerofly FS 4 actually stores and
 places scenery, much of which IPACS never documented. That's written up separately as a field guide
 to **the simulator**, not to this tool: `reference/AFS4_KNOWLEDGE_BASE_EN.md` in this repository.
-Fifteen sections — where everything lives in an install, the file grammar, what `tm.log` tells you
-before you ever take off, POI vs airport placement, orientation maths, heights, plants, lights,
-your own `.tmb` objects, heliports, the UDP flight-data stream, the Blender pipeline. Useful to
-anyone building things for AFS4, whether or not they ever touch PCT.
+Eighteen sections — where everything lives in an install, the file grammar, what `tm.log` tells you
+before you ever take off, POI vs airport placement, orientation maths, heights, plants, lights, your
+own `.tmb` objects, heliports and the `.wad` projection, the UDP flight-data stream, the Blender
+pipeline, what makes an airport actually load, missions, and reading the simulator's own binary for the
+vocabulary it accepts. Useful to anyone building things for AFS4, whether or not they ever touch PCT.
 
 That reference is also where the Inspector's **FS4 internal (.wad)** read-out is explained: the
 projected 0–65536 grid and the radians the sim keeps inside its own world-airport database. It is the
-same projection PCT works out for you when it installs a heliport (section 9); the read-out exists
+same projection PCT works out for you when it installs an airport (section 9); the read-out exists
 because a handful of people build those entries by hand and were converting the coordinates in a
 spreadsheet.
 
