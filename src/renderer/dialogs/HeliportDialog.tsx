@@ -251,7 +251,7 @@ export function HeliportDialog({ onClose }: { onClose: () => void }): React.Reac
           <>
             <p className="pct-field-meta">
               Writes this project into <code>…FS 4/scenery/airports</code> as an airport you can start a
-              flight from, with every object you placed around it. It does not replace the <code>/poi</code>
+              flight from, with every object you placed around it. It does not replace the <code>/poi</code>{" "}
               export — it is a second, separate copy.
             </p>
 
