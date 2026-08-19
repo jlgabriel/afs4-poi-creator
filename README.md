@@ -6,6 +6,10 @@
 **Decorate your Aerofly FS 4 world with the sim's own built-in objects** — hangars, towers,
 terminals, vehicles, parked aircraft, street lamps and more — **and light it up at night**. Place
 them on a real satellite map, and PCT hands you a scenery folder you drop straight into the sim.
+
+**Or build yourself somewhere to fly *from*:** a runway, a helipad, a parking stand, a glider start —
+a small airfield of your own that Aerofly lists among the places you can begin a flight.
+
 No modelling, no file editing.
 
 **New here? → [Read the guide](guide/GUIDE.md).** Fourteen sections and forty-six pictures, from a
@@ -27,10 +31,13 @@ POI-folder conventions.
 > tests, typecheck, and Electron end-to-end tests, all green in [CI](.github/workflows/ci.yml).
 > Lights, plants, your own custom XREF objects, an optional "Sim autoheight" export mode, real
 > object photos, hand-measured footprints, one-click straightening of a whole row, and installing a
-> project as an **airport you can start a flight from** — runway, helipad, parking stands and glider
-> starts — are all in —
-> each feature below is tagged with the version it arrived in, and the
-> release notes carry the full history. The export format is **confirmed working in the sim**. Builds
+> project as an **airport you can start a flight from** — runway, helipad, parking stands, aerotow and
+> winch launch — are all in. Each feature below is tagged with the version it arrived in, and the
+> release notes carry the full history.
+>
+> **v2.0 is the documentation.** The [guide](guide/GUIDE.md) and this README were rewritten around the
+> airport — a chapter per element, forty-six pictures, all of them taken from the running app.
+> The export format is **confirmed working in the sim**. Builds
 > are currently **unsigned**, so your OS will warn you once on first launch — see
 > [Installing PCT](#installing-pct). Grab the newest build from
 > [Releases](https://github.com/jlgabriel/afs4-poi-creator/releases/latest).
@@ -332,7 +339,10 @@ PCT started as a **community idea**. On the Aerofly FS 4 forum, **Michael (@Apfe
 wanted a simple way to dress up the world with the sim's *own* built-in objects, without editing a single file by hand. He didn't just ask for it: he
 handed over the complete file-format specification for POI scenery (the `.tsl` / `.toc` files) and
 argued for a pragmatic starting scope (the static "XREF" objects that cover the large majority of
-what people want to place). He also coined the family name: PCT is the
+what people want to place). He did it a second time for the **airport** side — the `.tsc` / `.wad`
+grammar, the field mask for every one of the six submenus, the order they appear in, and the rule that
+the left column and the right column must always agree — and has tested every release since, twice
+each: once without reading anything, then guided. He also coined the family name: PCT is the
 POI-only cousin of the "Racing Creation Tool" (the sibling
 [afs4-pylon-race](https://github.com/jlgabriel/afs4-pylon-race)).
 
