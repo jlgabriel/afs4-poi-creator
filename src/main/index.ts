@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { app, BrowserWindow, screen, session, shell } from "electron";
 import { registerIpc } from "./ipc";
 import { LOG_FILE_NAME, formatBootHeader, initLog, log } from "./log";
+import { mayNavigate } from "./navigation";
 import { readSettings, writeSettings } from "./settings";
 import { restoreBounds } from "./windowBounds";
 
@@ -109,17 +110,33 @@ function createWindow(): void {
   });
 
   // Navigation hardening: external links (e.g. map attribution) open in the OS browser; the window
-  // itself never navigates away from the app (in-app same-origin reloads — Vite dev — are allowed).
+  // itself never navigates away from the app.
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:\/\//.test(url)) void shell.openExternal(url);
     return { action: "deny" };
   });
-  win.webContents.on("will-navigate", (event, url) => {
-    const current = win.webContents.getURL();
-    if (current && new URL(url).origin === new URL(current).origin) return;
+
+  // ⚠️ This used to compare the target's origin against the current page's and allow a match. That
+  // FAILS OPEN in a packaged build: the renderer is loaded with loadFile, so the current URL is a
+  // file:// one, and EVERY file:// URL has origin "null" — so the comparison was "null" === "null"
+  // for a navigation to any local file, and the guard let it through.
+  //
+  // Dragging a file onto the window is enough to reach it: Chromium navigates the top-level frame
+  // to the drop, will-navigate fires, both origins are "null", and a crafted .html then loads at a
+  // file:// origin WITH THIS PRELOAD ATTACHED — handing that page window.pct, which can export,
+  // install and uninstall. (Found by a Fable review of the same code copied into the X-Plane tool.)
+  //
+  // PCT is a single page that never legitimately navigates, so the rule is now simply: block
+  // everything. The dev server's own origin is the one exception, because Vite may reload it.
+  // The decision itself lives in main/navigation.ts so it can be tested; see its spec for the
+  // case that matters — two file:// URLs must never count as the same origin.
+  const guardNavigation = (event: { preventDefault(): void }, url: string): void => {
+    if (mayNavigate(url, RENDERER_URL)) return;
     event.preventDefault();
     if (/^https?:\/\//.test(url)) void shell.openExternal(url);
-  });
+  };
+  win.webContents.on("will-navigate", guardNavigation);
+  win.webContents.on("will-redirect", guardNavigation);
 
   // Diagnostics: surface any renderer load failure to the dev terminal AND the log — a window that comes
   // up blank is the one report where the user has literally nothing else to tell us.

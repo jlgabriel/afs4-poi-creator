@@ -2,6 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
 import { installErrorLog } from "./app/errorLog";
+import { preventFileDrop } from "./app/preventFileDrop";
 import { installMockBridge } from "./dev/mockBridge";
 import "./styles.css";
 
@@ -14,6 +15,9 @@ if (import.meta.env.DEV && new URLSearchParams(window.location.search).has("mock
 
 // Before the first render, so a component that throws on mount is already covered.
 installErrorLog();
+
+// A dropped file must never become a navigation. Belt to main's braces.
+preventFileDrop();
 
 const root = document.getElementById("root");
 if (!root) throw new Error("root element missing");
