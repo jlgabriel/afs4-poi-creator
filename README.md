@@ -312,16 +312,20 @@ A couple of things worth knowing about the editor:
 
 ### Installing PCT
 
-Builds are **unsigned** for now, so the operating system warns you the first time you open one:
+Builds carry **no developer certificate** — one costs money every year — so the operating system
+warns you the first time you open one:
 
 - **Windows** — SmartScreen shows "Windows protected your PC" → **More info → Run anyway**.
-- **macOS ("cannot be opened")** — right-click the app → **Open → Open**, or System Settings →
-  Privacy & Security → **Open Anyway**. (This is the warning you'll usually get on the Intel build.)
+- **macOS** — open **PCT** once from **Applications** and dismiss the warning (**not** "Move to
+  Trash"), then go to System Settings → Privacy & Security, scroll to the bottom, and press
+  **Open Anyway**. Open it again and it stays open. On macOS 14 and earlier, right-clicking the app
+  → **Open → Open** works too; Apple removed that shortcut in macOS 15.
 
-On **Apple Silicon** you may instead see **"PCT.app is damaged and can't be opened."** It isn't
-damaged — it's the same unsigned-app quarantine — but on Apple chips it can't be cleared from the
-menus. Drag **PCT.app** into your **Applications** folder, then run this once in **Terminal** and open
-it normally:
+If you are holding a build from **v2.0.1 or earlier** and macOS says **"PCT.app is damaged and can't
+be opened"**, it is not damaged. Those builds went out with no signature at all, which is what Apple
+Silicon reports as damage, and that dialog has no way through — not even right-click → Open. Later
+builds are signed and do not do this. To rescue a copy you already have, drag **PCT.app** into
+**Applications** and run this once in **Terminal**:
 
 ```
 xattr -cr /Applications/PCT.app

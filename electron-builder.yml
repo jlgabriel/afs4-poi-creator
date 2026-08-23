@@ -49,8 +49,28 @@ portable:
   artifactName: ${name}-${version}-portable.${ext}
 
 # macOS builds must be produced on a Mac (dmg/zip can't be created from Windows). Both arches so
-# Apple-silicon (e.g. an M4) and Intel are covered. Unsigned → Gatekeeper right-click-Open.
+# Apple-silicon (e.g. an M4) and Intel are covered.
+#
+# ⚠️ `identity: "-"` is load-bearing, and its absence is a bug we shipped from v1.0 to v2.0.1.
+# electron-builder does NOT fall back to ad-hoc signing on its own — its own documentation says so:
+# with no identity set it searches the keychain, and "if none is found, signing is skipped for all
+# architectures — there is no automatic ad-hoc fallback". The release runner has no certificate, so
+# every .dmg went out with no signature at all, while the Electron.framework inside stayed signed by
+# somebody else. On Apple silicon a bundle whose seal does not verify is not reported as an
+# unidentified developer — it is reported as **damaged**, and that dialog offers only Move to Trash.
+# The README documented the symptom and the xattr workaround for two years without anybody noticing
+# it was a build setting, not a fact of life.
+#
+# Ad-hoc signing buys no trust: still unnotarized, still allowed by hand once. What it buys is a
+# coherent bundle, which is the difference between a door with a lock and a door nailed shut.
+# hardenedRuntime must come off with it — it enforces library validation, which rejects a pre-signed
+# framework from another Team ID, and it earns nothing without notarization.
+#
+# Verified on an Apple silicon Mac in the sibling project (XP Object Placer 1.0.1) before being
+# copied here: "damaged" became "Apple could not verify…", and Open Anyway launched the app.
 mac:
+  identity: "-"
+  hardenedRuntime: false
   target:
     - target: dmg
       arch: [arm64, x64]

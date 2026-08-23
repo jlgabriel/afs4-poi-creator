@@ -73,14 +73,17 @@ https://github.com/jlgabriel/afs4-poi-creator/releases/latest
 
 Windows installer or portable · macOS `.dmg` (arm64 and Intel) · Linux AppImage.
 
-**First launch needs one extra click.** The builds are unsigned — this is a small open-source
-project without a paid signing certificate — so your OS warns you once:
+**First launch needs one extra click.** The builds carry no developer certificate — this is a small
+open-source project, and one costs money every year — so your OS warns you once:
 
 - Windows: SmartScreen says "Windows protected your PC" → More info → Run anyway.
-- macOS: right-click the app → Open → Open. Or System Settings → Privacy & Security → Open Anyway.
-- macOS on Apple Silicon may instead say "PCT.app is damaged and can't be opened". It isn't — it's
-  the same quarantine flag, which on Apple chips can't be cleared from the menus. Drag PCT.app into
-  Applications, then run this once in Terminal and open it normally:
+- macOS: open PCT once from Applications and dismiss the warning (not "Move to Trash"), then go to
+  System Settings → Privacy & Security, scroll to the bottom, and press Open Anyway. On macOS 14 and
+  earlier, right-click the app → Open → Open also works; Apple removed that shortcut in macOS 15.
+- If a build from v2.0.1 or earlier says "PCT.app is damaged and can't be opened", it isn't — those
+  went out with no signature, which is what Apple Silicon reports as damage, and that dialog has no
+  way through. Later builds are signed and do not do this. To rescue the copy you have, drag PCT.app
+  into Applications and run this once in Terminal:
 
       xattr -cr /Applications/PCT.app
 
