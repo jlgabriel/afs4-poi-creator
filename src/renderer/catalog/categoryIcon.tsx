@@ -5,61 +5,7 @@
 // inline SVG (no assets, sandbox-safe) in a shared line style; several categories share a glyph where
 // the distinction doesn't help (e.g. every reservoir/fuel/water tank is a cylinder).
 import { memo } from "react";
-
-type IconKey =
-  | "plane"
-  | "truck"
-  | "car"
-  | "tower"
-  | "hangar"
-  | "factory"
-  | "tank"
-  | "house"
-  | "building"
-  | "church"
-  | "antenna"
-  | "crane"
-  | "chair"
-  | "person"
-  | "jetway"
-  | "light"
-  | "tree"
-  | "box"
-  | "generic";
-
-/** Map a display-taxonomy category path to an icon key. Prefix-aware so it works for both the exact
- *  sub-category ("buildings/tower") and, defensively, a bare top-level. */
-function iconKey(category: string): IconKey {
-  const c = category.toLowerCase();
-  if (c === "aircraft") return "plane";
-  if (c.startsWith("lights/")) return "light"; // v0.2 airport lights
-  if (c.startsWith("plants/")) return "tree"; // v0.4 plants — every group shares the one glyph
-
-  if (c.startsWith("vehicles/")) {
-    if (c.includes("truck") || c.includes("airport") || c.includes("caravan")) return "truck";
-    return "car";
-  }
-  if (c.startsWith("buildings/")) {
-    if (c.includes("tower")) return "tower";
-    if (c.includes("hangar")) return "hangar";
-    if (c.includes("factory")) return "factory";
-    if (c.includes("reservoir") || c.includes("fuel")) return "tank";
-    if (c.includes("residential")) return "house";
-    return "building"; // office, terminal
-  }
-  if (c === "churches") return "church";
-  if (c === "comm-towers") return "antenna";
-  if (c === "construction") return "crane";
-  if (c === "furniture") return "chair";
-  if (c === "people") return "person";
-  if (c === "jetways") return "jetway";
-  if (c.startsWith("items/")) {
-    if (c.includes("lighting")) return "light";
-    if (c.includes("watertank")) return "tank";
-    return "box"; // barrel, box, container, trashcan, technical, other
-  }
-  return "generic"; // various + anything unmapped
-}
+import { iconKey, type IconKey } from "./iconKey";
 
 // Each entry is the inner geometry of a 0 0 24 24 line-icon (stroke = currentColor, no fill).
 const ICONS: Record<IconKey, React.ReactElement> = {

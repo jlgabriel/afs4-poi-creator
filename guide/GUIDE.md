@@ -1042,6 +1042,12 @@ in its own subfolder. PCT does that:
 **What's supported:** text-format `.tmb` — what Aerofly's SDK and the AC3D exporter produce — are
 read fully. IPACS's pre-compiled binary `.tmb` can't be read automatically and stay greyed out.
 
+**The icon follows the folder's name.** Your objects are listed under **user**, and their icon comes
+from the name of the folder they sit in. Name it the way Aerofly names its own (`xref_aircraft`,
+`xref_vehicles`, `xref_buildings`), or use a plain word like `helicopters`, `hangars` or `trucks`,
+and every object in it shows the matching icon. That includes anyone you share the folder with. A
+name PCT can't read gets the generic icon, and a photo of your own still replaces either one.
+
 As everywhere else, PCT copies no model bytes: it re-lays *your* files and writes the small index
 next to them.
 

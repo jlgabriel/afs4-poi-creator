@@ -94,6 +94,20 @@ function buildBigCatalog(): Catalog {
     act: false,
     unregistered: true,
   });
+  // A REGISTERED user object in a bundle named like FS4's own folder — Michael's static aircraft
+  // (PM #335). Its row should show the plane glyph, not the generic box.
+  xref.push({
+    name: "p3c_orion_navy",
+    bundle: "xref_aircraft",
+    source: "user",
+    bbMin: [-15.2, -17.8, 0],
+    bbMax: [15.2, 17.8, 10.3],
+    bsRadius: Math.hypot(30.4, 35.6, 10.3) / 2,
+    size: { x: 30.4, y: 35.6, z: 10.3 },
+    category: "user/xref_aircraft",
+    displayName: "P3c Orion Navy",
+    act: false,
+  });
   for (let i = 0; i < 30; i++) {
     const name = `opaque_widget_${String(i).padStart(2, "0")}`;
     xref.push({
