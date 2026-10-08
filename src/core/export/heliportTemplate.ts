@@ -356,6 +356,17 @@ function runwayTscBlock(runways: HeliportRunwaySpec[]): string[] {
   return block("list_tmsimulator_runway", "runways", "", elements);
 }
 
+/** The four runway-end flags the `.wad` carries after `takeoff` (forum #350). ApfelFlieger lined up the
+ *  `.tap` the IPACS converter reads against the `.wad` it writes, and these come through on every end.
+ *  ⚠️ `non_precision` was `true` in his `.tap` and `false` in the `.wad`; the `.wad` value is what is
+ *  copied here, and the question is open with him. */
+const RUNWAY_END_WAD_DEFAULTS: ReadonlyArray<readonly [string, string]> = [
+  ["navigation", "true"],
+  ["departures", "true"],
+  ["non_precision", "false"],
+  ["precision", "false"],
+];
+
 /** The `.wad`'s `runway_pairs`, empty or not.
  *
  *  A level deeper than the `.tsc`'s: the pair holds an ARRAY of exactly two ends, and the shared `width`
@@ -375,6 +386,9 @@ function runwayWadBlock(runways: HeliportRunwaySpec[]): string[] {
         // project.json key buys nothing and strands every file already saved — so only the row moves.
         tag("bool", "landing", e.approach ? "true" : "false"),
         tag("bool", "takeoff", e.takeoff ? "true" : "false"),
+        // DEFAULT rows (forum #350): the IPACS converter writes these four on every end, and PCT offers
+        // nothing for them yet. Values are his SCSN00 example's `.wad` column, verbatim.
+        ...RUNWAY_END_WAD_DEFAULTS.map(([field, value]) => tag("bool", field, value)),
       ]),
     );
     return block("tmworld_airport_detailed_rwy_pair", "element", String(i), [

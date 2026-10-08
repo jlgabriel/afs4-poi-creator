@@ -1039,7 +1039,7 @@ They are not redundant — they have different consumers (§12).
 | parking stands | `parking_positions` | — |
 | glider aerotows / winches | — | **only here** |
 | approach lights, PAPI, REIL | `appltsys1/2`, `papi1/2`, `reil1/2` | — |
-| `landing`, `takeoff`, `elevation` | — | ✅ |
+| `landing`, `takeoff`, `elevation`, `navigation`, `departures`, `non_precision`, `precision` | — | ✅ |
 | scenery | `objects`, `cultivation_files[]` | — |
 
 - **The format has no single‑ended runway.** It is always a pair — suffixed `1`/`2` in the `.tsc`,

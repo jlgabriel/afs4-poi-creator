@@ -266,6 +266,13 @@ describe("heliport template — runways (v1.4)", () => {
     // `landing`, not `approach` (forum #342) — the project keeps its own key, only the row is renamed.
     expect(valuesOf(wad, "landing")).toEqual(["true", "true"]);
     expect(valuesOf(wad, "approach")).toEqual([]);
+    // The four DEFAULT flags the IPACS converter writes after `takeoff` on every end (forum #350).
+    const endRows = nodesByName(parseTm(wad), "runway_pair")[0]!.children[0]!.children.map((c) => c.name);
+    expect(endRows.slice(-6)).toEqual(["landing", "takeoff", "navigation", "departures", "non_precision", "precision"]);
+    expect(valuesOf(wad, "navigation")).toEqual(["true", "true"]);
+    expect(valuesOf(wad, "departures")).toEqual(["true", "true"]);
+    expect(valuesOf(wad, "non_precision")).toEqual(["false", "false"]);
+    expect(valuesOf(wad, "precision")).toEqual(["false", "false"]);
     expect(valuesOf(wad, "takeoff")).toEqual(["true", "true"]);
     // The .wad is the navigation database, not the scenery: no PAPI and no REIL rows live here.
     expect(nodesByName(parseTm(wad), "papi1")).toEqual([]);
