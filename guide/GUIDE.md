@@ -665,7 +665,7 @@ Warnings, live read-outs and anything explaining why a field is missing never fo
 
 ### Airport — the name and the code
 
-![Shot 30 — the Inspector on the airport itself: Lon and Lat, Name with its counter, ICAO code with its availability check, the optional IATA code, Country code, and the Export /airports… button](images/30_inspector_airport.jpg)
+![Shot 30 — the Inspector on the airport itself: Lon and Lat, Name with its counter, ICAO code with its availability check, Country code, and the Export /airports… button](images/30_inspector_airport.jpg)
 
 This panel is what makes an airfield installable. **None of it is needed to place or move anything on
 the map** — you can build a whole field and never open it. Only the install needs it.
@@ -680,9 +680,6 @@ PCT checks every airport in your install as you type: **Free on this machine**, 
 warning seriously — installing over an existing code does not merge with that airport, it makes it
 disappear. Invented codes are completely normal here; `PCT001` is as good as anything. (Six characters
 work today because Aerofly accepts them; four is the safe length if you would rather not rely on that.)
-
-**IATA code** is optional, three letters, and nothing else in PCT depends on it. PCT writes it as you
-type it.
 
 **Country code** is two letters — `us`, `de`, `cl`. All it decides is which folder your airport is
 filed under, the way Aerofly files its own: `scenery/airports/de/…`.

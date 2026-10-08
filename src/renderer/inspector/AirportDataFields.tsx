@@ -205,20 +205,8 @@ export function AirportDataFields({ airport }: { airport: ProjectAirport }): Rea
         )}
       </label>
 
-      {/* IATA has been in the model and in the .wad writer since the DATA model landed, with nothing on
-          screen able to set it. It is optional and PCT asserts nothing about what Aerofly does with it —
-          the field is written as typed, in capitals, because that is how every other code here is. */}
-      <label className="pct-field pct-field-col">
-        <span className="pct-field-label">IATA code — optional</span>
-        <input
-          className="pct-num"
-          value={(airport.iata ?? "").toUpperCase()}
-          placeholder="3 digits (A…Z)"
-          aria-label="IATA code"
-          onChange={(e) => store().setAirportIata(e.target.value.trim())}
-        />
-      </label>
-
+      {/* ⛔ "IATA code — optional" stood here (forum #220 → removed in #342): its `.wad` row is not
+          a member of the type the sim reads, so the code never reached Aerofly. */}
       <label className="pct-field pct-field-col">
         <span className="pct-field-label">Country code</span>
         <input

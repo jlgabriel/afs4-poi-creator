@@ -477,13 +477,6 @@ describe("placeAt — the helipad (v1.3)", () => {
     expect(store.getState().undoStack).toHaveLength(undos);
   });
 
-  it("IATA is writable — it was in the model and both writers with no way to set it", () => {
-    const { store } = makeStore();
-    store.getState().createAirport();
-    store.getState().setAirportIata("SCL");
-    expect(store.getState().project.airport?.iata).toBe("SCL");
-  });
-
   it("setAirportIdentity is a no-op without a pad — the identity has nowhere to live", () => {
     const { store } = makeStore();
     store.getState().setAirportIdentity({ icao: "pct001" });

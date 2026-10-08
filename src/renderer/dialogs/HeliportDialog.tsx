@@ -180,7 +180,6 @@ export function HeliportDialog({ onClose }: { onClose: () => void }): React.Reac
     if (airport.winches !== undefined) opts.heliport.winches = airport.winches;
     if (airport.parkings !== undefined) opts.heliport.parkings = airport.parkings;
     if (airport.position !== undefined) opts.heliport.position = airport.position;
-    if (airport.iata !== undefined) opts.heliport.iata = airport.iata;
     if (heightMode !== "autoheight" && baseElevation !== undefined) opts.baseElevation = baseElevation;
 
     setBusy(true);

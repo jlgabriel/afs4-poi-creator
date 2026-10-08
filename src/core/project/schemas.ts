@@ -221,7 +221,6 @@ export const zAirport = z.looseObject({
   icao: z.string().max(IDENTITY_MAX),
   name: z.string().max(IDENTITY_MAX),
   country: z.string().max(IDENTITY_MAX),
-  iata: z.string().max(IDENTITY_MAX).optional(),
   position: zLonLat.optional(),
   // Defaulted rather than required: an airport with no pads is legal (his "(1) DATA" example is exactly
   // that), and a hand-edited file missing the key should land on the empty list, not fail to open.

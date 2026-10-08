@@ -291,14 +291,15 @@ describe("planHeliport", () => {
       expect.arrayContaining(["ab12.tsc", "ab12.wad"]),
     );
 
-    for (const rel of ["ab12.tsc", "ab12.wad"]) {
+    // The row is `icao` in the `.tsc` and `identifier` in the `.wad` (forum #342); capitals in both.
+    for (const [rel, row] of [["ab12.tsc", "icao"], ["ab12.wad", "identifier"]] as const) {
       const text = plan.files.find((f) => f.relPath === rel)!.content;
-      expect(text).toContain("[icao][AB12]");
-      expect(text).not.toContain("[icao][ab12]");
-      // Only the CODE goes up. `country` is a path segment under scenery/airports/ and IPACS writes it
-      // lowercase in its own files, so it must not be swept along.
-      expect(text).toContain("[country][us]");
+      expect(text).toContain(`[${row}][AB12]`);
+      expect(text).not.toContain(`[${row}][ab12]`);
     }
+    // Only the CODE goes up. `country` is a path segment under scenery/airports/ and IPACS writes it
+    // lowercase in its own files, so it must not be swept along. (The `.tsc` is its only home now.)
+    expect(plan.files.find((f) => f.relPath === "ab12.tsc")!.content).toContain("[country][us]");
   });
 
   it("marks its README so only PCT's own folders are ever offered for Uninstall", () => {

@@ -762,9 +762,11 @@ A heliport is a POI with three files added on top — flown end to end on 2026�
 
 The `.tsc` (`tmsimulator_scenery_place`) is a superset of the `.tsl`: it adds
 `sname/lname/icao/country`, `helipads[]` (name, position, radius, **heading in degrees**), and
-an explicit position. The `.wad` (`tmworld_airport_detailed`) carries `uid`,
-`icao/iata/name/country`, a **projected** position, and helipads with `direction` **in
-radians**. **Both are TEXT `<[file]`** ⇒ a ~200‑line emitter can write them.
+an explicit position. The `.wad` (`tmworld_airport_detailed`) carries the code as
+`identifier` (not `icao`), an `elevation`, a **projected** position, and helipads with
+`direction` **in radians**. Its name and country live in the `.tsc` only: `uid`, `icao`,
+`iata`, `name`, `country`, `tags`, `priority`, `connections` and `time_zone` are not members
+of this type, and FS4 logs one `not a member of type` warning for each. **Both are TEXT `<[file]`** ⇒ a ~200‑line emitter can write them.
 
 ### The 3 GCS→WAD conversions (verified exact against 47 IPACS `.wad` files)
 
@@ -1030,14 +1032,14 @@ They are not redundant — they have different consumers (§12).
 
 | | `.tsc` — `tmsimulator_scenery_place` | `.wad` — `tmworld_airport_detailed` |
 |---|---|---|
-| identity | `icao`, `sname`, `lname`, `country` | `uid`, `icao`, `iata`, `name`, `country`, `tags`… |
+| identity | `sname`, `lname`, `icao`, `country` | `identifier` only |
 | position | degrees | **projected** (§12) |
 | runways | `runways`, every field suffixed `1`/`2` | `runway_pairs`, an array of exactly two ends |
 | helipads | ✅ | ✅ |
 | parking stands | `parking_positions` | — |
 | glider aerotows / winches | — | **only here** |
 | approach lights, PAPI, REIL | `appltsys1/2`, `papi1/2`, `reil1/2` | — |
-| `approach`, `takeoff`, `elevation` | — | ✅ |
+| `landing`, `takeoff`, `elevation` | — | ✅ |
 | scenery | `objects`, `cultivation_files[]` | — |
 
 - **The format has no single‑ended runway.** It is always a pair — suffixed `1`/`2` in the `.tsc`,

@@ -23,7 +23,6 @@ import {
   setLabel,
   setLightColor,
   setAirport,
-  setAirportIata,
   setAirportPadName,
   setAirportPadRadius,
   setAirportPosition,
@@ -418,11 +417,6 @@ describe("the airport block", () => {
 
   it("carries the v1.4 identity fields", () => {
     let p = setAirport(baseProject(), AIRPORT, NOW);
-    p = setAirportIata(p, "CLC", LATER);
-    expect(p.airport!.iata).toBe("CLC");
-    expect(setAirportIata(p, "CLC", LATER)).toBe(p); // no-op keeps the undo stack clean
-    p = setAirportIata(p, "", LATER);
-    expect("iata" in p.airport!).toBe(false); // cleared, not left as ""
 
     // The airport's own point is independent of the pad (forum #15/#220) — moving the pad must not move
     // it once it has been set on purpose.

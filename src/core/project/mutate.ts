@@ -448,19 +448,6 @@ export function setAirportPosition(project: Project, position: LonLat | null, no
   return { ...project, airport: { ...airport, position }, modifiedAt: now };
 }
 
-/** IATA code (forum #220). Empty string clears it — the `.wad` row is written either way, just blank. */
-export function setAirportIata(project: Project, iata: string, now = nowIso()): Project {
-  const airport = project.airport;
-  if (airport === undefined) return project;
-  if ((airport.iata ?? "") === iata) return project;
-  if (iata === "") {
-    const next = { ...airport };
-    delete next.iata;
-    return { ...project, airport: next, modifiedAt: now };
-  }
-  return { ...project, airport: { ...airport, iata }, modifiedAt: now };
-}
-
 /** A fresh pad, unnamed and facing true north. Unnamed is not a placeholder: the writer renders it as
  *  "FATO/TLOF", the literal v1.2/v1.3 always emitted, so a one-pad project's files do not move. */
 function newPad(position: LonLat, radius: number, id = randomId()): AirportPad {

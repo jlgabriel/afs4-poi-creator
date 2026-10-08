@@ -412,9 +412,9 @@ export interface ProjectAirport {
   icao: string; // 4-6 chars; lowercase on disk, shown uppercase in the UI (forum #170 EDIT 2)
   name: string; // shown in LOCATION; <= SNAME_MAX or the sim drops the whole airport
   country: string; // two lowercase letters — ALSO a path segment under scenery/airports/
-  /** IATA code, v1.4 (forum #220): "if airports have a IATA code, it is also displayed in FS 4". Its
-   *  own row in the `.wad` and empty in every file PCT has written so far, hence optional. */
-  iata?: string;
+  // ⛔ `iata` STOOD HERE from v1.4 until forum #342 (it came in with #220). Its `.wad` row is not a member of
+  // `tmworld_airport_detailed`, so nothing PCT wrote ever reached the sim. A project.json saved with one
+  // still opens — zAirport is a looseObject — and keeps the key untouched; nothing reads it.
   /** The AIRPORT's own point, v1.4 — independent of any pad.
    *
    *  ApfelFlieger asked for the split in #15 and then SHIPPED it: his older hand-built `.wad` carried

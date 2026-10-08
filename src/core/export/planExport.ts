@@ -93,8 +93,6 @@ export interface HeliportOptions {
   /** The AIRPORT's own point, unshifted (forum #15/#220 — it is independent of any pad). Absent → the
    *  first pad's position, which is exactly how v1.2/v1.3 behaved. */
   position?: LonLat;
-  /** IATA code (forum #220). */
-  iata?: string;
 }
 
 /** The pad as the two writers want it: a position already shifted with the scene, a TRUE heading and a
@@ -331,7 +329,6 @@ export function planHeliport(
     aerotows: heliportAerotows(opts.heliport.aerotows, project.shift),
     winches: heliportWinches(opts.heliport.winches, project.shift),
     parkings: heliportParkings(opts.heliport.parkings, project.shift),
-    iata: opts.heliport.iata,
     cultivationFileName: tocFileName,
     anchor,
     autoheight,

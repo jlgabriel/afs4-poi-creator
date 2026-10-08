@@ -207,8 +207,8 @@ export interface HeliportSpec {
    *  DEFAULT at the moment", so every airport file PCT writes now carries the full row set and the bytes
    *  of an already-flown file DO move. See the gate note on buildHeliportTsc. */
   parkings?: HeliportParkingSpec[];
-  /** IATA code (forum #220). Its row is written either way; empty is the normal case. */
-  iata?: string;
+  // ⛔ `iata` STOOD HERE (forum #220 → removed in #342): the `.wad` row it filled is not a member of
+  // `tmworld_airport_detailed`, so the code never reached the sim.
   /** The POI's cultivation basename ("poi"), or null for an empty POI — then no cultivation is referenced. */
   cultivationFileName: string | null;
   /** The plant anchor, when the POI carries one — it must be repeated here, because the `.tsc` REPLACES
@@ -265,12 +265,12 @@ function informationsBanner(): string[] {
   return [
     "",
     "//  Informations:",
-    `//  [icao]:     4-6 characters, IN CAPITALS here - FS 4 displays the airport by this row. It`,
-    "//              MUST NOT already exist on the machine that installs this - a repeat silently",
-    "//              REPLACES that airport. The file and folder names stay lowercase",
     `//  [sname]:    the name shown in LOCATION. MAX ${SNAME_MAX} CHARACTERS - longer and the sim`,
     "//              drops the whole airport",
     "//  [lname]:    long name; keep it the same unless you have a reason",
+    `//  [icao]:     4-6 characters, IN CAPITALS here - FS 4 displays the airport by this row. It`,
+    "//              MUST NOT already exist on the machine that installs this - a repeat silently",
+    "//              REPLACES that airport. The file and folder names stay lowercase",
     "//  [country]:  two letters, lowercase (the 2-digit internet country code is recommended)",
     "//  [position]: lon lat in degrees - written by PCT",
     "//  [filename]: the POI's own poi.toc, right beside this file",
@@ -371,7 +371,9 @@ function runwayWadBlock(runways: HeliportRunwaySpec[]): string[] {
         tag("string8u", "identifier", sanitizeValue(e.identifier).trim()),
         tag("string8u", "appltsys", e.appltsys),
         tag("float64", "elevation", "0"),
-        tag("bool", "approach", e.approach ? "true" : "false"),
+        // `landing`, not `approach` (forum #342). The PROJECT keeps calling it `approach` — renaming a
+        // project.json key buys nothing and strands every file already saved — so only the row moves.
+        tag("bool", "landing", e.approach ? "true" : "false"),
         tag("bool", "takeoff", e.takeoff ? "true" : "false"),
       ]),
     );
@@ -460,14 +462,16 @@ function parkingBlock(parkings: HeliportParkingSpec[], wad: boolean): string[] {
 export function buildHeliportTsc(spec: HeliportSpec): string {
   const pos = `${fmtLonLat(spec.position.lon)} ${fmtLonLat(spec.position.lat)}`;
   const v = identityValues(spec);
-  // `icao` first: ApfelFlieger's own standard, and the field a reader is looking for ("I put the line
-  // <[string8u][icao][....]> up, because that is more logical for me"). The sim does not care about tag
-  // order — its parser is name-keyed — and every field is described in the banner above.
+  // `icao` AFTER the two names (forum #342), which is the order of the `.tap` the IPACS converter reads —
+  // `name`, `name_short`, `icao` — so the two files line up row for row when read side by side. It used to
+  // lead ("I put the line <[string8u][icao][....]> up, because that is more logical for me"); the same
+  // person moved it once the TAP became the reference. The sim does not care either way: its parser is
+  // name-keyed, and every field is described in the banner above.
   const body: string[] = [
     ...informationsBanner(),
-    tag("string8u", "icao", v.icao),
     tag("string8", "sname", v.name),
     tag("string8", "lname", v.name),
+    tag("string8u", "icao", v.icao),
     tag("string8u", "country", v.country),
     tag("string8u", "coordinate_system", "flat"),
     tag("vector2_float64", "position", pos),
@@ -541,13 +545,11 @@ function tidy(lines: string[]): string {
 const WAD_BANNER: string[] = [
   "",
   "//  Informations:",
-  "//  [icao]:      the SAME code as in the .tsc, IN CAPITALS - or the database entry and the place",
-  "//               do not meet. The file name stays lowercase",
-  "//  [name]:      max 32 characters here",
-  "//  [country]:   two letters, lowercase - as in the .tsc",
-  "//  [position]:  FS4 grid units (0-65536), NOT degrees - written by PCT",
-  "//  [radius]:    metres, as in the .tsc",
-  "//  [direction]: RADIANS here, not degrees - written by PCT",
+  "//  [identifier]: the SAME code as the .tsc's [icao], IN CAPITALS - or the database entry",
+  "//                and the place do not meet. The file name stays lowercase",
+  "//  [position]:   FS4 grid units (0-65536), NOT degrees - written by PCT",
+  "//  [radius]:     metres, as in the .tsc",
+  "//  [direction]:  RADIANS here, not degrees - written by PCT",
   "",
 ];
 
@@ -572,21 +574,16 @@ export function buildHeliportWad(spec: HeliportSpec): string {
     ]),
   );
   const v = identityValues(spec);
+  // ★ FOUR IDENTITY ROWS AND FOUR DEFAULTS ARE GONE, and `icao` is now `identifier` (forum #342). They
+  // are the exact nine he pasted from his tm.log in #257 — `property 'uid'/'icao'/'iata'/'name'/
+  // 'country'/'tags'/'priority'/'connections'/'time_zone' is not a member of type
+  // 'tmworld_airport_detailed'` — i.e. rows that belong to the airport BASE list, not to this type. What
+  // is left is what the IPACS converter itself writes for a detailed airport. The name and country still
+  // reach the sim: they live in the `.tsc`.
   const body = [
     ...WAD_BANNER,
-    tag("uint64", "uid", "0"),
-    tag("stringt8c", "icao", v.icao),
-    tag("stringt8c", "iata", (spec.iata ?? "").trim().toUpperCase()),
-    tag("stringt8c", "name", v.name),
-    tag("stringt8c", "country", v.country),
-    // The DEFAULT rows (forum #217 → #236), verbatim from his files. `time_zone` is settled and stays 0:
-    // he asked for -400 at first, then measured his own three `.wad` and found none of them carries it —
-    // "as in FS 4 the field is always still 0, one can do without the input" (#225).
+    tag("stringt8c", "identifier", v.icao),
     tag("float32", "elevation", "0"),
-    tag("uint64", "tags", "0"),
-    tag("uint32", "priority", "0"),
-    tag("uint16", "connections", "0"),
-    tag("int8", "time_zone", "0"),
     tag("vector2_float64", "position", pos),
     // The grid centre, which is what his files carry when no tower is placed.
     tag("vector2_float64", "tower_position", "32768 32768"),

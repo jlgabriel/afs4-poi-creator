@@ -135,7 +135,6 @@ export interface HeliportFileOptions {
   winches?: AirportWinch[];
   parkings?: AirportParking[];
   position?: LonLat;
-  iata?: string;
 }
 
 /** "Create heliport…": the POI becomes a real airport PCT writes into scenery/airports/<country>/.

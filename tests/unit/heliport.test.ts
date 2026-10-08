@@ -66,6 +66,14 @@ function valuesOf(text: string, name: string): string[] {
   return nodesByName(parseTm(text), name).map((n) => n.value);
 }
 
+/** The runway ends' `identifier` rows only. Since #342 the `.wad` ALSO carries a top-level `identifier`
+ *  (the airport's code, formerly `icao`), so a whole-tree search would mix the two. */
+function runwayIdentifiers(wad: string): string[] {
+  return nodesByName(parseTm(wad), "runway_pair").flatMap((pair) =>
+    pair.children.flatMap((end) => end.children.filter((c) => c.name === "identifier").map((c) => c.value)),
+  );
+}
+
 describe("heliport template — the flown control", () => {
   it("reproduces the .wad numbers of the heliport that flew at KDAG", () => {
     const wad = buildHeliportWad(SPEC);
@@ -143,9 +151,8 @@ describe("heliport template — several pads (v1.4)", () => {
     expect(wadLat).toBeCloseTo(26282.05536889, 7);
   });
 
-  it("writes the IATA code, and leaves the row empty when there is none", () => {
-    expect(valuesOf(buildHeliportWad({ ...THREE, iata: "clc" }), "iata")).toEqual(["CLC"]);
-    expect(valuesOf(buildHeliportWad(THREE), "iata")).toEqual([""]);
+  it("writes no IATA row — it is not a member of the .wad's type (forum #342)", () => {
+    expect(valuesOf(buildHeliportWad(THREE), "iata")).toEqual([]);
   });
 
   it("accepts an airport with no pads at all", () => {
@@ -254,9 +261,11 @@ describe("heliport template — runways (v1.4)", () => {
     expect(a[1]).toBeCloseTo(HIS_RUNWAY.end1.wadLat, 6);
     expect(b[0]).toBeCloseTo(HIS_RUNWAY.end2.wadLon, 6);
     expect(b[1]).toBeCloseTo(HIS_RUNWAY.end2.wadLat, 6);
-    expect(valuesOf(wad, "identifier")).toEqual(["08", "26"]);
+    expect(runwayIdentifiers(wad)).toEqual(["08", "26"]);
     expect(valuesOf(wad, "width")).toEqual(["10"]);
-    expect(valuesOf(wad, "approach")).toEqual(["true", "true"]);
+    // `landing`, not `approach` (forum #342) — the project keeps its own key, only the row is renamed.
+    expect(valuesOf(wad, "landing")).toEqual(["true", "true"]);
+    expect(valuesOf(wad, "approach")).toEqual([]);
     expect(valuesOf(wad, "takeoff")).toEqual(["true", "true"]);
     // The .wad is the navigation database, not the scenery: no PAPI and no REIL rows live here.
     expect(nodesByName(parseTm(wad), "papi1")).toEqual([]);
@@ -334,7 +343,7 @@ describe("heliport template — runways (v1.4)", () => {
       ],
     };
     expect(valuesOf(buildHeliportTsc(two), "name1")).toEqual(["08", "18"]);
-    expect(valuesOf(buildHeliportWad(two), "identifier")).toEqual(["08", "26", "18", "36"]);
+    expect(runwayIdentifiers(buildHeliportWad(two))).toEqual(["08", "26", "18", "36"]);
     expect(valuesOf(buildHeliportWad(two), "width")).toEqual(["10", "40"]);
   });
 });
@@ -581,18 +590,19 @@ describe("heliport template — the full row set", () => {
   }
 
   // Taken from his sclc_0_demo, which is an airport that loads in FS 4 — so this is not a wish list, it
-  // is the row set of a working file. ONE deliberate difference: he opens the `.tsc` with sname/lname and
-  // PCT opens with `icao`, because he asked for exactly that in #172 ("I put the line <[string8u][icao]…>
-  // up, because that is more logical for me"). The sim's parser is name-keyed and does not care.
+  // is the row set of a working file. `icao` sits after sname/lname again (#342): it led from #172 to
+  // #342, and he moved it back so the `.tsc` reads row for row against the `.tap`.
+  //
+  // The `.wad` lost nine rows in #342 — the nine his tm.log called "not a member of type
+  // 'tmworld_airport_detailed'" in #257 — and its code row is spelled `identifier`.
   const TSC_ROWS = [
-    "icao", "sname", "lname", "country", "coordinate_system", "position",
+    "sname", "lname", "icao", "country", "coordinate_system", "position",
     "height", "tower_position", "autoheight", "autoheight_method", "geometry",
     "objects", "objects_animated",
     "runways", "helipads", "start_positions", "parking_positions", "cultivation_files",
   ];
   const WAD_ROWS = [
-    "uid", "icao", "iata", "name", "country",
-    "elevation", "tags", "priority", "connections", "time_zone", "position", "tower_position",
+    "identifier", "elevation", "position", "tower_position",
     "runway_pairs", "helipads", "glider_winches", "glider_aerotows", "parking_positions",
   ];
 
@@ -621,11 +631,16 @@ describe("heliport files — structure", () => {
   // #278 removed the only writer that ever wanted it. What is left is the rule that always mattered, and
   // it is enforced a layer up: planHeliport throws unless validateIdentity passes.
   it("carries the identity it was given, in capitals, in both files", () => {
-    for (const text of [buildHeliportTsc(SPEC), buildHeliportWad(SPEC)]) {
-      expect(valuesOf(text, "icao")).toEqual(["PCT001"]);
-      expect(valuesOf(text, "country")).toEqual(["us"]);
-      expect(text).toContain("PCT Test Helipad");
-    }
+    const tsc = buildHeliportTsc(SPEC);
+    expect(valuesOf(tsc, "icao")).toEqual(["PCT001"]);
+    expect(valuesOf(tsc, "country")).toEqual(["us"]);
+    expect(tsc).toContain("PCT Test Helipad");
+    // The `.wad` carries the code only, as `identifier` (#342); name and country live in the `.tsc`.
+    const wad = buildHeliportWad(SPEC);
+    expect(valuesOf(wad, "identifier")).toEqual(["PCT001"]);
+    // Top level only: the pads keep a `name` row of their own.
+    const top = parseTm(wad).children[0]!.children.map((c) => c.name);
+    for (const gone of ["icao", "name", "country", "iata", "uid"]) expect(top).not.toContain(gone);
   });
 
   it("is pure ASCII — the sim mangles non-ASCII in its own text files (tm.log: 'Stra?e')", () => {
@@ -867,10 +882,11 @@ describe("heliport template — the Informations banner", () => {
     expect(tsc.indexOf("<[tmsimulator_scenery_place]")).toBeLessThan(tsc.indexOf("//  Informations:"));
   });
 
-  it("puts icao first among the values", () => {
-    // "I put the line <[string8u][icao][....]> up, because that is more logical for me and actually
-    // also my standard." — ApfelFlieger, #167.
-    expect(tsc.indexOf("<[string8u][icao]")).toBeLessThan(tsc.indexOf("<[string8][sname]"));
+  it("puts icao after both names, the order of the .tap (forum #342)", () => {
+    // It led from #167 to #342 ("I put the line <[string8u][icao][....]> up"); he moved it back so the
+    // `.tsc` lines up with the `.tap` the IPACS converter reads: name, name_short, icao.
+    expect(tsc.indexOf("<[string8][sname]")).toBeLessThan(tsc.indexOf("<[string8][lname]"));
+    expect(tsc.indexOf("<[string8][lname]")).toBeLessThan(tsc.indexOf("<[string8u][icao]"));
   });
 
   it("still parses to the same values it always did", () => {

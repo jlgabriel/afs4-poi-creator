@@ -357,11 +357,9 @@ export interface EditorState {
   //    render it as FATO/TLOF, which is the literal v1.2 and v1.3 always wrote.
   setAirportPadName: (id: string, name: string) => void;
   setAirportIdentity: (patch: Partial<Pick<ProjectAirport, "icao" | "name" | "country">>) => void;
-  //    v1.4 DATA (forum #217/#232, his submenu (1)). `iata` has been in the model and in BOTH writers
-  //    since 7b1f38b with nothing on screen able to set it — a field the file could carry and the user
-  //    could not fill. `createAirport` is the Data card's click: unlike the other five it places nothing,
-  //    so it makes the block (when there is none) and selects it, which is the whole gesture.
-  setAirportIata: (iata: string) => void;
+  //    `createAirport` is the Data card's click: unlike the other five it places nothing, so it makes
+  //    the block (when there is none) and selects it, which is the whole gesture. (`setAirportIata` sat
+  //    above it until forum #342 retired the IATA row from the `.wad`.)
   //    `select` is what forum #282 turns on: the card may need the BLOCK without opening its panel.
   createAirport: (opts?: { select?: boolean }) => void;
   //    The Airport CARD's whole gesture, in one place because it is a three-way decision (toggle off /
@@ -897,10 +895,6 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
               country: patch.country ?? a.country,
             });
           }),
-        // The same coalesce key as the other three: IATA sits in the same mask (his DATA submenu is four
-        // fields) and tabbing between them is one edit of one thing.
-        setAirportIata: (iata) =>
-          commitCoalesced("airport:identity", (proj) => mutate.setAirportIata(proj, iata)),
         // NOT coalesced and not a placement: it either makes an empty block or does nothing, and then
         // selects it either way, so clicking Data on an airport that already exists just opens its panel.
         createAirport: (opts) => {

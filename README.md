@@ -233,7 +233,7 @@ click the card, click the map, edit it in the inspector.
 
 | Card | What it is |
 |---|---|
-| **Airport** | The airfield itself: its **name**, its **ICAO code**, an optional **IATA** code, its two-letter **country code**, and the one point the whole thing is filed under. |
+| **Airport** | The airfield itself: its **name**, its **ICAO code**, its two-letter **country code**, and the one point the whole thing is filed under. |
 | **Runway** | Two thresholds you drag; the length and the direction are whatever they say. Per end: identifier, approach lighting, PAPI, REIL, and whether you can land or take off there. |
 | **Helipad** | A helicopter start. Its own point, at its own radius, as many as you like. |
 | **Parking** | A stand — General Aviation, Jet or Pushback — that an aircraft starts a flight from. |

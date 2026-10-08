@@ -41,7 +41,7 @@ const DEFAULT_NEW_PARKING: ParkingType = "parked_ga";
 
 /** What each card answers the search box with. The words are what someone would actually type looking
  *  for the thing, not the label alone — "heliport" finds the pad, "stand"/"gate"/"apron" find parking. */
-const DATA_TERMS = "data airport icao iata code country name identity heliport";
+const DATA_TERMS = "data airport icao code country name identity heliport";
 const HELIPAD_TERMS = "start - helicopter helipad heliport pad";
 const PARKING_TERMS = `parking stand gate apron aircraft ${PARKING_TYPES.map(
   (t) => PARKING_TYPE_LABELS[t],
