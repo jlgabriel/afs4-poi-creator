@@ -303,8 +303,7 @@ A couple of things worth knowing about the editor:
   database**, and its rotation in radians. It changes nothing: it's the same projection PCT works out
   for itself when it installs an airport, surfaced here because a handful of people hand-build those
   entries and were converting the coordinates in a spreadsheet. Every coordinate and heading in the
-  **Airport** panels carries the same read-out as a small `WAD:` chip — double-click one to copy it. The projection is documented in the
-  [technical reference](reference/AFS4_KNOWLEDGE_BASE_EN.md).
+  **Airport** panels carries the same read-out as a small `WAD:` chip — double-click one to copy it.
 - **If something goes wrong**, PCT keeps a plain-text log of the session — the folders it used, what
   the scan found, and anything that failed. **Settings → Diagnostics → Open log file**. It's
   **rewritten from scratch every time PCT starts**, so it never grows and there's nothing to clean up,
@@ -408,26 +407,6 @@ doesn't show up in the sim.
 
 A twelve-object starter project comes with it, ready to install and then take apart:
 [guide/example/kdag_starter.json](guide/example/kdag_starter.json).
-
-## The Aerofly FS 4 technical reference
-
-Building PCT meant working out how Aerofly FS 4 actually stores and places scenery — much of which
-IPACS never documented. That knowledge is written up as a standalone field guide to **the simulator
-and its on-disk format**, not to this tool:
-
-**→ [reference/AFS4_KNOWLEDGE_BASE_EN.md](reference/AFS4_KNOWLEDGE_BASE_EN.md)**
-
-Eighteen sections: where everything lives in an install, the `<[type][name][value]>` file grammar,
-what `tm.log` tells you before you ever take off, POI vs airport placement, the built-in XREF
-catalog, orientation and heading maths, heights and autoheight, plants, lights, your own `.tmb`
-objects, built-in POIs and landmarks, heliports and the `.wad` projection, the UDP flight-data
-stream, the Blender-to-`.tmb` pipeline, the public datasets worth knowing about, what makes an
-airport actually load, user missions, and reading the simulator's own binary for the vocabulary it
-accepts.
-
-It's there for anyone building things for AFS4, whether or not they ever touch PCT. Verify anything
-critical against your own install: the sim is undocumented in these areas and changes between
-versions.
 
 ## For developers
 

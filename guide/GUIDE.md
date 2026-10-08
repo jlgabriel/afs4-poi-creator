@@ -22,7 +22,7 @@ section stands on its own.
 | 11 | [Making the catalog yours](#11-making-the-catalog-yours--photos-and-footprints) | Your own photos on the cards, and sizes for the objects the sim doesn't measure. |
 | 12 | [Your own models](#12-your-own-models) | Placing custom XREF objects you've added to the sim. |
 | 13 | [When something goes wrong](#13-when-something-goes-wrong) | Symptom by symptom — and where the log file is. |
-| 14 | [Where to go next](#14-where-to-go-next) | The forum, the technical reference, the source, and who built what. |
+| 14 | [Where to go next](#14-where-to-go-next) | The forum, the source, and who built what. |
 
 **In a hurry?** Section 3 puts one object into the sim in five minutes. If it doesn't turn up, the
 answer is almost always the first line of section 13.
@@ -890,7 +890,6 @@ same value in the units Aerofly keeps inside its own world-airport database — 
 for positions, radians for directions. It changes nothing. It is there because a handful of people
 build these entries by hand and were converting the numbers in a spreadsheet. **Double-click a chip to
 copy it**; it flashes green when the copy has actually happened.
-[Section 14](#14-where-to-go-next) says where that projection is documented.
 
 Older versions of PCT could also drop a pair of `heliport.tsc.txt` / `heliport.wad.txt` templates into
 a POI folder for you to finish by hand. That is gone, at ApfelFlieger's request: a POI folder holding
@@ -1141,20 +1140,10 @@ into a forum post saves a round of questions.
 Questions, bug reports and scenes you've built are all welcome:
 https://www.aerofly.com/community/
 
-**The technical reference.** Building PCT meant working out how Aerofly FS 4 actually stores and
-places scenery, much of which IPACS never documented. That's written up separately as a field guide
-to **the simulator**, not to this tool: `reference/AFS4_KNOWLEDGE_BASE_EN.md` in this repository.
-Eighteen sections — where everything lives in an install, the file grammar, what `tm.log` tells you
-before you ever take off, POI vs airport placement, orientation maths, heights, plants, lights, your
-own `.tmb` objects, heliports and the `.wad` projection, the UDP flight-data stream, the Blender
-pipeline, what makes an airport actually load, missions, and reading the simulator's own binary for the
-vocabulary it accepts. Useful to anyone building things for AFS4, whether or not they ever touch PCT.
-
-That reference is also where the Inspector's **FS4 internal (.wad)** read-out is explained: the
-projected 0–65536 grid and the radians the sim keeps inside its own world-airport database. It is the
-same projection PCT works out for you when it installs an airport (section 9); the read-out exists
-because a handful of people build those entries by hand and were converting the coordinates in a
-spreadsheet.
+**The Inspector's FS4 internal (.wad) read-out.** It shows the projected 0–65536 grid and the
+radians the sim keeps inside its own world-airport database. It is the same projection PCT works out
+for you when it installs an airport (section 9); the read-out exists because a handful of people
+build those entries by hand and were converting the coordinates in a spreadsheet.
 
 ![Shot 25 — the FS4 internal (.wad) block expanded: the projected longitude and latitude, and the rotation in radians](images/25_wad_readout.jpg)
 

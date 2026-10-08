@@ -40,3 +40,7 @@ docs/
 # so nothing here is ever `git add`-ed.
 /_local_reference/
 /_act-airport_creation_tool/
+
+# The AFS4 knowledge base (how the simulator stores and loads things). Kept on disk as local
+# reference; the public docs cover the app, not the sim's internals.
+/reference/

@@ -14,8 +14,7 @@
 // PROVENANCE: the three conversions are ApfelFlieger's (forum #113, his TAP/TOC/TSC/WAD/TSL sheet). They
 // were verified INDEPENDENTLY before shipping — by inverting float64s out of 47 binary IPACS `.wad`
 // files, where the tangent latitude beats a Mercator hypothesis 46 to 1 — and they reproduce his own
-// hand-built `de0869.wad` to all ten printed decimals. Both facts are documented in
-// `reference/AFS4_KNOWLEDGE_BASE_EN.md` §12.
+// hand-built `de0869.wad` to all ten printed decimals.
 import { headingToDirection } from "./orientation";
 
 /** Grid span of the `.wad` coordinate system: the full 360° of longitude / 180° of latitude. */
