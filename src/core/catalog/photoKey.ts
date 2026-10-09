@@ -1,27 +1,23 @@
-// photoKey.ts — the file-name stem that identifies an object's user photo (v0.8).
+// photoKey.ts — the file-name stem that identifies an object's user photo.
 //
-// v0.6 gave every XREF card a photo by making the identity trivial: the stem IS the object's `name`.
-// Plants and lights had no photo at all, and the reason was never "nobody wanted one" — a Runway Edge
-// Light and a Taxiway Edge Light are the same glyph, and Broadleaf 00 and 01 differ only by a metre of
-// height. The reason was that neither family has a `name`:
+// For an XREF the stem IS the object's `name`. Plants and lights have no `name`:
 //
 //   • a plant is identified by a PAIR (`group` + `species`), and plantKey joins them with a `/` —
 //     a path separator, so it could never be a file name;
-//   • an airport light has a unique `typeName`, but it lives in a FLAT folder shared with the ~900
-//     XREF stems, so `runway_edge_light.png` would be indistinguishable from an XREF of that name.
+//   • an airport light has a unique `typeName`, but it lives in a FLAT folder shared with the XREF
+//     stems, so `runway_edge_light.png` would be indistinguishable from an XREF of that name.
 //
 // So the three families get one namespaced key, and the separator is a DOT for two concrete reasons:
 //   1. `isValidThumbName` (main/thumbnails.ts) already admits `.`, and `path.extname`/`path.basename`
 //      still split `plant.palm.08.png` into the stem `plant.palm.08` + `.png`. Nothing downstream
 //      changes — not the guard, not the index, not the IPC signatures.
-//   2. A built-in XREF name is `[A-Za-z0-9_]` (all 837 scanned) and so CANNOT contain a dot. A prefixed
-//      key therefore can't collide with a catalog object by construction, rather than merely by luck —
-//      which is the same standard the rest of this feature is held to (a photo that silently attaches
-//      to the wrong object is bug #176 wearing a different hat).
+//   2. A built-in XREF name is `[A-Za-z0-9_]` and so CANNOT contain a dot. A prefixed key therefore
+//      can't collide with a catalog object by construction — a photo must never silently attach to
+//      the wrong object.
 //
-// The XREF key is the bare `name`, UNCHANGED: every photo taken with v0.6/v0.7 keeps resolving. That
-// backward compatibility is the load-bearing property of this module, not a nicety — the photos are the
-// user's own screenshots and PCT must never orphan them.
+// The XREF key is the bare `name`, UNCHANGED since photos were introduced (v0.6): existing photos keep
+// resolving. That backward compatibility is load-bearing — the photos are the user's own screenshots
+// and PCT must never orphan them.
 
 import type { PlacedObject } from "../project/types";
 import { plantKey } from "./plants";
@@ -32,12 +28,12 @@ export const PLANT_PHOTO_PREFIX = "plant";
 export const LIGHT_PHOTO_PREFIX = "light";
 
 /** The shape a photo key may have: starts alphanumeric, then letters, digits, `_`, `.`, `-`. It covers
- *  every key `photoKey` produces (the 837 scanned `[A-Za-z0-9_]` XREF names, the user's own registered
- *  objects — which routinely carry a `-`, forum #176 — and the dotted `plant.`/`light.` keys) while
+ *  every key `photoKey` produces (built-in `[A-Za-z0-9_]` XREF names, the user's own registered
+ *  objects — which routinely carry a `-` — and the dotted `plant.`/`light.` keys) while
  *  leaving out a leading `.`/`-` and any `..`, so a key is still safe to join into a path.
  *
  *  Two consumers, one shape: main/thumbnails.ts guards a FILE NAME with it (a key arrives over IPC and
- *  becomes `<dir>/<key>.png`), and v0.9's footprints.json guards a JSON KEY with it. The path-safety
+ *  becomes `<dir>/<key>.png`), and footprints.json guards a JSON KEY with it. The path-safety
  *  reason belongs to the first; the second wants it because a key outside this set can't correspond to
  *  any card, and a file full of such keys is a typo, not data. They share the predicate so the two can
  *  never drift into disagreeing about what a key is. */
@@ -59,11 +55,11 @@ export type PhotoSubject =
   | { kind: "light" };
 
 /** The photo file-name stem for a card. Case is preserved (catalog names carry mixed case, e.g.
- *  `UH60_usarmy`); every consumer lowercases when matching, exactly as the v0.6 index does. */
+ *  `UH60_usarmy`); every consumer lowercases when matching, exactly as the photo index does. */
 export function photoKey(subject: PhotoSubject): string {
   switch (subject.kind) {
     case "xref":
-      return subject.name; // v0.6/v0.7 compatibility — the bare name, untouched
+      return subject.name; // compatibility with existing photos — the bare name, untouched
     case "plant":
       // plantKey's `/` is the one character a file name can't hold, so it becomes the family separator:
       // `palm/08` → `plant.palm.08`. A group's own underscores ("conifer_forest") survive intact.

@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { parseXrefTable, lookupXref } from "../../src/core/catalog/xrefTable";
 
-// Synthetic — INVENTED names + values (never Rodeo/IPACS numbers), real column structure. Keeps
-// IPACS-derived data out of the repo; the real 753-row table is exercised only by the opt-in LOCAL
-// test (tests/local/xrefTableReal.test.ts). Grammar mirrors the real file:
+// Synthetic — INVENTED names + values, real column structure. Keeps IPACS-derived data out of the repo;
+// the real table is exercised only by the opt-in LOCAL test (tests/local/xrefTableReal.test.ts).
+// Grammar mirrors the real file:
 //   name;display;main;sub;type;length;width;height;offset(x y z); <shape verts…> ; <truescale verts…>
 // Each ring repeats its first vertex to close; the parser stores the ring OPEN.
 const HEADER =

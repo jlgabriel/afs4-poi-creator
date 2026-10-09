@@ -1,16 +1,12 @@
 // ParkingLayer.ts — the airport's parking positions on the map: a circle at each stand's real size, a
 // heading tick, and a rotate grip on the selected one.
 //
-// WHY IT EXISTS (forum #232, ApfelFlieger). A stand is its own point, for the same reason the helipad is
-// (#168): one that borrowed an XREF's coordinates parks the aircraft inside the building. Its mask is his
-// — LON · LAT · HEADING TRUE · SIZE m · NAME · TYPE — and "any number of parking positions can be
-// created", which is the whole difference from the pad.
+// WHY IT EXISTS. A stand is its own point, for the same reason the helipad is: one that borrowed an
+// XREF's coordinates parks the aircraft inside the building. Its fields are LON · LAT · HEADING TRUE ·
+// SIZE m · NAME · TYPE, and any number of stands can exist.
 //
-// WHY NOT HelipadLayer, WIDENED. That class is a SINGLETON with tuned pad visuals (white ring, the H that
-// turns with the heading, the H that disappears below a pixel threshold), and it is in production and
-// flown. Widening it to a list while also changing what it draws would put two risks in one change. This
-// class is the LIST shape, and it is deliberately written so the other repeatable point kinds — pads once
-// #221 lands, aerotows, winches — can fold into it later. A runway will not: it is two points, not one.
+// WHY NOT ONE CLASS WITH HelipadLayer. The two share this LIST shape, but the pad carries its own tuned
+// visuals (white ring, the H keyed to zoom). A runway will never fold in here: it is two points, not one.
 //
 // The three contracts it inherits from FootprintLayer, because they are the reason the map stays at 60 fps
 // and the reason a drag is one undo entry:
@@ -177,17 +173,12 @@ export class ParkingLayer {
     return Math.abs(edge.x - c.x);
   }
 
-  /** Create, move or drop one stand's P (forum #283). His words: "PARKING POSITION should definitely also
-   *  receive a labelling, I suggest 'P'" — the counterpart to the pad's H, which he had just approved in
-   *  the same post.
+  /** Create, move or drop one stand's P — the counterpart to the pad's H.
    *
-   *  ★ AND IT TURNS WITH THE STAND (#295). v1.7 shipped it upright and fixed, arguing that the stand
-   *  already draws a heading tick and that a P upside down stops reading as a P. He overruled it, and his
-   *  third reason is the one that settles it: "if a user positions several HELIPAD and PARKING POSITIONs
-   *  side by side or even alternately, then it irritates when some letters are vertical and others are
-   *  not." A marking belongs to the object, not to the screen — his first reason, and the one that makes
-   *  this a rule rather than a preference — and a 17 px letter is a better heading readout than a hairline
-   *  tick, not a duplicate of one. So: the pad's call, the pad's transform, for the pad's reason. */
+   *  ★ AND IT TURNS WITH THE STAND, like the H. A marking belongs to the object, not to the screen;
+   *  pads and stands side by side would look inconsistent if some letters stayed upright and others
+   *  turned; and the letter is a better heading readout than the hairline tick. So: the pad's
+   *  transform, for the pad's reason. */
   private layoutGlyph(e: Entry, at?: LonLat, heading?: number): void {
     const where = at ?? e.parking.position;
     const rot = heading ?? e.parking.heading;

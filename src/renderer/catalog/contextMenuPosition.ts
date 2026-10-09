@@ -1,4 +1,4 @@
-// contextMenuPosition.ts — where the right-click object menu (v0.7) lands. PURE and viewport-only (its
+// contextMenuPosition.ts — where the right-click object menu lands. PURE and viewport-only (its
 // inputs are the clientX/clientY of the contextmenu event plus the measured menu size), so the placement
 // rules unit-test without a DOM. The menu is portalled to <body> with position:fixed, which is why
 // viewport coordinates are exactly right and no scroll offset enters here.

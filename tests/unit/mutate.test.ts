@@ -82,7 +82,7 @@ const xref = (id: string, over: Partial<PlacedXref> = {}) =>
   createXref("tower_x", { lon: 11.86, lat: 48.37 }, { id, ...over });
 
 describe("createXref", () => {
-  it("applies M1 defaults", () => {
+  it("applies the defaults", () => {
     const x = xref("a");
     expect(x).toMatchObject({
       id: "a",
@@ -163,7 +163,7 @@ describe("object mutations are pure & immutable", () => {
   });
 });
 
-describe("v0.2 light factories", () => {
+describe("light factories", () => {
   it("createAirportLight applies defaults (terrain, orientation 0, default colour, group 0)", () => {
     const l = createAirportLight("runway_edge_light", { lon: 11, lat: 48 }, { id: "al" });
     expect(l).toMatchObject({
@@ -196,7 +196,7 @@ describe("v0.2 light factories", () => {
   });
 });
 
-describe("v0.2 kind-aware mutations", () => {
+describe("kind-aware mutations", () => {
   const airport = (id: string, over: Partial<PlacedAirportLight> = {}): PlacedAirportLight =>
     createAirportLight("runway_edge_light", { lon: 11, lat: 48 }, { id, ...over });
   const point = (id: string, over: Partial<PlacedLight> = {}): PlacedLight =>
@@ -257,7 +257,7 @@ describe("project-level mutations", () => {
     });
     expect(p0.name).toBe("t"); // input untouched
   });
-  it("createProject yields M1 defaults", () => {
+  it("createProject yields the defaults", () => {
     const p = createProject({ name: "Munich", poiName: "munich", camera: CAMERA, now: NOW });
     expect(p).toMatchObject({
       schemaVersion: 1,
@@ -291,7 +291,7 @@ describe("project-level mutations", () => {
   });
 });
 
-// ── The airport block (v1.2, forum #170 / #168) ──────────────────────────────────────────────────
+// ── The airport block ────────────────────────────────────────────────────────────────────────────
 describe("the airport block", () => {
   const PAD: AirportPad = {
     id: "pad-1",
@@ -343,8 +343,8 @@ describe("the airport block", () => {
     }
   });
 
-  // ★ The mirror is what lets PCT <= 1.3 OPEN a v1.4 file at all (types.ts ProjectAirport.pad), and a
-  // stale one would put its helipad where the user no longer has it. So it is not enough that setAirport
+  // ★ The mirror is what lets an older single-pad PCT (<= 1.3) OPEN a multi-pad file at all (types.ts
+  // ProjectAirport.pad), and a stale one would put its helipad where the user no longer has it. So it is not enough that setAirport
   // writes it — EVERY pad mutation has to keep it in step.
   it("keeps airport.pad mirroring pads[0] through every mutation", () => {
     let p = setAirport(baseProject(), AIRPORT, NOW);
@@ -381,7 +381,7 @@ describe("the airport block", () => {
     let p = setAirport(baseProject(), AIRPORT, NOW);
     p = addAirportPad(p, { lon: 6, lat: 46 }, 12, LATER, "pad-2");
 
-    // No id → the first pad, which is what every v1.3 caller means.
+    // No id → the first pad, which is what every single-pad caller means.
     p = setAirportPadName(p, "primary", LATER);
     expect(p.airport!.pads[0]!.name).toBe("primary");
     expect(p.airport!.pads[1]!.name).toBe("");
@@ -395,18 +395,18 @@ describe("the airport block", () => {
   });
 
   it("adds pads rather than moving the first one, and keeps a pad-less airport valid", () => {
-    // placeAirportPad MOVES (the v1.3 gesture: one pad card, click again to reposition)…
+    // placeAirportPad MOVES (the single-pad gesture: click again to reposition)…
     let p = setAirport(baseProject(), AIRPORT, NOW);
     p = placeAirportPad(p, { lon: 1, lat: 2 }, 10, LATER);
     expect(p.airport!.pads).toHaveLength(1);
     expect(padOf(p).position).toEqual({ lon: 1, lat: 2 });
 
-    // …addAirportPad APPENDS (forum #221: "can now be used as often as desired").
+    // …addAirportPad APPENDS: any number of pads.
     p = addAirportPad(p, { lon: 3, lat: 4 }, 10, LATER, "pad-2");
     expect(p.airport!.pads).toHaveLength(2);
 
-    // An airport with no pads is legal — his "(1) DATA" example is exactly that — so removing them all
-    // leaves the identity standing rather than deleting the airport.
+    // An airport with no pads is legal (an identity-only airport), so removing them all leaves the
+    // identity standing rather than deleting the airport.
     p = removeAirportPad(removeAirportPad(p, "pad-1", LATER), "pad-2", LATER);
     expect(p.airport!.icao).toBe("shjl");
     expect(p.airport!.pads).toEqual([]);
@@ -415,15 +415,15 @@ describe("the airport block", () => {
     expect(p.airport!.pads).toHaveLength(1);
   });
 
-  it("carries the v1.4 identity fields", () => {
+  it("carries the airport's own position, independent of the pad", () => {
     let p = setAirport(baseProject(), AIRPORT, NOW);
 
-    // The airport's own point is independent of the pad (forum #15/#220) — moving the pad must not move
-    // it once it has been set on purpose.
+    // The airport's own point is independent of the pad — moving the pad must not move it once it has
+    // been set on purpose.
     p = setAirportPosition(p, { lon: 10, lat: 20 }, LATER);
     p = moveAirportPad(p, { lon: 30, lat: 40 }, LATER);
     expect(p.airport!.position).toEqual({ lon: 10, lat: 20 });
-    // Cleared → the block follows the first pad again, which is how v1.2/v1.3 behaved.
+    // Cleared → the block follows the first pad again.
     p = setAirportPosition(p, null, LATER);
     expect("position" in p.airport!).toBe(false);
   });
@@ -443,7 +443,7 @@ describe("the airport block", () => {
     expect(setAirportPadRadius(p, 10)).toBe(p);
   });
 
-  // ── Runways (v1.4, forum #217 submenu (4)) ─────────────────────────────────────────────────────
+  // ── Runways ────────────────────────────────────────────────────────────────────────────────────
   describe("runways", () => {
     const A = { lon: -70.58515, lat: -33.38115 };
     const B = { lon: -70.57934, lat: -33.38024 };
@@ -453,10 +453,10 @@ describe("the airport block", () => {
     it("creates a pair with ONE point per end and no lights", () => {
       const r = runwaysOf(withRunway().airport)[0]!;
       expect(r.id).toBe("rwy-1");
-      expect(r.width).toBe(40); // every runway in his reference airports
+      expect(r.width).toBe(40); // the default runway width
       expect(r.ends).toHaveLength(2);
-      // ★ forum #236: "in the PCT the leading variable is [threshold]" — the document has no `endpoint`,
-      // because PCT draws no pavement and an extension it cannot show is a field nobody can judge.
+      // ★ The threshold is the leading variable — the document has no `endpoint`, because PCT draws no
+      // pavement and an extension it cannot show is a field nobody can judge.
       expect(r.ends[0]).toEqual({
         threshold: A,
         identifier: "08",
@@ -513,7 +513,7 @@ describe("the airport block", () => {
     });
   });
 
-  // ── Glider starts (v1.4, forum #237/#238) ──────────────────────────────────────────────────────
+  // ── Glider starts ──────────────────────────────────────────────────────────────────────────────
   describe("glider starts", () => {
     const G = { lon: -70.57713, lat: -33.3800929 };
     const W = { lon: -70.58609, lat: -33.3811 };
@@ -522,7 +522,7 @@ describe("the airport block", () => {
       return addAirportWinch(addAirportAerotow(p, G, LATER, "ato-1"), G, W, LATER, "wnc-1");
     };
 
-    it("adds an aerotow facing north and a winch at his default spacing", () => {
+    it("adds an aerotow facing north and a winch at the default spacing", () => {
       const p = withBoth();
       expect(aerotowsOf(p.airport)).toEqual([{ id: "ato-1", name: "", position: G, heading: 0 }]);
       expect(winchesOf(p.airport)).toEqual([
@@ -567,7 +567,7 @@ describe("the airport block", () => {
     });
   });
 
-  // ── Parking positions (v1.4, forum #232) ───────────────────────────────────────────────────────
+  // ── Parking positions ──────────────────────────────────────────────────────────────────────────
   describe("parking positions", () => {
     const HERE = { lon: -70.5842423, lat: -33.3806032 };
     const withStand = (type: ParkingType = "parked_ga"): Project =>
@@ -578,9 +578,9 @@ describe("the airport block", () => {
       expect(parkingsOf(p.airport)).toEqual([
         { id: "prk-1", name: "", position: HERE, heading: 0, size: 7.5, type: "parked_ga" },
       ]);
-      // His margin note: parked_ga = 7.5 m, parked_jet = 40 m.
+      // Default sizes: parked_ga = 7.5 m, parked_jet = 40 m.
       expect(parkingsOf(withStand("parked_jet").airport)[0]!.size).toBe(40);
-      // Appends rather than replaces — "any number of parking positions can be created".
+      // Appends rather than replaces — any number of parking positions can be created.
       const two = addAirportParking(p, { lon: 1, lat: 2 }, "pushback", LATER, "prk-2");
       expect(parkingsOf(two.airport).map((s) => s.id)).toEqual(["prk-1", "prk-2"]);
     });
@@ -592,7 +592,7 @@ describe("the airport block", () => {
         name: "",
         country: "",
         pads: [],
-        // The first element SEEDS the airport's own point (#255). Identity is still not invented —
+        // The first element SEEDS the airport's own point. Identity is still not invented —
         // a coordinate is where the thing is, a code is a claim about the world.
         position: HERE,
         parkings: [{ id: "prk-1", name: "", position: HERE, heading: 0, size: 7.5, type: "parked_ga" }],
@@ -602,7 +602,7 @@ describe("the airport block", () => {
     it("moves, turns, resizes and names one stand by id", () => {
       let p = withStand();
       p = moveAirportParking(p, "prk-1", { lon: 1, lat: 2 }, LATER);
-      p = rotateAirportParking(p, "prk-1", -195, LATER); // his own files carry negative headings
+      p = rotateAirportParking(p, "prk-1", -195, LATER); // headings may arrive negative
       p = setAirportParkingSize(p, "prk-1", 12, LATER);
       p = setAirportParkingName(p, "prk-1", "Parking_W", LATER);
       expect(parkingsOf(p.airport)[0]).toEqual({
@@ -653,10 +653,10 @@ describe("the airport block", () => {
   });
 });
 
-// ── The airport's own point: SEEDED once, then FROZEN (forum #255) ──────────────────────────────────
+// ── The airport's own point: SEEDED once, then FROZEN ───────────────────────────────────────────────
 //
-// His third reason is the behavioural one and the only one a test can hold: "the airfield coordinates
-// must not change if any other element changes coordinates." Everything below is that sentence.
+// The rule everything below holds: the airport's coordinates must not change when any other element
+// changes its coordinates.
 describe("the airport's own point", () => {
   const A = { lon: -70.58, lat: -33.38 };
   const B = { lon: -70.59, lat: -33.39 };
@@ -678,7 +678,7 @@ describe("the airport's own point", () => {
     expect(p.airport!.position).toEqual(A);
   });
 
-  it("★ does not move when the pad it was seeded from moves — the whole point of #255", () => {
+  it("★ does not move when the pad it was seeded from moves", () => {
     let p = addAirportPad(baseProject(), A, 10, LATER, "p1");
     p = moveAirportPad(p, B, LATER, "p1");
     expect(p.airport!.pads[0]!.position).toEqual(B); // the pad went
@@ -701,7 +701,7 @@ describe("the airport's own point", () => {
     expect(p.airport!.position).toEqual(B);
     p = setAirportPosition(p, null, LATER);
     expect(p.airport!.position).toBeUndefined();
-    // Cleared, it falls back to the first pad again — the pre-1.5 behaviour, still reachable.
+    // Cleared, it falls back to following the first pad again.
     expect(airportPosition(p.airport!)).toEqual(A);
   });
 

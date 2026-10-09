@@ -4,11 +4,10 @@ import path from "node:path";
 import { parseTmi } from "../../src/core/catalog/tmiParser";
 import { buildTmi, type TmiEntrySpec } from "../../src/core/export/tmiWriter";
 
-// Opt-in LOCAL test — validates `buildTmi` against REAL community/built-in `.tmi` files WITHOUT
-// hardcoding any of their (IPACS/Rodeo/Michael-derived) values into the repo. It reparses whatever
-// `.tmi` files sit under `_local_reference/` (gitignored) and checks that a buildTmi round-trip
-// preserves every name + bbox and derives bs_center/bs_radius. Auto-skips when none are present
-// (e.g. the reference zips aren't extracted), so CI stays green and IPACS-free.
+// Opt-in LOCAL test — validates `buildTmi` against real `.tmi` files WITHOUT hardcoding any of their
+// values into the repo. It reparses whatever `.tmi` files sit under `_local_reference/` (gitignored)
+// and checks that a buildTmi round-trip preserves every name + bbox and derives bs_center/bs_radius.
+// Auto-skips when none are present, so CI stays green and IPACS-free.
 // Point elsewhere — e.g. a real install's `scenery/xref` — with PCT_TMI_DIR=<dir>.
 const ROOTS = [process.env.PCT_TMI_DIR, path.resolve("_local_reference")].filter(
   (x): x is string => Boolean(x),
@@ -50,7 +49,7 @@ describe.skipIf(files.length === 0)("buildTmi vs real .tmi files (local, opt-in)
       e.bbMin.forEach((v, k) => expect(v).toBeCloseTo(src.bbMin[k], 6));
       e.bbMax.forEach((v, k) => expect(v).toBeCloseTo(src.bbMax[k], 6));
       // bs_center/bs_radius are PCT-DERIVED (midpoint + half-diagonal) — NOT a byte-match with the
-      // source (IPACS ships tighter true spheres by design); assert they equal our derivation.
+      // source (which may carry tighter spheres); assert they equal our derivation.
       src.bbMin.forEach((mn, k) => expect(e.bsCenter[k]).toBeCloseTo((mn + src.bbMax[k]) / 2, 6));
       const r =
         Math.hypot(src.bbMax[0] - src.bbMin[0], src.bbMax[1] - src.bbMin[1], src.bbMax[2] - src.bbMin[2]) /

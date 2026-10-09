@@ -25,7 +25,7 @@ describe("block", () => {
   });
 });
 
-describe("sanitizeValue — free text safe as a tag value (grammar has no escape, Fable C2)", () => {
+describe("sanitizeValue — free text safe as a tag value (grammar has no escape)", () => {
   it("turns brackets into parens so a value can't truncate at the first ']'", () => {
     expect(sanitizeValue("Munich [WIP]")).toBe("Munich (WIP)");
     expect(sanitizeValue("a]b[c")).toBe("a)b(c");

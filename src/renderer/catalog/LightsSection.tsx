@@ -1,13 +1,10 @@
-// LightsSection.tsx — v0.2 lights palette in the Catalog panel. A collapsible section listing the
-// scanned airport-light fixtures plus one parametric "Point light" card. Arming a card sets the store's
-// `placing` spec (by kind); the map then drops the light on click, exactly like an xref. Kept small +
-// non-virtualized (23 items, not the catalog's ~900) so it stays a simple, self-contained addition
-// that leaves the proven virtualized xref gallery untouched.
+// LightsSection.tsx — lights palette in the Catalog panel. A collapsible section listing the scanned
+// airport-light fixtures plus one parametric "Point light" card. Arming a card sets the store's
+// `placing` spec (by kind); the map then drops the light on click, exactly like an xref. Non-virtualized:
+// the fixture list is short, unlike the xref gallery.
 //
-// v0.8 gives these cards the photo treatment the xref gallery got in v0.6/v0.7. Unlike the plants,
-// nothing ever blocked the lights — a fixture has a unique `typeName` — they were simply never wired up.
-// They benefit as much: a Runway Edge Light and a Taxiway Edge Light are the same generated glyph, and
-// what a fixture actually looks like lit at night is precisely what a screenshot answers.
+// Cards get the same photo treatment as the xref gallery (keyed by the fixture's unique `typeName`):
+// different fixtures share one generated glyph, and a screenshot shows what a fixture looks like lit.
 import { memo, useCallback, useMemo } from "react";
 import { editorStore, useEditor } from "../state/editorStore";
 import { Thumbnail } from "./Thumbnail";
@@ -62,9 +59,8 @@ const POINT_TITLE = "Point light (custom)";
 export function LightsSection({ popovers }: { popovers: CardPopovers }): React.ReactElement {
   const lights = useEditor((s) => s.catalog?.airportLights);
   const placing = useEditor((s) => s.placing);
-  // The search box sits ABOVE both sections, so it has to filter both — it used to silently skip Lights,
-  // leaving all 23 fixtures on screen while the xref gallery narrowed to one hit. Not deferred like the
-  // gallery's: 23 cards re-render for free, the ~900 are the ones that needed the deferred pass.
+  // The search box sits ABOVE every section, so it filters this one too. Not deferred like the gallery's:
+  // a short list re-renders for free.
   const query = useEditor((s) => s.filter.query);
   const q = query.trim().toLowerCase();
 
@@ -111,8 +107,7 @@ export function LightsSection({ popovers }: { popovers: CardPopovers }): React.R
             key={l.typeName}
             icon={l.category}
             card={cardFor({ kind: "airport_light", typeName: l.typeName }, l.displayName)}
-            // The measured size joins the subtitle once there is one (v0.9). It is the whole reason the
-            // feature exists: nine Runway Approach fixtures whose only difference is how big they are.
+            // The measured size joins the subtitle once there is one: some fixtures differ only in size.
             subtitle={`${l.typeName}${sizeSuffix(l)}`}
             armed={placing?.kind === "airport_light" && placing.name === l.typeName}
             onArm={() => armAirportLight(l.typeName)}
@@ -120,8 +115,8 @@ export function LightsSection({ popovers }: { popovers: CardPopovers }): React.R
           />
         ))}
         {/* Two different empty states. With a query it's "your search found nothing here"; with no query
-            it's "you have no fixtures at all" — which for a catalog cached before v0.2 (or a first boot)
-            means Rescan, since the fixtures come from the install scan (the point light above needs none). */}
+            it's "you have no fixtures at all" — which for an old cached catalog (or a first boot) means
+            Rescan, since the fixtures come from the install scan (the point light above needs none). */}
         {sorted.length === 0 && !showPoint && <p className="pct-empty">No matching lights</p>}
         {sorted.length === 0 && !q && (
           <p className="pct-empty pct-lights-hint">Rescan to load airport lights from your install.</p>

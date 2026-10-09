@@ -3,7 +3,7 @@ import { categorize, displayName } from "../../src/core/catalog/categorize";
 import { CATEGORY_BY_NAME } from "../../src/core/catalog/categories.data";
 
 describe("categorize", () => {
-  it("every curated name resolves to its intended category with act=true (AC3)", () => {
+  it("every curated name resolves to its intended category with act=true", () => {
     const wrong: string[] = [];
     for (const [name, cat] of Object.entries(CATEGORY_BY_NAME)) {
       const r = categorize(name, "xref_any");
@@ -35,9 +35,9 @@ describe("displayName", () => {
     expect(displayName("terminal00_ds_16_13")).toBe("Terminal00");
   });
 
-  // forum #110 — the old trailing-number strip collapsed distinct community pylons to the
-  // same label. Keep the number so variants stay distinguishable (name is the only discriminator).
-  it("keeps meaningful trailing numbers so variants stay distinct (#110)", () => {
+  // Stripping trailing numbers would collapse distinct user pylons to the same label. Keep the number
+  // so variants stay distinguishable (name is the only discriminator).
+  it("keeps meaningful trailing numbers so variants stay distinct", () => {
     expect(displayName("pylon_15m")).toBe("Pylon 15m");
     expect(displayName("pylon_30m")).toBe("Pylon 30m");
     expect(displayName("pylon_air_race_18_4")).toBe("Pylon Air Race 18 4");
@@ -47,9 +47,8 @@ describe("displayName", () => {
     expect(displayName("pylon_air_race_18_4")).not.toBe(displayName("pylon_air_race_25_5"));
   });
 
-  // keeping trailing numbers also brings built-ins closer to IPACS's own curated labels,
-  // where numbered variants keep their index (verified against the official xref table).
-  it("keeps built-in numeric indices (matches IPACS labels)", () => {
+  // Built-in numbered variants keep their index too, matching the official display labels.
+  it("keeps built-in numeric indices", () => {
     expect(displayName("car_00")).toBe("Car 00");
     expect(displayName("glider_02")).toBe("Glider 02");
     expect(displayName("mast_03")).toBe("Mast 03");

@@ -1,13 +1,11 @@
 // CatalogPanel.tsx — the left panel: a category tree over a virtualized, searchable gallery of
 // catalog objects. Clicking a card arms placement (click the armed card again to disarm); the map
-// then drops the object on click. M2a fills in what the M1e-5 plain-text list deferred: the §2.4
-// category tree, generic per-category icons, and react-window virtualization.
+// then drops the object on click.
 //
-// Perf (the Bug A lesson, now structural): the ~900-object list is virtualized, so only the ~15
-// visible rows are ever in the DOM — a keystroke re-renders those, never 900 cards, and the giant
-// element array the M1e-6 fix had to memoize simply no longer exists. The input still echoes at
-// urgent priority via useDeferredValue while the filtered `objects` array is a deferred pass, and
-// `onArm` is stable so arming re-renders only the affected rows.
+// Perf: the object list is virtualized (react-window), so only the ~15 visible rows are ever in the
+// DOM — a keystroke re-renders those, never the whole catalog. The input echoes at urgent priority
+// via useDeferredValue while the filtered `objects` array is a deferred pass, and `onArm` is stable
+// so arming re-renders only the affected rows.
 import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { List, type RowComponentProps } from "react-window";
 import type { CatalogObject } from "../../core/project/types";
@@ -30,11 +28,9 @@ import { sizeLabel } from "./sizeLabel";
 import { FootprintDialog } from "../dialogs/FootprintDialog";
 
 const ROW_H = 64; // must match .pct-row height budget in styles.css (card + row padding)
-// Rest-before-show, so sweeping the mouse down the list doesn't strobe popups. 250 ms turned out to be
-// too eager in practice (forum #172): the popup kept opening while people were only reading the rows, and
-// they had to jiggle the mouse to stop it. 1 s is the floor of the "at least 1 s, 2 s is long" band
-// ApfelFlieger gave at #178: enough rest that reading the list never triggers it, while still feeling
-// responsive when you do stop on a card (1.5 s and 1.2 s both read as sluggish when actually flown).
+// Rest-before-show, so sweeping the mouse down the list doesn't strobe popups. 250 ms was too eager (the
+// popup opened while the user was only reading the rows); 1 s is long enough that reading never triggers
+// it while still feeling responsive when you stop on a card (1.2–1.5 s feel sluggish).
 const HOVER_DELAY_MS = 1000;
 
 interface ObjectCardProps {
@@ -59,7 +55,7 @@ const ObjectCard = memo(function ObjectCard({
       type="button"
       className={armed ? "pct-obj-card armed" : "pct-obj-card"}
       // The real object name now lives in the hover-preview (reliable on every OS); the native `title`
-      // tooltip was flaky on macOS (#166). Kept ONLY for the disabled/unregistered card — its preview
+      // tooltip was flaky on macOS. Kept ONLY for the disabled/unregistered card — its preview
       // never fires (disabled buttons emit no hover) and this text is a placement hint, not the name.
       title={unregistered ? `${o.name} — a loose user .tmb; use Register (above) before placing it` : undefined}
       aria-pressed={armed}
@@ -96,9 +92,8 @@ const ObjectCard = memo(function ObjectCard({
 /** A banner shown when the catalog holds user `.tmb` that no `.tmi` indexes yet (design B2). It counts
  *  and opens; the plan, the confirmation and the result all live in RegisterDialog.
  *
- *  Q4 chose "a simple banner + confirm/alert, not a bespoke modal", and that held right up until a user
- *  arrived with ~2000 objects: a native alert doesn't scroll, so his skipped list ran off the bottom of
- *  the screen (#125). The banner itself stayed simple — only the surface behind it grew. */
+ *  The result is a scrollable dialog, not a native alert: with thousands of objects the skipped list
+ *  would run off the bottom of the screen. */
 function RegisterBanner({ count }: { count: number }): React.ReactElement | null {
   const pct = getPct();
   const [open, setOpen] = useState(false);
@@ -157,18 +152,18 @@ export function CatalogPanel(): React.ReactElement {
   const filter = useEditor((s) => s.filter);
   const placing = useEditor((s) => s.placing);
 
-  // Hover-preview (forum #170/#166): the card the mouse is resting on, plus where its thumbnail sits.
+  // Hover-preview: the card the mouse is resting on, plus where its thumbnail sits.
   // A short rest-delay via `hoverTimer` keeps a fast scan down the list from strobing popups.
   //
   // Both popups are owned HERE, for the whole panel, and handed to the Lights and Plants sections as
-  // `popovers` (v0.8). Per-section state would have been less plumbing but would let a menu opened in
+  // `popovers`. Per-section state would have been less plumbing but would let a menu opened in
   // Plants sit on screen underneath a hover-preview raised in Objects — the exact stacking the
   // "suppress hover while the menu is open" rule below exists to prevent.
   const [hovered, setHovered] = useState<{ card: CardPhoto; anchor: DOMRect } | null>(null);
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  // Right-click "Paste photo" menu (v0.7): which card, and where the click landed (viewport coords).
+  // Right-click "Paste photo" menu: which card, and where the click landed (viewport coords).
   const [menu, setMenu] = useState<{ card: CardPhoto; x: number; y: number } | null>(null);
-  // The footprint editor (v0.9), opened from that menu. Owned here rather than inside the menu, which
+  // The footprint editor, opened from that menu. Owned here rather than inside the menu, which
   // closes on every action — a dialog rendered from a closing menu unmounts with it.
   const [footprintCard, setFootprintCard] = useState<CardPhoto | null>(null);
 
@@ -255,9 +250,9 @@ export function CatalogPanel(): React.ReactElement {
       />
       <RegisterBanner count={unregisteredCount} />
       {/* The XREF objects live in their own collapsible section so folding it lifts the Lights section
-          into view instead of leaving it pinned to the bottom (forum #86-1). Starts COLLAPSED like
-          Lights and Plants so all three families and their counts are visible at a glance on open,
-          instead of Objects pushing the other two off-screen (forum #163). */}
+          into view instead of leaving it pinned to the bottom. Starts COLLAPSED like the other
+          sections so every family and its count is visible at a glance on open, instead of Objects
+          pushing the rest off-screen. */}
       <details className="pct-objects">
         <summary className="pct-section-summary">Objects ({browsable.length})</summary>
         {tree && <CategoryTree tree={tree} active={category} onSelect={onSelectCategory} />}
@@ -280,10 +275,8 @@ export function CatalogPanel(): React.ReactElement {
       </details>
       <LightsSection popovers={popovers} />
       <PlantsSection popovers={popovers} />
-      {/* Last, and collapsed like the other three (#184): 1.3.0 left it open to advertise the one card
-          people could not find, and ApfelFlieger — who asked for the card in the first place — said he
-          would rather have the four headers line up. A section that is the only one hanging open reads
-          as a state, not as an invitation. */}
+      {/* Last, and collapsed like the other three so the four headers line up. A section that is the
+          only one hanging open reads as a state, not as an invitation. */}
       <AirportSection />
       {/* Suppress the hover-preview while the menu is open so the two popups never stack. */}
       {hovered !== null && menu === null && <HoverPreview card={hovered.card} anchor={hovered.anchor} />}

@@ -1,15 +1,11 @@
 // AirportLayer.ts — the AIRPORT's own point on the map: one draggable ⊕, and nothing else.
 //
-// WHY IT EXISTS (forum #255, ApfelFlieger). "It is very important that Airport has its own coordinates.
-// The coordinates of the airport must be possible for the user both by clicking on the map and by
-// entering the two fields LON and LAT." Through v1.4 the airport had a `position` field that nothing
-// could set and nothing drew, so in practice it followed the first helipad — and his third reason is
-// exactly that this must stop: "the airfield coordinates must not change if any other element changes
-// coordinates." A point you cannot see is a point you cannot trust to stay put.
+// WHY IT EXISTS. The airport has its own coordinates, settable both by clicking the map and by typing
+// LON/LAT, and they must not change when any other element moves. A point you cannot see is a point you
+// cannot trust to stay put.
 //
-// ★ THE GLYPH IS HIS. "each airfield also needs a corresponding symbol on the map. A plus sign that has a
-// circle around its center is common." He attached it. It is the aeronautical convention, so it needs no
-// legend — which is the entire argument for using it rather than inventing another coloured dot.
+// ★ THE GLYPH: a plus sign with a circle around its centre, the aeronautical convention for an airfield,
+// so it needs no legend — the argument for using it rather than inventing another coloured dot.
 //
 // ★ WHY A MARKER AND NOT A PATH, unlike every other layer here. A stand, a pad and a runway have a real
 // SIZE in metres, so they are drawn in world units and grow as you zoom in. An airport's point has no
@@ -19,10 +15,9 @@
 // per gesture is the same "one commit on release" contract the hand-rolled drags keep.
 //
 // ★ WHITE, AND TOLD APART BY SHAPE. Every colour on this map is spoken for — blue footprints, white pads,
-// green plants, violet stands, amber selection, red missing, cyan grips — and the one after this (his
-// ruler, #264) will want a free one too. So this does not spend one: ⊕ cannot be mistaken for the pad's
-// H-in-a-ring at any size, which is the same "distinguish by shape, never by colour" call he makes
-// himself in #264. Selected turns amber, because that is what selected looks like everywhere in PCT.
+// green plants, violet stands, amber selection, red missing, cyan grips. So this does not spend one: ⊕
+// cannot be mistaken for the pad's H-in-a-ring at any size ("distinguish by shape, never by colour").
+// Selected turns amber, because that is what selected looks like everywhere in PCT.
 import * as L from "leaflet";
 import type { LonLat } from "../../core/project/types";
 import { wrapLon } from "../../core/geo/geo";
@@ -79,7 +74,7 @@ export class AirportLayer {
   }
 
   /** Reconcile with the document. `position` is null for an airport that has no point yet — an
-   *  identity-only block, which is legal and is his "(1) DATA" example — and for a project with no
+   *  identity-only block, which is legal — and for a project with no
    *  airport at all. */
   sync(position: LonLat | null, selected: boolean): void {
     if (position === null) {

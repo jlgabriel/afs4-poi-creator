@@ -12,14 +12,11 @@ export function isEditableTarget(el: EventTarget | null): boolean {
 
 /** Is ANYTHING selected? It has to ask about both selections, because they are mutually exclusive:
  *  selecting an airport part empties `selection` and fills `airportSelection` (store.ts,
- *  selectAirportPart). Asking only about `selection` is exactly what left Delete dead on every airport
- *  element in v1.4.0 — "the DELETE key still works on the objects, but not on the elements from the
- *  airfield" (forum #253, refined in #258) — while the Delete BUTTON, which asks about both, went on
- *  working. Named rather than inlined in the hook so the regression has a test of its own.
+ *  selectAirportPart). Asking only about `selection` leaves Delete and the arrows dead on every airport
+ *  element. Named rather than inlined in the hook so the regression has a test of its own.
  *
- *  ★ It guards the ARROWS as well since v1.5, and that is why it is no longer called `hasDeletable`.
- *  The arrows had the identical blind spot and nobody had reported it yet; one predicate for "is there
- *  a subject for an edit shortcut" is the shape that stops the next shortcut inheriting it too.
+ *  ★ It guards Delete AND the arrows: one predicate for "is there a subject for an edit shortcut" stops
+ *  the next shortcut inheriting the same blind spot.
  *
  *  `object | null` rather than the store's AirportSelection: this file stays import-free on purpose, and
  *  the only thing the guard needs to know is whether there is one. */

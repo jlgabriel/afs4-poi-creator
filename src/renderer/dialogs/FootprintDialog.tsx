@@ -1,9 +1,9 @@
-// FootprintDialog.tsx — type in what an object actually measures (v0.9).
+// FootprintDialog.tsx — type in what an object actually measures.
 //
 // Reached from the same right-click menu as the photo actions, and for the same reason: the card already
 // knows exactly which object it names, so the measurement lands under the right key with zero typing of
 // names. What the user supplies is three numbers in metres — the reading you get holding the model up
-// against a 1 × 1 × 1 m cube, which is how ApfelFlieger produced the Runway Approach figures in #129.
+// against a 1 × 1 × 1 m cube.
 //
 // Three things this dialog says out loud, because each is a real limit rather than a detail:
 //   • the numbers are the user's own and stay on their disk (`footprints.json` in userData);
@@ -35,7 +35,7 @@ function scannedSize(subject: PhotoSubject, raw: Catalog | null): Size3 | null {
 /** Parse a field. Returns null for anything that isn't a usable number, so the caller can refuse to save
  *  rather than writing a NaN into a file the loader would then reject. */
 function num(text: string): number | null {
-  const v = Number(text.trim().replace(",", ".")); // a comma decimal is what half the forum types
+  const v = Number(text.trim().replace(",", ".")); // accept a comma decimal separator too
   return text.trim() !== "" && Number.isFinite(v) ? v : null;
 }
 

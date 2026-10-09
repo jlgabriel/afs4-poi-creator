@@ -6,7 +6,7 @@ import {
   lifecycleShortcut,
 } from "../../src/renderer/app/keyboard";
 
-describe("isEditableTarget — the P1-4 focus guard", () => {
+describe("isEditableTarget — the focus guard", () => {
   it("is true for text-entry controls", () => {
     expect(isEditableTarget({ tagName: "INPUT" } as unknown as EventTarget)).toBe(true);
     expect(isEditableTarget({ tagName: "TEXTAREA" } as unknown as EventTarget)).toBe(true);
@@ -22,7 +22,7 @@ describe("isEditableTarget — the P1-4 focus guard", () => {
   });
 });
 
-describe("hasSelection — the guard in front of Del AND the arrows (#253 → #258)", () => {
+describe("hasSelection — the guard in front of Del AND the arrows", () => {
   it("is true for a placed-object selection", () => {
     expect(hasSelection(["obj-1"], null)).toBe(true);
     expect(hasSelection(["obj-1", "obj-2"], null)).toBe(true);
@@ -30,7 +30,7 @@ describe("hasSelection — the guard in front of Del AND the arrows (#253 → #2
 
   // ★ THE REGRESSION. Selecting an airport part EMPTIES `selection` and fills `airportSelection`, so a
   // guard that counted only `selection` returned before deleteSelection ever ran and Del was dead on all
-  // six airport elements while it still worked on objects — which is precisely how he described it.
+  // six airport elements while it still worked on objects.
   it("is true for every airport part, whose selection leaves `selection` empty", () => {
     expect(hasSelection([], { kind: "data" })).toBe(true);
     expect(hasSelection([], { kind: "pad", id: "p1" })).toBe(true);

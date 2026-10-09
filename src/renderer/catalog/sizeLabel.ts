@@ -1,8 +1,8 @@
 // sizeLabel.ts — how a card writes an object's dimensions. One spelling for all three families, so the
-// Lights and Plants sections say "2.0 × 0.5 × 4.0 m" exactly as the XREF gallery has since M2a.
+// Lights and Plants sections say "2.0 × 0.5 × 4.0 m" exactly as the XREF gallery does.
 //
-// A light or a plant only HAS dimensions once the user measured them (v0.9), so the suffix form collapses
-// to "" when there are none — a card with no measurement looks precisely as it did before this feature.
+// A light or a plant only HAS dimensions once the user measured them, so the suffix form collapses to ""
+// when there are none.
 import type { UserFootprint } from "../../core/project/types";
 
 export interface Size3 {

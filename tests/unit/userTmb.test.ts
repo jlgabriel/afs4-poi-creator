@@ -3,7 +3,7 @@ import { parseUserTmb, isTextTmb } from "../../src/core/catalog/userTmb";
 import { buildTmi } from "../../src/core/export/tmiWriter";
 import { parseTmi } from "../../src/core/catalog/tmiParser";
 
-// All fixtures synthetic — invented names, no pylon/IPACS bytes (guardrail #8). Real-file validation
+// All fixtures synthetic — invented names, no pylon/IPACS bytes. Real-file validation
 // is the opt-in LOCAL test. Shape mirrors the real plain-text .tmb: scene → geometry_list →
 // tmxglgeometry(name, matrix, mesh_collision.point_list).
 const IDENTITY = "1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1";
@@ -122,7 +122,7 @@ describe("isTextTmb — first-byte discriminator", () => {
     expect(isTextTmb("  \n\t<[file]")).toBe(true);
   });
   it("false for compiled/binary or empty input", () => {
-    expect(isTextTmb("µþ$Ç")).toBe(false); // the real box.tmb starts 0xB5 0xFE 0x24 0xC7
+    expect(isTextTmb("µþ$Ç")).toBe(false); // a compiled .tmb can start 0xB5 0xFE 0x24 0xC7
     expect(isTextTmb("")).toBe(false);
     expect(isTextTmb("plain text no bracket")).toBe(false);
   });

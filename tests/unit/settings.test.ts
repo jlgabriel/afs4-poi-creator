@@ -5,7 +5,7 @@ import path from "node:path";
 import { readSettings, writeSettings } from "../../src/main/settings";
 
 let tmp: string;
-let realDir: string; // writeSettings now refuses a directory that isn't on disk (Fable I6)
+let realDir: string; // writeSettings refuses a directory that isn't on disk
 beforeEach(() => {
   tmp = mkdtempSync(path.join(os.tmpdir(), "pct-set-"));
   realDir = path.join(tmp, "install");

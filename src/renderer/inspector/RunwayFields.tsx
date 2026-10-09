@@ -1,23 +1,19 @@
 // RunwayFields.tsx — the Inspector's panel for one runway.
 //
-// The layout is ApfelFlieger's, described in words in forum #242 (he skipped the drawing for this one):
-// the two runway ends go in "two possibly fold-out and retractable blocks below each other", explicitly
-// NOT side by side. Both open by default; either can be collapsed.
+// The two runway ends go in two fold-out blocks one below the other, NOT side by side. Both open by
+// default; either can be collapsed.
 //
-// ★★ THE CAPITALS ARE DISPLAY-ONLY. He asked that the selections "appear in the layout in CAPITAL
-// LETTERS", and they do — but the value written into the .tsc/.wad stays lower case. This format is case
-// sensitive and a value it does not recognise fails SILENTLY (the same trap as the XREF names), so the
-// uppercasing lives here, in the label, and never touches the token. There is a test on the writer side.
+// ★★ THE CAPITALS ARE DISPLAY-ONLY. Selections are shown in CAPITAL LETTERS, but the value written into
+// the .tsc/.wad stays lower case. This format is case sensitive and a value it does not recognise fails
+// SILENTLY (the same trap as the XREF names), so the uppercasing lives here, in the label, and never
+// touches the token. There is a test on the writer side.
 //
-// ★ WHAT IS NOT HERE, and both are his instruction, not an omission:
-//   • `endpoint`. PCT uses the threshold for both rows (#236: "in the PCT the leading variable is
-//     [threshold] and their values are automatically transferred to [endpoint]"), and #242 repeats it:
-//     "PCT should not show [endpoint] in the layout at all". Offering it would let a user describe a
-//     displaced threshold for pavement PCT never draws.
-//   • `elevation`. "Currently not used in FS 4" — written as 0, never shown.
-//   • The custom PAPI position and its three companion rows. #242 says use the defaults at first; #243
-//     is the follow-up that says PCT could map it eventually. All four rows already go out with his
-//     default values, so adding the controls later changes no file that nobody edits.
+// ★ WHAT IS NOT HERE, deliberately:
+//   • `endpoint`. PCT uses the threshold for both rows. Offering it would let a user describe a displaced
+//     threshold for pavement PCT never draws.
+//   • `elevation`. Unused by FS4 — written as 0, never shown.
+//   • The custom PAPI position and its three companion rows. All four already go out with default
+//     values, so adding the controls later changes no file that nobody edits.
 import type {
   AirportRunway,
   AirportRunwayEnd,
@@ -38,7 +34,7 @@ const shout = (v: string): string => v.toUpperCase();
 const bearing = (deg: number): string => String(Math.round(deg) % 360).padStart(3, "0");
 
 /** The runway's title: its two identifiers, which is how anyone refers to a runway. Both may be empty —
- *  legal, and his 0001 sample leaves the second blank — and then it is just "Runway". */
+ *  legal, and a one-ended sample leaves the second blank — and then it is just "Runway". */
 function titleFor(r: AirportRunway): string {
   const a = r.ends[0].identifier.trim();
   const b = r.ends[1].identifier.trim();
@@ -62,8 +58,8 @@ function EndBlock({
 
   return (
     <details className="pct-runway-end" open>
-      {/* His numbering, not a zero-based index: the file's rows are `threshold1`/`threshold2`, and #242
-          asks that "this distinction should also be made in the layout of the PCT". */}
+      {/* 1-based, not a zero-based index: the file's rows are `threshold1`/`threshold2`, and the layout
+          mirrors that. */}
       <summary>
         END {index + 1}
         {end.identifier.trim() !== "" && <span className="pct-end-code">{end.identifier.trim()}</span>}
@@ -119,10 +115,8 @@ function EndBlock({
 
       <label className="pct-field pct-field-col">
         <span className="pct-field-label">Approach lighting</span>
-        {/* A FLAT list, deliberately. The vocabulary splits in two (airport.ts: the six his ACT offers,
-            the five FS2-era ones FS4 still loads), but that split is a fact about HIS editor, and nobody
-            using PCT has it — grouping the menu by it would show the user a distinction that means
-            nothing to them. The order is still his. */}
+        {/* A FLAT list, deliberately. The vocabulary has two generations (airport.ts), but grouping the
+            menu by that would show the user a distinction that means nothing to them. */}
         <select
           className="pct-num"
           value={end.appltsys}
@@ -205,17 +199,12 @@ export function RunwayFields({ runway }: { runway: AirportRunway }): React.React
     <div className="pct-inspector-body">
       <div className="pct-field-title">{titleFor(runway)}</div>
 
-      {/* ⛔ Two notes stood here and #286 strikes both under one X: the drag instructions, and "What PCT
-          writes" — his own demarcation from the ACT (#242), that PCT writes the runway's data and not its
-          asphalt. That one is the most quotable sentence in the panel and it is still true; it is the
-          manual's now, like every other header note. */}
+      {/* PCT writes the runway's DATA, not its asphalt — explained in the manual, not here. */}
       <div className="pct-field pct-field-col">
         <span className="pct-field-label">Runway</span>
       </div>
 
       <label className="pct-field pct-field-col">
-        {/* The note that hung off this label is gone (#286). What Aerofly does with the width is
-            background, and background is the manual's job now. */}
         <span className="pct-field-label">Width — m</span>
         <NumberInput
           value={runway.width}

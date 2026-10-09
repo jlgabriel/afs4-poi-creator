@@ -3,9 +3,8 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { parseXrefTable, lookupXref } from "../../src/core/catalog/xrefTable";
 
-// Opt-in LOCAL test — validates the parser against the REAL official `xref_table.csv` WITHOUT copying
-// any of it into the repo (guardrail: assertions check derived properties, never hardcoded IPACS
-// values). Point at the CSV with PCT_XREF_TABLE=<file>, or drop it anywhere under `_local_reference/`
+// Opt-in LOCAL test — validates the parser against a real `xref_table.csv` WITHOUT copying any of it
+// into the repo (assertions check derived properties, never hardcoded values). Point at the CSV with PCT_XREF_TABLE=<file>, or drop it anywhere under `_local_reference/`
 // (gitignored). Auto-skips when absent so CI stays green and IPACS-free.
 function findCsv(): string | null {
   const env = process.env.PCT_XREF_TABLE;
@@ -26,10 +25,10 @@ function findCsv(): string | null {
 
 const csvPath = findCsv();
 
-describe.skipIf(!csvPath)("parseXrefTable vs the real official xref_table.csv (local, opt-in)", () => {
+describe.skipIf(!csvPath)("parseXrefTable vs a real xref_table.csv (local, opt-in)", () => {
   it("parses cleanly: hundreds of rows, zero warnings, every row well-formed", () => {
     const t = parseXrefTable(readFileSync(csvPath!, "utf8"));
-    expect(t.rows).toBeGreaterThan(700); // ~753 in the 2026-04-10 snapshot
+    expect(t.rows).toBeGreaterThan(700);
     expect(t.warnings).toEqual([]); // the real table parses with no complaints
 
     for (const e of t.byName.values()) {

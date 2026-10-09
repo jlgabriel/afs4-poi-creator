@@ -2,10 +2,9 @@ import { describe, it, expect } from "vitest";
 import { DEFAULT_SIZE, isReachable, restoreBounds, type Rect } from "../../src/main/windowBounds";
 import type { WindowBounds } from "../../src/core/project/types";
 
-// "Can the PCT app also be coded in such a way that it reappears at the same place and in the size as
-// when closing?" (forum #125, @ApfelFlieger). The easy half is giving the bounds back; the half worth
-// testing is the display set CHANGING between runs, because getting that wrong strands the window
-// somewhere unclickable AND persists — every restart reopens it in the same unreachable place.
+// The window reopens where and at the size it was closed. The easy half is giving the bounds back; the
+// half worth testing is the display set CHANGING between runs, because getting that wrong strands the
+// window somewhere unclickable AND persists — every restart reopens it in the same unreachable place.
 
 const LAPTOP: Rect = { x: 0, y: 0, width: 1920, height: 1040 };
 const SECOND: Rect = { x: 1920, y: 0, width: 2560, height: 1400 }; // docked monitor, to the right

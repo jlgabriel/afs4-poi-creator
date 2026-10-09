@@ -1,5 +1,5 @@
 // buildCatalog.ts — TmiSource[] → Catalog. Pure: text in, typed catalog out.
-// Keeps ALL entries (no dedupe): the raw per-bundle sum is the headline 911 count. Duplicate
+// Keeps ALL entries (no dedupe): the catalog count is the raw per-bundle sum. Duplicate
 // handling for the browse UI (source:user wins) is a renderer concern (design §2.1), not here.
 
 import { parseTmi } from "./tmiParser";
@@ -22,14 +22,13 @@ export interface TmiSource {
 }
 
 /** One unregistered user `.tmb` the scan shell hands to buildCatalog (design B2). `text` is the full
- *  plain-text body for an AC3D-exported `.tmb`; null for an OPAQUE (IPACS-compiled) one the scan
+ *  plain-text body for an AC3D-exported `.tmb`; null for an OPAQUE (compiled) one the scan
  *  classified by its first byte and deliberately did NOT read in full. Passed as data (not a filesystem
  *  read here) so buildCatalog stays pure.
  *
  *  `bundle` and `base` differ, and must: the unit of registration is the FOLDER (one `.tmi` per folder,
  *  named after it — see scan.listUserTmb), so N `.tmb` in one folder share a bundle while each keeps its
- *  own basename. v0.3.0 had a single `base` for both, which only held because it looked at the xref root
- *  alone, where every `.tmb` is its own bundle (forum #122). */
+ *  own basename. Only a `.tmb` loose at the xref root is its own bundle. */
 export interface UserTmbInput {
   base: string; // the `.tmb`'s own basename — the object NAME fallback when the file is opaque
   bundle: string; // the bundle it belongs to: its folder, or its own base when loose at the xref root
@@ -67,9 +66,8 @@ export function buildCatalog(
   sources: TmiSource[],
   meta: { installDir: string; userXrefDir: string | null; scannedAt: string },
   airportLights: CatalogAirportLight[] = [],
-  // Optional official-table overlay (build-but-disabled until forum #114 — see xrefTable.ts /
-  // docs/XREF_TABLE_CSV_DECISION.md). null = the shipping default: pure heuristic, output byte-identical
-  // to before. The overlay is STRICTLY ADDITIVE and consulted only per scanned install-source entry —
+  // Optional object-table overlay (built but disabled — see xrefTable.ts). null = the shipping
+  // default: pure heuristic. The overlay is STRICTLY ADDITIVE and consulted only per scanned install-source entry —
   // it never iterates the table, so it can't add objects the scan didn't find.
   table: XrefTable | null = null,
   // Loose user `.tmb` (design B2): objects a user dropped in scenery/xref that aren't yet resolvable from
@@ -98,9 +96,9 @@ export function buildCatalog(
       // registering only clears the `unregistered` badge; the object never MOVES in the tree, and a
       // category selected before hitting Register still exists after it.
       //
-      // `categorize` only describes IPACS's built-ins, so it can't say anything true about a user
+      // `categorize` only describes the built-ins, so it can't say anything true about a user
       // object: it either buries it in `other/<bundle>`, or — on a name collision — files it under
-      // the built-in's category, scattering the user's library through 855 objects that aren't
+      // the built-in's category, scattering the user's library through objects that aren't
       // theirs. Same reasoning as the overlay guard below: the names may collide, the geometry is
       // the user's own. `act` (present in the curated table) is false for the same reason.
       const isUser = src.source === "user";
@@ -122,9 +120,8 @@ export function buildCatalog(
           y: round2(e.bbMax[1] - e.bbMin[1]),
           z: round2(e.bbMax[2] - e.bbMin[2]),
         },
-        category, // NOT replaced this phase: the curated 29-category tree stays the source of the browse
-        //           tree/icons; the official taxonomy rides along as metadata (obj.taxonomy) so wiring
-        //           it into categories is a later UI call, not baked in here.
+        category, // NOT replaced by the overlay: the curated category tree stays the source of the browse
+        //           tree/icons; the table's taxonomy rides along as metadata (obj.taxonomy).
         displayName: official ? official.displayName : displayName(e.name),
         act,
       };

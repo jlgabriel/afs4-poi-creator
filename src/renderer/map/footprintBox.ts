@@ -1,12 +1,11 @@
 // footprintBox.ts — WHICH box a placed object draws and HOW it is turned. Split out of FootprintLayer for
 // the same reason syncDiff was: this file carries no Leaflet import, so it unit-tests under the node
-// config (importing Leaflet in Node throws — it touches `window` at module load). It is also the subtlest
-// arithmetic in v0.9, and untested subtle arithmetic about rotation is exactly what forum #120 was.
+// config (importing Leaflet in Node throws — it touches `window` at module load). Rotation arithmetic
+// is subtle, so it must stay tested.
 //
-// Until v0.9 "has a footprint" and "is an XREF" were the same question, because only an XREF is indexed
-// in a `.tmi`. A user measurement (core/catalog/footprints) gives a light or a plant a box too, so the
-// question splits — and with it comes the fact these functions exist for: the three kinds do not store
-// their facing in the same units.
+// "Has a footprint" and "is an XREF" are different questions: only an XREF gets a box from the scan
+// (only XREFs are indexed in a `.tmi`), but a user measurement (core/catalog/footprints) gives a light or
+// a plant a box too — and the three kinds do not store their facing in the same units.
 
 import type {
   CatalogAirportLight,
@@ -76,7 +75,7 @@ export function extentOf(box: Box): number {
 
 /** The box an object draws, or null when it draws as a point. An XREF always has one — a name the catalog
  *  lacks falls back to the red-dashed placeholder — while a light or plant has one only where the user
- *  measured it (v0.9); a parametric point light never does, since its parameters ARE the light and there
+ *  measured it; a parametric point light never does, since its parameters ARE the light and there
  *  is nothing to measure. */
 export function boxFor(
   obj: PlacedObject,

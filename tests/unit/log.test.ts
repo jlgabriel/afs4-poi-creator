@@ -152,8 +152,8 @@ describe("the log never breaks the app", () => {
 describe("export summary", () => {
   const base = { poiName: "munich_2", objects: 2, target: "install", overwrite: false };
 
-  // The regression. The first real log ever produced read "2 objects, undefined mode": absent IS the
-  // default (setHeightMode deletes the key for baked-asl), and this line printed the field raw.
+  // The regression: printing the field raw gave "2 objects, undefined mode" — absent IS the default
+  // (setHeightMode deletes the key for baked-asl).
   it("an ABSENT heightMode reads as baked-asl, never as undefined", () => {
     const line = formatExportSummary({ ...base, heightMode: undefined });
     expect(line).toContain("baked-asl mode");

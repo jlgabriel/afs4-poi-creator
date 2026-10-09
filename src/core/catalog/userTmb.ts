@@ -2,15 +2,15 @@
 // box), the raw material the registrar turns into a generated `.tmi` (design B2). PURE: text in,
 // typed geometries out — the filesystem/classification shell lives in main (scan.ts).
 //
-// User `.tmb` come in two classes (verified against the real pylon/box files, 2026-07-15):
+// User `.tmb` come in two classes:
 //   • AC3D-exported community objects = PLAIN TEXT in the same <[type][name][value]> grammar PCT
 //     already parses. First byte '<'. Name + real bbox are derivable here.
-//   • IPACS-compiled objects = OPAQUE BINARY (first byte 0xB5, not '<'). Nothing is derivable; the
-//     caller falls back to a filename-only placeholder. This module never sees them (the scan shell
-//     classifies by first byte and only passes text-class files here) but degrades safely if it does.
+//   • Compiled objects = OPAQUE BINARY (first byte not '<'). Nothing is derivable; the caller falls
+//     back to a filename-only placeholder. This module never sees them (the scan shell classifies by
+//     first byte and only passes text-class files here) but degrades safely if it does.
 //
-// Resolution key = the INTERNAL geometry name, the string a POI `.toc` and the generated `.tmi` both
-// reference. The in-sim gate settled this over the earlier file-basename hypothesis. Tolerant by
+// Resolution key = the INTERNAL geometry name (not the file basename), the string a POI `.toc` and the
+// generated `.tmi` both reference. Tolerant by
 // contract (mirrors tmiParser): a parse failure, or a geometry with no derivable bbox, degrades with
 // a warning to "nothing here" (empty geometries) — which the caller treats as the opaque tier — and
 // never throws out of parseUserTmb.
@@ -38,7 +38,7 @@ export interface UserTmbResult {
 const IDENTITY_4X4 = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
 
 /** True if `head` — after an optional BOM and leading whitespace — begins with '<', the plain-text
- *  AFS4 grammar. Compiled `.tmb` are binary (first byte 0xB5 in the real IPACS files) → false. The
+ *  AFS4 grammar. Compiled `.tmb` are binary → false. The
  *  scan shell calls this on a small head so it never decodes a multi-MB binary in full. */
 export function isTextTmb(head: string): boolean {
   let i = head.charCodeAt(0) === 0xfeff ? 1 : 0;

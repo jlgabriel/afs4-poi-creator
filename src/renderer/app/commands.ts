@@ -1,6 +1,6 @@
 // commands.ts — the IPC↔store orchestration the TopBar delegates to. The store never calls IPC and
-// IPC never touches the store; this thin layer is the one place they meet (P0-2: main owns paths +
-// dialogs, the renderer only says WHAT). Every command no-ops without the bridge so preview stays
+// IPC never touches the store; this thin layer is the one place they meet (main owns paths + dialogs,
+// the renderer only says WHAT). Every command no-ops without the bridge so preview stays
 // safe; the buttons are also disabled there, this is belt-and-suspenders.
 import * as mutate from "../../core/project/mutate";
 import { firstProjectError } from "../../core/project/schemas";
@@ -10,12 +10,12 @@ import { editorStore } from "../state/editorStore";
 import { DEFAULT_CAMERA } from "../state/store";
 import { getPct } from "./pct";
 
-/** Minimal error surfacing for M1e-5 — a proper toast/banner is M2. */
+/** Minimal error surfacing: a native alert. */
 function reportError(error: PctError): void {
   window.alert(error.message);
 }
 
-/** Save-time safety net for Fable C1: the editor must never write a document its own loader would
+/** Save-time safety net: the editor must never write a document its own loader would
  *  reject (an out-of-range or non-finite coordinate), which would lock the project out on the next
  *  open. The Inspector's input clamps stop the common cases; this closes the whole class for any path
  *  that slips through. Returns the project to write, or null after warning (nothing is written). */
@@ -77,7 +77,7 @@ export async function doSaveAs(): Promise<void> {
   void pct.clearShadow();
 }
 
-// ── Crash-recovery banner (M2e). The shadow found at boot sits in store.pendingRecovery; the banner
+// ── Crash-recovery banner. The shadow found at boot sits in store.pendingRecovery; the banner
 // resolves it exactly once. Restore loads it as unsaved work; Discard drops it (store + disk shadow). ──
 
 /** Load the pending crash-recovery shadow as unsaved work. */

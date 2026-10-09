@@ -6,8 +6,8 @@ import type { LonLat, Vec3 } from "../../src/core/project/types";
 
 // footprint corners are verified by PROPERTY, not by magic lon/lat literals: each corner must sit
 // at the expected ground distance and compass azimuth from the anchor (checked back through the
-// independent geo.haversine / geo.initialBearing). This pins the axis mapping to the in-sim V3 finding
-// and the rotation sense to the 2026-07-15 in-sim gate, without hand-computing coordinates.
+// independent geo.haversine / geo.initialBearing). This pins the axis mapping and the rotation sense
+// without hand-computing coordinates.
 // (Absolute-coordinate drift is already frozen by geo.test.ts's destination() goldens, which every
 // corner flows through.)
 
@@ -24,7 +24,7 @@ const axisDelta = (a: number, b: number) => {
 };
 
 // A model-local ground offset's expected azimuth (0 = +Y = North, +X = East), turned by `direction` —
-// which runs NEGATIVE against the compass (2026-07-15 gate; see orientation.rotateAzimuth).
+// which runs NEGATIVE against the compass (see orientation.rotateAzimuth).
 const expectedAzimuth = (east: number, north: number, dir: number) =>
   norm360(Math.atan2(east, north) * R2D - dir);
 
@@ -37,7 +37,7 @@ function expectOffset(anchor: LonLat, corner: LonLat, east: number, north: numbe
   }
 }
 
-const ANCHOR: LonLat = { lon: 11.86, lat: 48.37 }; // near Juan's real RCT POI
+const ANCHOR: LonLat = { lon: 11.86, lat: 48.37 };
 
 describe("footprintCorners — model-local corners projected to the map", () => {
   it("symmetric box, direction 0, scale 1: each corner at its true distance & azimuth", () => {
@@ -60,8 +60,8 @@ describe("footprintCorners — model-local corners projected to the map", () => 
     expect(initialBearing(ANCHOR, c2)).toBeCloseTo(expectedAzimuth(10, 20, 0), 4);
   });
 
-  // The calibrated sense (2026-07-15 in-sim gate, three asymmetric objects): `direction` is a
-  // right-handed yaw, so it SUBTRACTS from every corner's compass azimuth. v0.3.0 added it here.
+  // The rotation sense: `direction` is a right-handed yaw, so it SUBTRACTS from every corner's compass
+  // azimuth.
   it("direction turns the footprint AGAINST the compass", () => {
     const bbMin: Vec3 = [-5, -10, 0];
     const bbMax: Vec3 = [5, 10, 4];
@@ -85,12 +85,11 @@ describe("footprintCorners — model-local corners projected to the map", () => 
     expect(initialBearing(ANCHOR, c2x2)).toBeCloseTo(initialBearing(ANCHOR, c2), 4);
   });
 
-  // The V3 experiment: elongated hangar hangar_small_plates_ds_02_15_42 (bbox X=15.45, Y=41.28), long
-  // side along model-Y. In-sim: N–S at direction 0, E–W at direction 90. That pins the AXIS MAPPING —
-  // and ONLY the axis mapping. It says nothing about the rotation sense: the box swings N–S → E–W under
-  // −90 exactly as under +90, because an axis is a line and this box is 180°-symmetric. Reading a sense
-  // into V3 is precisely what caused #120, so this test asserts mod 180 — all V3 ever actually saw.
-  it("V3 parity: the long (model-Y) side runs N–S at dir 0 and E–W at dir 90 (axis only)", () => {
+  // An elongated hangar (bbox X=15.45, Y=41.28), long side along model-Y, runs N–S at direction 0 and
+  // E–W at direction 90. That pins the AXIS MAPPING — and ONLY the axis mapping. It says nothing about
+  // the rotation sense: the box swings N–S → E–W under −90 exactly as under +90, because an axis is a
+  // line and this box is 180°-symmetric. So this test asserts mod 180; the sense is pinned elsewhere.
+  it("axis parity: the long (model-Y) side runs N–S at dir 0 and E–W at dir 90 (axis only)", () => {
     const bbMin: Vec3 = [-7.725, -20.64, 0];
     const bbMax: Vec3 = [7.725, 20.64, 6.83];
     // the box's left long edge runs along model +Y: c0 (minX,minY) → c3 (minX,maxY).
@@ -102,11 +101,11 @@ describe("footprintCorners — model-local corners projected to the map", () => 
     expect(axisDelta(longAxisAt(90), 90)).toBeCloseTo(0, 2); // E–W
   });
 
-  // THE #120 regression. The polygon and the map's facing tick are ONE rotation, so pin the
-  // RELATIONSHIP, not just each side on its own: before the fix the corners added `direction` while the
-  // tick (directionToHeading) subtracted it, and every test here still passed while users watched the box
-  // turn against its own tick. Any future drift between the two now fails right here.
-  it("#120: a corner and the facing tick always swing together, never against each other", () => {
+  // REGRESSION. The polygon and the map's facing tick are ONE rotation, so pin the RELATIONSHIP, not
+  // just each side on its own: if the corners added `direction` while the tick (directionToHeading)
+  // subtracted it, every per-side test could still pass while the box turned against its own tick.
+  // Any drift between the two fails right here.
+  it("a corner and the facing tick always swing together, never against each other", () => {
     const bbMin: Vec3 = [-5, -10, 0];
     const bbMax: Vec3 = [5, 10, 4];
     const cornerAz = (dir: number) =>

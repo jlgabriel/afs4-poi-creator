@@ -84,7 +84,7 @@ describe("shiftEastNorth — (east, north) metres → point", () => {
     expect(w.lat).toBeCloseTo(west.lat, 12);
   });
 
-  it("wraps a shift that pushes a near-antimeridian object past ±180 (Fable B/shift)", () => {
+  it("wraps a shift that pushes a near-antimeridian object past ±180", () => {
     const near = { lon: 179.9995, lat: -16.5 }; // ~Fiji, just west of the antimeridian
     const out = shiftEastNorth(near, 200, 0); // 200 m east → across +180
     expect(out.lon).toBeGreaterThanOrEqual(-180);

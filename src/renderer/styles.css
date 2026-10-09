@@ -138,8 +138,8 @@ body {
    so the rotation is written inline by the layer and this only has to make it legible over satellite
    imagery, which is what the dark shadow is for. pointer-events:none so the glyph never eats the drag on
    the circle underneath it. */
-/* The stand's P (forum #283) shares the H's geometry and legibility, and differs only in that the layer
-   never writes a rotation onto it — see ParkingLayer.layoutGlyph for why. */
+/* The stand's P shares the H's geometry and legibility, and turns with its stand the same way — see
+   ParkingLayer.layoutGlyph. */
 .pct-helipad-glyph,
 .pct-parking-glyph {
   background: none;
@@ -148,7 +148,7 @@ body {
   overflow: visible; /* the icon box is 0×0 now — the letter lives outside it */
 }
 /* The letter painted on a round airport element. It is positioned by its own CENTRE rather than by a
-   fixed box, because since v1.8 its size follows the circle's on-screen radius (map/glyph.ts) and a
+   fixed box, because its size follows the circle's on-screen radius (map/glyph.ts) and a
    24 px box cannot hold a 50 px letter. The layer writes font-size and the full transform inline —
    translate(-50%,-50%) first, then the heading rotation. */
 .pct-helipad-h,
@@ -169,8 +169,7 @@ body {
   user-select: none;
 }
 
-/* The winch drum on the map (forum #278): "The symbol at the position of the winch must be rectangular
-   instead of a round circle." It is a divIcon rather than a Leaflet vector because Leaflet has no square
+/* The winch drum on the map: a square, not a circle. It is a divIcon rather than a Leaflet vector because Leaflet has no square
    in pixels — see GliderLayer. Unlike the pad's H this one IS the click target, so it keeps its pointer
    events and wears the same grab cursor as everything else you can drag. The colours are written inline
    by the layer, which owns the palette; only the geometry lives here. */
@@ -309,8 +308,8 @@ body {
   background: #1f2937;
   color: #cbd5e1;
   cursor: pointer;
-  /* A crowded bar was breaking "Baked ASL" over two lines, so that one button stood 40 px tall beside a
-     24 px "Autoheight" — the uneven box in chrispriv's #151 screenshot. The labels are two words at most.
+  /* A crowded bar would break "Baked ASL" over two lines, so that one button stood 40 px tall beside a
+     24 px "Autoheight". The labels are two words at most.
      (Pin the shrink on the SWITCH, not here: buttons that refuse to shrink let the flex parent collapse
      instead, and `overflow: hidden` then clips them — that briefly ate the whole map-style switch.) */
   white-space: nowrap;
@@ -330,8 +329,8 @@ body {
 /* Airport search — "Airport:" label + typeahead in the dark top bar; the dropdown overflows down over
    the map (see the .pct-topbar stacking-context note above). Recenters the map only; draws nothing.
    `.pct-barfield` is the same label-then-control pairing for any other top-bar control (the Heights
-   switch): grouped here ON PURPOSE so every bar label is one rule — chrispriv (#151) read a label
-   styled unlike "Airport:" as a different KIND of thing, so they must not be able to drift apart. */
+   switch): grouped here ON PURPOSE so every bar label is one rule — a label styled unlike "Airport:" reads
+   as a different KIND of thing, so they must not be able to drift apart. */
 .pct-airport,
 .pct-barfield {
   display: flex;
@@ -546,7 +545,7 @@ body {
   border-radius: 5px;
   background: #f1f5f9;
 }
-/* v0.6: a user photo (Settings → object photos folder) fills the slot instead of the drawn glyph. It
+/* A user photo (Settings → object photos folder) fills the slot instead of the drawn glyph. It
    also carries `.pct-thumb`, so it inherits the slot's size + radius; here we drop the glyph's inner
    padding and cover the square. The padding zeroing uses the doubled class `.pct-thumb.pct-thumb-photo`
    so it OUT-RANKS `.pct-placed-row .pct-thumb` (which sets 3px and appears later in the file) rather
@@ -561,8 +560,8 @@ body {
 .pct-placed-row .pct-thumb.pct-thumb-photo {
   padding: 0;
 }
-/* Hover-preview (forum #170/#166): a floating popup that enlarges the user photo (~3× the 40px thumb —
-   Michael's max) and shows the object's REAL catalog name, the string a photo file is named after.
+/* Hover-preview: a floating popup that enlarges the user photo (~3× the 40px thumb, kept modest) and
+   shows the object's REAL catalog name, the string a photo file is named after.
    Portalled to <body>, so its position:fixed coords come straight from the anchor's bounding rect and
    nothing (the panel's overflow:hidden, the map's stacking context) can clip it. pointer-events:none so
    it never steals the hover from the card underneath; z-index sits above the map, below the modal
@@ -577,7 +576,7 @@ body {
   max-width: 220px;
   padding: 6px;
   background: #fff;
-  border: 1px solid #cbd5e1; /* the thin frame Michael asked for */
+  border: 1px solid #cbd5e1; /* thin frame */
   border-radius: 10px; /* rounded corners */
   box-shadow: 0 6px 20px rgba(15, 23, 42, 0.18);
   pointer-events: none;
@@ -604,7 +603,7 @@ body {
   word-break: break-all; /* long technical names wrap rather than overflow the frame */
 }
 
-/* Right-click object menu (v0.7 "Paste photo"). Same portalled, position:fixed popup family as the
+/* Right-click object menu ("Paste photo"). Same portalled, position:fixed popup family as the
    hover-preview above; z-index 50 sits over a preview that hasn't faded yet, still below the modal layer. */
 .pct-context-menu {
   position: fixed;
@@ -649,7 +648,7 @@ body {
   color: #94a3b8;
   cursor: default;
 }
-/* Separates the photo actions from the footprint one (v0.9) — two different things about the same object. */
+/* Separates the photo actions from the footprint one — two different things about the same object. */
 .pct-context-menu-sep {
   margin: 4px 8px;
   border: 0;
@@ -741,7 +740,7 @@ body {
   flex: 0 0 auto;
 }
 
-/* Register dialog lists (forum #125). Each list scrolls at its own cap, INSIDE .pct-modal-card's 90vh —
+/* Register dialog lists. Each list scrolls at its own cap, INSIDE .pct-modal-card's 90vh —
    two independent bounds, so neither a 35-line skipped list nor both lists together can run off-screen.
    That is the entire bug: a native alert has no such bound and simply grew past the bottom of the screen. */
 .pct-reg-head {
@@ -758,7 +757,7 @@ body {
      shrink below their content by default — in a short window the one-row "will be registered" list
      collapsed to a ~14px sliver with its own scrollbar. Refuse to shrink: each list keeps its cap, and if
      the total still doesn't fit, the card's own overflow scrolls (same as ExportDialog). Only reproducible
-     in a SHORT window — which is the one Michael has. */
+     in a SHORT window. */
   flex: 0 0 auto;
   max-height: 180px;
   overflow-y: auto;
@@ -813,11 +812,8 @@ body {
    TOP-LEVEL `.pct-field`, which sits in the panel's own flex COLUMN, that same rule reads as "grow
    vertically", so every such block stretched to swallow the panel's leftover height.
 
-   It was always there — Michael's own v1.5.0 screenshot has the gap under the helipad's paragraph — but
-   it stayed invisible while the blocks were full of prose. Folding the notes away behind a `?` (#275)
-   turned it into a gap around NOTHING, which is exactly what Juan caught: "todo el espacio donde ira la
-   explicacion esta en blanco, entonces no se gana nada con ocultarla". Measured on the winch panel: the
-   intro block was 69 px tall for one 16 px line, and the two field blocks 69 px for 51 px of content. */
+   With the notes folded behind a `?`, that stretch shows as a blank gap around NOTHING (e.g. a 69 px
+   block for one 16 px line), which defeats the point of folding them. */
 .pct-field.pct-field-col {
   flex: none;
 }
@@ -836,7 +832,7 @@ body {
   font-size: 12px;
   color: #64748b;
 }
-/* The Inspector's folded notes (forum #275, see inspector/HelpNote.tsx). A 14 px ring beside an 11 px
+/* The Inspector's folded notes (see inspector/HelpNote.tsx). A 14 px ring beside an 11 px
    label: big enough to hit, small enough that a panel of six fields does not read as a panel of six
    buttons. It has to spell out its own font and letter-spacing because it sits inside .pct-field-label,
    which is uppercase and tracked out — and so does the note, or the explanation would shout. */
@@ -931,9 +927,8 @@ body {
   min-width: 0;
 }
 /* Placeholders are HINTS, and they were reading as answers: the browser default is rgb(117,117,117),
-   which sits at 4.6:1 on white — the same weight as the .pct-field-label above the box (4.8:1). Measured,
-   not guessed. ApfelFlieger filled in a heliport and "had to take a closer look several times to realize
-   I had not entered anything yet" (#187), and asked for writing paler than the field names. #94a3b8 is
+   which sits at 4.6:1 on white — the same weight as the .pct-field-label above the box (4.8:1), so an
+   empty field looks filled in. They must be paler than the field names. #94a3b8 is
    the ink this app already uses for text that is present but switched off (.pct-num-off).
    NOT applied to .pct-search: that box has no visible label, so its placeholder is the only thing naming
    it and has to stay legible. */
@@ -942,8 +937,8 @@ body {
   color: #94a3b8;
 }
 /* A checkbox and its words on one line. `.pct-lock` came first (the object's Lock row) and `.pct-check`
-   is the same idiom under a name that is not about locking — the runway's can-land / can-take-off pair
-   (v1.4). One rule rather than two, so they cannot drift. */
+   is the same idiom under a name that is not about locking — the runway's can-land / can-take-off pair.
+   One rule rather than two, so they cannot drift. */
 .pct-lock,
 .pct-check {
   display: flex;
@@ -953,8 +948,7 @@ body {
   color: #334155;
 }
 
-/* One RUNWAY END, fold-out. ApfelFlieger asked for the two ends as "two possibly fold-out and retractable
-   blocks below each other" (forum #242), explicitly not side by side. Same collapsed-details idiom as
+/* One RUNWAY END, fold-out: the two ends are fold-out blocks below each other, not side by side. Same collapsed-details idiom as
    .pct-wad, with a frame because unlike that read-out these blocks are EDITABLE and there are two of
    them — without an edge, END 2's fields read as a continuation of END 1's. */
 .pct-runway-end {
@@ -982,7 +976,7 @@ body {
   gap: 0;
 }
 
-/* Arrange (v0.9.2) — the multi-selection panel's two position buttons, side by side and equal width so
+/* Arrange — the multi-selection panel's two position buttons, side by side and equal width so
    neither reads as the primary one; they do different jobs and are often used together. */
 .pct-arrange-row {
   display: flex;
@@ -1047,7 +1041,7 @@ body {
   margin-top: 8px;
 }
 
-/* The ALWAYS-VISIBLE .wad read-out under an airport field (forum #284, inspector/WadReadout.tsx). It is
+/* The ALWAYS-VISIBLE .wad read-out under an airport field (inspector/WadReadout.tsx). It is
    the same conversion .pct-wad hides behind a summary, and it is styled deliberately quieter than the
    field above it: this line is a value you copy, never one you edit, and six airport panels each carrying
    one must not read as six more inputs. Hence 10 px, no border, and the whole thing one line tall. */
@@ -1055,13 +1049,12 @@ body {
   display: flex;
   align-items: center;
   /* `.pct-field-row`'s gap, deliberately, not a tighter one: these read-outs sit UNDER Lon and Lat and
-     have to line up with the fields they belong to (#295). */
+     have to line up with the fields they belong to. */
   gap: 8px;
   margin-top: 2px;
 }
-/* One read-out = its own tag AND its own value (#295). The tag used to sit once at the head of the line,
-   which on a pair reads as a label for the left number only — "on the left is '.wad' and on the right
-   not". Two identical items, each half the width, is the shape that cannot be misread. */
+/* One read-out = its own tag AND its own value. A single tag at the head of the line would read, on a
+   pair, as a label for the left number only. Two identical items, each half the width, is the shape that cannot be misread. */
 .pct-wad-item {
   flex: 1 1 0;
   min-width: 0; /* same reason as .pct-wad-cell's: a 16-digit value must be allowed to shrink */
@@ -1258,7 +1251,7 @@ body {
   height: 30px;
   padding: 3px;
 }
-/* v1.3: the install dialog's read-only summary of what is about to be written. Label left, value right,
+/* The install dialog's read-only summary of what is about to be written. Label left, value right,
    so four rows of different lengths still read as a table. */
 .pct-summary {
   list-style: none;
@@ -1278,9 +1271,9 @@ body {
   overflow-wrap: anywhere;
 }
 
-/* v1.3: the pad's pinned row. Its icon is a .pct-thumb like every other row's, so the 30px sizing above
-   already covers it; all this adds is a hairline under the row, so the one thing that is not an object
-   reads as a header rather than as list item zero. */
+/* The airport parts' pinned rows. Their icon is a .pct-thumb like every other row's, so the 30px sizing
+   above already covers it; all this adds is a hairline under each row, so the things that are not
+   objects read as headers rather than as list items. */
 .pct-placed-pad {
   margin-bottom: 6px;
   border-bottom-color: #cbd5e1;
@@ -1641,7 +1634,7 @@ body {
   cursor: pointer;
 }
 
-/* v0.2 lights — dropdown, colour swatches, and the Catalog "Lights" section. */
+/* Lights — dropdown, colour swatches, and the Catalog "Lights" section. */
 .pct-select {
   font: inherit;
   padding: 4px 8px;
@@ -1678,11 +1671,11 @@ body {
   border-color: #f59e0b;
   box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.45);
 }
-/* Collapsible catalog sections (forum #86-1): Objects (the virtualized gallery) + Lights fold alike and
+/* Collapsible catalog sections: Objects (the virtualized gallery) + Lights fold alike and
    SHARE the panel's vertical space. NOTE: Chromium wraps a <details>'s content in a block
    ::details-content pseudo-element, so display:flex on the <details> alone never reaches the inner
    scroller — we must flex ::details-content too, or the gallery collapses to its content height and
-   won't scroll. When both are open Objects keeps ~2/3 (it's the 850-object primary list); collapsing one
+   won't scroll. When both are open Objects keeps ~2/3 (it's the large primary list); collapsing one
    lets the other fill the column. */
 .pct-objects,
 .pct-lights {
@@ -1739,7 +1732,7 @@ body {
   margin: 0;
 }
 
-/* Footprint dialog (v0.9): the three metre fields side by side, so width × depth × height reads as one
+/* Footprint dialog: the three metre fields side by side, so width × depth × height reads as one
    measurement rather than three unrelated settings. Wraps on a narrow window instead of squeezing. */
 .pct-footprint-row {
   display: flex;

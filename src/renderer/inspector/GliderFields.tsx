@@ -1,15 +1,14 @@
 // GliderFields.tsx — the Inspector's panels for the two glider starts, AEROTOW and WINCH LAUNCH.
 //
-// One file for both because they are one family (forum #237/#238): both `.wad`-only, both repeatable, both
+// One file for both because they are one family: both `.wad`-only, both repeatable, both
 // named by the user. Two components, because the shape of the data differs in the one way that matters.
 //
-// ★ THE NAME IS THE USER'S JOB, in his words: it should match the runway the start belongs to ("26"), but
-// "the user must enter this himself, PCT does not need to worry about it." So nothing here derives a name
-// from the nearest runway, however tempting — a guessed name on a start that feeds the wrong runway is
-// worse than an empty field.
+// ★ THE NAME IS THE USER'S JOB: it should match the runway the start belongs to ("26"), but the user
+// types it. Nothing here derives a name from the nearest runway, however tempting — a guessed name on a
+// start that feeds the wrong runway is worse than an empty field.
 //
-// ★ AN AEROTOW HAS A HEADING; A WINCH LAUNCH DOES NOT. "The length and direction then result from the two
-// positions GLIDER and WINCH." The winch panel therefore shows two coordinate pairs and no heading field —
+// ★ AN AEROTOW HAS A HEADING; A WINCH LAUNCH DOES NOT: its length and direction follow from the two
+// positions, GLIDER and WINCH. The winch panel therefore shows two coordinate pairs and no heading field —
 // a heading here could disagree with the two points, and the file has no row for it.
 import type { AirportAerotow, AirportWinch } from "../../core/project/types";
 import { clampLonLat } from "../../core/project/schemas";
@@ -40,9 +39,6 @@ export function AerotowFields({ aerotow }: { aerotow: AirportAerotow }): React.R
             and the cyan grip to turn it.
           </Help>
         </span>
-        {/* ⛔ "Does it need a runway? — No. It usually sits on one, or on its extension when the runway
-            is too short." is struck whole in #289. It was HIS OWN note (#237), kept because the obvious
-            assumption is the opposite one. He is retiring it himself. */}
       </div>
 
       <div className="pct-field pct-field-row">
@@ -109,22 +105,16 @@ export function WinchFields({ winch }: { winch: AirportWinch }): React.ReactElem
   return (
     <div className="pct-inspector-body">
       <div className="pct-field-title">
-        {/* Capital L (#290): he ringed the "l" and wrote «"L" in CAPITAL LETTER». The catalog card and
-            the placed list already said Winch Launch; the panel was the odd one out. */}
+        {/* Capital L, matching the catalog card and the placed list. */}
         {winch.name.trim() === "" ? "Winch Launch" : `Winch Launch ${winch.name.trim()}`}
       </div>
-
-      {/* ✅ The warning that stood here through v1.4.0 is gone. It was never a caveat we invented — he
-          reported the bug to IPACS himself (#229) — and it is retired on his word too: "In the FS 4 the
-          winch is repaired, so the warning can already go away" (#261). */}
 
       <div className="pct-field pct-field-col">
         <span className="pct-field-label">
           Winch Launch
           {/* ★ THIS SENTENCE IS A TEST, and it caught a real bug once: it promises "drag either pink dot,
-              or the rope between them", and the rope shipped without a mousedown. Folding it does not
-              retire the promise — GliderLayer still has to keep it. #290 struck the label's tail
-              ("— two points, no heading") but NOT the note under it, so the promise stays on screen. */}
+              or the rope between them", and the rope once shipped without a mousedown. Folding it does
+              not retire the promise — GliderLayer still has to keep it. */}
           <Help>
             The rope runs from the glider to the winch, and its length and direction are whatever those
             two points say. Drag either pink dot, the square winch, or the rope between them.
@@ -182,12 +172,12 @@ export function WinchFields({ winch }: { winch: AirportWinch }): React.ReactElem
           />
         </label>
       </div>
-      {/* Both ends get one. A winch launch has no heading field — "the length and direction then result
-          from the two positions" (#238) — so the pair of positions IS everything the file carries. */}
+      {/* Both ends get one. A winch launch has no heading field — length and direction follow from the
+          two positions — so the pair of positions IS everything the file carries. */}
       <WadPosition position={winch.winch} />
 
-      {/* Derived, read-only, and worth the line: his range for a real winch launch is 800–1000 m, and the
-          rope length is the one thing here you cannot read off either coordinate pair. */}
+      {/* Derived, read-only, and worth the line: a real winch launch runs 800–1000 m,
+          and the rope length is the one thing here you cannot read off either coordinate pair. */}
       <span className="pct-field-meta">
         {Math.round(ropeM)} m of rope · {bearing(initialBearing(winch.position, winch.winch))}° true.
         Usually 800–1000 m.
@@ -196,9 +186,6 @@ export function WinchFields({ winch }: { winch: AirportWinch }): React.ReactElem
       <label className="pct-field pct-field-col">
         <span className="pct-field-label">
           Glider spacing — m
-          {/* "His own value is 25" left with the other background notes (#284). It was a note from
-              ApfelFlieger to us that had leaked onto the screen, in the third person, where nobody using
-              PCT knows who "he" is. What the field MEANS is not background, so that half stays. */}
           <Help>
             A two-rope winch launches two gliders side by side; this is how far apart they stand —
             basically a wingspan.

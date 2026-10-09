@@ -48,8 +48,7 @@ const PROJECT: Project = {
 };
 
 const ID = { icao: "pct001", name: "PCT Test Heliport", country: "us" };
-/** A spec built by hand, to reach the writers without going through the planner. It used to be called
- *  TEMPLATE_SPEC and carried `identity: null` — the by-hand `.txt` pair, removed in #278. */
+/** A spec built by hand, to reach the writers without going through the planner. */
 const BARE_SPEC: HeliportSpec = {
   position: { lon: -116.7947, lat: 34.8536 },
   pads: [{ name: "", position: { lon: -116.7947, lat: 34.8536 }, headingDeg: 40, radiusM: 10 }],
@@ -58,7 +57,7 @@ const BARE_SPEC: HeliportSpec = {
   autoheight: false,
   identity: ID,
 };
-/** The pad is its own point now, not a borrowed object (forum #168) — deliberately NOT on the hangar. */
+/** The pad is its own point, not a borrowed object — deliberately NOT on the hangar. */
 const PAD: AirportPad = {
   id: "pad-1",
   name: "",
@@ -122,12 +121,10 @@ describe("planHeliport", () => {
     ]);
   });
 
-  // ★ REGRESSION. The INSTALL path and the export-TEMPLATE path build their own HeliportSpec, and when
-  // stands were added only the template one got them: "Install HELIPORT…" wrote an airport with the
-  // helipad and silently no parking. Nothing failed — the files were valid, just missing a block — which
-  // is why this is a test and not a code comment. EVERY repeatable element is pinned here, so the next
-  // one cannot be added to one half only.
-  it("writes every repeatable element on the INSTALL path too, not only in the templates", () => {
+  // ★ REGRESSION. The install path builds its own HeliportSpec, and an element that is not wired into it
+  // is silently dropped: the files stay valid, just missing a block. EVERY repeatable element is pinned
+  // here, so the next one cannot be left out of the install.
+  it("writes every repeatable element on the INSTALL path", () => {
     const opts = {
       ...OPTS,
       heliport: {
@@ -211,18 +208,15 @@ describe("planHeliport", () => {
     }
   });
 
-  // ★★ INSTALLABLE ALONE (v1.5, forum #255). "When all data entries for an airport are made, it must
-  // already be able to be installed alone - even if no other element for this airport has yet been
-  // entered." Through v1.4 an empty pad list was silently replaced by ONE invented pad at the POI anchor,
-  // which was right for the opt-in heliport TEMPLATE — a template with no helipad has nowhere to spawn a
-  // helicopter — and wrong here: it wrote a helipad the user never placed into a file they are installing
-  // precisely to see what FS 4 already knows about the code.
+  // ★★ INSTALLABLE ALONE. An airport with only its data entries filled in must already be installable,
+  // with no other element. An empty pad list must stay empty: inventing a pad at the POI anchor would
+  // write a helipad the user never placed.
   it("writes NO helipad when the project has none, instead of inventing one", () => {
     const opts = { identity: ID, heliport: { pads: [], position: PAD.position } };
     const plan = planHeliport(PROJECT, [HANGAR], opts);
     const tsc = plan.files.find((f) => f.relPath === "pct001.tsc")!.content;
     const wad = plan.files.find((f) => f.relPath === "pct001.wad")!.content;
-    // The LISTS are still written — they are DEFAULT rows in his own files (#217/#236) — but empty.
+    // The LISTS are still written — they are DEFAULT rows — but empty.
     expect(tsc).toContain("[list_tmsimulator_helipad][helipads][]");
     expect(tsc).not.toContain("[tmsimulator_helipad][element]");
     expect(wad).not.toContain("[tmworld_airport_detailed_helipad][element]");
@@ -230,9 +224,8 @@ describe("planHeliport", () => {
     expect(tsc).toContain("[icao][PCT001]");
   });
 
-  // ⛔ GATED 2026-08-14 and REFUSED BY THE SIMULATOR. PCT wrote the pad-less airport #255 asked for and
-  // FS 4 answered: "no valid runway or helipad defined. invalid airport 'PCT No Pad'", with the airport
-  // count unmoved at 8141. The floor is one HELIPAD or one RUNWAY — its words, so a stand does not count.
+  // ⛔ FS 4 rejects an airport with neither a runway nor a helipad ("no valid runway or helipad
+  // defined"). The floor is one HELIPAD or one RUNWAY — a stand does not count.
   it("warns when there is neither a helipad nor a runway, which Aerofly refuses", () => {
     const opts = { identity: ID, heliport: { pads: [], position: PAD.position } };
     const plan = planHeliport(PROJECT, [HANGAR], opts);
@@ -240,8 +233,7 @@ describe("planHeliport", () => {
   });
 
   it("does NOT warn for an airport that has a runway but no helipad — that one is legal", () => {
-    // And this is the case the no-inventing change is actually for: it used to get a helipad the user
-    // never placed.
+    // The case not inventing a pad matters for: a runway-only airport must not gain a helipad.
     const runway = {
       id: "rwy-1",
       ends: [
@@ -256,10 +248,6 @@ describe("planHeliport", () => {
     const tsc = plan.files.find((f) => f.relPath === "pct001.tsc")!.content;
     expect(tsc).not.toContain("[tmsimulator_helipad][element]");
   });
-
-  // ⛔ "still gives the export TEMPLATE its default pad — the two callers want opposite things" stood
-  // here, guarding the split between an install that writes no helipad and a template that invented one.
-  // There is one caller now (#278), and it is the one that invents nothing.
 
   it("drops the cultivation reference entirely for an empty project", () => {
     const plan = planHeliport(PROJECT, [], OPTS);
@@ -279,10 +267,9 @@ describe("planHeliport", () => {
     expect(plan.country).toBe("us");
   });
 
-  // ApfelFlieger, forum #172: the icao ROW must be capitals for FS 4 to display the airport, while the
-  // file and folder names stay lowercase. IPACS agrees with itself on this — `de0025.wad` holds `DE0025`.
-  // v1.1 and v1.2 wrote the code lowercase in both files; the sim matched it anyway (codes are compared
-  // case-insensitively), so the only symptom was cosmetic, which is exactly why it shipped twice.
+  // The code ROW must be capitals for FS 4 to display the airport, while the file and folder names stay
+  // lowercase. The sim matches codes case-insensitively, so a lowercase row only shows as a cosmetic
+  // fault — easy to miss, hence the test.
   it("writes the code in CAPITALS inside both files, and in lowercase on disk", () => {
     const plan = planHeliport(PROJECT, [HANGAR], { ...OPTS, identity: { ...ID, icao: "ab12" } });
 
@@ -291,14 +278,14 @@ describe("planHeliport", () => {
       expect.arrayContaining(["ab12.tsc", "ab12.wad"]),
     );
 
-    // The row is `icao` in the `.tsc` and `identifier` in the `.wad` (forum #342); capitals in both.
+    // The row is `icao` in the `.tsc` and `identifier` in the `.wad`; capitals in both.
     for (const [rel, row] of [["ab12.tsc", "icao"], ["ab12.wad", "identifier"]] as const) {
       const text = plan.files.find((f) => f.relPath === rel)!.content;
       expect(text).toContain(`[${row}][AB12]`);
       expect(text).not.toContain(`[${row}][ab12]`);
     }
-    // Only the CODE goes up. `country` is a path segment under scenery/airports/ and IPACS writes it
-    // lowercase in its own files, so it must not be swept along. (The `.tsc` is its only home now.)
+    // Only the CODE goes up. `country` is a lowercase path segment under scenery/airports/, so it must
+    // not be swept along. (The `.tsc` is its only home.)
     expect(plan.files.find((f) => f.relPath === "ab12.tsc")!.content).toContain("[country][us]");
   });
 
@@ -327,8 +314,8 @@ describe("icaoIndex", () => {
   });
 
   it("never opens a file — a .wad that cannot be read still counts", () => {
-    // Belt and braces on the zero-IPACS-bytes rule: the index is readdir-only, so an unreadable or
-    // binary file is indistinguishable from an empty one.
+    // The index is readdir-only (PCT never reads the sim's files), so an unreadable or binary file is
+    // indistinguishable from an empty one.
     const install = path.join(tmp, "install");
     touch(install, "scenery/airports_db/kdag.wad");
     expect(scanTakenIcaos(install, null).has("kdag")).toBe(true);
@@ -349,10 +336,9 @@ describe("icaoIndex", () => {
   });
 });
 
-// ★ forum #170: "The airfield code must be changed every time." Two faults met here — PCT counted its
-// OWN heliport as a collision, so re-installing after an adjustment was impossible; and deleting the
-// folder by hand did not release the code either. His test zip is SHJH, SHJI, SHJJ, SHJK, SHJL: five
-// codes for one rooftop pad.
+// ★ Re-installing must not force a new code. Two faults are pinned here: counting PCT's OWN heliport as
+// a collision (re-installing after an adjustment would be impossible), and a folder deleted by hand not
+// releasing its code.
 describe("icaoStatus — your own heliport is not a collision", () => {
   /** Install OPTS's heliport into `tmp` and return where it landed. */
   const install = (opts = OPTS): string => {
@@ -367,7 +353,7 @@ describe("icaoStatus — your own heliport is not a collision", () => {
   it("reports a code PCT installed as `ours`, NOT as taken", () => {
     install();
     const s = icaoStatus(null, tmp, "pct001", { refresh: true });
-    expect(s.taken).toBe(false); // ← v1.1 said true here, and blocked the button
+    expect(s.taken).toBe(false); // ← true here would block the Install button
     expect(s.ours.map((h) => h.icao)).toEqual(["pct001"]);
   });
 
@@ -409,7 +395,7 @@ describe("the folder name comes from the IDENTITY, not the POI slug", () => {
   // scenery/airports/, where a coordinate prefix means nothing anyway.
   const UNNAMED: Project = { ...PROJECT, poiName: "", name: "" };
 
-  it("builds <code>_<name>, IPACS's own convention in that tree", () => {
+  it("builds <code>_<name>, the convention in that tree", () => {
     expect(planHeliport(PROJECT, [HANGAR], OPTS).folderName).toBe("pct001_pct_test_heliport");
   });
 
@@ -490,11 +476,9 @@ describe("installing under scenery/airports", () => {
 });
 
 describe("★ nothing may precede the root <[file] tag", () => {
-  // The failure this pins down: with a ten-line `//` banner above `<[file]`, the sim logs
-  // `ERROR: (error loading '…/pct002.tsc')` and NOTHING else. The `.wad` still loads, so the code is in
-  // the airport database while the place is missing — the airport half-exists and cannot be flown, and
-  // the LOCATION search shows nothing. Measured on 2026-07-31; the same file without the banner flew.
-  // Both known-good heliports agree (ApfelFlieger's de0869, the Hong Kong pack).
+  // The failure this pins down: with a `//` banner above `<[file]`, the sim refuses the `.tsc` with only
+  // a generic loading error. The `.wad` still loads, so the code is in the airport database while the
+  // place is missing — the airport half-exists and cannot be flown, and the LOCATION search shows nothing.
   const startsClean = (text: string): boolean => text.startsWith("<[file][][]");
 
   it("holds for an installed heliport", () => {
@@ -510,9 +494,8 @@ describe("★ nothing may precede the root <[file] tag", () => {
     }
   });
 
-  // v1.1 hung a trailing `// …` off each tag line, separated by TABs. Both are gone: the descriptions
-  // moved into a banner INSIDE the place block (ApfelFlieger #167, the shape IPACS uses in its aircraft
-  // files) and TABs went with them, on Jan's advice that they "could lead to interference".
+  // Field descriptions live in a banner INSIDE the place block, not as trailing comments on tag lines,
+  // and the files carry no TABs (they can interfere with parsing).
   it("carries the descriptions in a banner, with no TAB anywhere", () => {
     const tsc = planHeliport(PROJECT, [HANGAR], OPTS).files.find((f) => f.relPath === "pct001.tsc")!;
     expect(tsc.content).toContain("//  Informations:");

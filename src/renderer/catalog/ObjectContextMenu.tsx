@@ -1,17 +1,16 @@
-// ObjectContextMenu.tsx — the right-click menu on a catalog card (v0.7). It turns "I photographed this
-// object in the sim" into "this object now shows that photo", named right by construction: the card already
+// ObjectContextMenu.tsx — the right-click menu on a catalog card. It turns "I photographed this object
+// in the sim" into "this object now shows that photo", named right by construction: the card already
 // knows the object's exact photo key, so Paste writes `<key>.png` with zero typing (main/ipc.ts
-// saveObjectPhoto reads the clipboard itself — the renderer only NAMES the object; P0-2).
+// saveObjectPhoto reads the clipboard itself — the renderer only NAMES the object).
 //
-// v0.8: the key comes from core/catalog/photoKey rather than being an XREF's `name`, so this same menu
-// now serves the Lights and Plants cards. main/ipc.ts is untouched — it always took an opaque, guarded
-// name string, and a namespaced key is just another one.
+// The key comes from core/catalog/photoKey, so the same menu serves xref, Lights and Plants cards;
+// main/ipc.ts takes it as a guarded name string like any other.
 //
-// v0.9 adds a second, separated group: the object's FOOTPRINT. It belongs on this menu for the same reason
-// the photo does — the card knows which object it names, so neither action needs the user to type an id —
-// and it is the answer to forum #126/#129: an airport light has no `.tmi` and therefore no size, so it
-// draws as a bare point until somebody measures it. The editing itself lives in FootprintDialog; this menu
-// only routes to it (the panel owns the dialog, since every menu action closes the menu).
+// A second, separated group edits the object's FOOTPRINT, for the same reason — the card knows which
+// object it names, so no action needs the user to type an id. An airport light has no `.tmi` and
+// therefore no size, so it draws as a bare point until the user measures it. The editing itself lives in
+// FootprintDialog; this menu only routes to it (the panel owns the dialog, since every menu action closes
+// the menu).
 //
 // The three photo actions map 1:1 to the PctApi write side: Paste photo (clipboard → file), Remove photo
 // (delete every extension of the stem, behind a confirm), Open photos folder. The two EXPECTED snags surface INLINE

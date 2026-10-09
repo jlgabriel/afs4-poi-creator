@@ -1,7 +1,6 @@
 // AirportSearch.tsx — the TopBar "Airport:" typeahead. Type an ICAO or a name, pick a match, and the
 // map recenters on that sim airport: a flyTo at AIRPORT_ZOOM, wide enough to frame the whole field.
-// It is purely a camera move — it draws NO marker and never touches the document (Juan's spec: just
-// move the map). The list is bundled reference data (data/airports.ts); ranking is the pure-core
+// It is purely a camera move — it draws NO marker and never touches the document. The list is bundled reference data (data/airports.ts); ranking is the pure-core
 // searchAirports. The keyboard: ↑/↓ move the highlight, Enter picks it, Esc closes then clears.
 import { useMemo, useRef, useState } from "react";
 import { editorStore, useEditor } from "../state/editorStore";

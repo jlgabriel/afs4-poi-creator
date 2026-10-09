@@ -1,17 +1,14 @@
 // ParkingFields.tsx — the Inspector's panel for one parking position.
 //
-// The mask is ApfelFlieger's, drawn in forum #232: LON · LAT · HEADING TRUE · SIZE m · NAME · TYPE. It is
-// the only one of the five submenus he drew rather than described, so this panel follows it field for
-// field and in his order.
+// Field order: LON · LAT · HEADING TRUE · SIZE m · NAME · TYPE.
 //
-// ★ THE USER NEVER SEES `parked_ga`. He was explicit about it (#236): the menu should carry "the terms
-// that tell him something as a human being" — General Aviation, Jet, Pushback. The file's spelling is a
-// fact about the format and lives in PARKING_TYPE_LABELS, one map, so the words on screen and the token
-// on disk can never drift apart.
+// ★ THE USER NEVER SEES `parked_ga`. The menu carries human terms — General Aviation, Jet, Pushback. The
+// file's spelling is a fact about the format and lives in PARKING_TYPE_LABELS, one map, so the words on
+// screen and the token on disk can never drift apart.
 //
-// ★ SIZE IS A RADIUS and the simulator shows the DIAMETER, exactly as for the helipad. His own margin
-// note pins the two defaults ([parked_ga] = 7.5 M, [parked_jet] = 40 M), so the panel says what the sim
-// will call it rather than letting someone discover the factor of two in flight.
+// ★ SIZE IS A RADIUS and the simulator shows the DIAMETER, exactly as for the helipad (defaults:
+// parked_ga = 7.5 m, parked_jet = 40 m), so the panel says so rather than leaving the factor of two to be
+// discovered in flight.
 import type { AirportParking, ParkingType } from "../../core/project/types";
 import { PARKING_TYPES, PARKING_TYPE_LABELS } from "../../core/project/airport";
 import { clampLonLat } from "../../core/project/schemas";
@@ -33,7 +30,6 @@ export function ParkingFields({ parking }: { parking: AirportParking }): React.R
       </div>
 
       <div className="pct-field pct-field-col">
-        {/* ⛔ Struck in #288, note and "?" together — the pad's twin, struck the same way. */}
         <span className="pct-field-label">Parking position</span>
       </div>
 
@@ -67,8 +63,7 @@ export function ParkingFields({ parking }: { parking: AirportParking }): React.R
         <label className="pct-field-col">
           <span className="pct-field-label">
             Heading — true
-            {/* Measured in-sim 2026-07-31 for the pad, and it is the same field: we write TRUE and the
-                sim's menu shows MAGNETIC. */}
+            {/* Same field as the pad's: PCT writes TRUE and the sim's menu shows MAGNETIC. */}
             <Help>Aerofly shows this heading as MAGNETIC, so expect it to read a few degrees off.</Help>
           </span>
           <NumberInput
@@ -80,8 +75,7 @@ export function ParkingFields({ parking }: { parking: AirportParking }): React.R
         <label className="pct-field-col">
           <span className="pct-field-label">
             Size — m
-            {/* His wording, verbatim (#295) — the pad's twin, and deliberately the SAME sentence: these
-                two fields are one field seen twice, and two spellings of one rule is what he objects to. */}
+            {/* Deliberately the SAME sentence as the pad's: one rule, one spelling. */}
             <Help>This is the RADIUS - the map shows DIAMETER (= 2x RADIUS)</Help>
           </span>
           <NumberInput
@@ -111,12 +105,9 @@ export function ParkingFields({ parking }: { parking: AirportParking }): React.R
       <label className="pct-field pct-field-col">
         <span className="pct-field-label">
           Type
-          {/* His replacement (#288 — blue frame, arrow pointing at this block). ⚠️ WHAT IT REPLACED, in
-              case he wants it back: "Which aircraft Aerofly parks here. Changing it resizes the stand,
-              unless you have already typed a size of your own." That resize is real — setAirportParkingType
-              does it — and it is the one thing on this panel the app does to a number the user did not
-              touch. His sentence covers the one TYPE whose behaviour is not in its name. Only the German
-              quotation marks he wrote it with are changed, because the rest of this UI is English. */}
+          {/* The note covers the one TYPE whose behaviour is not in its name. Not mentioned on screen:
+              changing the type resizes the stand unless the user already typed a size
+              (setAirportParkingType) — the one number on this panel the app changes by itself. */}
           <Help>&ldquo;Pushback&rdquo; activates the pushback function regardless of size.</Help>
         </span>
         <select

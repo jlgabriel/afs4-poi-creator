@@ -1,5 +1,4 @@
-// projectFile.ts — main-process project.json persistence (design §3.5). Per the Fable review (P0-2)
-// MAIN owns the current path and every dialog; the renderer only says WHAT (save / save-as / open),
+// projectFile.ts — main-process project.json persistence (design §3.5). Per P0-2, MAIN owns the current path and every dialog; the renderer only says WHAT (save / save-as / open),
 // never WHERE. That path never crosses in from the sandboxed renderer, so a shared/untrusted
 // project.json can't turn into a "write anywhere" primitive.
 //
@@ -18,7 +17,7 @@ import { writeFileAtomic } from "./fsAtomic";
 export type PickPath = () => Promise<string | null> | string | null;
 
 // The path of the project currently open in this main-process instance. Module-level because main is
-// a singleton (Fable P0-2). Exported setter doubles as the reset seam for unit tests.
+// a singleton (P0-2). Exported setter doubles as the reset seam for unit tests.
 let currentPath: string | null = null;
 export function getCurrentProjectPath(): string | null {
   return currentPath;
@@ -32,7 +31,7 @@ function readProjectFile(file: string): Project {
 }
 
 // Atomic (tmp + rename): a crash mid-save must not shred the user's project file — the previous save is
-// the thing they'd fall back on (Fable I5). Same for the sidecar and the shadow below.
+// the thing they'd fall back on. Same for the sidecar and the shadow below.
 function writeProjectFile(file: string, project: Project): void {
   writeFileAtomic(file, JSON.stringify(project, null, 2));
 }
@@ -71,7 +70,7 @@ export async function saveProjectAs(
   return { path: file };
 }
 
-/** Drop a copy of the project JSON INTO an exported POI folder (forum #89-3), beside its
+/** Drop a copy of the project JSON INTO an exported POI folder, beside its
  *  poi.toc/poi.tsl/README, so a shared POI can be re-opened and revised in PCT. Same serialization as
  *  Save; named by the POI slug (already filesystem-safe), falling back to "project". Does NOT touch
  *  currentPath — the sidecar is a companion copy, not "the open file". */
@@ -89,7 +88,7 @@ const shadowFile = (userDataDir: string): string => path.join(userDataDir, "shad
 
 // The MOST important atomic write in the app: a crash DURING the shadow write is exactly the scenario
 // recovery exists for, and a half-written shadow makes loadShadow return null — the safety net gone at the
-// only moment it was ever needed (Fable I5).
+// only moment it was ever needed.
 export function autosaveShadow(userDataDir: string, project: Project): void {
   writeFileAtomic(shadowFile(userDataDir), JSON.stringify(project));
 }

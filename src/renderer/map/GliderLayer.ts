@@ -1,20 +1,15 @@
 // GliderLayer.ts — the two glider starts on the map: AEROTOW and WINCH LAUNCH.
 //
-// ONE layer for both, because they are one family. ApfelFlieger delivered them in one breath (forum
-// #237/#238), both live ONLY in the `.wad`, both are named by the user after the runway they serve, and
-// both are a glider on the ground with a rope leading away from it. Splitting them would mean a fourth and
+// ONE layer for both, because they are one family: both live ONLY in the `.wad`, both are named by the
+// user after the runway they serve, and both are a glider on the ground with a rope leading away from it. Splitting them would mean a fourth and
 // a fifth copy of the same drag state machine — this file has one, with four modes.
 //
 // WHAT MAKES THEM DIFFERENT, and it is the whole reason the winch is not just an aerotow:
 //
-//   AEROTOW  — a point and a HEADING. The tug pulls that way; the rope is drawn a fixed 60 m, his figure.
-//   WINCH    — a PAIR of points and no heading at all. "The length and direction then result from the two
-//              positions GLIDER and WINCH", so the rope (800–1000 m of it) IS the geometry, and storing a
+//   AEROTOW  — a point and a HEADING. The tug pulls that way; the rope is drawn a fixed 60 m.
+//   WINCH    — a PAIR of points and no heading at all. Length and direction result from the two
+//              positions GLIDER and WINCH, so the rope (800–1000 m of it) IS the geometry, and storing a
 //              heading beside it would let the two disagree. Same shape as a runway, one dimension poorer.
-//
-// ✅ WINCH LAUNCH IS REPAIRED IN FS 4 (forum #261) — it came out twisted in the ground through v1.4.0
-// (#229), which is why this file carried a ⛔ and why the shape drawn here had never been confirmed
-// against the simulator. He reported both the bug and the fix; the warnings in the UI went with it.
 //
 // The three contracts every layer here keeps: reference-diff sync, layer-local drag preview with exactly
 // one commit on release, and select on the shape's own `click` while `mousedown` starts the drag — never
@@ -50,7 +45,7 @@ const MARK_PX = 6; // the glider itself is a POINT fixture, so pixels, not metre
 /** The winch drum's side, in pixels. Matched to the glider dot's DIAMETER (2 × MARK_PX) so the two ends
  *  of a launch read as the same weight — a square that circumscribed the circle would look bigger. */
 const WINCH_BOX_PX = 2 * MARK_PX;
-/** How much rope to draw for an aerotow. His figure; the file stores no length, only the heading. */
+/** How much rope to draw for an aerotow. Display only; the file stores no length, only the heading. */
 const AEROTOW_ROPE_M = 60;
 const HANDLE_MARGIN_M = 25; // gap between the rope's end and the rotate grip
 
@@ -69,9 +64,8 @@ interface WinchEntry {
   model: AirportWinch;
   selected: boolean;
   mark: L.CircleMarker; // the glider
-  // ★ THE ONLY SQUARE ON THIS MAP, and a Marker rather than a Path for that reason (#278): "The symbol at
-  // the position of the winch must be rectangular instead of a round circle." Leaflet's vector shapes are
-  // circles and lat/lng polygons — a rectangle drawn in degrees would grow and shrink with the zoom,
+  // ★ THE ONLY SQUARE ON THIS MAP (the winch symbol is rectangular, not round), and a Marker rather than
+  // a Path for that reason. Leaflet's vector shapes are circles and lat/lng polygons — a rectangle drawn in degrees would grow and shrink with the zoom,
   // while the glider dot beside it stayed 12 px. So it is a divIcon, the way AirportLayer draws its ⊕ and
   // HelipadLayer its H, and it is styled through setIcon instead of setStyle.
   far: L.Marker; // the winch itself: a drum, and it looks like one
@@ -453,7 +447,7 @@ export class GliderLayer {
   };
 }
 
-/** The drum, drawn as a square (#278). Module-level and rebuilt on every restyle rather than mutated,
+/** The drum, drawn as a square. Module-level and rebuilt on every restyle rather than mutated,
  *  which is what a divIcon costs and what AirportLayer's ⊕ already pays: the colour lives in the html,
  *  so changing it means a new icon. The casing is the same dark ring the glider dot wears, so the two
  *  ends of a launch stay legible over satellite imagery. */

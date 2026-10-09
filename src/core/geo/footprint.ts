@@ -2,19 +2,13 @@
 //
 // A placed object is anchored at its MODEL ORIGIN (the PlacedXref.position). The scanned
 // bounding box (bbMin/bbMax, model-local metres, z up) is NOT centred on that origin, so the
-// map polygon must be built in model-local metres and offset-rotated around the anchor — this
-// reproduces the ACT idiom (blue footprint, yellow anchor dot).
+// map polygon must be built in model-local metres and offset-rotated around the anchor.
 //
-// AXIS MAPPING — verified in-sim, matrix V3:
+// AXIS MAPPING:
 //   at direction 0:  model +Y = North,  +X = East   (z is up, irrelevant to the 2-D footprint)
 //
-// ROTATION SENSE — NOT spelled out here: orientation.rotateAzimuth owns it, so a corner and the map's
-// facing tick turn as one. That split is deliberate. V3 looked like it settled the sense too ("+Y = North,
-// clockwise"), but it never could: its evidence was an elongated hangar swinging N–S → E–W, which happens
-// under −90 exactly as under +90 — a 180°-symmetric box is blind to the sign. The sense was only ever
-// pinned by the 2026-07-15 in-sim gate (three ASYMMETRIC objects, whose front you can actually see):
-// `direction` turns compass azimuths NEGATIVE, despite the format bible's `("-"=COUNTERCLOCKWISE)` note.
-// This file believed the wrong half of V3 until forum #120 — users saw the polygon turn against its tick.
+// ROTATION SENSE — NOT spelled out here: orientation.rotateAzimuth owns it (`direction` turns compass
+// azimuths NEGATIVE), so a corner and the map's facing tick turn as one.
 //
 // So a model-local ground offset (east, north) sits at azimuth rotateAzimuth(atan2(east, north), direction).
 // geo.ts already speaks this language (destination(): 0 = North, 90 = East, clockwise), so footprints stay

@@ -1,7 +1,7 @@
 // usePct.ts — the app bootstrap hook. Runs once on mount and decides the top-level phase:
 //   • no bridge (preview)      → seed the demo catalog + project, go to "editor"
 //   • bridge + cached catalog  → load it, start a blank project, go to "editor"
-//   • bridge, nothing cached   → "wizard" (first-run; the real wizard lands in M1e-5e)
+//   • bridge, nothing cached   → "wizard" (first-run)
 // The store is seeded BEFORE the editor renders, so MapView (which reads the camera once at mount)
 // sees the right project. The `cancelled` latch keeps React 19 StrictMode's double-invoke from
 // double-seeding / racing the async IPC reads (which are idempotent anyway).
@@ -47,7 +47,7 @@ export function useBootstrap(): Bootstrap {
         pct.getSettings(),
         pct.getCachedCatalog(),
         pct.loadShadow(), // a crash-recovery copy from a previous session, or null
-        pct.getFootprints(), // v0.9 measurements — applied to whichever catalog arrives below
+        pct.getFootprints(), // footprint measurements — applied to whichever catalog arrives below
       ]);
       if (cancelled) return;
       // BEFORE the branch, so it holds on both paths: loadCatalog reads the current overrides, and on the

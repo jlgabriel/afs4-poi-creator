@@ -1,5 +1,5 @@
-// Electron main process — window lifecycle, IPC registration, and the security hardening from the
-// Fable review (P1-6): sandboxed renderer, a locked-down navigation/permission surface, and a CSP
+// Electron main process — window lifecycle, IPC registration, and the security hardening (P1-6):
+// sandboxed renderer, a locked-down navigation/permission surface, and a CSP
 // applied to the packaged renderer. All real I/O lives in the main modules reached through
 // main/ipc.ts; the renderer stays sandboxed and talks only to the preload bridge.
 import { homedir } from "node:os";
@@ -52,7 +52,7 @@ app.on("will-quit", () => {
 // packaged app is what loads untrusted project.json, and that's where the CSP matters.
 //
 // img-src allows any https host (not just Esri/OSM) so the Settings dialog's custom XYZ tile provider
-// works (design §4 escape-hatch, Fable P1-6 "relax only img-src to https:"). Low risk here: tile URLs
+// works (design §4 escape-hatch, P1-6: relax only img-src to https:). Low risk here: tile URLs
 // come only from the user's own Settings, never from the untrusted project.json (which is names + coords,
 // no image refs). script/connect stay locked to 'self'.
 const CSP =
@@ -64,7 +64,7 @@ function createWindow(): void {
   const userData = app.getPath("userData");
   const documents = app.getPath("documents");
 
-  // Reopen where the user left it (forum #125). `screen` is only legal after app.whenReady(), which both
+  // Reopen where the user left it. `screen` is only legal after app.whenReady(), which both
   // call sites satisfy. windowBounds decides — including refusing a position whose display is gone.
   const workAreas = screen.getAllDisplays().map((d) => d.workArea);
   const { maximized, ...frame } = restoreBounds(readSettings(userData, documents).window, workAreas);
@@ -73,8 +73,8 @@ function createWindow(): void {
     ...frame, // width/height always; x/y only when they still land on a screen
     show: false,
     autoHideMenuBar: true,
-    // The version is here because Michael was asked to test v0.3.3 and had no way to tell what he was
-    // running (forum #131). Build-time constant → the same string in dev, e2e and the installer.
+    // The version is in the title so a tester can tell which build is running. Build-time constant →
+    // the same string in dev, e2e and the installer.
     title: `PCT ${__APP_VERSION__} — POI Creation Tool`,
     webPreferences: {
       preload: join(import.meta.dirname, "../preload/index.cjs"),
@@ -116,17 +116,17 @@ function createWindow(): void {
     return { action: "deny" };
   });
 
-  // ⚠️ This used to compare the target's origin against the current page's and allow a match. That
-  // FAILS OPEN in a packaged build: the renderer is loaded with loadFile, so the current URL is a
-  // file:// one, and EVERY file:// URL has origin "null" — so the comparison was "null" === "null"
-  // for a navigation to any local file, and the guard let it through.
+  // ⚠️ Don't compare the target's origin against the current page's and allow a match. That FAILS
+  // OPEN in a packaged build: the renderer is loaded with loadFile, so the current URL is a file://
+  // one, and EVERY file:// URL has origin "null" — so the comparison is "null" === "null" for a
+  // navigation to any local file.
   //
   // Dragging a file onto the window is enough to reach it: Chromium navigates the top-level frame
   // to the drop, will-navigate fires, both origins are "null", and a crafted .html then loads at a
   // file:// origin WITH THIS PRELOAD ATTACHED — handing that page window.pct, which can export,
-  // install and uninstall. (Found by a Fable review of the same code copied into the X-Plane tool.)
+  // install and uninstall.
   //
-  // PCT is a single page that never legitimately navigates, so the rule is now simply: block
+  // PCT is a single page that never legitimately navigates, so the rule is simply: block
   // everything. The dev server's own origin is the one exception, because Vite may reload it.
   // The decision itself lives in main/navigation.ts so it can be tested; see its spec for the
   // case that matters — two file:// URLs must never count as the same origin.
@@ -201,11 +201,10 @@ app.whenReady().then(() => {
   logEnvironment();
 
   // Deny every permission request app-wide (no camera/mic/geolocation/notifications are needed) — with
-  // exactly ONE exception. Electron routes navigator.clipboard.writeText through this handler, so the
-  // blanket cb(false) made the Inspector's Copy button silently do nothing: it looked like it worked and
-  // never touched the clipboard (Fable I7 — suspected, and confirmed by the e2e, which found the
-  // clipboard still holding its sentinel after a click). Writing SANITIZED text from our own sandboxed
-  // renderer is the narrowest grant that makes the button honest; clipboard READ stays denied.
+  // exactly ONE exception. Electron routes navigator.clipboard.writeText through this handler, so a
+  // blanket cb(false) makes the Inspector's Copy button silently do nothing (the e2e checks the
+  // clipboard after a click). Writing SANITIZED text from our own sandboxed renderer is the narrowest
+  // grant that makes the button honest; clipboard READ stays denied.
   session.defaultSession.setPermissionRequestHandler((_wc, permission, cb) =>
     cb(permission === "clipboard-sanitized-write"),
   );

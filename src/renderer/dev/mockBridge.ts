@@ -4,7 +4,7 @@
 // renderer bundle and never runs inside Electron (where the real preload bridge already exists).
 //
 // Why it exists: some bugs (e.g. "catalog search rejects typing after a wizard boot") only appear on the
-// wizard path with a FULL ~900-object catalog — impossible to reach in the demo-seed preview. This lets
+// wizard path with a FULL production-sized catalog — impossible to reach in the demo-seed preview. This lets
 // `preview:renderer` reproduce it. The synthetic catalog is built with the SAME core categorize/displayName
 // the real scanner uses, so object field shapes match production exactly.
 import type { Catalog, CatalogObject, PlacedXref, Project, Settings } from "../../core/project/types";
@@ -13,8 +13,8 @@ import { photoKey } from "../../core/catalog/photoKey";
 import { EMPTY_FOOTPRINTS, setFootprint, type FootprintOverrides } from "../../core/catalog/footprints";
 import type { InstalledHeliport, InstalledPoi, PctApi } from "../../shared/pctApi";
 
-// A spread of real-ish name stems across the catalog's categories, expanded with numeric suffixes to
-// ~900 entries so the list is production-scale.
+// A spread of real-ish name stems across the catalog's categories, expanded with numeric suffixes so
+// the list is production-scale.
 const STEMS = [
   "tower00_small_plates",
   "hangar_small_plates",
@@ -77,10 +77,8 @@ function buildBigCatalog(): Catalog {
     }
   }
   // Loose user `.tmb` (design B2), in the proportion the register dialog actually has to survive: ONE
-  // readable + THIRTY opaque. The COUNT is the point, not the coverage. Michael scanned ~2000 objects
-  // with exactly one readable, and at roughly this length the old alert-driven flow ran off the bottom
-  // of his screen (#125) — a 1+1 mock renders both lists beautifully and could never have shown that.
-  // Same trap as the register bug itself: ask what the harness is incapable of reproducing.
+  // readable + THIRTY opaque. The COUNT is the point, not the coverage: a long skipped list is what
+  // overflows the screen, and a 1+1 mock renders both lists beautifully and could never show that.
   xref.push({
     name: "my_pylon",
     bundle: "my_pylon",
@@ -94,8 +92,8 @@ function buildBigCatalog(): Catalog {
     act: false,
     unregistered: true,
   });
-  // A REGISTERED user object in a bundle named like FS4's own folder — Michael's static aircraft
-  // (PM #335). Its row should show the plane glyph, not the generic box.
+  // A REGISTERED user object in a bundle named like FS4's own folder (`xref_aircraft`). Its row should
+  // show the plane glyph, not the generic box.
   xref.push({
     name: "p3c_orion_navy",
     bundle: "xref_aircraft",
@@ -132,13 +130,11 @@ function buildBigCatalog(): Catalog {
     userXrefDir: null,
     bundles: [{ bundle, source: "install", path: "C:/Mock/.../tmi", count: xref.length }],
     xref,
-    // v0.8: the Plants and Lights sections were mocked as EMPTY, which meant the preview harness (and the
-    // e2e that drives it) could only ever see their "Rescan to load…" state — so the photo surfaces those
-    // two sections just gained would have been unverifiable outside a packaged build, which is exactly the
-    // hole v0.6.2 closed for the xref gallery. A handful of real-shaped entries each is enough.
+    // A handful of real-shaped Plants and Lights entries, so the preview harness (and the e2e that drives
+    // it) can see those sections' cards and photo surfaces, not only their "Rescan to load…" state.
     //
     // The plants are picked deliberately: `conifer_forest` is the group whose own underscore the photo key
-    // must not mangle, and `palm`/`08` is the pair the format author's proven file places (plants.ts).
+    // must not mangle, and `palm`/`08` is a known-valid pair (plants.ts).
     plants: [
       { group: "broadleaf", species: "00", naturalHeight: 17.5, source: "install", category: "plants/broadleaf", displayName: "Broadleaf 00" },
       { group: "broadleaf", species: "01", naturalHeight: 16.5, source: "install", category: "plants/broadleaf", displayName: "Broadleaf 01" },
@@ -155,12 +151,9 @@ function buildBigCatalog(): Catalog {
   };
 }
 
-// v0.6.2: the browser preview has no disk, so object photos (v0.6) were entirely un-exercisable here —
-// every card kept its glyph and the hover-preview's photo path couldn't be seen without a packaged
-// build. These synthetic photos fix that: a few stems get a generated SVG "photo" so `preview:renderer`
-// shows real <img> thumbs AND the enlarged hover, while every other card still falls back to its glyph.
-// v0.8 adds two non-xref stems (a plant and a fixture) so the harness shows the namespaced keys working
-// end to end, not just the xref path they were modelled on.
+// The browser preview has no disk, so object photos are synthetic here: a few stems get a generated SVG
+// "photo" so `preview:renderer` shows real <img> thumbs AND the enlarged hover, while every other card
+// still falls back to its glyph. Two non-xref stems (a plant and a fixture) exercise the namespaced keys.
 const PHOTO_STEMS = [
   "tower00_small_plates",
   "car_sedan",
@@ -174,7 +167,7 @@ function hasMockPhoto(name: string): boolean {
 /** A stand-in "photo": a tall SVG (200×280, like a person/tower shot) so object-fit:contain visibly
  *  letterboxes in the square thumb and the hover box, exactly as a real portrait photo would.
  *
- *  Keyed by the photo STEM rather than a CatalogObject (v0.8): plants and lights have no CatalogObject to
+ *  Keyed by the photo STEM rather than a CatalogObject: plants and lights have no CatalogObject to
  *  look up, and the mock's job is only to prove the key round-trips. */
 function mockPhoto(stem: string): string {
   const hue = (stem.length * 47) % 360;
@@ -253,7 +246,7 @@ export function installMockBridge(): void {
   let installedHeliports: InstalledHeliport[] = [
     { folderName: "e00367n4801_france", country: "fr", icao: "fr0001" },
   ];
-  // v0.7: a MUTABLE set of lowercased names that have a photo, seeded from PHOTO_STEMS. saveObjectPhoto
+  // A MUTABLE set of lowercased names that have a photo, seeded from PHOTO_STEMS. saveObjectPhoto
   // adds and deleteObjectPhoto removes, so the right-click menu's paste/remove flow is exercisable with no
   // disk (the preview has none). Respects settings.thumbnailsDir like main: none set → "no-photos-dir".
   let mockFootprints: FootprintOverrides = EMPTY_FOOTPRINTS;
@@ -305,7 +298,7 @@ export function installMockBridge(): void {
       return { ok: true, value: undefined };
     },
     openPhotosDir: noop,
-    // v0.9 footprint overrides — in-memory, so the right-click "Edit footprint…" flow and the map's
+    // Footprint overrides — in-memory, so the right-click "Edit footprint…" flow and the map's
     // point→polygon switch are exercisable in the preview harness with no disk. Import/export need a
     // native file dialog, so they report "cancelled" (null) rather than pretending.
     getFootprints: async () => mockFootprints,
@@ -333,8 +326,7 @@ export function installMockBridge(): void {
         xref: catalog.xref.map((o) => (o.unregistered && !o.sizeUnknown ? { ...o, unregistered: undefined } : o)),
       };
       // The real registerXref appends one "Skipped …" warning PER skipped file (xrefRegistrar.ts), so the
-      // RESULT screen gets the same wall the plan did — which is the half of #125 that bit Michael twice.
-      // `warnings: []` here meant the preview could never render that list at all.
+      // RESULT screen gets the same long list the plan did.
       return {
         ok: true,
         value: {
@@ -372,9 +364,9 @@ export function installMockBridge(): void {
       return { ok: true, value: undefined };
     },
     listInstalledPois: async () => installedPois,
-    // Heliports. `kdag` and `lowi` stand in for the ~8k codes a real install has, so the dialog's
+    // Heliports. `kdag` and `lowi` stand in for the codes a real install has, so the dialog's
     // "already used on this machine" path is exercisable with no disk. Codes held by an installed
-    // heliport are NOT `taken` — they come back as `ours`, which is the "replace it" path (forum #170).
+    // heliport are NOT `taken` — they come back as `ours`, which is the "replace it" path.
     icaoStatus: async (icao) => {
       const code = icao.trim().toLowerCase();
       return {

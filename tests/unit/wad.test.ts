@@ -11,9 +11,9 @@ import {
 import { headingToDirection } from "../../src/core/geo/orientation";
 import { buildHeliportWad } from "../../src/core/export/heliportTemplate";
 
-// GROUND TRUTH — ApfelFlieger's hand-built `de0869.wad` (forum #113, in _local_reference). He wrote the
-// degrees; the sim reads the projected pair. If PCT is going to show a user the number to paste, it has
-// to be HIS number, to the last printed digit — so the file itself is the fixture, not our own algebra.
+// GROUND TRUTH — a known-good hand-built `de0869` airport: degrees in the `.tsc`, the projected pair the
+// sim reads in the `.wad`. If PCT is going to show a user the number to paste, it has to match that file
+// to the last printed digit — so the file's values are the fixture, not our own algebra.
 //
 //     de0869.tsc  <[vector2_float64][position][11.82883 49.23516]>            (degrees)
 //     de0869.wad  <[vector2_float64][position][34921.3727857778 43182.1475959329]>
@@ -25,7 +25,7 @@ describe("WAD conversion — reproduces a real .wad file", () => {
   });
 
   it("turns that helipad's compass heading into its exact printed radians", () => {
-    // 111° in his .tsc → raw .toc direction 339 → radians. Routing through headingToDirection is the
+    // 111° in the .tsc → raw .toc direction 339 → radians. Routing through headingToDirection is the
     // point: the sim-calibrated heading mapping stays in ONE place and this is only a unit change.
     expect(headingToDirection(111)).toBe(339);
     expect(directionToWad(headingToDirection(111)).toFixed(14)).toBe("5.91666616426078");
@@ -51,9 +51,8 @@ describe("WAD conversion — the grid anchors", () => {
     // Spherical Mercator, normalized onto the same 0–65536 grid (±85.05° at the edges).
     const mercator = (lat: number): number =>
       WAD_SPAN * (0.5 + Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI) / 360)) / (2 * Math.PI));
-    // At 49° the gap is 86.5 WAD units — 0.31° of latitude, ~34 km on the ground. A different function,
-    // not an approximation, which is why inverting 47 binary IPACS `.wad` files could tell them apart
-    // (46 to 1 for the tangent). This test exists so a future "simplification" to the familiar Mercator
+    // At 49° the gap is 86.5 WAD units — 0.31° of latitude, ~34 km on the ground: a different function,
+    // not an approximation. This test exists so a future "simplification" to the familiar Mercator
     // formula fails loudly instead of quietly moving every heliport a town over.
     expect(Math.abs(latToWad(49) - mercator(49))).toBeGreaterThan(50);
   });
@@ -73,8 +72,8 @@ describe("WAD conversion — display contract", () => {
   });
 });
 
-// Forum #284: the Inspector now shows these values beside the LON/LAT and HEADING fields of all six
-// Airport submenus, so a user can copy them. That makes the read-out and the WRITER two mouths on one
+// The Inspector shows these values beside the LON/LAT and HEADING fields of all six Airport submenus,
+// so a user can copy them. That makes the read-out and the WRITER two mouths on one
 // number, and a heading is where they could disagree without either looking wrong — hence one function.
 describe("WAD conversion — heading, the composed form the Inspector shows", () => {
   it("is the raw direction in radians, not the heading in radians", () => {
@@ -97,7 +96,7 @@ describe("WAD conversion — heading, the composed form the Inspector shows", ()
       identity: { icao: "pct001", name: "Readout", country: "de" },
     });
     // The pad's and the aerotow's `direction` rows, and the position the airport row carries — every one
-    // of them a string the Inspector now prints beside the field the user typed.
+    // of them a string the Inspector prints beside the field the user typed.
     expect(wad).toContain(formatWad(headingToWadDirection(111)));
     expect(wad).toContain(formatWad(lonToWad(at.lon)));
     expect(wad).toContain(formatWad(latToWad(at.lat)));

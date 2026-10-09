@@ -75,11 +75,9 @@ function InstalledPois(): React.ReactElement | null {
 }
 
 /** The fix-it text for an autoheight blocker, shared by the pre-export warning and the error envelope.
- *  The lights wording states the REASON on purpose: chrispriv asked why lights were refused when xrefs
- *  and trees work in autoheight (#151). The in-sim gate (2026-07-20) answered it — a silo in an autoheight
- *  POI lands on the terrain, but airport lights in the same POI are dropped far below the surface: lights
- *  need an absolute (ASL) height, and autoheight is all ground-relative. So the block is a real sim
- *  limitation, not caution, and Baked ASL is the path for lights. */
+ *  The lights wording states the REASON on purpose, since xrefs and trees DO work in autoheight: in an
+ *  autoheight POI the sim drops lights far below the surface — they need an absolute (ASL) height, and
+ *  autoheight is all ground-relative. A real sim limitation, not caution; Baked ASL is the path for lights. */
 function autoheightBlockText(reason: "asl" | "lights", n: number): string {
   const these = n === 1 ? "it" : "them";
   return reason === "lights"
@@ -155,7 +153,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }): React.ReactE
   );
 
   // One install attempt. On a folder-exists refusal, offer to replace and retry with overwrite — the
-  // installer's overwrite path is already safe, so this is dialog-side only (Fable P1-5 / A#5).
+  // installer's overwrite path is already safe, so this is dialog-side only.
   const install = async (opts: ExportOptions): Promise<void> => {
     if (!pct) return;
     setBusy(true);
@@ -183,7 +181,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }): React.ReactE
     setError(null);
 
     const baseElevation = baseElev.trim() === "" ? undefined : Number.parseFloat(baseElev);
-    // isFinite (not just !isNaN): "1e999" → Infinity → "Infinity" literal in the .toc height (Fable C1).
+    // isFinite (not just !isNaN): "1e999" → Infinity → "Infinity" literal in the .toc height.
     if (baseElevation !== undefined && !Number.isFinite(baseElevation)) {
       setError("Base elevation must be a number (metres ASL).");
       return;
@@ -200,9 +198,9 @@ export function ExportDialog({ onClose }: { onClose: () => void }): React.ReactE
     }
     // heightMode is already persisted the moment it's toggled (store-backed) — nothing to sync here.
 
-    // Export-time twin of the C1 save-net (commands.ts): never write a POI the loader would reject.
+    // Export-time twin of the save-net (commands.ts): never write a POI the loader would reject.
     // The export path bypasses doSave, so without this an out-of-range coordinate that Save refuses could
-    // still land in scenery/poi (Fable B2). Belt-and-suspenders now that B1 wraps the map inputs, but it
+    // still land in scenery/poi. Belt-and-suspenders now that the map inputs clamp, but it
     // closes the class and mirrors save. store.serialize() reads the live state, so it reflects the
     // reference/shift/slug just persisted above.
     const problem = firstProjectError(store.serialize());
@@ -345,18 +343,8 @@ export function ExportDialog({ onClose }: { onClose: () => void }): React.ReactE
               </div>
             </div>
 
-            {/* ⛔ "HELIPORT TEMPLATE (ADVANCED)" STOOD HERE AND HE ASKED FOR IT GONE (#278), with a red
-                frame drawn around it in his screenshot: "The red-framed function is actually a good idea -
-                but it still needs to be deleted. In a comparable case, IPACS has very urgently requested to
-                avoid non-specialist TXT files. In the present case, it could be that a user thinks that a
-                POI with TSC and WAD files could also be directly useable as an airfield. => Please delete
-                the framed function without replacement."
-
-                It was the ancestor of "Install HELIPORT…" (forum #160), from a version of PCT that could
-                not write into scenery/airports at all — so it wrote the airport files INTO the POI with a
-                .txt suffix and told the user how to finish the job by hand. That has been a real button
-                since v1.3, which left this one putting airport files in the one place an airport cannot
-                live. Deleted, not hidden: the writers behind it are the install's, untouched. */}
+            {/* The old heliport-template export is gone on purpose: airport files inside a POI folder look
+                installable but are not — an airport only loads from scenery/airports. */}
 
             <div className="pct-field pct-field-col">
               <span className="pct-field-label">Destination</span>

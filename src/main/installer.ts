@@ -4,8 +4,7 @@
 // and lists installed POIs.
 //
 // Electron-free (fs only; dirs passed in, shell.showItemInFolder stays in ipc.ts) so it unit-tests
-// directly. This module IS the write half of the trust boundary: per the Fable review (P0-2) the
-// folder name is re-validated with isSafePoiFolderName HERE — having the check in core is not enough,
+// directly. This module IS the write half of the trust boundary: the folder name is re-validated with isSafePoiFolderName HERE — having the check in core is not enough,
 // it must sit where disk is touched — and every path is resolved strictly inside its root, so PCT can
 // only ever create or delete folders it could have produced (design §3.4 safety note).
 
@@ -111,9 +110,9 @@ export function writePoi(
 
   mkdirSync(root, { recursive: true });
   // Build the POI in a sibling staging folder and swap it in with ONE rename. Writing straight into
-  // `dest` meant a failure part-way through the loop (a full disk) left a PARTIAL POI in scenery/poi/ —
-  // and on overwrite the old, WORKING POI had already been deleted, so the user lost both (Fable I5).
-  // Now the destination changes only once the replacement is complete on disk.
+  // `dest` would leave a PARTIAL POI in scenery/poi/ on a failure part-way through (a full disk) — and
+  // on overwrite the old, WORKING POI would already be deleted, so the user would lose both. The
+  // destination changes only once the replacement is complete on disk.
   const staging = dest + STAGING_SUFFIX;
   rmSync(staging, { recursive: true, force: true }); // scratch from an interrupted earlier write
   try {
@@ -223,8 +222,8 @@ export class UnsafeCountryError extends Error {
 
 const COUNTRY_DIR_RE = /^[a-z]{2}$/;
 
-/** `<afs4UserDir>/scenery/airports/<country>` — mirrors how IPACS itself lays them out
- *  (`scenery/airports/de/de0451_steyerberg…/de0451.tsc`). */
+/** `<afs4UserDir>/scenery/airports/<country>` — the standard airport layout
+ *  (`scenery/airports/<country>/<code>_<name>/<code>.tsc`). */
 export function airportRoot(afs4UserDir: string, country: string): string {
   if (!COUNTRY_DIR_RE.test(country)) throw new UnsafeCountryError(country);
   return path.join(afs4UserDir, "scenery", "airports", country);

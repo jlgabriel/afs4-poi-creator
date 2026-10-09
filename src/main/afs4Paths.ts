@@ -8,7 +8,7 @@ import path from "node:path";
 
 /** Recursively collect every file under `root` with the given lowercase extension (unreadable dirs are
  *  skipped, not fatal). Recursion is load-bearing for `.tmi`/`.tmb`, where an add-on ships as a
- *  ZIP-of-a-folder and a root-only walk saw nothing (forum #122). */
+ *  ZIP-of-a-folder and a root-only walk would see nothing. */
 function findByExt(root: string, ext: string, out: string[] = []): string[] {
   let entries;
   try {
@@ -31,7 +31,7 @@ export const findTmi = (root: string): string[] => findByExt(root, ".tmi");
 export const findTmb = (root: string): string[] => findByExt(root, ".tmb");
 
 /** Every .ttx under `root` — the v0.4 plant library. `.ttx` is a TEXTURE, and for plants that is the
- *  whole asset: `scenery/plants` ships 41 textures and no geometry at all, so the filename is the
+ *  whole asset: `scenery/plants` ships textures and no geometry at all, so the filename is the
  *  entire record (see core/catalog/plants.ts). */
 export const findTtx = (root: string): string[] => findByExt(root, ".ttx");
 

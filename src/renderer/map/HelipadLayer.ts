@@ -1,25 +1,16 @@
 // HelipadLayer.ts — the helicopter start pads on the map: a circle at each pad's real radius, an H, a
 // heading tick, and a rotate grip on the selected one. Drag one to move it, drag its grip to turn it.
 //
-// WHY IT EXISTS. Until v1.2 the pad had no representation at all — it was derived at export time from
-// whichever object happened to be selected, so "where does the helicopter actually start, and which way
-// does it face" was a question you answered by flying there. ApfelFlieger asked for exactly this (forum
-// #170): the start position should be something you can see on the map for "positioning, alignment and
-// size", and — separately, #168 — it must not be an XREF, "because this will lead to collisions too
-// quickly". Both wants are the same object: a pad of its own, drawn.
+// WHY IT EXISTS. Where the helicopter starts and which way it faces should be visible on the map
+// (position, alignment, size), and the start must not be an XREF — an object's coordinates would put the
+// helicopter inside it. Both needs are the same object: a pad of its own, drawn.
 //
-// ★ A LIST SINCE v1.4 (forum #221: "this element can now be used as often as desired" — his own SCLC
-// ships three). This class was a SINGLETON that reached for `pads[0]`, which is the last place the UI
-// knew less than the model. It now takes ParkingLayer's shape verbatim — a Map of entries keyed by id,
-// reference-diff sync, drag state that names an id — because that shape was written for this (see its
-// header, which says so) and a second list machine would be a second thing to keep correct.
+// ★ A LIST: an airport may have any number of pads. Same shape as ParkingLayer — a Map of entries keyed
+// by id, reference-diff sync, drag state that names an id — so there is one list machine to keep correct.
 //
-// ★★ AND THE REWRITE FIXES A KNOWN BUG, which is half the reason it is a rewrite and not a widening.
-// This class used to fire `onSelect` from the DOCUMENT's mouseup when a drag had never `moved`, and
-// `moved` is set on the first mousemove with no threshold — so any tremor between pressing and releasing
-// ate the click and the pad did not select. ParkingLayer hit this on day one and fixed it by splitting
-// the gestures: `click` on the shape selects, `mousedown` starts the drag, and Leaflet decides which is
-// which. The note left behind then said this file still had the fragile spelling. It does not now.
+// ★★ SELECT ON `click`, DRAG ON `mousedown`. Never fire `onSelect` from the document's mouseup when a
+// drag never `moved`: `moved` is set on the first mousemove with no threshold, so any tremor between
+// press and release eats the click. Splitting the gestures lets Leaflet decide which is which.
 //
 // WHY NOT FOLD INTO ParkingLayer OUTRIGHT. A pad is not a stand where it is drawn: the white-on-satellite
 // ring, and the H — which turns with the heading and vanishes below a pixel threshold, because at world
@@ -43,7 +34,7 @@ import { snapAngle } from "./rotate";
 export interface HelipadCallbacks {
   onMove(id: string, p: LonLat): void; // fired once on drag END (undo-friendly), like every other layer's
   onRotate(id: string, headingDeg: number): void; // TRUE compass degrees
-  /** A click that was not a drag — the pad becomes the Inspector's subject (v1.3, forum #173). Carries
+  /** A click that was not a drag — the pad becomes the Inspector's subject. Carries
    *  the pad's own id: there are several airport parts and the store needs to know WHICH one was hit. */
   onSelect(id: string): void;
 }
@@ -54,7 +45,7 @@ export interface HelipadCallbacks {
 const PAD_STROKE = "#ffffff";
 const PAD_CASING = "#0f172a";
 /** Selected: the same amber every other selected thing on this map wears (FootprintLayer's
- *  COLOR_SELECTED). v1.3 — before it, the pad could not be selected at all. */
+ *  COLOR_SELECTED). */
 const PAD_SELECTED = "#f59e0b";
 const COLOR_HANDLE = "#06b6d4"; // the same cyan grip the footprints use — it is the same control
 const SNAP_DEG = 5; // Shift-snap, as everywhere else
@@ -241,7 +232,7 @@ export class HelipadLayer {
     // The H turns WITH the pad — a helipad's H is painted along the approach, so a pad heading 090 shows
     // an H lying on its side. That is also the cheapest readout of the heading at a glance.
     //
-    // ★ AND IT IS SIZED FROM THE PAD, not from the screen (v1.8) — see glyph.ts. The icon box is 0×0 and
+    // ★ AND IT IS SIZED FROM THE PAD, not from the screen — see glyph.ts. The icon box is 0×0 and
     // the letter centres itself with translate(-50%,-50%), because a fixed box cannot hold a letter whose
     // size changes with the zoom.
     const size = glyphPx(this.radiusPx(p));

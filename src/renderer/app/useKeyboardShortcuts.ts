@@ -13,7 +13,7 @@ export function useKeyboardShortcuts(): void {
     const onKey = (e: KeyboardEvent): void => {
       // A modal (the Export dialog) owns the keyboard while open. Its buttons aren't editable targets,
       // so without this the focus guard below lets Delete/arrows/Ctrl+Z mutate the document behind the
-      // modal (P1-2). aria-modal is the semantic signal every PCT modal sets — covers Settings in M2 too.
+      // modal. aria-modal is the semantic signal every PCT modal sets.
       if (document.querySelector('[aria-modal="true"]') !== null) return;
       const mod = e.ctrlKey || e.metaKey;
 
@@ -55,13 +55,11 @@ export function useKeyboardShortcuts(): void {
         // macOS laptops send Backspace for their only delete key (P1-6). Consume it only when there's
         // something to delete, so a bare Backspace isn't swallowed (and never triggers history back-nav).
         //
-        // ★ ASK ABOUT BOTH SELECTIONS, or the key is dead on half the app (forum #253, refined in #258:
-        // "the DELETE key still works on the objects, but not on the elements from the airfield").
-        // Selecting an airport part EMPTIES `selection` and fills `airportSelection` — the two are
-        // mutually exclusive by design (store.ts, selectAirportPart) — so a guard that counts only
-        // `selection` returns before ever reaching deleteSelection, which has handled both since v1.4.
-        // The Delete BUTTON never had this bug because it asks `!hasSelection && !airportSelected`;
-        // `hasSelection` is that same question, asked once and testable.
+        // ★ ASK ABOUT BOTH SELECTIONS, or the key is dead on every airport element. Selecting an airport
+        // part EMPTIES `selection` and fills `airportSelection` — the two are mutually exclusive by
+        // design (store.ts, selectAirportPart) — so a guard that counts only `selection` returns before
+        // ever reaching deleteSelection, which handles both. The Delete BUTTON asks the same question
+        // (`!hasSelection && !airportSelected`); `hasSelection` asks it once and testably.
         if (!hasSelection(store.selection, store.airportSelection)) return;
         e.preventDefault();
         store.deleteSelection();
@@ -80,11 +78,11 @@ export function useKeyboardShortcuts(): void {
 
       const vec = arrowToVector(e.key, e.shiftKey);
       // The same guard Delete uses, for the same reason: an airport part leaves `selection` empty, so
-      // counting only that list is what kept the arrows off every airport element until v1.5.
+      // counting only that list would keep the arrows off every airport element.
       if (vec !== null && hasSelection(store.selection, store.airportSelection)) {
         e.preventDefault(); // else arrows scroll the panels
         // ONE call for the whole selection: looping per object made each keypress push N undo entries,
-        // because the store's coalescing key alternated between them and never engaged (Fable I4).
+        // because the store's coalescing key alternated between them and never engaged.
         store.nudgeSelection(vec.deltaM, vec.bearingDeg);
       }
     };

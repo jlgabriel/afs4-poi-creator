@@ -1,9 +1,8 @@
 // fsAtomic.ts — write a file, or leave the previous one intact. Never anything in between.
 //
-// Every durable write in PCT aimed writeFileSync straight at its destination, so a crash (or a full disk)
-// part-way through replaced a good file with a truncated one. That is worst precisely where it hurts most:
-// the crash-recovery shadow — the one file whose entire job is to survive a crash — and the POI folder,
-// where an overwrite deleted the working POI BEFORE writing its replacement (Fable I5).
+// Aiming writeFileSync straight at the destination means a crash (or a full disk) part-way through
+// replaces a good file with a truncated one. That is worst precisely where it hurts most: the
+// crash-recovery shadow — the one file whose entire job is to survive a crash.
 //
 // The fix is the standard one: build the new content beside the destination, then RENAME it into place.
 // rename is atomic on NTFS and POSIX alike (Node passes MOVEFILE_REPLACE_EXISTING on Windows, so it

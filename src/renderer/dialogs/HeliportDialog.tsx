@@ -1,21 +1,11 @@
 // HeliportDialog.tsx — "Export /airports": write the open project into scenery/airports/ as a real
 // heliport you can start a flight from.
 //
-// ★ WHAT v1.3 TOOK OUT OF HERE, and why (forum #173, ApfelFlieger). Through v1.2 this dialog was the
-// whole feature: it placed the pad, held the code, the name and the country, moved the pad by numbers,
-// and installed. He asked for the opposite shape — place the pad from the left column like any other
-// object, edit it on the right in the Inspector — and the argument that settles it is not taste:
-//
-//   • The pad is a thing you judge by looking at the map. This is a full-screen overlay. Through v1.2
-//     the dialog TOLD you to drag a pad it was sitting on top of.
-//   • He tests twice, and the first pass is deliberately without reading anything we wrote ("intuitive
-//     - without reading what Claude wrote"). A control you can only find by reading fails that pass.
-//
-// So placing lives in the catalog (AirportSection), editing lives in the Inspector (HelipadFields for a
-// pad, AirportDataFields for the airport's name and code), and what is left here is the one act that
-// writes outside the project — plus the things that belong to writing and to nothing else: the
-// destination, the overwrite confirmation, the result, and the list of what PCT has already installed
-// with its Uninstall.
+// Placing lives in the catalog (AirportSection) and editing in the Inspector (HelipadFields for a pad,
+// AirportDataFields for the airport's name and code): the pad is judged by looking at the map, and a
+// full-screen dialog would cover it. What is left here is the one act that writes outside the project —
+// plus the things that belong to writing and to nothing else: the destination, the overwrite
+// confirmation, the result, and the list of what PCT has already installed with its Uninstall.
 import { useCallback, useEffect, useState } from "react";
 import type { HeliportInstallOptions, InstallResult, InstalledHeliport, PctError } from "../../shared/pctApi";
 import { identityProblemText, validateIdentity } from "../../core/export/heliportTemplate";
@@ -98,8 +88,8 @@ export function HeliportDialog({ onClose }: { onClose: () => void }): React.Reac
         };
   const problem = identity === null ? null : validateIdentity(identity);
 
-  // Whether the code is one of OURS decides the button's word. Asked once, when the dialog opens, rather
-  // than on every keystroke like v1.2 did — nothing is typed in here any more.
+  // Whether the code is one of OURS decides the button's word. Asked once, when the dialog opens —
+  // nothing is typed in here.
   useEffect(() => {
     let cancelled = false;
     if (pct === null || identity === null || problem === "icao-format") return;
@@ -112,10 +102,8 @@ export function HeliportDialog({ onClose }: { onClose: () => void }): React.Reac
   }, [pct, identity?.icao, problem, installedKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /** Send the user to put the AIRPORT down: arm the placement and get out of the way, because the map is
-   *  behind this. The whole point of v1.3 is that this is the same gesture as placing anything else.
-   *
-   *  It armed a HELIPAD until v1.5, back when a heliport needed one to exist. Since #255 the thing an
-   *  install cannot do without is the airport's own point, so that is what this offers to go and set. */
+   *  behind this — the same gesture as placing anything else. The airport's own point is what an
+   *  install cannot do without, so that is what this offers to go and set. */
   const goPlace = (): void => {
     editorStore.getState().createAirport();
     editorStore.getState().armPlacement({ kind: "airport" });
@@ -126,22 +114,15 @@ export function HeliportDialog({ onClose }: { onClose: () => void }): React.Reac
     if (!pct || airport === undefined || identity === null || problem !== null) return;
     setError(null);
 
-    // ★ NO LONGER "you need a helipad" (v1.5, forum #255). He asked for the opposite: "When all data
-    // entries for an airport are made, it must already be able to be installed alone - even if no other
-    // element for this airport has yet been entered", because installing the bare airfield is how you
-    // find out whether FS 4 already knows it and where it thinks it is.
-    //
-    // What IS required is a point. An airport with no coordinates would be written at the POI anchor, and
+    // ★ A POINT IS REQUIRED. An airport with no coordinates would be written at the POI anchor, and
     // for a project with no objects either that anchor is 0/0 — an airfield in the Gulf of Guinea, filed
     // under the user's own country code. Refusing is the only honest answer, and it is one click to fix.
     if (airport.position === undefined) {
       setError("This airport has no point on the map yet. Set it in the Airport panel, then install.");
       return;
     }
-    // ⛔ THE FLOOR IS AEROFLY'S, and it was measured rather than assumed (gate 2026-08-14). #255 asked for
-    // an airport that installs with nothing else entered; PCT wrote exactly that and the simulator threw
-    // it out: "no valid runway or helipad defined. invalid airport 'PCT No Pad'", with the airport count
-    // unmoved. Its own words name the two that count — a parking position or a glider start does not.
+    // ⛔ THE FLOOR IS AEROFLY'S: the simulator rejects an airport with neither a runway nor a helipad
+    // ("no valid runway or helipad defined"). A parking position or a glider start does not count.
     if (airport.pads.length === 0 && (airport.runways ?? []).length === 0) {
       setError(
         "Aerofly needs at least one helipad or one runway — it rejects an airport with neither. Place one from the catalog, then install.",
@@ -210,7 +191,7 @@ export function HeliportDialog({ onClose }: { onClose: () => void }): React.Reac
     <div className="pct-modal" role="dialog" aria-label="Export to /airports" aria-modal="true">
       <div className="pct-modal-card">
         <div className="pct-modal-head">
-          {/* Named for its destination, like the button that opens it (#296). */}
+          {/* Named for its destination, like the button that opens it. */}
           <h2>Export to /airports</h2>
           <button className="pct-close" onClick={onClose} disabled={busy} aria-label="Close">
             ×
@@ -230,12 +211,10 @@ export function HeliportDialog({ onClose }: { onClose: () => void }): React.Reac
                 ))}
               </ul>
             )}
-            {/* Measured 2026-07-31, twice, and re-measured on 2026-08-02 with the code in capitals: the
-                LOCATION search matches the NAME, never the code, and the row it returns renders BLANK for
-                an invented code — the airport is there (its distance is right) with no text. The map
-                panel shows it correctly, under our own name and code. So: search by name, and the map is
-                the answer to "is it really there". Saying "search for PCT002" made a working install look
-                broken. The capitals did not change this; that text comes from Aerofly's own database. */}
+            {/* Aerofly's LOCATION search matches the NAME, never the code, and for an invented code the row
+                it returns can render BLANK — the airport is there (its distance is right) with no text. The
+                map panel shows it correctly. So: search by name, and the map is the answer to "is it really
+                there". Telling the user to search for the code would make a working install look broken. */}
             <p>
               Restart Aerofly FS 4, then open LOCATION and search for{" "}
               <strong>{airport?.name.trim()}</strong> — by name; the code does not match. The row may come
@@ -255,12 +234,8 @@ export function HeliportDialog({ onClose }: { onClose: () => void }): React.Reac
             </p>
 
             {airport === undefined || airport.position === undefined ? (
-              // Nothing that can be installed yet. Rather than offering to fix it here — which is the
-              // modal-shaped habit v1.3 is undoing — point at the gesture that fixes it and step aside.
-              //
-              // ★ THE MISSING THING IS THE POINT, NOT A HELIPAD (v1.5, #255). An airport with no helipad
-              // installs perfectly well now, and he wants it to: it is how you learn what FS 4 already
-              // has. An airport with no coordinates is the one that cannot be written.
+              // Nothing that can be installed yet. Rather than offering to fix it here, point at the
+              // gesture that fixes it and step aside. An airport with no coordinates cannot be written.
               <div className="pct-field pct-field-col">
                 <p className="pct-empty">
                   This airport is not on the map yet. Every other field can wait; this one cannot, because
@@ -277,8 +252,8 @@ export function HeliportDialog({ onClose }: { onClose: () => void }): React.Reac
               </div>
             ) : (
               <>
-                {/* What is about to be written, read-only. The dialog used to own these fields; now it
-                    reports them, so there is exactly one place they can be changed. */}
+                {/* What is about to be written, read-only: the fields have exactly one place they can be
+                    changed, the Inspector. */}
                 <div className="pct-field pct-field-col">
                   <span className="pct-field-label">About to install</span>
                   <ul className="pct-summary">

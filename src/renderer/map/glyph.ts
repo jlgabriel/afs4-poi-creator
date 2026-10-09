@@ -1,17 +1,12 @@
 // glyph.ts — how big the letter painted on a round airport element is, in screen pixels.
 //
-// WHY IT IS SHARED. The pad's H and the stand's P are meant to be the same object seen twice: he asked
-// for the P *because* the H was already there ("PARKING POSITION should definitely also receive a
-// labelling", #283), and in #295 he made the rule explicit — "All markings should always remain constant
-// relative to the object", and "if a user positions several HELIPAD and PARKING POSITIONs side by side …
-// it irritates when some letters are vertical and others are not." A constant that lived in two files
-// would drift, and the drift would be visible in exactly the arrangement he described.
+// WHY IT IS SHARED. The pad's H and the stand's P are the same kind of marking: both stay constant
+// relative to their object, and pads and stands side by side must show letters of the same size. A
+// constant that lived in two files would drift, and the drift would be visible in exactly that layout.
 //
-// WHY IT SCALES AT ALL (v1.8). Until now the letter was a fixed 17 px while the circle under it grew with
-// the zoom, so a 10 m pad drawn 100 px wide carried a letter 17 px tall — 17% of it. Real paint does not
-// work that way, and his second reason for turning the P leans on the letter being the thing you read:
-// "The 'P' is much better to see than the orientation arrow and thus gives the user a better indication
-// of how (P) is aligned." A letter that shrinks to a sixth of its circle is not that.
+// WHY IT SCALES AT ALL. A fixed-size letter over a circle that grows with the zoom shrinks to a fraction
+// of its circle (17 px on a 100 px pad). Real paint does not work that way, and the letter is meant to be
+// the thing you read the stand's or pad's alignment from.
 
 /** Never smaller than the size it has always had — below this the letter stops being legible, and the
  *  layers already drop it entirely below a 14 px radius. */

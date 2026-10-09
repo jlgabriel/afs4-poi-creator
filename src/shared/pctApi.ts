@@ -1,5 +1,5 @@
-// pctApi.ts — the ONE typed contract between the sandboxed renderer and Electron main (design §3.5),
-// hardened per the Fable review 2026-07-07 (P0-1, P0-2). Two rules from that review:
+// pctApi.ts — the ONE typed contract between the sandboxed renderer and Electron main (design §3.5).
+// Two rules (P0-1, P0-2):
 //   1. Errors do NOT survive ipcRenderer.invoke (the renderer gets a flattened Error, losing
 //      name/points/installDir). So every method that can fail in an EXPECTED way returns a
 //      `PctResult` envelope with a discriminated `PctError.code`; the renderer switches on the code
@@ -44,7 +44,7 @@ export type PctError =
   | { code: "clipboard-empty"; message: string }
   // "Create heliport…": the identity is malformed, or its code is already an airport on THIS machine.
   // `icao-taken` is a REFUSAL, not a warning — installing over a code that exists makes the other airport
-  // disappear with no trace but a line in tm.log, and the person who loses it is not necessarily this user.
+  // disappear with no visible error, and the person who loses it is not necessarily this user.
   | { code: "invalid-identity"; message: string }
   | { code: "icao-taken"; message: string; icao: string }
   | { code: "io"; message: string };
@@ -52,8 +52,8 @@ export type PctError =
 export type PctResult<T> = { ok: true; value: T } | { ok: false; error: PctError };
 
 /** What a scan produced. `warnings` are NON-fatal parse problems (a corrupt .tmi, an entry missing its
- *  bounding box): the catalog is still usable, just smaller. They used to be discarded in main, which
- *  meant an object silently absent from the catalog looked like a PCT bug rather than a damaged install. */
+ *  bounding box): the catalog is still usable, just smaller. Surfacing them keeps an object silently
+ *  absent from the catalog from looking like a PCT bug rather than a damaged install. */
 export interface ScanResult {
   catalog: Catalog;
   warnings: string[];
@@ -121,13 +121,10 @@ export interface IcaoStatus {
 /** Everything the `.tsc`/`.wad` pair needs that is not identity, in UNSHIFTED map coordinates — main hands
  *  it straight to planHeliport, which applies the export shift so all of it travels with the scene.
  *
- *  ★ It used to serve TWO paths, the install and the POI's opt-in `.txt` templates. The templates are gone
- *  (forum #278) and with them `radiusM`, which only ever fed the template's invented default pad.
- *
  *  `pads` — each its OWN point, never a reference to a placed object, so the helicopter cannot spawn inside
- *  the XREF it borrowed coordinates from (forum #168). EMPTY writes no helipad, which is legal for an
- *  airport that has a runway (forum #255). `runways` / `parkings` — EMPTY/absent write no block at all
- *  (forum #217/#232). `position` — the airport's own point (forum #15/#220), absent = the first pad's. */
+ *  the XREF it borrowed coordinates from. EMPTY writes no helipad, which is legal for an airport that has
+ *  a runway. `runways` / `parkings` — EMPTY/absent write no block at all. `position` — the airport's own
+ *  point, absent = the first pad's. */
 export interface HeliportFileOptions {
   pads: AirportPad[];
   runways?: AirportRunway[];
@@ -155,8 +152,7 @@ export interface ExportOptions {
   // terrain-relative height against this one value; when absent, main uses the elevation provider
   // and may return a `needs-elevation` envelope the renderer answers by re-exporting WITH a base.
   baseElevation?: number;
-  // ⛔ `heliport` lived here and is gone (forum #278): a POI export used to be able to carry an opt-in
-  // pair of heliport `.txt` templates. A POI is a POI now, and an airport is installed by its own call.
+  // No `heliport` field: a POI export is only a POI; an airport is installed by its own call.
 }
 
 /** Async (IPC). Implemented in preload/index.ts, handled in main/ipc.ts. Fallible methods return a
@@ -188,7 +184,7 @@ export interface PctApi {
   openPhotosDir(): Promise<void>;
 
   // Footprint overrides (v0.9) — the user's own width × depth × height for objects the scan can't measure
-  // (every airport light and plant, forum #126/#129), stored in their own userData file. Same naming
+  // (every airport light and plant), stored in their own userData file. Same naming
   // discipline as the photos: the renderer names an OBJECT by its photo key and main owns the file.
   // `setFootprint(key, null)` clears one. Every write returns the FULL set, so the renderer adopts one
   // value rather than maintaining its own copy of the truth.
@@ -221,7 +217,7 @@ export interface PctApi {
   uninstallPoi(folderName: string): Promise<PctResult<void>>;
   listInstalledPois(): Promise<InstalledPoi[]>;
 
-  // Heliports (forum #160). `icaoStatus` is for LIVE feedback while the user types; it is not the
+  // Heliports. `icaoStatus` is for LIVE feedback while the user types; it is not the
   // safety mechanism — installHeliport re-checks against a fresh scan at the moment it writes, because
   // the dialog may have been open for a while and another add-on may have landed meanwhile.
   icaoStatus(icao: string): Promise<IcaoStatus>;

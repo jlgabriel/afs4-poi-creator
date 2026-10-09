@@ -162,9 +162,9 @@ describe("placeAt", () => {
   });
 });
 
-// v1.3, forum #173: the pad is placed from the catalog like any other card. It is NOT an object, so
-// this is the one spec that writes the airport block — everything below is about that difference.
-describe("placeAt — the helipad (v1.3)", () => {
+// The pad is placed from the catalog like any other card. It is NOT an object, so this is the one spec
+// that writes the airport block — everything below is about that difference.
+describe("placeAt — the helipad", () => {
   it("writes the airport block instead of an object, and invents no identity", () => {
     const { store } = makeStore();
     store.getState().armPlacement({ kind: "helipad" });
@@ -191,8 +191,7 @@ describe("placeAt — the helipad (v1.3)", () => {
     expect(st.selection).toEqual([]);
   });
 
-  // v1.4, forum #221: "this element can now be used as often as desired". Until then a second drop MOVED
-  // the one pad, because a second pad was not a thing that could exist. His own SCLC ships three.
+  // A pad can be placed any number of times: a second drop APPENDS rather than moving the first pad.
   it("placing again APPENDS a pad and keeps the identity typed in between", () => {
     const { store } = makeStore();
     store.getState().armPlacement({ kind: "helipad" });
@@ -310,12 +309,10 @@ describe("placeAt — the helipad (v1.3)", () => {
     expect(store.getState().airportSelection).toBeNull();
   });
 
-  // ★ #278, and it inverts what this test asserted through v1.5. Deleting the only pad of an airport
-  // nobody had named used to take the block with it; his words: "that must not be. As long as the PCT is
-  // only in the labour process ... only the affected elements themselves may change." His own case was
-  // exactly this one — "AIRPORT DATA and 1x HELIPAD" — and it also has to hold for an airport that was
-  // never touched at all, since placing a pad is one of the five things that CREATES the block.
-  it("Delete on the pad KEEPS the block, even unnamed (#278)", () => {
+  // ★ Deleting a part changes only that part: deleting the only pad keeps the airport block, even one
+  // nobody has named. That has to hold for an airport that was never touched at all, since placing a pad
+  // is one of the five things that CREATES the block. (Del on the AIRPORT still removes its parts.)
+  it("Delete on the pad KEEPS the block, even unnamed", () => {
     const { store } = makeStore();
     store.getState().armPlacement({ kind: "helipad" });
     store.getState().placeAt({ lon: 10, lat: 48 });
@@ -330,9 +327,8 @@ describe("placeAt — the helipad (v1.3)", () => {
     expect(store.getState().project.airport?.pads).toHaveLength(1);
   });
 
-  // v1.4, and a deliberate change from v1.3: the identity used to go with the last part. It cannot any
-  // more — the DATA submenu gives an identity-only airport a row and a panel, so keeping the old rule
-  // would mean deleting a pad silently threw away a code the user had typed somewhere else.
+  // The identity does not go with the last part: the DATA submenu gives an identity-only airport a row
+  // and a panel, so deleting a pad must not silently throw away a code the user typed somewhere else.
   it("Delete on the pad KEEPS an airport that has been named", () => {
     const { store } = makeStore();
     store.getState().armPlacement({ kind: "helipad" });
@@ -345,15 +341,15 @@ describe("placeAt — the helipad (v1.3)", () => {
     expect(a?.pads).toHaveLength(0);
   });
 
-  it("Delete on the AIRPORT asks once, then removes it all (#253c)", () => {
+  it("Delete on the AIRPORT asks once, then removes it all", () => {
     const { store } = makeStore();
     store.getState().armPlacement({ kind: "helipad" });
     store.getState().placeAt({ lon: 10, lat: 48 });
     store.getState().setAirportIdentity({ icao: "pct001", name: "Roof", country: "cl" });
 
     store.getState().selectAirportPart({ kind: "data" });
-    // ★ The FIRST press changes nothing but the question. "if you have entered a lot and are not paying
-    // attention, everything is gone with one blow" — so it is not gone until the second one.
+    // ★ The FIRST press changes nothing but the question, so one inattentive keystroke cannot wipe a
+    // whole airport — it is not gone until the second press.
     store.getState().deleteSelection();
     expect(store.getState().pendingAirportDelete).toBe(true);
     expect(store.getState().project.airport).toMatchObject({ icao: "pct001" });
@@ -416,12 +412,10 @@ describe("placeAt — the helipad (v1.3)", () => {
     expect(st.project.objects).toHaveLength(0);
   });
 
-  // ── forum #282: the Airport CARD, which is not the same thing as `createAirport` ──
+  // ── The Airport CARD, which is not the same thing as `createAirport` ──
   //
-  // He ran all six submenus side by side on a fresh project and found exactly one difference: "5x PCT
-  // behaves identically … 1x it is different — in the submenu Airport", where the INSPECTOR came up on
-  // the first click while the other five wait for the map. His reason for closing the gap is the one that
-  // has decided every call like this: "the more uniform PCT works, the less needs to be explained".
+  // All six airport cards behave the same way: the first click arms the map and opens no Inspector; the
+  // map click is what opens the panel. Uniform behaviour means less to explain.
   it("the Airport card arms the map and opens NOTHING — like the other five", () => {
     const { store } = makeStore();
     store.getState().startAirportCard();
@@ -484,8 +478,8 @@ describe("placeAt — the helipad (v1.3)", () => {
   });
 });
 
-// v1.4, forum #232. The stand is the first REPEATABLE airport part to get a UI, so these pin the two
-// things that make it different from the pad rather than re-testing the mutations (mutate.test.ts).
+// The stand is a REPEATABLE airport part, so these pin the two things that make it different from the
+// pad rather than re-testing the mutations (mutate.test.ts).
 describe("store — parking positions", () => {
   const placeStand = (store: ReturnType<typeof makeStore>["store"], lon: number, lat: number): string => {
     store.getState().armPlacement({ kind: "parking", parkingType: "parked_ga" });
@@ -504,7 +498,7 @@ describe("store — parking positions", () => {
     expect(st.project.airport?.parkings?.[0]).toMatchObject({
       position: { lon: 10, lat: 48 },
       heading: 0,
-      size: 7.5, // his margin note: [parked_ga] = 7.5 M
+      size: 7.5, // the parked_ga default
       name: "",
     });
 
@@ -529,8 +523,8 @@ describe("store — parking positions", () => {
   });
 
   it("Delete removes THAT stand and leaves the pad and its neighbours alone", () => {
-    // Through v1.3 this branch deleted the whole airport block. With a second kind placeable that would
-    // take the pad and the other stands with it.
+    // Deleting a stand must not delete the whole airport block — that would take the pad and the other
+    // stands with it.
     const { store } = makeStore();
     store.getState().armPlacement({ kind: "helipad" });
     store.getState().placeAt({ lon: 10, lat: 48 });
@@ -549,10 +543,9 @@ describe("store — parking positions", () => {
     expect(store.getState().airportSelection).toBeNull();
   });
 
-  // The stand's half of the same inversion (#278). The runway is the case he actually named second —
-  // "AIRPORT DATA and 1x RUNWAY" — but the rule is about the LAST part, whichever kind it was, so the
-  // cheapest way to hold it is the kind whose helper is already here.
-  it("deleting the LAST part KEEPS the block, even unnamed (#278)", () => {
+  // The stand's half of the same rule: deleting the LAST part, whichever kind it was, keeps the block.
+  // (The runway has its own case below.)
+  it("deleting the LAST part KEEPS the block, even unnamed", () => {
     const { store } = makeStore();
     const a = placeStand(store, 10, 48);
 
@@ -568,9 +561,9 @@ describe("store — parking positions", () => {
 
   // ★ The one deletion that still cascades, and the reason the rule above is not just "never cascade":
   // Del on the AIRPORT row means the airport, and it asks first. Without this test, a future reading of
-  // #278 as "nothing ever takes anything with it" would quietly disarm the only deliberate way to throw
-  // an airport away.
-  it("Del on the AIRPORT still takes its parts with it (#278 does not touch this)", () => {
+  // the keep-the-block rule as "nothing ever takes anything with it" would quietly disarm the only
+  // deliberate way to throw an airport away.
+  it("Del on the AIRPORT still takes its parts with it", () => {
     const { store } = makeStore();
     placeStand(store, 10, 48);
 
@@ -580,10 +573,8 @@ describe("store — parking positions", () => {
     expect(store.getState().project.airport).toBeUndefined();
   });
 
-  // The dead end the DATA submenu was built to close: placing a stand creates the airport block, and
-  // until v1.4 the identity fields lived inside the PAD's panel — so this project had an airport, no
-  // pad, and no way to give it a code. Now the identity is reachable, and so it has to survive the
-  // stand it arrived with.
+  // Placing a stand creates the airport block with no pad; the DATA submenu makes its identity
+  // reachable anyway, so a typed identity has to survive the stand it arrived with.
   it("deleting the LAST part KEEPS an airport that has been named", () => {
     const { store } = makeStore();
     const a = placeStand(store, 10, 48);
@@ -624,8 +615,7 @@ describe("store — parking positions", () => {
   });
 });
 
-// v1.4, forum #242. A runway is the only airport part a single click cannot finish, because it is defined
-// by TWO points — these pin what one click actually produces and how the two ends stay independent.
+// A runway is the only airport part a single click cannot finish, because it is defined by TWO points — these pin what one click actually produces and how the two ends stay independent.
 describe("store — runways", () => {
   const placeRunway = (store: ReturnType<typeof makeStore>["store"], lon: number, lat: number): string => {
     store.getState().armPlacement({ kind: "runway" });
@@ -645,16 +635,16 @@ describe("store — runways", () => {
     const r = st.project.airport!.runways![0];
     expect(r.ends[0].threshold).toEqual({ lon: 10, lat: 48 });
     expect(r.width).toBe(40);
-    // End 2 lands a default length due NORTH (#253b: the map is north-south oriented and he finds it
-    // easier to turn an element into place from there), and 200 m away rather than a kilometre (#258: a
-    // short strip is one drag to fix, a strip off the edge of the map is two zoom changes).
+    // End 2 lands a default length due NORTH (the map is north-up, and an element is easiest to turn
+    // into place from there), and 200 m away rather than a kilometre (a short strip is one drag to fix,
+    // a strip off the edge of the map is two zoom changes).
     // The IDENTIFIERS stay empty on purpose in either direction — naming a runway 18/36 would be a claim
     // about the real world that a default heading cannot make.
     near(haversine(r.ends[0].threshold, r.ends[1].threshold), NEW_RUNWAY_LENGTH_M, 1);
     expect(NEW_RUNWAY_LENGTH_M).toBe(200);
     near(initialBearing(r.ends[0].threshold, r.ends[1].threshold), NEW_ELEMENT_BEARING_DEG, 0.5);
     expect([r.ends[0].identifier, r.ends[1].identifier]).toEqual(["", ""]);
-    // A fresh end is unlit and usable both ways — the defaults every end in his files carries.
+    // A fresh end is unlit and usable both ways.
     expect(r.ends[0]).toMatchObject({ appltsys: "none", papi: "none", reil: "none", approach: true, takeoff: true });
   });
 
@@ -673,9 +663,9 @@ describe("store — runways", () => {
   });
 
   it("moves the WHOLE strip as one undo entry, keeping its length and direction", () => {
-    // Juan's first gesture in the real app was to drag the runway, and it panned the map instead: the
-    // strip had no mousedown handler, so nothing disabled Leaflet's own container drag. These pin the
-    // store half of the fix — the layer half is the handler itself.
+    // Without a mousedown handler on the strip, dragging the runway panned the map instead (nothing
+    // disabled Leaflet's own container drag). These pin the store half of the fix — the layer half is
+    // the handler itself.
     const { store } = makeStore({ coalesceMs: 800 });
     const id = placeRunway(store, 10, 48);
     const before = store.getState().project.airport!.runways![0];
@@ -725,9 +715,8 @@ describe("store — runways", () => {
     expect(airport.pads).toHaveLength(1);
   });
 
-  // ★ HIS SECOND CASE, WORD FOR WORD (#278): "AIRPORT DATA and 1x RUNWAY ... If now the RUNWAY (2. Case),
-  // AIRPORT DATA will also be automatically deleted. But that must not be." Through v1.5 it did.
-  it("deleting the only runway KEEPS the airport block (#278)", () => {
+  // ★ An airport with only a runway: deleting the runway must not delete the airport block with it.
+  it("deleting the only runway KEEPS the airport block", () => {
     const { store } = makeStore();
     const id = placeRunway(store, 10, 48);
     store.getState().selectAirportPart({ kind: "runway", id });
@@ -738,9 +727,9 @@ describe("store — runways", () => {
   });
 });
 
-// v1.4, forum #237/#238. The two glider starts are the same family with one structural difference, and
-// that difference is what these pin: an aerotow is a point with a HEADING, a winch launch is a PAIR of
-// points with none — "the length and direction then result from the two positions".
+// The two glider starts are the same family with one structural difference, and that difference is
+// what these pin: an aerotow is a point with a HEADING, a winch launch is a PAIR of points with none —
+// its length and direction result from the two positions.
 describe("store — glider starts", () => {
   const placeAerotow = (store: ReturnType<typeof makeStore>["store"], lon: number, lat: number): string => {
     store.getState().armPlacement({ kind: "aerotow" });
@@ -762,7 +751,7 @@ describe("store — glider starts", () => {
     expect(st.project.airport!.aerotows![0]).toMatchObject({
       position: { lon: 10, lat: 48 },
       heading: 0,
-      name: "", // his rule: the name is the user's job, PCT never derives it from a nearby runway
+      name: "", // the name is the user's job; PCT never derives it from a nearby runway
     });
   });
 
@@ -774,10 +763,10 @@ describe("store — glider starts", () => {
     expect(st.airportSelection).toEqual({ kind: "winch", id });
     const w = st.project.airport!.winches![0];
     expect(w.position).toEqual({ lon: 10, lat: 48 });
-    expect(w.spacing).toBe(25); // his number: "basically the span"
-    // The rope keeps its length — 900 m is HIS figure for what a winch launch is, not a shape PCT
-    // invented, so #258's "make it shorter" does not reach it. Only the bearing changed (#253b).
-    near(haversine(w.position, w.winch), NEW_WINCH_ROPE_M, 1); // inside his 800–1000 m
+    expect(w.spacing).toBe(25); // roughly a glider's span
+    // The rope keeps a realistic winch-launch length (900 m) — unlike the runway, it is not shortened
+    // for convenience. It shares the default north bearing.
+    near(haversine(w.position, w.winch), NEW_WINCH_ROPE_M, 1); // a typical 800–1000 m winch launch
     expect(NEW_WINCH_ROPE_M).toBe(900);
     near(initialBearing(w.position, w.winch), NEW_ELEMENT_BEARING_DEG, 0.5);
   });
@@ -900,7 +889,7 @@ describe("nudgeSelection — coalescing + elevation drop", () => {
     expect(store.getState().project.objects[0].position).toEqual({ lon: 10, lat: 48 });
   });
 
-  // Fable I4 — the actual bug. The old per-object nudge coalesced on a `${id}:pos` key, so with 2+
+  // The regression this guards: the old per-object nudge coalesced on a `${id}:pos` key, so with 2+
   // selected the key alternated and the run NEVER continued: one keypress = N undo entries, and a held
   // arrow flooded the 50-entry cap in about a second, taking the real history with it.
   it("moves a MULTI selection as one undo entry per gesture, and one undo restores them all", () => {
@@ -1074,7 +1063,7 @@ describe("resolved-elevation cache", () => {
   });
 });
 
-describe("M2d inspector mutations", () => {
+describe("inspector mutations", () => {
   it("scale / label / lock each commit exactly one undo entry", () => {
     const { store } = makeStore({ initialProject: baseProject([xref("a")]) });
     store.getState().scaleObject("a", 2);
@@ -1098,7 +1087,7 @@ describe("M2d inspector mutations", () => {
   });
 });
 
-describe("M2e crash-recovery + autosave lifecycle", () => {
+describe("crash-recovery + autosave lifecycle", () => {
   it("recoverProject loads the shadow as UNSAVED (dirty), resets history/selection, adopts its camera, clears the banner", () => {
     const { store } = makeStore();
     store.getState().renameProject("scratch"); // some history to prove it's reset
@@ -1148,7 +1137,7 @@ describe("M2e crash-recovery + autosave lifecycle", () => {
   });
 });
 
-describe("M2h tile config", () => {
+describe("tile config", () => {
   it("setTiles updates the map provider without dirtying the document (reference data)", () => {
     const { store, persist } = makeStore();
     const tiles = { provider: "custom" as const, customUrl: "https://t/{z}/{x}/{y}.png" };
@@ -1160,7 +1149,7 @@ describe("M2h tile config", () => {
   });
 });
 
-describe("object photos (v0.6/v0.7)", () => {
+describe("object photos", () => {
   it("setThumbnails bumps the epoch only when the set CONTENT changes", () => {
     const { store } = makeStore();
     const e0 = store.getState().thumbnailEpoch;
@@ -1208,7 +1197,7 @@ describe("lifecycle", () => {
     expect(s.mapView).toEqual({ lon: 10, lat: 48, zoom: 15 });
   });
 
-  it("bumps cameraEpoch on document load (open/new) but not on edits or pan (P1-4 re-center signal)", () => {
+  it("bumps cameraEpoch on document load (open/new) but not on edits or pan (re-center signal)", () => {
     const { store } = makeStore();
     const e0 = store.getState().cameraEpoch;
     store.getState().renameProject("edit"); // a document edit…
@@ -1249,7 +1238,7 @@ describe("lifecycle", () => {
   });
 });
 
-// ── v0.9.2 arrange ────────────────────────────────────────────────────────────
+// ── Arrange ───────────────────────────────────────────────────────────────────
 // Three objects 100 m apart along a 135° row, with the middle one pushed 12 m off the line.
 const ROW_ORIGIN = { lon: 10, lat: 48 };
 const rowPoint = (along: number, cross: number) => {
@@ -1381,12 +1370,11 @@ describe("setSelectionRotation", () => {
   });
 });
 
-// ── The arrow keys reach the airport (v1.5) ─────────────────────────────────────────────────────────
+// ── The arrow keys reach the airport ────────────────────────────────────────────────────────────────
 //
-// Through v1.4 nudgeSelection walked `selection` only, and selecting an airport part EMPTIES that list,
-// so the arrows moved objects and did nothing at all to a pad, a stand, a runway or a glider start. The
-// same blind spot the DELETE key had (#253 → #258); unlike Delete this never worked, so it is a gap
-// rather than a regression. Every kind gets its own move path, hence a case each.
+// Selecting an airport part EMPTIES `selection`, so a nudgeSelection that walked `selection` only would
+// move objects and do nothing at all to a pad, a stand, a runway or a glider start (the same blind spot
+// the DELETE key must avoid). Every kind gets its own move path, hence a case each.
 describe("store — nudging the airport parts", () => {
   const NORTH = 0;
   const arm = (store: ReturnType<typeof makeStore>["store"], kind: "helipad" | "parking" | "aerotow"): void => {
@@ -1449,7 +1437,7 @@ describe("store — nudging the airport parts", () => {
   });
 
   it("does nothing on an airport that has no point to nudge", () => {
-    // An arrow key must not invent the coordinate #255 took out of the model.
+    // An arrow key must not invent a coordinate: an identity-only airport has no point of its own.
     const { store } = makeStore();
     store.getState().createAirport();
     store.getState().nudgeSelection(5, NORTH);

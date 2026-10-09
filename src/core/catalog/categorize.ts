@@ -11,8 +11,8 @@ export interface CategoryResult {
   act: boolean;
 }
 
-// First match wins; ordered specific → general. Tuned against the real 911-object scan so
-// ≥95% land outside other/* (M0 acceptance #3). Case-insensitive.
+// First match wins; ordered specific → general, so that nearly every scanned object lands outside
+// other/*. Case-insensitive.
 const PREFIX_RULES: Array<[RegExp, string]> = [
   // Buildings
   [/^hangar/i, "buildings/hangar"],
@@ -51,13 +51,12 @@ export function categorize(name: string, bundle: string): CategoryResult {
 }
 
 /** Derived pretty label — the fallback for objects NOT covered by an authoritative table.
- *  Strips only the IPACS decoration runs (_ds_.., _sh_.., _mw_.., _lod_..), splits
+ *  Strips only the built-in decoration runs (_ds_.., _sh_.., _mw_.., _lod_..), splits
  *  camelCase / underscores, title-cases. Trailing numeric tokens are KEPT on purpose:
- *   - for community objects they're the meaningful discriminator — pylon_air_race_18_4 vs
- *     _25_5 collapsed to the same label (forum #110), making variants indistinguishable;
- *   - no built-in needs them gone — every IPACS size code sits behind a _ds/_sh/_mw/_lod
- *     marker (stripped above), and IPACS's own curated names keep the number as often as not
- *     (car_00 → "Car 00", glider_02 → "Glider 02"), so keeping is the closer default.
+ *   - for community objects they're the meaningful discriminator — stripping them makes
+ *     pylon_air_race_18_4 and _25_5 indistinguishable;
+ *   - built-in size codes sit behind a _ds/_sh/_mw/_lod marker (stripped above), and curated
+ *     names often keep the number (car_00 → "Car 00"), so keeping is the closer default.
  *  The raw name is always shown alongside, so this is a display nicety only.
  *  e.g. "tower00_small_plates_ds_00_08_08" → "Tower00 Small Plates". */
 export function displayName(name: string): string {

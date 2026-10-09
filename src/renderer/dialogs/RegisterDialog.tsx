@@ -1,15 +1,13 @@
-// RegisterDialog.tsx — the user-XREF registration surface (design B2; forum #125, @ApfelFlieger).
+// RegisterDialog.tsx — the user-XREF registration surface (design B2).
 //
-// v0.3.x drove this from window.confirm()/alert(), flattening the plan and its result into a single
-// string with one bullet per object. That fits the three-pylon case it was built against and breaks on
-// the real one: Michael scanned ~2000 objects with only ONE readable, so "can't auto-register" ran to
-// ~35 lines — and a native dialog does not scroll. It just grew past the bottom of his screen ("My
-// Desktop is to short"). An in-app modal can't do that: .pct-modal-card is already capped at 90vh and
-// scrolls, so the list is bounded by the window no matter how many objects the user has.
+// An in-app modal, not window.confirm()/alert(): a scan can report dozens of objects that can't be
+// auto-registered, and a native dialog does not scroll — it grows past the bottom of the screen.
+// .pct-modal-card is capped at 90vh and scrolls, so the list is bounded by the window no matter how many
+// objects the user has.
 //
-// The skipped list is also not an error list. It's the answer he came for ("I have never been able to
-// determine so quickly whether something is XREF-compatible") AND a worklist he then works through by
-// hand — so it stays on screen, scrolls, and can be copied out, rather than being a wall to dismiss.
+// The skipped list is also not an error list. It answers "is this XREF-compatible?" AND is a worklist the
+// user then works through by hand — so it stays on screen, scrolls, and can be copied out, rather than
+// being a wall to dismiss.
 import { useCallback, useEffect, useState } from "react";
 import type { XrefRegistrationPlan } from "../../shared/pctApi";
 import { editorStore } from "../state/editorStore";
@@ -192,9 +190,10 @@ export function RegisterDialog({ onClose }: { onClose: () => void }): React.Reac
                     </li>
                   ))}
                 </ul>
-                {/* Not a failure of PCT and not something the user can fix in PCT: an IPACS-compiled `.tmb`
-                    keeps its name and bbox in a format we can't read, and PCT ships zero model bytes. Say
-                    so, because "can't be read" next to 35 filenames otherwise reads as a bug. */}
+                {/* Not a failure of PCT and not something the user can fix in PCT: a compiled `.tmb`
+                    keeps its name and bbox in a format PCT does not read, and PCT ships zero model
+                    bytes. Say so, because "can't be read" next to a long list of filenames otherwise
+                    reads as a bug. */}
                 <p className="pct-field-meta">
                   These are compiled (binary) models — their internal name and size aren&apos;t readable, so
                   PCT can&apos;t write an index for them. They still work if you index them by hand.

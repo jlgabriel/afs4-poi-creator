@@ -9,9 +9,9 @@ import type { Airport } from "./types";
 
 /** Parse the raw `[ICAO, name, lat, lon]` tuple array (fboes/aerofly-data `airport-coordinates.json`)
  *  into validated `Airport`s. Rows failing validation are skipped. Optionally keep only ICAOs present
- *  in `coreIcaos` (the `airport-list.json` set) to exclude community/WIP airports — Frank #19 + Juan
- *  #20 agreed the picker stays core-only. In today's snapshot the two sets are identical, so the
- *  filter is a no-op that future-proofs a refresh that adds community entries. */
+ *  in `coreIcaos` (the `airport-list.json` set) to exclude community/WIP airports — the picker stays
+ *  core-only. In the current snapshot the two sets are identical, so the filter is a no-op that
+ *  future-proofs a refresh that adds community entries. */
 export function parseAirportCoordinates(raw: unknown, coreIcaos?: ReadonlySet<string>): Airport[] {
   if (!Array.isArray(raw)) return [];
   const out: Airport[] = [];
@@ -31,9 +31,9 @@ export function parseAirportCoordinates(raw: unknown, coreIcaos?: ReadonlySet<st
 /** Fold a string for accent- AND case-insensitive matching: NFD-decompose (so an accented letter
  *  becomes base + a combining mark), drop every combining mark (Unicode Nonspacing_Mark, `\p{Mn}`),
  *  then lowercase. So a name whose real spelling carries an accent — "Zurich", "...Merino Benitez" —
- *  matches a query typed without it ("zurich", "benitez"). 858 of the 7845 names carry diacritics, and
- *  the name tier is the one that saves a user who doesn't know the ICAO, so folding it is what makes
- *  that tier actually work (Fable A1). */
+ *  matches a query typed without it ("zurich", "benitez"). Many names carry diacritics, and the name
+ *  tier is the one that saves a user who doesn't know the ICAO, so folding it is what makes that tier
+ *  actually work. */
 export function foldForSearch(s: string): string {
   return s.normalize("NFD").replace(/\p{Mn}/gu, "").toLowerCase();
 }
@@ -42,7 +42,7 @@ export function foldForSearch(s: string): string {
  *    1. ICAO exact      ("LFPG" -> LFPG)
  *    2. ICAO prefix     ("LFP"  -> LFPG, LFPO, ...)
  *    3. name substring  ("charles" -> LFPG; "zurich" -> LSZH)
- *  A blank query returns nothing (the dropdown stays closed). 7845 rows is tiny — a full linear scan
+ *  A blank query returns nothing (the dropdown stays closed). The list is small — a full linear scan
  *  per keystroke is a couple of milliseconds at most, so there is no index to keep in sync. */
 export function searchAirports(airports: Airport[], query: string, limit = 20): Airport[] {
   const q = foldForSearch(query.trim());

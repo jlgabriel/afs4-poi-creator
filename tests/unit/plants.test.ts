@@ -1,14 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { buildPlants, type PlantFile } from "../../src/core/catalog/plants";
 
-// The REAL install layout: all 41 filenames in `<install>/scenery/plants/`, verbatim off Juan's disk
-// (2026-07-17). Every one is a `.ttx` texture — there is no `.tmb` and no geometry in that folder at
-// all, which is why a plant is placeable from its filename alone.
-//
-// This list is also the cross-check: the format bible's plant list (group → species indices) matches
-// it EXACTLY, 41 = 41, including the i04–i07 gap in every group. Two independent sources agreeing is
-// the closest thing to ground truth this feature has — the install's own `list_plant`s are all inside
-// binary-packed cultivation `.toc` files we cannot read.
+// The install layout: the filenames in `<install>/scenery/plants/`, verbatim. Every one is a `.ttx`
+// texture — there is no `.tmb` and no geometry in that folder at all, which is why a plant is placeable
+// from its filename alone. The documented group → species list matches it exactly, including the
+// i04–i07 gap in every group.
 const REAL_FILES: PlantFile[] = [
   "alley__i00__h2740_color",
   "broadleaf__i00__h1750_color",
@@ -57,14 +53,14 @@ describe("buildPlants — enumerate the plant library", () => {
   const { plants, warnings } = buildPlants(REAL_FILES);
   const speciesOf = (g: string) => plants.filter((p) => p.group === g).map((p) => p.species);
 
-  it("yields all 41 plants from the 41 install textures, with no warnings", () => {
+  it("yields one plant per install texture, with no warnings", () => {
     expect(plants).toHaveLength(41);
     expect(warnings).toEqual([]);
   });
 
-  it("matches the format bible's group → species list exactly, gaps included", () => {
-    // Independently transcribed from the bible's "LISTS - PLANTS" table, NOT derived from the
-    // filenames above — the whole point is that the two sources agree without being the same source.
+  it("matches the documented group → species list exactly, gaps included", () => {
+    // Transcribed from the documented plant list, NOT derived from the filenames above — the two
+    // sources must agree without being the same source.
     expect(speciesOf("alley")).toEqual(["00"]);
     expect(speciesOf("broadleaf")).toEqual(["00", "01", "02", "03", "08", "09", "10", "11", "12"]);
     expect(speciesOf("conifer")).toEqual(["00", "01", "02", "03", "08", "09", "10", "11", "12", "13"]);
@@ -83,11 +79,11 @@ describe("buildPlants — enumerate the plant library", () => {
   });
 
   it("keeps `species` as the filename's 2 zero-padded digits — NOT a 0-based ordinal", () => {
-    // Confirmed against the format author's proven-in-sim file, which places `palm`/`08` and
-    // `palm`/`11`. Palm's textures are i08…i14, so an ordinal would top out at 6 and `11` could not
-    // exist — the gaps are real and this field carries the filename's number.
+    // A known-good file places `palm`/`08` and `palm`/`11`. Palm's textures are i08…i14, so an ordinal
+    // would top out at 6 and `11` could not exist — the gaps are real and this field carries the
+    // filename's number.
     expect(speciesOf("alley")).toEqual(["00"]);
-    expect(speciesOf("palm")).toContain("11"); // the exact value in the working reference file
+    expect(speciesOf("palm")).toContain("11"); // a value a known-good file uses
     expect(plants.every((p) => /^\d\d$/.test(p.species))).toBe(true);
   });
 
@@ -144,10 +140,9 @@ describe("buildPlants — tolerance contract", () => {
     expect(plants[0]).toMatchObject({ group: "broadleaf", species: "00", naturalHeight: 17.5 });
   });
 
-  it("accepts the two FS4-beta names that arrived without the `h` (forum #244)", () => {
-    // Verbatim off ApfelFlieger's rescan: the beta Steam stream added plants and exactly two of them
-    // are missing the `h` before the centimetres. Before this, PCT warned and dropped both — the user
-    // could see the plants in the sim and not place them.
+  it("accepts the two FS4-beta names that arrived without the `h`", () => {
+    // Two plant textures in the FS4 beta lack the `h` before the centimetres. They must parse, not be
+    // warned about and dropped — the user can see the plants in the sim.
     const { plants, warnings } = buildPlants([
       { base: "shrub__i16__0150_color" },
       { base: "shrub__i18__0200_color" },

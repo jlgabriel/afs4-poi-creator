@@ -30,7 +30,7 @@ describe("isValidThumbName", () => {
     }
   });
 
-  it("accepts a user-registered XREF name with `-` or `.` (forum #176 — the whole point of the widening)", () => {
+  it("accepts a user-registered XREF name with `-` or `.`", () => {
     // A user's own .tmb objects are NOT limited to the sim's `[A-Za-z0-9_]`; XREF_NAME_RE and
     // isSafeBundleName have always allowed these, and a photo must be nameable after the object.
     for (const n of ["cabin-boat-red", "my.obj-1_v2", "boat-01", "a.b"]) {
@@ -56,7 +56,7 @@ describe("indexThumbnails", () => {
     touch("UH60_usarmy.jpg");
     touch("a380_klm.png");
     touch("f18.webp");
-    touch("cabin-boat-red.png"); // a user-registered XREF name (forum #176) — must index, not be skipped
+    touch("cabin-boat-red.png"); // a user-registered XREF name — must index, not be skipped
     touch("with.dot.jpg"); // a dot in the stem is legal too; extname still splits off only `.jpg`
     touch("notes.txt"); // not an image
     touch("readme.md"); // not an image
@@ -98,13 +98,13 @@ describe("indexThumbnails", () => {
   });
 });
 
-// ── v0.7 "Paste photo" write side ──
+// ── "Paste photo" write side ──
 describe("photoWritePath", () => {
   it("builds <dir>/<name>.png for a valid catalog name (a pasted bitmap is always saved as PNG)", () => {
     expect(photoWritePath(tmp, "UH60_usarmy")).toBe(path.join(tmp, "UH60_usarmy.png"));
   });
 
-  it("builds it for a user-registered XREF name with a `-` too (forum #176: Paste used to throw here)", () => {
+  it("builds it for a user-registered XREF name with a `-` too", () => {
     expect(photoWritePath(tmp, "cabin-boat-red")).toBe(path.join(tmp, "cabin-boat-red.png"));
   });
 
@@ -132,7 +132,7 @@ describe("photoFilesForStem", () => {
     expect(photoFilesForStem(tmp, "../evil")).toEqual([]);
   });
 
-  it("finds a user-XREF stem with a `-` (so Remove photo can clear one — forum #176)", () => {
+  it("finds a user-XREF stem with a `-` (so Remove photo can clear one)", () => {
     touch("cabin-boat-red.png");
     touch("cabin-boat-red.jpg");
     touch("cabin-boat-blue.png"); // a near-miss stem must not be swept up

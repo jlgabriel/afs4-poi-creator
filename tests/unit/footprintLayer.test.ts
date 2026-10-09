@@ -66,7 +66,7 @@ const XREFS = new Map<string, CatalogObject>([["tower", CAT]]);
 const FIXTURES = new Map<string, CatalogAirportLight>([["papi_3_light", FIX]]);
 const PLANTS = new Map<string, CatalogPlant>([["broadleaf/00", PLANT]]);
 
-// The P1-5 reference-diff contract: mutate.ts keeps untouched objects at the same reference, so the
+// The reference-diff contract: mutate.ts keeps untouched objects at the same reference, so the
 // layer can skip them and only rebuild what actually changed.
 describe("diffEntry — the O(changed) sync decision", () => {
   it("rebuilds when there is no previous entry", () => {
@@ -91,7 +91,7 @@ describe("diffEntry — the O(changed) sync decision", () => {
     expect(diffEntry({ obj: obj(), selected: true }, obj(), true)).toBe("rebuild");
   });
 
-  it("rebuilds an otherwise-unchanged object when the catalog index changed (a Rescan) — Fable I3", () => {
+  it("rebuilds an otherwise-unchanged object when the catalog index changed (a Rescan)", () => {
     const o = obj();
     // same reference + same selection, but the catalog was swapped → its bbox/missing state may differ
     expect(diffEntry({ obj: o, selected: false }, o, false, true)).toBe("rebuild");
@@ -101,7 +101,7 @@ describe("diffEntry — the O(changed) sync decision", () => {
   });
 });
 
-// A missing object is not an error — the sim skips an unknown name and keeps parsing (gate V6) — but it
+// A missing object is not an error — the sim skips an unknown name and keeps parsing — but it
 // renders as NOTHING, so every surface that lists objects has to say so.
 describe("isMissing — does this object name something the install doesn't have", () => {
   it("flags an xref that is not in the catalog", () => {
@@ -131,7 +131,7 @@ describe("isMissing — does this object name something the install doesn't have
   it("flags everything nameable when the catalog is empty (the pre-scan / stale-cache boot)", () => {
     expect(isMissing(obj(), new Map(), new Map(), new Map())).toBe(true);
     expect(isMissing(light("papi_3_light"), new Map(), new Map(), new Map())).toBe(true);
-    // The v0.3→v0.4 upgrade boot: a cached catalog carries `plants: []`, so every plant reads missing
+    // An older cached catalog carries `plants: []`, so every plant reads missing
     // until a Rescan. Red-dashed is the honest state — the app can't know the install has them yet.
     expect(isMissing(plant("broadleaf", "00"), XREFS, FIXTURES, new Map())).toBe(true);
   });

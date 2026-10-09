@@ -1,8 +1,8 @@
 // planExport.ts — Project + height-resolved objects → a pure ExportPlan (design §3.4).
 //
 // No I/O: it returns { folderName, files[], warnings } describing exactly what the installer
-// (main process, M1b) should write into `scenery/poi/<folderName>/`. Keeping this pure makes
-// the whole POI package golden-testable byte-for-byte, the way the Race App exporter was.
+// (main process) should write into `scenery/poi/<folderName>/`. Keeping this pure makes
+// the whole POI package golden-testable byte-for-byte.
 
 import type {
   AirportAerotow,
@@ -38,7 +38,7 @@ import {
   type IdentityProblem,
 } from "./heliportTemplate";
 
-// A POI's two payload files are named `poi.tsl` / `poi.toc` (format bible), and the .tsl
+// A POI's two payload files are named `poi.tsl` / `poi.toc`, and the .tsl
 // references the .toc by this basename.
 const POI_BASENAME = "poi";
 
@@ -61,61 +61,46 @@ function buildReadme(project: Project, resolved: ResolvedObject[]): string {
   ].join("\n");
 }
 
-/** The pad radius PCT starts from when nobody has chosen one, metres. Michael's own heliports use 10
- *  (the sim renders it as "Size 66 ft / 20 m"), which comfortably clears an EC135's 10.2 m rotor. */
+/** The pad radius PCT starts from when nobody has chosen one, metres (the sim shows a 20 m "Size"),
+ *  which comfortably clears an EC135's 10.2 m rotor. */
 export const DEFAULT_PAD_RADIUS_M = 10;
 
-/** What the AIRPORT install writes. Everything about IDENTITY lives beside it; see heliportTemplate.ts.
- *
- *  ⛔ THIS USED TO SERVE TWO CALLERS AND NOW SERVES ONE. Until #278 the same options also drove an opt-in
- *  pair of `.txt` templates inside the POI folder (forum #160) — the ancestor of the install, from before
- *  PCT could write into scenery/airports itself. He asked for them to go: see planExport. */
+/** What the AIRPORT install writes. Everything about IDENTITY lives beside it; see heliportTemplate.ts. */
 export interface HeliportOptions {
   /** The pads, in the same UNSHIFTED map coordinates the placed objects use — the planner applies the
    *  project's export shift to them below, so a pad travels with the scene instead of ending up `shift`
-   *  metres away from it (the trap the folder-name preview had to be fixed for).
+   *  metres away from it.
    *
-   *  EMPTY → no helipad at all, which is legal for an airport that has a runway (forum #255). PCT does not
-   *  invent one: the template's opposite rule went out with the template. */
+   *  EMPTY → no helipad at all, which is legal for an airport that has a runway. PCT never invents one. */
   pads: AirportPad[];
-  /** The parking positions, unshifted like the pads (forum #232). Absent or EMPTY → the writers emit no
-   *  `parking_positions` block, so a project without stands exports the same bytes it always did.
+  /** The parking positions, unshifted like the pads. Absent or EMPTY → an empty `parking_positions`
+   *  block.
    *
-   *  Unlike `pads` there is no "empty means one default" rule here, and there must not be: a heliport with
-   *  no helipad has nowhere to spawn the helicopter, whereas an airport with no stand is simply an airport
-   *  with no stand — his own "(1) DATA" and "(2) HELIPADS" examples are exactly that. */
+   *  There is no "empty means one default" rule here, and there must not be: an airport with no stand is
+   *  simply an airport with no stand. */
   parkings?: AirportParking[];
-  /** The runways, unshifted (forum #217 submenu (4)). Absent or EMPTY → no block in either file. */
+  /** The runways, unshifted. Absent or EMPTY → an empty runway block in both files. */
   runways?: AirportRunway[];
-  /** The glider starts, unshifted (forum #237/#238). Absent or EMPTY → no block; `.wad`-only. */
+  /** The glider starts, unshifted. Absent or EMPTY → empty blocks; `.wad`-only. */
   aerotows?: AirportAerotow[];
   winches?: AirportWinch[];
-  /** The AIRPORT's own point, unshifted (forum #15/#220 — it is independent of any pad). Absent → the
-   *  first pad's position, which is exactly how v1.2/v1.3 behaved. */
+  /** The AIRPORT's own point, unshifted (independent of any pad). Absent → the first pad's position,
+   *  which keeps older projects' output unchanged. */
   position?: LonLat;
 }
 
-/** The pad as the two writers want it: a position already shifted with the scene, a TRUE heading and a
- *  radius.
+/** Move a point by the project's export shift (no-op when absent or zero).
  *
- *  ★ v1.1 derived all three from a placed object (`objectId`). ApfelFlieger asked for that to stop
- *  (forum #168): "the functional starting position for Helicopter should be independent of XREF objects
- *  because this will lead to collisions too quickly" — a pad that borrows a mast's coordinates spawns the
- *  helicopter in the mast. The pad is now its own point on the document (types.ts AirportPad); seeding it
- *  from a selection is a copy the UI offers, not a link the exporter follows. */
+ *  Airport parts (pads etc.) are their own points on the document (types.ts AirportPad), never derived
+ *  from a placed object: a pad that borrowed a mast's coordinates would spawn the helicopter inside the
+ *  mast. Seeding one from a selection is a copy the UI offers, not a link the exporter follows. */
 function shiftPoint(p: LonLat, shift: Project["shift"]): LonLat {
   return !shift || (shift.east === 0 && shift.north === 0)
     ? p
     : shiftEastNorth(p, shift.east, shift.north);
 }
 
-/** The pads exactly as the project has them: shifted with the scene, nothing invented.
- *
- *  ★ THERE USED TO BE A SECOND ONE OF THESE, `templatePads`, and the pair carried a note about the two
- *  callers wanting opposite things: the TEMPLATE invented a default pad at the POI anchor when a project
- *  had none, because a heliport template with no helipad has nowhere to spawn the helicopter, while the
- *  INSTALL must write none (forum #255 asks for the bare airfield by name). The template is gone (#278),
- *  and with it the only caller that ever invented anything. */
+/** The pads exactly as the project has them: shifted with the scene, nothing invented. */
 function mapPads(pads: AirportPad[], shift: Project["shift"]): HeliportPadSpec[] {
   return pads.map((p) => ({
     name: p.name,
@@ -134,7 +119,7 @@ function heliportRunways(
   return (runways ?? []).map((r) => ({
     widthM: r.width,
     ends: r.ends.map((e) => ({
-      // ONE point in the document, BOTH rows in the file (types.ts AirportRunwayEnd, forum #236).
+      // ONE point in the document, BOTH rows in the file (types.ts AirportRunwayEnd).
       endpoint: shiftPoint(e.threshold, shift),
       threshold: shiftPoint(e.threshold, shift),
       identifier: e.identifier,
@@ -198,9 +183,7 @@ function heliportPosition(
   return pads[0]?.position ?? fallback;
 }
 
-/** Plan the POI package. `project.reference` sets the folder-name anchor; when null it falls
- *  back to the centroid of the placed objects (design §2.2). */
-/** Apply the project's global export shift (forum #12) to every object's position: nudge each one
+/** Apply the project's global export shift to every object's position: nudge each one
  *  `shift` metres east/north. The height was resolved at the object's REAL location, so shifting the
  *  horizontal coordinate afterwards is correct — it only lines the objects up with FS4's satellite
  *  tiles. A zero/absent shift returns the same array (no-op), keeping the golden output stable. */
@@ -209,19 +192,11 @@ function applyShift(resolved: ResolvedObject[], shift: Project["shift"]): Resolv
   return resolved.map((o) => ({ ...o, position: shiftEastNorth(o.position, shift.east, shift.north) }));
 }
 
-/** Plan the POI package — three files, always the same three.
+/** Plan the POI package — three files, always the same three. `project.reference` sets the
+ *  folder-name anchor; when null it falls back to the centroid of the placed objects.
  *
- *  ⛔ IT USED TO HAVE AN OPT-IN FOURTH AND FIFTH, and #278 took them out. `heliport.tsc.txt` and
- *  `heliport.wad.txt` were the ancestor of the AIRPORT install (forum #160, v0.9): real airport files with
- *  a placeholder identity, written with a `.txt` suffix so the sim would ignore them, that a user finished
- *  by hand and renamed. PCT has installed airports itself since v1.3, so all they were still doing was
- *  putting airport files where an airport cannot live. His two reasons for removing them:
- *
- *    "In a comparable case, IPACS has very urgently requested to avoid non-specialist TXT files. In the
- *     present case, it could be that a user thinks that a POI with TSC and WAD files could also be
- *     directly useable as an airfield. => Please delete the framed function without replacement."
- *
- *  Both writers stay exactly where they were — `planHeliport` below is the caller that always mattered. */
+ *  A POI folder never carries airport files (`.tsc`/`.wad`): an airport cannot live under scenery/poi/,
+ *  and users would mistake them for a usable airfield. Airports go through `planHeliport` below. */
 export function planExport(project: Project, resolved: ResolvedObject[]): ExportPlan {
   const warnings: string[] = [];
   if (resolved.length === 0) {
@@ -248,8 +223,8 @@ export function planExport(project: Project, resolved: ResolvedObject[]): Export
   return { folderName, files, assets: anchor ? [...ANCHOR_ASSETS] : [], warnings };
 }
 
-/** A heliport PCT installs itself, rather than the templates a user finishes by hand. Same folder, minus
- *  the `poi.tsl` the `.tsc` replaces, with the identity filled in and the two files named after the code. */
+/** A heliport PCT installs itself. The POI's files minus the `poi.tsl` the `.tsc` replaces, with the
+ *  identity filled in and the two files named after the code. */
 export interface HeliportPlan {
   folderName: string; // the POI's own slug — already a safe name, so the installer's guard applies unchanged
   country: string; // the directory under scenery/airports/ this goes in
@@ -286,35 +261,22 @@ export function planHeliport(
   const tocFileName = objects.length > 0 ? POI_BASENAME : null;
   const anchor = autoheight ? computeAutoheightAnchor(objects) : computeAnchor(objects);
 
-  // The AIRPORT install writes what the project has and invents nothing (#255: "it must already be able
-  // to be installed alone - even if no other element for this airport has yet been entered").
+  // The AIRPORT install writes what the project has and invents nothing.
   const pads = mapPads(opts.heliport.pads, project.shift);
   if (autoheight) {
     warnings.push(
       "Heliports were only verified in-sim with baked-asl heights — in Sim-autoheight mode, check the objects' heights after the first flight.",
     );
   }
-  // ⛔ NOT "installable with nothing at all" — GATED AND REFUSED, 2026-08-14. #255 asked for an airport
-  // that installs alone, and PCT wrote one: identity, a coordinate, five empty lists. FS 4 read it and
-  // threw it out by name:
-  //
-  //     ERROR: (no valid runway or helipad defined. invalid airport 'PCT No Pad'.
-  //             tsc_file='…/pct002.tsc')
-  //
-  // The count stayed at 8141. So the floor is the simulator's, not ours, and it is exactly one HELIPAD or
-  // one RUNWAY — its own words, which also means a stand or a glider start does not satisfy it.
-  //
-  // What survives from the change is the part that was right for a different reason: PCT no longer
-  // INVENTS a helipad for an airport that has none. An airport with a runway and no helipad is legal, and
-  // used to get a pad the user never placed.
+  // ⛔ FS 4 rejects an airport with neither a runway nor a helipad (a stand or a glider start does not
+  // count), so warn. PCT still never INVENTS a helipad: an airport with a runway and no helipad is legal.
   if (pads.length === 0 && (opts.heliport.runways ?? []).length === 0) {
     warnings.push(
       "Aerofly rejects an airport with no helipad and no runway — it needs at least one of the two.",
     );
   }
   if (objects.length === 0) {
-    // "just the pad" stopped being true the moment an airport could be installed without one (#255), and
-    // paired with the warning above it read as a contradiction: no helipad, and also just the pad.
+    // Without a pad, "just the pad" would contradict the warning above.
     warnings.push(
       pads.length === 0
         ? "The airport has no objects around it either — this installs the bare airfield data."

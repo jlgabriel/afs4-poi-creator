@@ -1,8 +1,6 @@
 // cli/export.ts — M1b headless exporter. Reads a project.json, resolves object heights, builds
 // the POI package (poi.tsl + poi.toc + README) via the pure core, writes it, and optionally
-// installs it into the AFS4 user folder's scenery/poi/. This is what generates the POIs for the
-// M1 in-sim verification matrix (design §6.2): the writers are golden-tested, the *format* is
-// confirmed by flying to the result in the sim.
+// installs it into the AFS4 user folder's scenery/poi/. Useful for building test POIs headlessly.
 //
 //   npm run export -- <project.json> [--install] [--afs4-dir <dir>]
 //                     [--out <dir>] [--base-elevation <metres ASL>]
@@ -32,9 +30,7 @@ interface Args {
   out: string;
   baseElevation: number | null;
   baseElevationRaw?: string; // kept only to quote the bad value back in the error
-  // ⛔ --heliport / --heliport-radius / --helipad-object ARE GONE (forum #278). They existed to drive the
-  // opt-in `heliport.tsc.txt` + `heliport.wad.txt` pair inside a POI folder, and that pair was removed
-  // without replacement — see planExport. This CLI writes POIs; airports are installed from the app.
+  // No heliport options: this CLI writes POIs; airports are installed from the app.
 }
 
 function parseArgs(argv: string[]): Args {
@@ -100,9 +96,8 @@ function main(): number {
     );
     return 2;
   }
-  // `Number("584m")` / a missing value → NaN, which sailed straight through resolveHeightsFlat and got
-  // emitted as the literal text "NaN" in the .toc's position — a POI the sim silently won't place, and the
-  // headless path the in-sim gate probes are built with. Fail loudly instead.
+  // `Number("584m")` / a missing value → NaN, which would pass through resolveHeightsFlat and be emitted
+  // as the literal text "NaN" in the .toc's position — a POI the sim silently won't place. Fail loudly.
   if (args.baseElevation !== null && !Number.isFinite(args.baseElevation)) {
     console.error(
       `ERROR: --base-elevation expects a number in metres ASL, got ${JSON.stringify(args.baseElevationRaw ?? "")}.`,

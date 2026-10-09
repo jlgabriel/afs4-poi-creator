@@ -3,13 +3,11 @@ import type { ResolvedObject, ResolvedPlant, ResolvedXref } from "../../src/core
 import { buildToc } from "../../src/core/export/tocWriter";
 import { parseTm, child, findAll } from "../../src/core/tm/tmParser";
 
-// v0.4 plants. This golden is now a transcription of a REAL, in-sim-proven `list_plant`: the format's
-// author built one at Heligoland, flew it, and sent the file (2026-07-17, kept out of the repo in
-// _local_reference). Its element is byte-for-byte the shape below.
+// Plants. This golden is the byte shape of a known-good `list_plant` element.
 //
-// ★ It corrects the format bible on all three types — `vector2_float64` not vector3, `vector2_float32`
-// not vector3, `stringt8c` not string8 — which is why the bible's own template printed two values into
-// a "vector3": the type is a vector2. Regenerate deliberately only against a newer proven file.
+// ★ Note the three types — `vector2_float64` (not vector3) for position, `vector2_float32` (not vector3)
+// for height_range, `stringt8c` (not string8) for group/species. Both vectors carry TWO values.
+// Regenerate deliberately only against a newer known-good file.
 const PLANT: ResolvedPlant = {
   id: "p1",
   kind: "plant",
@@ -47,8 +45,8 @@ const GOLDEN_PLANTS_TOC = `<[file][][]
 >
 `;
 
-describe("buildToc — list_plant (v0.4)", () => {
-  it("emits the bible's declared plant element, byte-exact", () => {
+describe("buildToc — list_plant", () => {
+  it("emits the known-good plant element, byte-exact", () => {
     expect(buildToc([PLANT])).toBe(GOLDEN_PLANTS_TOC);
   });
 
@@ -69,9 +67,8 @@ describe("buildToc — list_plant (v0.4)", () => {
     expect(buildToc([palm])).toContain("<[stringt8c][species][11]>");
   });
 
-  it("declares position and height_range as vector2, not vector3 (the bible's error)", () => {
-    // The bible says vector3 for both while printing two values into them; the author's working file
-    // says vector2. This is the one thing PCT emitted that the reference file contradicts outright.
+  it("declares position and height_range as vector2, not vector3", () => {
+    // Both carry two values, so both are vector2. A vector3 here is wrong even though it looks plausible.
     const toc = buildToc([PLANT]);
     expect(toc).toContain("<[vector2_float64][position]");
     expect(toc).toContain("<[vector2_float32][height_range]");
@@ -84,7 +81,7 @@ describe("buildToc — list_plant (v0.4)", () => {
     expect(toc).toContain("list_xref");
   });
 
-  it("emits list_plant FIRST, in the bible's sibling order, whatever the input order", () => {
+  it("emits list_plant FIRST, in the known-good sibling order, whatever the input order", () => {
     const mixed: ResolvedObject[] = [WITNESS, PLANT];
     const toc = buildToc(mixed);
     expect(toc.indexOf("list_plant")).toBeLessThan(toc.indexOf("list_xref"));

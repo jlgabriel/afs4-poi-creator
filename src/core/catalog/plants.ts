@@ -1,8 +1,7 @@
 // plants.ts — enumerate the AFS4 plant library into CatalogPlant[] (v0.4).
-// PURE: filenames in, typed catalog out. Like airportLights there is NOTHING TO PARSE — but here the
-// reason is stronger: `<install>/scenery/plants/` holds 41 files and ALL 41 are `.ttx` textures, with
-// no `.tmb` and no geometry anywhere. The sim draws a plant from its texture alone, so the whole
-// "scan" is name derivation and PCT ships zero proprietary bytes.
+// PURE: filenames in, typed catalog out. Like airportLights there is NOTHING TO PARSE:
+// `<install>/scenery/plants/` holds only `.ttx` textures, no geometry. The sim draws a plant from its
+// texture alone, so the whole "scan" is name derivation and PCT ships zero proprietary bytes.
 //
 // The filename carries the entire record we need:
 //
@@ -10,38 +9,15 @@
 //     └─ group ─┘  └sp┘ └─h─┘
 //
 //   • group   → the `.toc` `group` value, VERBATIM ("conifer_forest" — groups contain `_`, so the
-//               field separator is the DOUBLE underscore, not a single one). CONFIRMED in-sim: the
-//               log rejects `type` ("property 'type' is not a member of type 'plant'") and never
-//               objects to `group`.
+//               field separator is the DOUBLE underscore, not a single one). The plant property is
+//               `group`; `type` is not a member of `plant`.
 //   • species → the `.toc` `species` value: the filename's own 2 zero-padded digits ("08", not "0").
-//               ✅ CONFIRMED by the format author's proven file: it places `palm`/`08` and `palm`/`11`.
-//               ⚠️ Do NOT "fix" this to a 0-based ordinal. The sim's startup log (`tmterrain_trees`)
-//               enumerates palm as 7 variations with `fi=23`, which reads exactly like a 0..6 ordinal
-//               and is tempting — but `fi` is an index into the renderer's flat 41-texture array, NOT
-//               this field. `palm/11` in a working file settles it: the gaps (i04–i07) are real and
-//               `species` carries the filename's number.
-//   • h####   → the texture's natural height in CENTIMETRES (h1750 = 17.50 m). Range across the real
-//               41: 0.80 m (shrub__i11) … 28.20 m (conifer_forest__i01). CONFIRMED: `tmterrain_trees`
-//               lists exactly these 41 heights, in this order.
-//               ⚠️ THE `h` IS OPTIONAL SINCE 2026-08-12, and not because the format changed — because
-//               IPACS shipped two files without it. The FS4 beta Steam stream added plants, and of
-//               them exactly TWO arrived as `shrub__i16__0150_color` / `shrub__i18__0200_color`
-//               (forum #244, ApfelFlieger's rescan). *Two* out of a larger batch is the tell: a real
-//               convention change would have dropped the `h` from all of them, so this reads as an
-//               upstream typo. PCT tolerates it either way — losing a plant the user can see in the
-//               sim, over a character missing from someone else's filename, is the worse failure.
-//               ⚠️ What is NOT confirmed is that those two digits still mean centimetres. 0150 → 1.50 m
-//               and 0200 → 2.00 m are plausible shrubs, and the field position is unchanged, so that is
-//               what we decode — but the cheap oracle is `tmterrain_trees` in a beta `tm.log`, which
-//               enumerates every plant's height. Ask before treating 1.50/2.00 as verified.
-//
-// Nothing in this file was ever the reason plants didn't render — that was `autoheight` in the `.tsl`
-// (see tslWriter). The author's verdict on the scan + emit was "Claude did not make a mistake".
-//
-// Cross-validated: the format bible's plant list (group → species indices) matches these filenames
-// EXACTLY, 41 = 41, down to the i04–i07 gaps absent from every group in both sources. Two
-// independent sources agreeing is as close to ground truth as this feature gets — every real
-// `list_plant` in the install is inside a binary-packed cultivation `.toc` we cannot read.
+//               ⚠️ Do NOT "fix" this to a 0-based ordinal: the numbering has real gaps (i04–i07) and
+//               `species` carries the filename's number (e.g. `palm`/`11` is valid).
+//   • h####   → the texture's natural height in CENTIMETRES (h1750 = 17.50 m).
+//               ⚠️ The `h` is OPTIONAL: some stock files omit it (`shrub__i16__0150_color`). The digits
+//               are decoded as centimetres all the same; skipping the plant would lose one the user can
+//               see in the sim.
 
 import type { CatalogPlant } from "../project/types";
 
@@ -64,11 +40,11 @@ export interface PlantBuildResult {
 
 /** `<group>__i<species>__[h]<centimetres>` plus an optional `_<channel>` suffix.
  *  `(.+?)` is lazy so the group keeps its own underscores up to the first `__i` ("conifer_forest").
- *  The suffix is optional and ignored: all 41 install files are `_color`, but the sim's texture naming
+ *  The suffix is optional and ignored: install plant files are `_color`, but the sim's texture naming
  *  elsewhere pairs `_color` with a `_light` map, and a second channel for the same plant must not
  *  become a second catalog entry (see the group/species de-dupe below).
  *  `h?` cannot make the parse ambiguous: `\d` never matches `h`, so the optional letter is consumed
- *  when present and skipped when absent, and all 41 h-bearing names parse exactly as before. */
+ *  when present and skipped when absent. */
 const PLANT_RE = /^(.+?)__i(\d+)__h?(\d+)(?:_[a-z]+)?$/;
 
 /** Pretty label: underscores → spaces, title-cased, keeping the species index — `broadleaf__i00` and

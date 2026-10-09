@@ -1,6 +1,6 @@
 // heights.ts — resolve each object's HeightSpec to absolute metres ASL (design §2.2 / R1).
 //
-// POI xref heights are absolute ASL (format bible; matrix V2 confirms), so before export every
+// POI xref heights are absolute ASL, so before export every
 // object's height must become a single ASL number. This module is the PURE, offline path: it
 // takes a terrain elevation you already have (or null) and does the arithmetic. The networked
 // per-point lookup (Open-Meteo) lands later in main/elevation.ts and feeds the same shape.
@@ -49,17 +49,17 @@ export function resolveHeightsFlat(
   return resolved;
 }
 
-// ── Autoheight (AGL) mode — forum #142 / in-sim gate 2026-07-19 ─────────────────────────────────────
+// ── Autoheight (AGL) mode ───────────────────────────────────────────────────────────────────────────
 
 /** Objects that an AUTOHEIGHT export cannot represent (types.ts HeightMode). Two reasons:
  *  • "asl"    — an absolute-ASL height: the place is autoheight=true, so the sim would read the number as
  *               metres-ABOVE-GROUND, not ASL. The fix is the user's — switch those to Terrain / Terrain+offset,
  *               or export in Baked ASL. (Deliberately NOT NeedsElevationError, whose "enter a base elevation"
  *               recovery is the wrong advice here.)
- *  • "lights" — a `light` / `airport_light`: the sim can't place lights in autoheight. In-sim gate
- *               (2026-07-20): a silo in an autoheight POI lands on the terrain, but airport lights in the
- *               same POI drop far below the surface — lights need an absolute (ASL) height, which autoheight
- *               (all ground-relative) can't give them. Use Baked ASL for lights. */
+ *  • "lights" — a `light` / `airport_light`: the sim can't place lights in autoheight — they drop far
+ *               below the surface while other objects in the same POI land on the terrain. Lights need an
+ *               absolute (ASL) height, which autoheight (all ground-relative) can't give them. Use Baked
+ *               ASL for lights. */
 export class UnsupportedInAutoheightError extends Error {
   readonly points: PlacedObject[];
   readonly reason: "asl" | "lights";

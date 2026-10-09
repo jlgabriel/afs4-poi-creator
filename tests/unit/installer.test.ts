@@ -80,9 +80,8 @@ describe("writePoi", () => {
     );
   });
 
-  // Fable I5. writePoi used to write straight into the destination, deleting the previous POI FIRST on an
-  // overwrite — so a failure part-way through (a full disk) destroyed the working POI and left a partial
-  // one in its place. Now it stages the whole thing beside the destination and swaps it in with one rename.
+  // writePoi stages the whole POI beside the destination and swaps it in with one rename, so a failure
+  // part-way through (a full disk) never destroys the working POI or leaves a partial one in its place.
   //
   // The failure is injected portably: file 2's relPath nests UNDER file 1's filename, so mkdirSync of its
   // parent hits an existing FILE and throws (EEXIST/ENOTDIR) half-way through the loop.
@@ -113,7 +112,7 @@ describe("writePoi", () => {
   });
 });
 
-describe("writePoi — bundled assets (v0.4 plant anchor)", () => {
+describe("writePoi — bundled assets (plant anchor)", () => {
   const withAssets = (folderName: string, assets: string[]): ExportPlan => ({ ...plan(folderName), assets });
 
   it("copies each plan asset from assetsDir into the POI folder", () => {

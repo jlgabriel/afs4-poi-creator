@@ -9,7 +9,7 @@ import { FirstRunWizard } from "./dialogs/FirstRunWizard";
 
 export function App(): React.ReactElement {
   const { phase, showEditor, showWizard } = useBootstrap();
-  useThumbnailSync(); // v0.6: keep object photos in step with the folder (mount + on window focus)
+  useThumbnailSync(); // keep object photos in step with the folder (mount + on window focus)
   if (phase === "loading") {
     return (
       <div className="pct-boot">

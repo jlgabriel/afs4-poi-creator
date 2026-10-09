@@ -1,8 +1,8 @@
 // RunwayLayer.ts — the airport's runways on the map: the strip drawn at its real width, with a draggable
 // handle on each threshold when it is selected.
 //
-// WHY IT IS A RECTANGLE AND NOT A LINE (forum #242). PCT lays no asphalt — ApfelFlieger is explicit that a
-// PCT runway has no markings, no centre line and no surface, because all of that would need a TMB. But
+// WHY IT IS A RECTANGLE AND NOT A LINE. PCT lays no asphalt — a PCT runway has no markings, no centre
+// line and no surface, because all of that would need a TMB. But
 // `width` is not decoration: it is the number the simulator lands an aircraft with. Drawn as a line, the
 // only feedback that 40 is not 400 would be the digits in a text field. Drawn to scale, it is obvious.
 // The map is PCT's, not the sim's ground — showing the width contradicts nothing.
@@ -11,17 +11,13 @@
 // their rotate grips: a field with six runways would otherwise carry twelve grabbable dots, most of them
 // belonging to something the user is not editing.
 //
-// ★★ DRAGGING THE STRIP MOVES THE WHOLE RUNWAY, and the first cut of this file got that wrong. The
-// argument was that a runway is defined BY its two thresholds, so the gesture that matches the data is
-// grabbing one of them — true about the model, and irrelevant to the person looking at a runway in the
-// wrong field. Juan tried to move it within a minute of opening the app.
+// ★★ DRAGGING THE STRIP MOVES THE WHOLE RUNWAY. A runway is defined by its two thresholds, but a user
+// looking at a runway in the wrong place grabs the strip, not an end.
 //
-// The failure was not just a missing feature, it was a missing MOUSEDOWN. Leaflet's map drag lives on the
-// container, and a path does not stop it: every layer here calls `map.dragging.disable()` from its own
-// mousedown, which is what makes a shape grabbable at all. With no handler on the strip, pressing it and
-// pulling panned the map — the runway did not merely refuse to move, it looked inert while the world slid
-// under it. A shape that is not draggable has to be a shape that does not look draggable, and this one
-// does. Both ends move together in ONE commit, so it is one undo entry.
+// That needs a MOUSEDOWN on the strip. Leaflet's map drag lives on the container, and a path does not
+// stop it: every layer here calls `map.dragging.disable()` from its own mousedown, which is what makes a
+// shape grabbable at all. With no handler on the strip, pressing it and pulling pans the map and the
+// runway looks inert. Both ends move together in ONE commit, so it is one undo entry.
 //
 // Colour: the palette had no saturated colour left that is not already spoken for — blue footprints,
 // white pad, green plants, amber selection, red missing, cyan grips, violet stands. So the strip is

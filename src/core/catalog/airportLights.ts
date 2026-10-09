@@ -1,15 +1,13 @@
 // airportLights.ts — enumerate the AFS4 airport-light library into CatalogAirportLight[] (v0.2).
 // PURE: filenames in, typed catalog out. Unlike the xref catalog there is NOTHING TO PARSE — we
-// never open the `.tmb` (opaque IPACS binary), so PCT ships zero proprietary bytes here. The whole
+// never open the `.tmb` (opaque binary), so PCT ships zero proprietary bytes here. The whole
 // "scan" is name derivation: `<install>/airport_lights/al_<type>/al_<type>[…].tmb` → type_name is
 // the `.tmb` basename minus the `al_` prefix, which is exactly the string8u a POI `.toc` writes.
 //
-// Two evidence-backed rules (Fable, cross-checked against Juan's install + the canonical examples):
-//   • EXCLUDE `*_model` — al_center_line_light ships a companion `..._model.tmb` (the visible-mesh
-//     helper), absent from the format bible's name list and used 0× in the examples.
-//   • INCLUDE `runway_edge_light` — present in the install and used 40× in examples, yet MISSING from
-//     the bible's list. The scan is ground truth, not the doc (same lesson as the `.tmi` scan).
-// The 15 install folders yield 23 `.tmb`; after the `_model` exclusion, 22 placeable type_names.
+// Two rules:
+//   • EXCLUDE `*_model` — e.g. al_center_line_light ships a companion `..._model.tmb` (a visible-mesh
+//     helper), which is not a placeable type_name.
+//   • The scan is ground truth, not any published name list (e.g. `runway_edge_light` is placeable).
 
 import type { CatalogAirportLight } from "../project/types";
 

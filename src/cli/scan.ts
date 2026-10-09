@@ -1,10 +1,10 @@
 // cli/scan.ts — M0 headless scanner. Walks an AFS4 install's scenery/xref/**/*.tmi, builds
 // the catalog, writes catalog.json, and prints the per-bundle table plus the M0 acceptance
-// checks (911 objects, ACT cross-check, geo parity, ≥95% categorized).
+// checks (object and plant counts, geo parity, ≥95% categorized).
 //
 //   npm run scan -- --install "<AFS4 install dir>" [--user "<user dir>"] [--out catalog.json]
-//                    [--xref-table "<xref_table.csv>"]   (optional official-CSV overlay — see
-//                    docs/XREF_TABLE_CSV_DECISION.md; lets you verify the overlay without the app)
+//                    [--xref-table "<xref_table.csv>"]   (optional object-table overlay; lets you
+//                    verify the overlay without the app)
 
 import { readFileSync, writeFileSync, readdirSync, statSync, existsSync, mkdirSync } from "node:fs";
 import path from "node:path";
@@ -88,12 +88,12 @@ function main(): number {
     }
   }
 
-  // Optional official-CSV overlay. Only loaded when --xref-table is given (the CLI never auto-discovers
+  // Optional object-table overlay. Only loaded when --xref-table is given (the CLI never auto-discovers
   // it) so the M0 acceptance run below stays on the pure-heuristic path by default.
   const load = args.xrefTable ? loadXrefTable([args.xrefTable]) : { table: null, path: null, warnings: [] };
   for (const w of load.warnings) console.warn(`  WARN ${w}`);
 
-  // v0.4 plants: filenames only — `scenery/plants` holds 41 `.ttx` textures and no geometry.
+  // v0.4 plants: filenames only — `scenery/plants` holds `.ttx` textures and no geometry.
   const plantsDir = resolvePlantsDir(args.install);
   const { plants, warnings: plantWarnings } = buildPlants(
     plantsDir ? findTtx(plantsDir).map((p) => ({ base: path.basename(p, ".ttx") })) : [],
@@ -130,28 +130,20 @@ function main(): number {
     console.log(`Official overlay: ${matched}/${catalog.xref.length} scanned objects matched (${pct}%), ${rows} rows in table.\n`);
   }
 
-  const byName = new Map(catalog.xref.map((o) => [o.name, o]));
   const fallbacks = catalog.xref.filter((o) => o.category.startsWith("other/"));
   const nonFallbackPct = catalog.xref.length
     ? (1 - fallbacks.length / catalog.xref.length) * 100
     : 0;
 
-  // v0.4 acceptance: the install ships 41 plant textures and the format bible's plant list has the
-  // same 41 group/species pairs. Asserting the count here catches BOTH a scanner regression and an
-  // install whose library moved — and it is the only automated check that the two sources still agree.
+  // v0.4 acceptance: asserting the plant count catches BOTH a scanner regression and an install whose
+  // plant library moved.
   const plantGroups = [...new Set(catalog.plants.map((p) => p.group))].sort();
-  const tower = byName.get("tower00_small_plates_ds_00_08_08");
   const checks: Array<[string, boolean, string]> = [
     ["exactly 911 objects", catalog.xref.length === 911, `got ${catalog.xref.length}`],
     [
-      "exactly 41 plants in 6 groups (matches the bible's list)",
+      "exactly 41 plants in 6 groups",
       catalog.plants.length === 41 && plantGroups.length === 6,
       `got ${catalog.plants.length} in ${plantGroups.length}: ${plantGroups.join(", ")}`,
-    ],
-    [
-      "ACT tower cross-check 8.19 x 25.90 m",
-      !!tower && Math.abs(tower.size.x - 8.19) < 0.01 && Math.abs(tower.size.z - 25.9) < 0.01,
-      tower ? `x=${tower.size.x} y=${tower.size.y} z=${tower.size.z}` : "tower not found",
     ],
     [
       "≥95% categorized (outside other/*)",

@@ -25,7 +25,7 @@ describe("buildCatalog", () => {
         source: "install",
         text: tmi(
           "xref_test",
-          // synthetic name, but the ACT tower's exact bbox → proves the 8.19 x 25.90 size math
+          // synthetic name with an asymmetric bbox → proves the 8.19 x 25.90 size math
           entry("hangar_demo_ds_01", "-3.587511 -3.978786 -1.565422", "4.602168 4.010449 24.339308") +
             entry("mystery_thing", "0 0 0", "1 2 3"),
         ),
@@ -74,7 +74,7 @@ describe("buildCatalog", () => {
   });
 });
 
-// The official `xref_table.csv` overlay (build-but-disabled until forum #114). Synthetic table only —
+// The official `xref_table.csv` overlay (built but disabled). Synthetic table only —
 // invented names/values, real column grammar — so no IPACS bytes enter the repo.
 describe("buildCatalog — official xref_table overlay", () => {
   const meta = { installDir: "X", userXrefDir: null, scannedAt: "t" };
@@ -118,7 +118,7 @@ describe("buildCatalog — official xref_table overlay", () => {
     expect(miss.displayName).toBe("Uncatalogued Thing"); // heuristic label
   });
 
-  it("never overlays a user-source object, even on a name collision (Q5 — user geometry is its own)", () => {
+  it("never overlays a user-source object, even on a name collision (user geometry is its own)", () => {
     const userSources: TmiSource[] = [
       { path: "u/xref_user.tmi", source: "user", text: tmi("xref_user", entry("PCT_Liveried_Jet", "0 0 0", "1 1 1")) },
     ];
@@ -143,7 +143,7 @@ describe("buildCatalog — official xref_table overlay", () => {
   });
 });
 
-// Loose user `.tmb` → `unregistered` catalog objects (design B2). Synthetic `.tmb` fixtures — invented
+// Loose user `.tmb` → `unregistered` catalog objects. Synthetic `.tmb` fixtures — invented
 // names, the real plain-text grammar (scene → geometry_list → tmxglgeometry(name, matrix, mesh_collision)).
 describe("buildCatalog — loose user .tmb (unregistered)", () => {
   const meta = { installDir: "X", userXrefDir: "U", scannedAt: "t" };
@@ -184,7 +184,7 @@ ${g.join("\n")}
     expect(o.bbMax).toEqual([1, 2, 3]);
     expect(o.size).toEqual({ x: 2, y: 4, z: 3 });
     expect(o.sizeUnknown).toBeUndefined();
-    expect(o.official).toBeUndefined(); // user source is never overlaid (Q5)
+    expect(o.official).toBeUndefined(); // user source is never overlaid
   });
 
   it("makes a single sizeUnknown placeholder for an opaque .tmb (text:null)", () => {
@@ -222,9 +222,8 @@ ${g.join("\n")}
     expect(warnings.join(" ")).toContain("shares a built-in's name");
   });
 
-  // #122: the real shape — N `.tmb` in ONE folder share that folder's bundle, and each keeps its own
-  // basename. v0.3.0 had a single `base` doing both jobs, which only survived because it looked at the
-  // xref root alone (where every `.tmb` IS its own bundle).
+  // The real add-on shape — N `.tmb` in ONE folder share that folder's bundle, and each keeps its own
+  // basename. `base` and `bundle` coincide only at the xref root, where every `.tmb` IS its own bundle.
   it("several .tmb in one folder share the folder's bundle, each keeping its own name", () => {
     const { catalog } = buildCatalog([], meta, [], null, [
       { base: "pylon_15m", bundle: "xref_air_race_pylons", text: userTmb(meshGeom("pylon_15m", "(-1 -1 0) (1 1 15)")) },
@@ -257,10 +256,10 @@ ${g.join("\n")}
     expect(buildCatalog(install, meta, [], null).catalog.xref.every((o) => !o.unregistered)).toBe(true);
   });
 
-  // Registering must not MOVE a user's object in the browse tree. Found by using the tool: the natural
-  // flow is to click the `user` category to see your loose `.tmb`, then hit Register — and the rescan
-  // filed them under `other/<bundle>` instead, so the node the user was standing in ceased to exist and
-  // the gallery went blank for EVERY search (catalogTree.hasCategory covers that second half).
+  // Registering must not MOVE a user's object in the browse tree. The natural flow is to click the
+  // `user` category to see your loose `.tmb`, then hit Register; if the rescan filed them under
+  // `other/<bundle>`, the node the user was standing in would cease to exist and the gallery would go
+  // blank for EVERY search (catalogTree.hasCategory covers that second half).
   // Pins the contract the way a user states it: Register clears the badge and changes nothing else.
   it("registering a folder does not move its objects — same category before and after", () => {
     const loose = buildCatalog([], meta, [], null, [
@@ -285,8 +284,8 @@ ${g.join("\n")}
     expect(registered.unregistered).toBeUndefined(); // the ONLY difference the user should see
   });
 
-  // `categorize` speaks only for IPACS's built-ins, so a user object whose name happens to hit a curated
-  // rule must not be filed under it: that scatters someone's own library through 855 objects that aren't
+  // `categorize` speaks only for the built-ins, so a user object whose name happens to hit a curated
+  // rule must not be filed under it: that scatters someone's own library through objects that aren't
   // theirs, and `act` would claim it came from the curated table when it didn't.
   it("a user-source .tmi never scatters into a built-in category on a name match", () => {
     const { catalog } = buildCatalog(

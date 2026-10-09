@@ -1,4 +1,4 @@
-// windowBounds.ts — pure geometry for "reopen where you left it" (forum #125, @ApfelFlieger). No Electron
+// windowBounds.ts — pure geometry for "reopen where you left it". No Electron
 // import: main passes what it got from `screen` and gets back the bounds to open with, so this unit-tests
 // directly — the settings.ts idiom.
 //

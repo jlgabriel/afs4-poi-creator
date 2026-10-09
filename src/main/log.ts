@@ -1,9 +1,7 @@
-// log.ts — PCT's ONE diagnostic log: a plain-text file the user can open and paste into a forum report.
+// log.ts — PCT's ONE diagnostic log: a plain-text file the user can open and paste into a bug report.
 //
-// Why it exists: every expensive bug so far (plants not loading on Mac, photos missing for a dashed
-// XREF name, a tooltip broken only on macOS) was expensive for the same reason — nobody could see what
-// happened on the reporter's machine, so each one cost a round of "try this, tell me what you see".
-// The log turns that first round into a paste.
+// Why it exists: without it, nobody can see what happened on the reporter's machine, so every bug
+// costs a round of "try this, tell me what you see". The log turns that first round into a paste.
 //
 // Two rules keep it from becoming the thing it is meant to prevent:
 //
@@ -53,7 +51,7 @@ export interface LogOptions {
 }
 
 /** The log is meant to be pasted in public, and on Windows every interesting path starts with the user's
- *  real name (`C:\Users\Juan Luis\…`). Hide the home PREFIX only: the part that actually diagnoses things
+ *  real name (`C:\Users\<Full Name>\…`). Hide the home PREFIX only: the part that actually diagnoses things
  *  — a OneDrive-redirected Documents, a dash in a folder name, the case of a path segment — is downstream
  *  of it and survives intact. Case-insensitive (Windows is), and both separators, since Node hands back
  *  `\` and our own joins sometimes carry `/`. */
@@ -70,7 +68,7 @@ export function redactHome(text: string, home: string | null | undefined): strin
 const pad = (n: number, width = 2): string => String(n).padStart(width, "0");
 
 /** `HH:MM:SS.mmm`, local time. The full date lives once in the boot header; per-line wall-clock time is
- *  what lets a PCT line be lined up against the sim's own tm.log entry for the same moment. */
+ *  what lets a PCT line be lined up against the sim's own log entry for the same moment. */
 function stamp(d: Date): string {
   return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${pad(d.getMilliseconds(), 3)}`;
 }
@@ -179,8 +177,8 @@ export interface BootInfo {
   startedAt: Date;
 }
 
-/** The first block of every log. Everything here answers a question that otherwise costs a forum round
- *  trip — which PCT, which OS, dev build or installer. Pure, so its shape is asserted in the unit test. */
+/** The first block of every log. Everything here answers a question that otherwise costs a round trip
+ *  with the reporter — which PCT, which OS, dev build or installer. Pure, so its shape is asserted in the unit test. */
 export function formatBootHeader(i: BootInfo): string {
   const d = i.startedAt;
   const date = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${stamp(d)}`;
@@ -206,11 +204,9 @@ export function formatBootHeader(i: BootInfo): string {
 
 /** The export line. Takes `heightMode` as it is ON THE PROJECT, i.e. possibly absent.
  *
- *  The first version of this printed `project.heightMode` raw and the very first real log said
- *  "undefined mode" — because absent IS the default (mutate.setHeightMode deletes the key for "baked-asl"
- *  so saved projects stay byte-identical, and every other reader spells the `?? "baked-asl"` out). A log
- *  answering "which height mode did this export use?" with "undefined" answers nothing, and heights are
- *  exactly the class of question that otherwise costs a test flight. Resolve it here, once. */
+ *  Absent IS the default (mutate.setHeightMode deletes the key for "baked-asl" so saved projects stay
+ *  byte-identical, and every other reader spells the `?? "baked-asl"` out). Printing it raw would log
+ *  "undefined mode", which answers nothing. Resolve it here, once. */
 export function formatExportSummary(i: {
   poiName: string;
   objects: number;
@@ -218,8 +214,7 @@ export function formatExportSummary(i: {
   target: string;
   overwrite: boolean;
   baseElevation?: number;
-  // ⛔ `heliport` was reported here too, and went with the templates (forum #278). The airport install
-  // has its own log line in ipc.ts, which is where pads have been worth spelling out all along.
+  // No `heliport` field: the airport install has its own log line in ipc.ts, which spells out the pads.
 }): string {
   return (
     `export "${i.poiName}" — ${i.objects} objects, ${i.heightMode ?? "baked-asl"} mode, ` +

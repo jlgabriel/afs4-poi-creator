@@ -17,8 +17,8 @@ export function tag(type: string, name: string, value: string | number): string 
 
 /** Make arbitrary free text safe as a tag VALUE. The grammar has NO escape mechanism: tmParser reads
  *  a value verbatim up to the FIRST `]` (see tmParser.bracket), so a stray `]` truncates the value and
- *  corrupts the rest of the file — e.g. a project named `Munich [WIP]` would break its own `.tsl`
- *  (Fable C2). Brackets become parens (readable), and CR/LF/TAB collapse to a space so a value can't
+ *  corrupts the rest of the file — e.g. a project named `Munich [WIP]` would break its own `.tsl`.
+ *  Brackets become parens (readable), and CR/LF/TAB collapse to a space so a value can't
  *  break out of its single line. The only user-controlled value today is the `.tsl` place `name`
  *  (project.name); catalogue-sourced xref names are slugs and can't contain these. */
 export function sanitizeValue(s: string): string {
@@ -57,8 +57,8 @@ export function fmtNum(v: number, maxDecimals = 6): string {
 }
 
 /** Fixed 6-decimal float for `.tmi` geometry fields (bb_min/bb_max/bs_center/bs_radius). Unlike
- *  `fmtNum`, trailing zeros are KEPT — fixed width keeps the byte-goldens stable and matches the
- *  precision flown and accepted in-sim (~1 µm). The one wrinkle: a tiny negative that rounds to zero
+ *  `fmtNum`, trailing zeros are KEPT — fixed width keeps the byte-goldens stable, and the sim accepts
+ *  this precision (~1 µm). The one wrinkle: a tiny negative that rounds to zero
  *  yields `"-0.000000"`, which would make an otherwise-symmetric bbox emit a stray minus and destabilise
  *  goldens, so it is normalised to `"0.000000"` (the only value that ever needs normalising — a genuine
  *  ±1 µm keeps its sign). Real files vary radius/precision and all render, so this is a wide-tolerance

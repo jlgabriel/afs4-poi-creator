@@ -2,7 +2,7 @@
 // selection[0] → the object reference (Object.is-stable across unrelated store changes, so panning the
 // map never re-renders this) → its catalog metadata. Edits route through the store mutations so the
 // map's O(changed) footprint diff stays intact. The body dispatches by `kind`: xref (footprint) |
-// airport_light | light (the two point kinds) | plant (v0.4), sharing the position row + the
+// airport_light | light (the two point kinds) | plant, sharing the position row + the
 // height/label/lock tail.
 import { useMemo, useState } from "react";
 import type {
@@ -62,7 +62,7 @@ function LabelField({ id, label }: { id: string; label: string | undefined }): R
 }
 
 /** Lon/Lat row — shared by every kind. Clamps into ±180/±90 so a slipped decimal can't write an
- *  out-of-range, unloadable project (Fable C1). */
+ *  out-of-range, unloadable project. */
 function PositionRow({ obj }: { obj: PlacedObject }): React.ReactElement {
   const store = editorStore.getState;
   return (
@@ -114,10 +114,9 @@ function WadRow({ label, value, title }: { label: string; value: string; title: 
  *  off a row of objects — the entire point of the feature — would re-open the block for every click. */
 let wadOpen = false;
 
-/** The same position/rotation in the units FS4 uses INSIDE its own world-airport database (`.wad`):
- *  a 0–65536 projected grid and radians (see core/geo/wad.ts). Read-only, collapsed by default —
- *  irrelevant to placing objects, and only wanted by the few people who hand-build heliport files and
- *  were converting with a private spreadsheet (forum #150). Every kind gets it; the rotation row is
+/** The same position/rotation in the units of Aerofly's airport files (`.wad`): a 0–65536 projected
+ *  grid and radians (see core/geo/wad.ts). Read-only, collapsed by default — irrelevant to placing
+ *  objects, useful only to someone hand-building airport files. Every kind gets it; the rotation row is
  *  dropped for the two kinds that have none (a point light and a plant don't turn). */
 function Fs4Internal({ obj }: { obj: PlacedObject }): React.ReactElement {
   const [open, setOpen] = useState(wadOpen);
@@ -133,16 +132,16 @@ function Fs4Internal({ obj }: { obj: PlacedObject }): React.ReactElement {
       open={open}
       onToggle={(e) => setOpen((wadOpen = e.currentTarget.open))}
     >
-      <summary title="The projected values FS4 stores internally. PCT does not write .wad files — this is a read-out.">
+      <summary title="The same position in the units Aerofly's airport files use. A read-out: it changes nothing.">
         FS4 internal (.wad)
       </summary>
       <WadRow label="Longitude" value={lon} title="0 = 180° W · 32768 = Greenwich · 65536 = 180° E" />
-      <WadRow label="Latitude" value={lat} title="0 = 90° S · 32768 = Equator · 65536 = 90° N (tangent projection)" />
+      <WadRow label="Latitude" value={lat} title="0 = 90° S · 32768 = Equator · 65536 = 90° N" />
       {rotation !== undefined && (
         <WadRow
           label="Direction"
           value={formatWad(directionToWad(rotation))}
-          title="The raw .toc rotation in radians — the form a .wad stores it in"
+          title="The object's rotation in radians, as an airport file stores it"
         />
       )}
       <button
@@ -158,7 +157,7 @@ function Fs4Internal({ obj }: { obj: PlacedObject }): React.ReactElement {
 }
 
 /** Height + label + lock — identical across kinds. Height resolves to absolute ASL at export for every
- *  kind (in-sim gate 2026-07-12), so the same HeightControl serves lights and xrefs. */
+ *  kind, so the same HeightControl serves lights and xrefs. */
 function SharedTail({
   obj,
   resolvedAsl,
@@ -185,7 +184,7 @@ function SharedTail({
 }
 
 /** Night-visibility group — carried by both light kinds. Doubles as the "lights only render at night"
- *  teaching cue (without it, "I placed a light and see nothing at noon" is the #1 support thread). */
+ *  teaching cue (without it, "I placed a light and see nothing at noon" is the usual confusion). */
 function GroupIndexField({ id, value }: { id: string; value: number }): React.ReactElement {
   const store = editorStore.getState;
   return (
@@ -253,7 +252,7 @@ function XrefFields({
         <label className="pct-field-col">
           <span
             className="pct-field-label"
-            title="Compass heading the object faces in-sim: 0 = North, 90 = East, clockwise, normalized to 0–360°. Calibrated in-sim (heading = 90 − the raw .toc direction). Drag the cyan handle on the map (hold Shift to snap to 5°) or type it here."
+            title="Compass heading the object faces in-sim: 0 = North, 90 = East, clockwise, normalized to 0–360°. Drag the cyan handle on the map (hold Shift to snap to 5°) or type it here."
           >
             Heading °
           </span>
@@ -384,7 +383,7 @@ function AirportLightFields({
           value={obj.typeName}
           onChange={(e) => store().setAirportLightType(obj.id, e.target.value)}
         >
-          {/* A <select> whose value matches no <option> renders BLANK — so a project shared from a forum
+          {/* A <select> whose value matches no <option> renders BLANK — so a project shared by another
               user with a fixture we don't have used to show an empty, lying dropdown. Carry the dangling
               name as a disabled option so the field states what it actually holds. */}
           {!meta && (
@@ -442,7 +441,7 @@ const sameColor = (a: Vec3, b: Vec3): boolean => a[0] === b[0] && a[1] === b[1] 
 
 /** Flash pattern [A B C D] editor (types.ts: A cycle · B sequence · C flash-length · D unused). The
  *  checkbox toggles steady↔flashing; when on, A/B/C are editable. Staggering B (sequence) across a row
- *  of point lights is how you build a "running light" sweep (forum #94) — the reason a raw [A B C D]
+ *  of point lights is how you build a "running light" sweep — the reason a raw [A B C D]
  *  editor beats a single on/off toggle. D stays as-is (unused, 0). */
 function FlashingField({
   id,
@@ -564,7 +563,7 @@ function PlantFields({
   resolvedAsl: number | undefined;
 }): React.ReactElement {
   const store = editorStore.getState;
-  // v0.4 always keeps MIN = MAX (see mutate.setPlantHeightRange), so one number drives the pair.
+  // PCT always keeps MIN = MAX (see mutate.setPlantHeightRange), so one number drives the pair.
   const height = obj.heightRange[0];
   const natural = meta?.naturalHeight;
   return (
@@ -592,9 +591,8 @@ function PlantFields({
           value={height}
           format={(n) => n.toFixed(2)}
           onCommit={(v) => {
-            // A plant 0 m tall is, at best, invisible — and it's the value the format bible's template
-            // shows, so it's exactly the one a curious user would try. Refuse it rather than let the
-            // editor write an object that silently renders as nothing.
+            // A plant 0 m tall is, at best, invisible — and 0 is a value a curious user would try.
+            // Refuse it rather than let the editor write an object that silently renders as nothing.
             if (v > 0) store().setPlantHeightRange(obj.id, [v, v]);
           }}
           ariaLabel="Plant height in metres"
@@ -606,7 +604,7 @@ function PlantFields({
   );
 }
 
-// ── multi-selection: arrange (v0.9.2) ─────────────────────────────────────────
+// ── multi-selection: arrange ──────────────────────────────────────────────────
 /** The RAW `.toc` rotation an object carries, if it has one at all (a point light and a plant don't). */
 function rawRotation(o: PlacedObject): number | undefined {
   return o.kind === "xref" ? o.direction : o.kind === "airport_light" ? o.orientation : undefined;
@@ -660,9 +658,9 @@ function BulkRotationField({
 /** What the Inspector shows for 2+ selected objects: put them in a tidy row.
  *
  *  The 2D-editor "align left / align top" does not survive the trip to a map — left is WEST, and the
- *  row you actually want is almost never axis-aligned (the parked B747s that prompted this run at
- *  135°). So the two position tools work in the row's own frame: LINE UP zeroes each object's offset
- *  across the line through the two farthest apart, SPACE EVENLY equalises the gaps along it. They are
+ *  row you actually want is almost never axis-aligned (parked aircraft
+ *  at 135°, say). So the two position tools work in the row's own frame: LINE UP zeroes each object's
+ *  offset across the line through the two farthest apart, SPACE EVENLY equalises the gaps along it. They are
  *  orthogonal, so running both gives a clean row and running one leaves the other property alone. */
 function ArrangePanel(): React.ReactElement {
   const objects = useEditor((s) => s.project.objects);
@@ -746,7 +744,7 @@ function ArrangePanel(): React.ReactElement {
             onCommit={(deg) => store().setSelectionRotation(isXref ? headingToDirection(deg) : deg)}
           />
           {/* Only for xrefs: this button asserts that a compass bearing IS the object's facing, which
-              is the mapping calibrated in-sim for xrefs and never measured for a light fixture. */}
+              holds for xrefs and is not established for a light fixture. */}
           {isXref && axis && (
             <label className="pct-field-col">
               <span className="pct-field-label">&nbsp;</span>
@@ -796,7 +794,7 @@ export function Inspector(): React.ReactElement {
     const sel = s.airportSelection;
     return sel?.kind === "pad" ? s.project.airport?.pads.find((p) => p.id === sel.id) : undefined;
   });
-  // The airport ITSELF (his submenu (1) DATA), which is the one airport selection that names no part and
+  // The airport ITSELF (the DATA submenu), which is the one airport selection that names no part and
   // so carries no id. Same guard as the others: the block may already be gone while the selection still
   // points at it for one render.
   const airportData = useEditor((s) =>

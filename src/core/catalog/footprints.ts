@@ -3,21 +3,17 @@
 // WHY THIS EXISTS. An XREF carries a bounding box because the install indexes it in a `.tmi`, so the map
 // can draw the blue footprint that tells you whether the thing fits where you're putting it. An
 // `airport_light` and a `plant` have no `.tmi` at all — the scan is pure name derivation — so they draw
-// as bare dots, and forum #126/#129 (ApfelFlieger) is exactly what that costs: the Runway Approach Light
-// group is nine fixtures whose whole difference IS their size (Center 1 is 0.5 × 0.5 × 2.0 m, Center 5 is
-// 8.0 × 0.5 × 10.0), and on the map all nine are the same 6-pixel circle.
+// as bare dots, even where fixtures in one family differ only by size.
 //
-// WHAT THIS IS NOT. The obvious fix — ship a `.tmi` of every airport light inside PCT — was declined, and
-// not for effort: PCT's one hard rule is that it ships ZERO IPACS data, and a table of measurements of
-// IPACS models is IPACS data wearing a spreadsheet. So the numbers are never PCT's. They are the user's,
-// typed into their own file on their own disk, exactly like the v0.6 object photos — and like the photos,
-// they can be exported and handed to somebody else, which is how a measurement made once by one person
-// reaches everybody without a single byte of it ever living in this repository.
+// WHAT THIS IS NOT. Shipping measurements of the built-in models inside PCT is ruled out: PCT ships ZERO
+// IPACS data, and a table of measurements of IPACS models is IPACS data. So the numbers are never PCT's.
+// They are the user's, typed into their own file on their own disk, exactly like the object photos — and
+// like the photos, they can be exported and shared without any of it living in this repository.
 //
-// THE MODEL. One entry per CARD, keyed by the v0.8 `photoKey` — the same key the photo feature already
-// uses, so the two features name an object identically and one right-click menu can serve both. What the
-// user types is `width × depth × height` in metres, the reading they get by eyeballing the model against
-// a 1 × 1 × 1 m cube (#129), and `overrideToBox` turns that into the model-local bbox the map wants.
+// THE MODEL. One entry per CARD, keyed by `photoKey` — the same key the photo feature uses, so the two
+// features name an object identically and one right-click menu can serve both. What the user types is
+// `width × depth × height` in metres, and `overrideToBox` turns that into the model-local bbox the map
+// wants.
 //
 // TWO ASSUMPTIONS, STATED. Both are assumptions and neither is a finding:
 //   1. The box is CENTRED on the model origin in x/y and rises from it in z. A scanned XREF box is NOT
@@ -27,8 +23,7 @@
 //      invent a fourth and fifth number. If a fixture turns out to hang visibly off its anchor, the fix
 //      is an offset pair here — not a reinterpretation of these three.
 //   2. `height` does NOT reach the map. The footprint is a ground polygon; z has no say in it. It is
-//      stored because it is what #129 measured and because the card's size line reads better with it,
-//      and for nothing else. Anyone reading a taller polygon into a taller number is reading a bug.
+//      stored for the card's size line and nothing else. Anyone reading a taller polygon into a taller number is reading a bug.
 
 import type { Catalog, CatalogAirportLight, CatalogObject, CatalogPlant, Vec3 } from "../project/types";
 import { photoKey } from "./photoKey";
@@ -147,9 +142,9 @@ export function mergeFootprints(
 /** Apply every override onto a freshly scanned catalog, returning the catalog the editor should use.
  *
  *  Returns the SAME reference when there is nothing to apply, which is the common case and keeps a user
- *  with no overrides on exactly the code path v0.8 had. When it does rewrite, every touched entry is a new
- *  object and the caller rebuilds its indexes — which is precisely what makes the map notice (FootprintLayer
- *  rebuilds an entry whose index Map identity changed, Fable I3).
+ *  with no overrides on the plain path. When it does rewrite, every touched entry is a new object and the
+ *  caller rebuilds its indexes — which is precisely what makes the map notice (FootprintLayer rebuilds an
+ *  entry whose index Map identity changed).
  *
  *  A key naming nothing in the catalog is silently kept in the file and ignored here: it may belong to an
  *  object from an install this machine doesn't have (an imported file is written for somebody else's), and

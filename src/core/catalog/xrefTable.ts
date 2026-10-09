@@ -1,14 +1,13 @@
-// xrefTable.ts — the official IPACS `xref_table.csv` → an in-memory lookup, PCT's optional catalog
-// overlay (design: docs/XREF_TABLE_CSV_DECISION.md — build-but-disabled until forum #114 settles
-// packaging/licence). PURE: text in, typed index out — no filesystem. The loader (main/xrefTableSource)
-// owns the read; buildCatalog owns the merge.
+// xrefTable.ts — an `xref_table.csv` object table → an in-memory lookup, PCT's optional catalog
+// overlay (built but disabled: PCT ships no such table). PURE: text in, typed index out — no
+// filesystem. The loader (main/xrefTableSource) owns the read; buildCatalog owns the merge.
 //
-// The table is metadata only (166 KB of text, zero model/texture bytes) and STRICTLY ADDITIVE: it
-// improves displayName / taxonomy / footprint for the ~551 scanned objects it matches and never adds
-// objects PCT didn't scan (the "scan your own install" posture stays intact — the merge in buildCatalog
-// only consults a scanned entry, never iterates the table).
+// The table is metadata only and STRICTLY ADDITIVE: it improves displayName / taxonomy / footprint for
+// the scanned objects it matches and never adds objects PCT didn't scan (the "scan your own install"
+// posture stays intact — the merge in buildCatalog only consults a scanned entry, never iterates the
+// table).
 //
-// CSV shape (verified against the real 753-row table, separator ';'):
+// CSV shape (separator ';'):
 //   name internal ; display name ; main cat ; sub cat ; type cat ; length ; width ; height ; offset
 //     ; <shape vertices…> ; <shape-truescale vertices…>
 // `name internal` is LOWERCASE while a scan yields mixed case (A320_aca) → lookup is case-insensitive.
@@ -25,10 +24,10 @@ import type { Vec3 } from "../project/types";
 
 /** One official object row. `size`/`offset` are model metadata (not merged into the catalog in this
  *  phase — the bbox stays authoritative from the `.tmi`); `footprint` (truescale, metres) is the real
- *  polygon the `.tmi` cannot provide — the footprint-glyph feature (#86-2). Rings are stored OPEN. */
+ *  polygon the `.tmi` cannot provide — the footprint glyph. Rings are stored OPEN. */
 export interface XrefTableEntry {
   name: string; // as in the CSV (lowercase); the lookup key is name.toLowerCase()
-  displayName: string; // official IPACS label — no heuristic can reproduce these (car_00→"Car 00")
+  displayName: string; // curated label — no heuristic can reproduce these (car_00→"Car 00")
   taxonomy: { main: string; sub: string; type: string }; // 3-level, e.g. Aircraft / Airliner / A320
   size: { length: number; width: number; height: number }; // metres, from the CSV (may be NaN if absent)
   offset: Vec3; // model offset (x y z), metres
@@ -80,7 +79,7 @@ function parseRings(vertFields: string[]): { rings: [number, number][][]; ok: bo
   return { rings, ok: cur.length === 0 }; // a leftover open ring = the last ring never closed
 }
 
-/** Parse the official `xref_table.csv` text into a case-insensitive lookup. Never throws. */
+/** Parse `xref_table.csv` text into a case-insensitive lookup. Never throws. */
 export function parseXrefTable(csv: string): XrefTable {
   const warnings: string[] = [];
   const byName = new Map<string, XrefTableEntry>();

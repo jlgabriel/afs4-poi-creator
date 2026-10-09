@@ -23,7 +23,7 @@ describe("settings", () => {
     expect(s.elevation.provider).toBe("open-meteo");
     expect(s.recentProjects).toEqual([]);
     expect(s.lastScanAt).toBeNull();
-    expect(s.thumbnailsDir).toBeNull(); // v0.6 object-photo folder — opt-in, no default location
+    expect(s.thumbnailsDir).toBeNull(); // object-photo folder — opt-in, no default location
   });
   it("readSettings on an empty dir returns defaults", () => {
     expect(readSettings(tmp).tiles.provider).toBe("esri");
@@ -78,7 +78,7 @@ describe("normalizeUserDir — undo the scenery/poi mis-nesting", () => {
   });
 });
 
-// Fable I6: afs4UserDir is renderer-writable over IPC and is the root exportPoi/uninstallPoi create and
+// afs4UserDir is renderer-writable over IPC and is the root exportPoi/uninstallPoi create and
 // delete folders under. resolvePoiPath bounds WHAT gets written there; this bounds WHERE.
 describe("writeSettings — main-side sanity on the directory fields", () => {
   it("corrects a mis-nested user folder instead of persisting it", () => {
@@ -106,7 +106,7 @@ describe("writeSettings — main-side sanity on the directory fields", () => {
     expect(saved.tiles.provider).toBe("osm");
   });
 
-  // The photo folder (v0.6) is renderer-writable over IPC too, and although it's only ever READ, a path
+  // The photo folder is renderer-writable over IPC too, and although it's only ever READ, a path
   // that isn't on disk would make every listThumbnails come back empty for no visible reason.
   it("keeps a real thumbnailsDir, refuses a vanished one, and allows clearing to null", () => {
     expect(writeSettings(tmp, { thumbnailsDir: realDir }).thumbnailsDir).toBe(realDir);

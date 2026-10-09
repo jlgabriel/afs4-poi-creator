@@ -37,7 +37,7 @@ export function SettingsDialog({
   const [busy, setBusy] = useState(false);
   const [pathNote, setPathNote] = useState<string | null>(null);
   const [logPath, setLogPath] = useState("");
-  // Footprint overrides (v0.9). Read live from the store rather than loaded here: the count has to move
+  // Footprint overrides. Read live from the store rather than loaded here: the count has to move
   // when an import lands, and the store is what the rest of the app already watches.
   const footprintCount = useEditor((s) => countFootprints(s.footprints));
   const [fpBusy, setFpBusy] = useState(false);
@@ -323,7 +323,7 @@ export function SettingsDialog({
               </div>
             </div>
 
-            {/* v0.9. The measurements are the user's own file, so they can leave the machine: one person
+            {/* The measurements are the user's own file, so they can leave the machine: one person
                 measures the airport lights once, posts the file, everyone else imports it — and PCT still
                 ships none of those numbers itself. */}
             <div className="pct-field pct-field-col">

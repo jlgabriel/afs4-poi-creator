@@ -28,8 +28,8 @@ export function iconKey(category: string): IconKey {
   const c = category.toLowerCase();
   if (c === "aircraft") return "plane";
   if (c.startsWith("user/")) return userBundleIconKey(c.slice("user/".length));
-  if (c.startsWith("lights/")) return "light"; // v0.2 airport lights
-  if (c.startsWith("plants/")) return "tree"; // v0.4 plants — every group shares the one glyph
+  if (c.startsWith("lights/")) return "light"; // airport lights
+  if (c.startsWith("plants/")) return "tree"; // plants — every group shares the one glyph
 
   if (c.startsWith("vehicles/")) {
     if (c.includes("truck") || c.includes("airport") || c.includes("caravan")) return "truck";
@@ -60,8 +60,8 @@ export function iconKey(category: string): IconKey {
 // A user's own objects browse under `user/<bundle>` (buildCatalog), and the curated table can't say
 // what they are — so the glyph comes from the bundle's NAME instead. FS4 names its own xref folders
 // by kind (xref_aircraft, xref_vehicles, xref_buildings…), and a creator who follows that convention
-// gets the matching icon on every machine the folder is shared to, with no per-object photo (forum PM
-// #335: Michael's xref_aircraft rendered as the generic box). Whole WORDS only, so a bundle like
+// gets the matching icon on every machine the folder is shared to, with no per-object photo (e.g. a
+// user `xref_aircraft` bundle shows the plane, not the generic box). Whole WORDS only, so a bundle like
 // "air_race_pylons" isn't read as an aircraft.
 const USER_BUNDLE_WORDS: Array<[RegExp, IconKey]> = [
   [/^(aircraft|airplanes?|planes?|helicopters?|helis?|gliders?)$/, "plane"],

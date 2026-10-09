@@ -11,7 +11,7 @@ import rawCoreList from "../../../data/aerofly-data/airport-list.json";
 
 // airport-list.json = the core ICAOs (excludes community/WIP). In today's snapshot it equals the
 // coordinates set, so filtering is a no-op that future-proofs a manual refresh adding community
-// entries — the picker stays core-only (Frank #19 / Juan #20).
+// entries — the picker stays core-only.
 const coreIcaos: ReadonlySet<string> = new Set(
   (Array.isArray(rawCoreList) ? rawCoreList : []).filter((x): x is string => typeof x === "string"),
 );

@@ -1,24 +1,14 @@
 // AirportDataFields.tsx — the Inspector's panel for the airport ITSELF: what it is called and what code
-// it gets. ApfelFlieger's submenu (1) DATA (forum #217, renumbered in #227/#232), and the sixth card of
-// the six his Airport section is made of.
+// it gets. The DATA submenu, one of the six cards of the Airport section.
 //
-// WHY IT EXISTS, and why it is not just tidiness. Through v1.3 these four fields lived inside the PAD's
-// panel, and the comment there said the quiet part out loud: "a project has exactly one airport, so the
-// pad IS the airport as far as anyone using this can tell". That stopped being true twice over.
-//
-//  1. The pad is repeatable now (forum #221). Identity inside the pad's panel would be one code shown N
-//     times, which reads as N codes — and editing it in one pad would silently change the others.
-//  2. It was ALREADY wrong before that, and reachably so: placing a stand creates the airport block
-//     (mutate.ts), so a project whose only airport part was a parking position had an airport with no
-//     identity and NO WAY TO TYPE ONE — the pad's panel was the only door to these fields, and there was
-//     no pad. The install dialog's own message sent you to "select the helipad", which did not exist.
-//     A dead end, reachable in two clicks from a blank project.
-//
-// So the identity belongs to the airport, and this is the airport's panel. The pad's panel keeps the pad.
+// WHY THE IDENTITY HAS ITS OWN PANEL rather than living in the pad's:
+//  1. The pad is repeatable. Identity inside the pad's panel would be one code shown N times, which reads
+//     as N codes — and editing it in one pad would silently change the others.
+//  2. Placing a stand also creates the airport block (mutate.ts), so a project whose only airport part is
+//     a parking position still needs a place to type its identity.
 //
 // ★ ONE FIELD, THREE PLACES ON DISK. "Airport name" feeds `sname` and `lname` in the .tsc and `name` in
-// the .wad — his simplification, from the field table in #15/#217. PCT never showed the user three boxes
-// for it and does not start now.
+// the .wad. The user is not shown three boxes for it.
 import { useEffect, useState } from "react";
 import type { ProjectAirport } from "../../core/project/types";
 import type { IcaoStatus } from "../../shared/pctApi";
@@ -87,11 +77,9 @@ export function AirportDataFields({ airport }: { airport: ProjectAirport }): Rea
         {airport.name.trim() === "" ? "Airport" : airport.name.trim()}
       </div>
 
-      {/* ★ THE NOTE HE ASKED FOR (#253c): "Before deleting DATA (and only for this) a note must appear
-          that then everything will be deleted and only with another click can it really be deleted." It
-          sits at the TOP of the panel, above everything, because it is answering a key that was already
-          pressed — a warning further down the panel would be a warning the user scrolls to after the
-          fact. The count is the part that makes it worth reading. */}
+      {/* ★ Deleting the airport takes a second press, because it deletes every part with it. The note
+          sits at the TOP of the panel because it answers a key that was already pressed — further down it
+          would be a warning the user scrolls to after the fact. The count is what makes it worth reading. */}
       {pendingDelete && (
         <p className="pct-warn">
           Delete this airport{parts > 0 ? ` and its ${parts} ${parts === 1 ? "element" : "elements"}` : ""}?
@@ -99,25 +87,17 @@ export function AirportDataFields({ airport }: { airport: ProjectAirport }): Rea
         </p>
       )}
 
-      {/* The label alone since v1.8 (#285). "— what this becomes in Aerofly" and its note went under the
-          same red line that took the header note off all six submenus. */}
       <div className="pct-field pct-field-col">
         <span className="pct-field-label">Airport</span>
       </div>
 
       {/* ★ LON/LAT SITS HERE, DIRECTLY UNDER THE DESCRIPTION, because that is exactly where it sits in the
-          helipad's panel, the stand's and the aerotow's. Forum #253d: "It bothers me when the LAYOUT of the
-          data constantly changes during a quick change between individual elements, when they are actually
-          always comparable fields. The best example of this is for me LON LAT, because they could actually
-          always be in the same place regardless of the element." The other panels already agreed with each
-          other — this one was the outlier, and it had no coordinates on it at all. */}
+          helipad's panel, the stand's and the aerotow's: comparable fields keep one place across elements,
+          so switching between them does not reshuffle the layout. */}
       {point !== undefined ? (
         <>
           <div className="pct-field pct-field-row">
             <label className="pct-field-col">
-              {/* ⛔ The note that stood here — drag the ⊕, it stays where you put it, moving a helipad
-                  does not move the airport — is struck in #285. It was the one thing about this field a
-                  1.4 user would get wrong, and it is the manual's to say now. */}
               <span className="pct-field-label">Lon</span>
               <NumberInput
                 value={point.lon}
@@ -167,9 +147,7 @@ export function AirportDataFields({ airport }: { airport: ProjectAirport }): Rea
           aria-label="Airport name"
           onChange={(e) => store().setAirportIdentity({ name: e.target.value })}
         />
-        {/* The counter stays, the sentence that used to follow it does not (#285). The input is capped at
-            SNAME_MAX anyway, so the limit is enforced whether or not the panel explains itself — and what
-            Aerofly does past it belongs to the manual, not to a line under every keystroke. */}
+        {/* A counter only: the input is capped at SNAME_MAX, so the limit is enforced without a sentence. */}
         <span className="pct-field-meta">
           {airport.name.trim().length}/{SNAME_MAX}
         </span>
@@ -177,8 +155,8 @@ export function AirportDataFields({ airport }: { airport: ProjectAirport }): Rea
 
       <label className="pct-field pct-field-col">
         <span className="pct-field-label">ICAO code</span>
-        {/* Shown in CAPITALS (forum #170 EDIT 2) and, since v1.2.1, written that way into the .tsc and
-            the .wad too — the file NAMES stay lowercase, which is what Aerofly does with its own. */}
+        {/* Shown in CAPITALS and written that way into the .tsc and the .wad too — the file NAMES stay
+            lowercase, as Aerofly's own are. */}
         <input
           className="pct-num"
           value={airport.icao.toUpperCase()}
@@ -205,8 +183,8 @@ export function AirportDataFields({ airport }: { airport: ProjectAirport }): Rea
         )}
       </label>
 
-      {/* ⛔ "IATA code — optional" stood here (forum #220 → removed in #342): its `.wad` row is not
-          a member of the type the sim reads, so the code never reached Aerofly. */}
+      {/* No IATA field: the `.wad` has no member the sim reads for it, so the code would never reach
+          Aerofly. */}
       <label className="pct-field pct-field-col">
         <span className="pct-field-label">Country code</span>
         <input
@@ -221,17 +199,12 @@ export function AirportDataFields({ airport }: { airport: ProjectAirport }): Rea
         )}
       </label>
 
-      {/* The read-only "Position" block that stood here through v1.4 is gone. It existed because the
-          model had a point the UI could neither set nor draw, so all it could honestly do was report
-          which fallback the writers would take. Both halves of that are now real: the field above sets
-          it and the map draws it. */}
-
       {/* The one act that writes outside the project. It stays in a dialog because that is where the
           things that belong to WRITING live: the destination, the installed list with Uninstall, the
           overwrite confirmation and the result. */}
       <div className="pct-modal-actions">
         <span className="pct-spacer" />
-        {/* Same act as the toolbar's, so it wears the toolbar's name (#296). */}
+        {/* Same act as the toolbar's, so it wears the toolbar's name. */}
         <button
           type="button"
           className="pct-primary"
@@ -241,10 +214,6 @@ export function AirportDataFields({ airport }: { airport: ProjectAirport }): Rea
           Export /airports…
         </button>
       </div>
-      {/* ⛔ The line that sat under this button — "The airport code must be 4 to 6 letters or digits" — is
-          struck in #285, and little is lost with it: the same sentence still appears BESIDE the ICAO field
-          the moment you type something it will not accept, and the export dialog refuses with its own
-          message. What went is the copy that greeted a blank project before anyone had typed anything. */}
     </div>
   );
 }

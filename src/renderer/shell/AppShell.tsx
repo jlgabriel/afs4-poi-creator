@@ -18,14 +18,14 @@ export function AppShell({ onRescan }: { onRescan: () => void }): React.ReactEle
   const [exportOpen, setExportOpen] = useState(false);
   const [heliportOpen, setHeliportOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  // The photo menu (v0.7) fires this when the user has no photo folder yet and clicks "Open Settings" on
+  // The photo menu fires this when the user has no photo folder yet and clicks "Open Settings" on
   // its inline error — the portalled menu can't set this state directly, so it asks via a window event.
   useEffect(() => {
     const open = (): void => setSettingsOpen(true);
     window.addEventListener("pct:open-settings", open);
     return () => window.removeEventListener("pct:open-settings", open);
   }, []);
-  // Same channel for the install dialog (v1.3): the Inspector's heliport panel asks for it, and the
+  // Same channel for the install dialog: the Inspector's heliport panel asks for it, and the
   // Inspector is not this component's child in any way it could receive a prop through.
   useEffect(() => {
     const open = (): void => setHeliportOpen(true);

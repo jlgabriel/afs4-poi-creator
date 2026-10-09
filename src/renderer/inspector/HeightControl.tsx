@@ -1,5 +1,5 @@
-// HeightControl.tsx — the always-visible 3-mode height control (design §5, a product-owner acceptance
-// condition). Radio: Terrain / Terrain + offset / ASL, a metres field, and ±0.5 / ±5 m nudge buttons.
+// HeightControl.tsx — the always-visible 3-mode height control (design §5). Radio: Terrain /
+// Terrain + offset / ASL, a metres field, and ±0.5 / ±5 m nudge buttons.
 // Nudging a terrain-mode object silently PROMOTES it to terrain-offset (the store's nudgeHeight does
 // this) so "lift it half a metre" is one click, never a mode dialog. The resolved-ASL readout shows
 // the terrain elevation under the object once fetched — the lazy network lookup (M2d) is the "Fetch
@@ -98,7 +98,7 @@ export function HeightControl({ id, height, resolvedAsl }: HeightControlProps): 
       <div className="pct-radio-row">
         {MODES.map((m) => {
           // ASL has no meaning under Sim autoheight: the place is autoheight=true, so the sim reads an
-          // absolute number as metres-above-ground (forum #148, chrispriv). Disable the radio there so a
+          // absolute number as metres-above-ground. Disable the radio there so a
           // user can't build an unexportable project; the export guard still catches an ASL height already
           // set on an object (e.g. from an opened project), which the ExportDialog warning explains.
           const disabled = autoheight && m.mode === "asl";

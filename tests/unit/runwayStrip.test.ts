@@ -4,7 +4,7 @@ import { haversine, initialBearing } from "../../src/core/geo/geo";
 
 // The map draws a runway as a rectangle rather than a line because `width` is not decoration — it is the
 // number the simulator lands an aircraft with, and drawn to scale it is the only feedback that 40 is not
-// 400 (forum #242). These pin the geometry that claim rests on.
+// 400. These pin the geometry that claim rests on.
 
 const A = { lon: 11.86, lat: 48.37 };
 const near = (got: number, want: number, tol: number): void => expect(Math.abs(got - want)).toBeLessThan(tol);

@@ -13,9 +13,9 @@ describe("iconKey — built-in categories", () => {
   });
 });
 
-describe("iconKey — user objects take the glyph from their bundle name (PM #335)", () => {
+describe("iconKey — user objects take the glyph from their bundle name", () => {
   it("follows FS4's own xref folder names", () => {
-    expect(iconKey("user/xref_aircraft")).toBe("plane"); // Michael's static aircraft
+    expect(iconKey("user/xref_aircraft")).toBe("plane");
     expect(iconKey("user/xref_vehicles")).toBe("car");
     expect(iconKey("user/xref_buildings")).toBe("building");
   });

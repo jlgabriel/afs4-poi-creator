@@ -1,7 +1,7 @@
 // scan.ts — main-process XREF scan. Reads the install's (and optional user's) scenery/xref .tmi
 // files and builds the catalog via the pure core, then caches it as catalog.json in userData.
-// No Electron import (paths passed in) so it unit-tests without a running app; the same
-// buildCatalog the M0 CLI validated at 911 objects produces the result here.
+// No Electron import (paths passed in) so it unit-tests without a running app; it uses the same
+// buildCatalog as the CLI.
 import { closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { buildCatalog, type BuildResult, type TmiSource, type UserTmbInput } from "../core/catalog/buildCatalog";
@@ -28,7 +28,7 @@ export class NoXrefError extends Error {
 }
 
 /** Read the first `n` bytes of a file as UTF-8 — enough to classify a `.tmb` by its head (plain-text
- *  `<` vs opaque `0xB5`) WITHOUT decoding a multi-MB binary in full. */
+ *  `<` vs opaque binary) WITHOUT decoding a multi-MB binary in full. */
 function readHead(file: string, n = 512): string {
   const fd = openSync(file, "r");
   try {
@@ -46,11 +46,9 @@ function readHead(file: string, n = 512): string {
  *  that folder. So a directory is unregistered exactly when it holds `.tmb` but NO `.tmi`, at any depth.
  *  A `.tmb` loose at the xref ROOT is its own bundle-to-be (registration gives it a folder of its own).
  *
- *  v0.3.0 walked the root ONLY, reasoning that a `.tmb` in a subfolder "is a registered bundle already
- *  read via the `.tmi` path". That conflates *in a subfolder* with *next to a `.tmi`* — and real add-ons
- *  ship as a ZIP OF A FOLDER, so extracting one puts every `.tmb` one level down with no `.tmi` anywhere,
- *  and PCT saw nothing at all (forum #122). findTmi has always recursed; this walk has to agree with it,
- *  or the two disagree about what exists — which is precisely the bug the user hit.
+ *  Don't conflate *in a subfolder* with *next to a `.tmi`*: real add-ons ship as a ZIP OF A FOLDER, so
+ *  extracting one puts every `.tmb` one level down with no `.tmi` anywhere. findTmi recurses; this walk
+ *  has to agree with it, or the two disagree about what exists.
  *
  *  Classify each by its first byte — read a plain-text `.tmb` in full (buildCatalog derives its geometry),
  *  leave an opaque one unread (text:null → sizeUnknown). */
@@ -84,7 +82,7 @@ function listUserTmb(xrefRoot: string): UserTmbInput[] {
 }
 
 /** Read + parse an install's (and optional user's) XREF into a Catalog. `scannedAt` is injectable
- *  for deterministic tests. `table` is the optional official-CSV overlay (null = disabled, the shipping
+ *  for deterministic tests. `table` is the optional object-table overlay (null = disabled, the shipping
  *  default; ipc.ts loads it from the injected candidates). Throws NoXrefError if the install has no
  *  scenery/xref. */
 export function scanXref(
@@ -114,7 +112,7 @@ export function scanXref(
   }
 
   // v0.2 airport lights: enumerate airport_lights/**/*.tmb from the INSTALL — filenames only, no bytes
-  // read (the .tmb is opaque IPACS binary). type_name = basename minus "al_"; see core/catalog/airportLights.
+  // read (the .tmb is opaque binary). type_name = basename minus "al_"; see core/catalog/airportLights.
   const airportLightFiles: AirportLightFile[] = [];
   const alDir = resolveAirportLightsDir(installDir);
   if (alDir) {
@@ -125,7 +123,7 @@ export function scanXref(
   const { lights, warnings: lightWarnings } = buildAirportLights(airportLightFiles);
 
   // v0.4 plants: enumerate scenery/plants/*.ttx from the INSTALL — filenames only, and here that is
-  // not a self-imposed limit but the whole library: those 41 textures ARE the plants, there is no
+  // not a self-imposed limit but the whole library: those textures ARE the plants, there is no
   // geometry file to read. group/species/height all decode from the name; see core/catalog/plants.
   const plantFiles: PlantFile[] = [];
   const plantsDir = resolvePlantsDir(installDir);

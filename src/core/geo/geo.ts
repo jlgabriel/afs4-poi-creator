@@ -58,7 +58,7 @@ export function destination(p: LonLat, distanceM: number, bearingDeg: number): L
 /** Wrap a longitude into WGS84 [-180, 180) — the same real point, in the range `zLonLat` accepts.
  *  Map gestures can hand us a longitude that Leaflet never wraps: a click/drag in a repeated world-copy
  *  (pan at low zoom) or across the antimeridian lands >180 / <-180, which then makes the project
- *  unsavable and the export invalid (Fable B1/B2). Unlike the inspector's CLAMP — a mistyped `181` is a
+ *  unsavable and the export invalid. Unlike the inspector's CLAMP — a mistyped `181` is a
  *  typo, snap it to the 180 edge — a MAP `181` is genuinely `-179`, so here we WRAP. In-range values
  *  pass through byte-identical (the guard avoids float noise on coordinates that were already valid, so
  *  existing positions/goldens are untouched). NOTE: keep this OUT of `destination`/`haversine`/
@@ -70,7 +70,7 @@ export function wrapLon(lon: number): number {
 
 /** Nudge a point by (east, north) metres — a compass-consistent wrapper over `destination`
  *  (0 = North, 90 = East). Either component may be negative; (0, 0) returns the point unchanged.
- *  Used for the project-global export shift (design: Project.shift / forum #12). The result's
+ *  Used for the project-global export shift (Project.shift). The result's
  *  longitude is wrapped so a shift that pushes a near-antimeridian object past ±180 stays valid. */
 export function shiftEastNorth(p: LonLat, east: number, north: number): LonLat {
   if (east === 0 && north === 0) return p;

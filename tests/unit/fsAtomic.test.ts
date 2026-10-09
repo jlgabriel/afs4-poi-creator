@@ -19,7 +19,7 @@ describe("writeFileAtomic", () => {
     expect(readFileSync(f, "utf8")).toBe("hola\nmundo");
   });
 
-  it("writes a Buffer verbatim as binary — a PNG round-trips byte-for-byte (v0.7 paste)", () => {
+  it("writes a Buffer verbatim as binary — a PNG round-trips byte-for-byte (photo paste)", () => {
     const f = path.join(tmp, "photo.png");
     // PNG signature + high bytes that a naive utf8 write would mangle into replacement chars.
     const bytes = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0xff, 0x80, 0x7f]);

@@ -1,21 +1,17 @@
 // orientation.ts — convert between an XREF object's raw `.toc` `direction` (the rotation the sim applies)
 // and the COMPASS HEADING its front actually points in-sim.
 //
-// Empirically calibrated 2026-07-15 via a dedicated PCT in-sim gate (Juan flew it at KDAG with three
-// MAXIMALLY DIVERSE objects — an A320 airliner, a fuel truck, and a hangar): at `direction 0` all three
-// faced EAST (90°), and rotation runs NEGATIVE, i.e.
+// At `direction 0` an object faces EAST (90°) — aircraft, vehicles and buildings alike — and rotation
+// runs NEGATIVE, i.e.
 //
 //     heading = (90 − direction) mod 360        direction = (90 − heading) mod 360
 //
-// This matches chrispriv's forum formula (#74), now confirmed across aircraft + vehicle + building — which
-// overturns the earlier "aircraft-vs-buildings behave differently" reading (the hangar sided with the
-// aircraft). The GLOBAL base facing (90° East) is a strong default; a per-object calibration override for
-// any exceptions (e.g. a report of an object flipping at 270°) is a planned layer, so both functions take
-// the base as a parameter and it slots in without touching call sites. See docs/notes on xref orientation.
+// The base facing (90° East) is a parameter of both functions, so a per-object override could slot in
+// without touching call sites.
 //
-// The stored `PlacedXref.direction` stays the RAW `.toc` value (no format change — the emitter and its
-// goldens are untouched); this conversion lives only at the UI boundary, so the Inspector and the on-map
-// handle can finally speak compass headings instead of the raw rotation users misread as a facing.
+// The stored `PlacedXref.direction` stays the RAW `.toc` value (the emitter and its goldens depend on
+// it); this conversion lives only at the UI boundary, so the Inspector and the on-map handle speak
+// compass headings.
 
 /** The compass heading (degrees) an XREF faces at `direction 0` — model +X = East. Global default. */
 export const XREF_BASE_HEADING = 90;
@@ -28,10 +24,8 @@ const norm360 = (deg: number): number => ((deg % 360) + 360) % 360;
  *  right-handed yaw about +z (up) in a model frame of +X = East / +Y = North, so it turns compass
  *  azimuths NEGATIVE; that is the same fact that makes `heading = 90 − direction`.
  *
- *  It exists because v0.3.0 spelled that sense out in two places — the facing (below, calibrated) and
- *  the map footprint's corners, which still ADDED `direction` from the pre-calibration guess. They
- *  rotated opposite ways and the polygon visibly fought its own heading tick (forum #120). Anything
- *  that turns with an object — a facing, a bbox corner, a tick — is one rotation and shares one line. */
+ *  Anything that turns with an object — a facing, a bbox corner, a tick — must use this one line; if
+ *  the sense is spelled out twice the footprint polygon can rotate against its own heading tick. */
 export function rotateAzimuth(azimuthAtDir0: number, direction: number): number {
   return norm360(azimuthAtDir0 - direction);
 }

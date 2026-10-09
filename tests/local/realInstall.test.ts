@@ -64,7 +64,7 @@ describe.skipIf(!xref)("real AFS4 install (local, opt-in)", () => {
     catalog = buildCatalog(sources, { installDir: dir, userXrefDir: null, scannedAt: "t" }).catalog;
   });
 
-  it("catalogs exactly 911 objects across 7 bundles", () => {
+  it("catalogs the known-good object and bundle counts", () => {
     expect(catalog.xref).toHaveLength(911);
     expect(catalog.bundles).toHaveLength(7);
   });
@@ -82,7 +82,7 @@ describe.skipIf(!xref)("real AFS4 install (local, opt-in)", () => {
     });
   });
 
-  it("ACT cross-check: tower00_small_plates_ds_00_08_08 is 8.19 x 25.90 m", () => {
+  it("cross-check: tower00_small_plates_ds_00_08_08 is 8.19 x 25.90 m", () => {
     const t = catalog.xref.find((o) => o.name === "tower00_small_plates_ds_00_08_08");
     expect(t).toBeDefined();
     expect(t!.size.x).toBeCloseTo(8.19, 2);
@@ -96,7 +96,7 @@ describe.skipIf(!xref)("real AFS4 install (local, opt-in)", () => {
 });
 
 describe.skipIf(!airportLightsDir)("real AFS4 airport lights (local, opt-in)", () => {
-  it("derives exactly 22 placeable type_names, incl. runway_edge_light, sans the _model helper", () => {
+  it("derives the known-good placeable type_names, incl. runway_edge_light, sans the _model helper", () => {
     const dir = airportLightsDir as string;
     const files: AirportLightFile[] = findTmb(dir).map((p) => ({
       folder: path.basename(path.dirname(p)),

@@ -32,9 +32,9 @@ export function FirstRunWizard({ onDone }: { onDone: () => void }): React.ReactE
       // Seed BOTH dirs from the SAVED settings first, falling back to auto-detect only on a true first
       // run (no saved value). This flow is reused for Rescan and `finish()` writes both unconditionally,
       // so seeding from auto-detect alone silently wiped a hand-set path when detect can't find it (a
-      // non-standard install / Documents folder), breaking the next export (Fable I1 — the afs4UserDir
-      // half shipped in a0e557e; the installDir half is this fix). Also surface a saved-but-undetected
-      // install dir as a candidate so it shows up selected in the list, not only as the radio value.
+      // non-standard install / Documents folder), breaking the next export. Also surface a
+      // saved-but-undetected install dir as a candidate so it shows up selected in the list, not only as
+      // the radio value.
       const savedInstall = settings.installDir;
       setCandidates(
         savedInstall !== null && !paths.installDirs.includes(savedInstall)

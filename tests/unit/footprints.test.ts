@@ -60,7 +60,7 @@ const withEntries = (entries: FootprintOverrides["entries"]): FootprintOverrides
   entries,
 });
 
-// ApfelFlieger's own reading of a Runway Approach Light Center 2 (forum #129): 2 lights, 2.0 × 0.5 × 4.0.
+// A measured Runway Approach Light Center 2: 2.0 × 0.5 × 4.0.
 const CENTER_2 = { width: 2, depth: 0.5, height: 4 };
 
 describe("overrideToBox — three typed numbers → a model-local bbox", () => {

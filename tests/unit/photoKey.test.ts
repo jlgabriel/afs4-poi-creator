@@ -12,9 +12,9 @@ import { buildPlants } from "../../src/core/catalog/plants";
 import path from "node:path";
 
 describe("photoKey — XREF", () => {
-  it("is the bare catalog name, so every v0.6/v0.7 photo keeps resolving", () => {
+  it("is the bare catalog name, so every existing XREF photo keeps resolving", () => {
     // The load-bearing property of the whole module: the user's existing screenshots are files on their
-    // own disk under `<name>.png`, and v0.8 must not orphan a single one.
+    // own disk under `<name>.png`, and the namespaced keys must not orphan a single one.
     for (const name of ["tower00_small_plates", "UH60_usarmy", "cabin-boat-red", "my.obj-1_v2"]) {
       expect(photoKey({ kind: "xref", name })).toBe(name);
     }
@@ -90,7 +90,7 @@ describe("photoKeyForPlaced", () => {
 describe("photoKey — the guarantees the folder relies on", () => {
   it("every key is a name main/thumbnails.ts will accept (index, write and delete all guard on it)", () => {
     // A key the guard rejects is a card whose Paste throws and whose photo could never be indexed —
-    // silently, which is exactly how #176 presented. Assert the two halves agree.
+    // silently. Assert the two halves agree.
     const keys = [
       photoKey({ kind: "xref", name: "tower00_small_plates" }),
       photoKey({ kind: "plant", group: "conifer_forest", species: "01" }),
@@ -115,7 +115,7 @@ describe("photoKey — the guarantees the folder relies on", () => {
     }
   });
 
-  it("is unique across the real 41-plant install list", () => {
+  it("is unique across install-shaped plant names", () => {
     // The install's own filenames, verbatim in shape (plants.ts). If two plants shared a key they would
     // share a photo, and the group with underscores is the case most likely to alias.
     const { plants } = buildPlants([

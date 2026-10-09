@@ -2,8 +2,7 @@
 //
 // The 2D-editor vocabulary ("align left", "align top") does not survive the trip to a map: left is
 // WEST, and nobody wants seven parked aircraft snapped to the westernmost meridian. On a map the real
-// request is "put them on the line they already almost form", and that line is hardly ever N-S or E-W —
-// the row of B747s that prompted this (ApfelFlieger's KMZJ example, forum #152) runs at about 135°.
+// request is "put them on the line they already almost form", and that line is hardly ever N-S or E-W.
 //
 // So everything here is expressed in the row's own frame: ALONG the line and ACROSS it.
 //

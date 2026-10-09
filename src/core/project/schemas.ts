@@ -1,6 +1,6 @@
 // schemas.ts — runtime validators (zod v4) + schemaVersion migration for every file PCT reads.
 //
-// project.json is UNTRUSTED input — people share them on the forum — so we validate the shape on
+// project.json is UNTRUSTED input — users share them — so we validate the shape on
 // load rather than trust it. Unknown fields are PRESERVED (z.looseObject) so a file written by a
 // newer PCT round-trips through an older build without silent data loss (design §2, line 108:
 // "unknown fields are preserved (forward compat)"). Version handling is centralised in migrate*():
@@ -21,12 +21,11 @@ export const CURRENT_SETTINGS_VERSION = 1;
  *  isSafePoiFolderName in geo/poiName.ts — keep the two in sync. */
 export const POI_SLUG_RE = /^[a-z0-9_]+$/;
 
-/** A placed object's `name` is a catalog object id. Every scanned/.tmi name is `[A-Za-z0-9_]` (verified:
- *  837/837 in categories.data.ts), so we allow that plus `.`/`-` as headroom and reject the rest. This
- *  stops an untrusted, forum-shared project.json from smuggling a `]` (or a newline) into the value —
- *  the TM grammar has NO escape, so that would truncate and corrupt the emitted `poi.toc` written into
- *  the user's scenery/poi/ (Fable A — the C2 class, but via a foreign project.json rather than
- *  project.name). tocWriter runs the name through `sanitizeValue` as well, as defence in depth. */
+/** A placed object's `name` is a catalog object id. Built-in names are `[A-Za-z0-9_]`, so we allow that
+ *  plus `.`/`-` as headroom and reject the rest. This stops an untrusted, shared project.json from
+ *  smuggling a `]` (or a newline) into the value — the TM grammar has NO escape, so that would truncate
+ *  and corrupt the emitted `poi.toc` written into the user's scenery/poi/. tocWriter runs the name
+ *  through `sanitizeValue` as well, as defence in depth. */
 export const XREF_NAME_RE = /^[A-Za-z0-9_.-]+$/;
 
 /** Thrown when a file's schemaVersion is one this build cannot (yet) read. */
@@ -48,8 +47,8 @@ export const zLonLat = z.object({
 });
 
 /** Clamp a coordinate into the exact WGS84 ranges `zLonLat` enforces on load, so a mistyped inspector
- *  value (a slipped decimal → lat 481.3) can never produce a project the loader later rejects (Fable
- *  C1). Assumes finite inputs — the numeric field's `Number.isFinite` gate filters NaN/±Infinity first;
+ *  value (a slipped decimal → lat 481.3) can never produce a project the loader later rejects.
+ *  Assumes finite inputs — the numeric field's `Number.isFinite` gate filters NaN/±Infinity first;
  *  `firstProjectError` is the save-time net for anything that still slips through. */
 export function clampLonLat(p: LonLat): LonLat {
   return {
@@ -87,14 +86,13 @@ export const zPlacedXref = z.looseObject({
 });
 
 /** An airport-light `configuration`: 0–2 colour letters from [bgrwy]. Empty = the fixture's own
- *  default colour (valid — used in the in-sim gate). 1 letter = all-around, 2 = a direction + its
- *  opposite (format bible). Upper bound of 2 mirrors the grammar; the UI constrains further. */
+ *  default colour (valid). 1 letter = all-around, 2 = a direction + its opposite. Upper bound of 2
+ *  mirrors the grammar; the UI constrains further. */
 export const CONFIGURATION_RE = /^[bgrwy]{0,2}$/;
 
 // v0.2 lights. Permissive-on-load / constrained-at-the-editor: e.g. `color` accepts the whole 0..1
-// continuum in case the in-sim gate later proves continuous RGB, while the Inspector offers only the
-// valid corners for now. These validate the two new placed kinds; they wire into zProject.objects
-// (as a discriminated union on `kind`) when the lights UI slice flips Project.objects to PlacedObject.
+// continuum, while the Inspector offers only the valid corners. Both kinds are arms of the
+// zProject.objects discriminated union on `kind`.
 export const zPlacedAirportLight = z.looseObject({
   id: z.string().min(1),
   kind: z.literal("airport_light"),
@@ -125,12 +123,12 @@ export const zPlacedLight = z.looseObject({
 });
 
 // v0.4 plants. `group`/`species` are catalog-derived slugs, so they get the same XREF_NAME_RE gate as
-// an xref name and for the same reason: a forum-shared project.json must not smuggle a `]` into a
+// an xref name and for the same reason: a shared project.json must not smuggle a `]` into a
 // value the TM grammar cannot escape (tocWriter's sanitizeValue is the second line of defence).
 // `heightRange` is validated as a plain non-negative pair, NOT as min ≤ max — what the sim does with
-// an inverted range is unknown until the in-sim gate reports, and rejecting a file on an unverified
-// rule would lock people out of their own projects over a guess. The editor constrains; the loader
-// stays permissive (the same split as `color` above).
+// an inverted range is unknown, and rejecting a file on an unverified rule would lock people out of
+// their own projects. The editor constrains; the loader stays permissive (the same split as `color`
+// above).
 export const zPlacedPlant = z.looseObject({
   id: z.string().min(1),
   kind: z.literal("plant"),
@@ -154,7 +152,7 @@ const IDENTITY_MAX = 200;
  *
  *  So this validates SHAPE only. What makes the values safe to write is `validateIdentity`, which every
  *  path to disk goes through (planHeliport throws without it) — and `country` gets checked twice more,
- *  because it becomes a directory name under scenery/airports/ and a forum-shared project.json is
+ *  because it becomes a directory name under scenery/airports/ and a shared project.json is
  *  untrusted input: once by validateIdentity's two-letter rule, once by main's own path guard. */
 const zPad = z.looseObject({
   id: z.string().min(1),
@@ -166,7 +164,7 @@ const zPad = z.looseObject({
 
 /** One runway end (types.ts AirportRunwayEnd). The three lighting rows are ENUMS for the same reason the
  *  parking `type` is: they are compared against literals, so a typo is a row the sim ignores rather than an
- *  error anyone can read — and the values here were taken from the simulator's own binary. */
+ *  error anyone can read. */
 const zRunwayEnd = z.looseObject({
   threshold: zLonLat,
   identifier: z.string().max(IDENTITY_MAX),
@@ -187,7 +185,7 @@ const zRunway = z.looseObject({
 
 /** The two glider starts (types.ts AirportAerotow / AirportWinch). Both are `.wad`-only elements, so
  *  nothing here has a `.tsc` counterpart to keep in step. The winch carries TWO points and no heading —
- *  its direction is the line between them (forum #238). */
+ *  its direction is the line between them. */
 const zAerotow = z.looseObject({
   id: z.string().min(1),
   name: z.string().max(IDENTITY_MAX),
@@ -204,10 +202,10 @@ const zWinch = z.looseObject({
 });
 
 /** A parking position (types.ts AirportParking). `type` is validated as an ENUM, not a free string, and
- *  that is deliberate even though everything around it is permissive: the row is hashed by the sim, so a
- *  typo produces a stand that silently does nothing rather than an error anyone can read. A hand-edited or
- *  forum-shared project.json is exactly where such a typo comes from, and here is the only place it can
- *  still be caught. `size` follows `radius`: finite and positive, refused rather than clamped. */
+ *  that is deliberate even though everything around it is permissive: a typo produces a stand that
+ *  silently does nothing rather than an error anyone can read. A hand-edited or shared project.json is
+ *  exactly where such a typo comes from, and here is the only place it can still be caught. `size`
+ *  follows `radius`: finite and positive, refused rather than clamped. */
 const zParking = z.looseObject({
   id: z.string().min(1),
   name: z.string().max(IDENTITY_MAX),
@@ -222,8 +220,8 @@ export const zAirport = z.looseObject({
   name: z.string().max(IDENTITY_MAX),
   country: z.string().max(IDENTITY_MAX),
   position: zLonLat.optional(),
-  // Defaulted rather than required: an airport with no pads is legal (his "(1) DATA" example is exactly
-  // that), and a hand-edited file missing the key should land on the empty list, not fail to open.
+  // Defaulted rather than required: an airport with no pads is legal, and a hand-edited file missing the
+  // key should land on the empty list, not fail to open.
   pads: z.array(zPad).default([]),
   // OPTIONAL rather than defaulted, unlike `pads`: a default would write `"runways": []` / `"parkings": []`
   // into every project.json that has an airport and neither, and "absent means none" costs nothing to read
@@ -238,7 +236,7 @@ export const zAirport = z.looseObject({
 });
 
 // loose (like the document top level) so a project written by a newer PCT that adds camera fields
-// round-trips without loss — zod v4 z.object would strip them (Fable review nit).
+// round-trips without loss — zod v4 z.object would strip them.
 export const zCamera = z.looseObject({
   lon: z.number().finite(),
   lat: z.number().finite(),
@@ -257,7 +255,7 @@ export const zProject = z.looseObject({
   // Discriminated on `kind` — an xref-only project (pre-v0.2) still validates, and a `kind` outside
   // the four arms is a precise error rather than a silent drop. schemaVersion stays 1 (the seam was
   // designed for this): bumping it would lock older builds out of every v0.2-saved project, including
-  // pure-xref ones people share on the forum. The cost of staying at 1 is the mirror case — a v0.3
+  // pure-xref ones people share. The cost of staying at 1 is the mirror case — a v0.3
   // build opening a project with plants reports an unknown `kind` rather than dropping them silently,
   // which is the failure we want.
   objects: z.array(
@@ -362,8 +360,8 @@ function isRecord(x: unknown): x is Record<string, unknown> {
  *  block was designed around. One legacy pad per project, so one constant is enough. */
 export const LEGACY_PAD_ID = "pad-1";
 
-/** v1.2/v1.3 stored ONE pad under `airport.pad`; v1.4 stores a list under `airport.pads` (forum #221 —
- *  HELICOPTER became a repeatable element). Lift the old shape into the new one, in place, so everything
+/** v1.2/v1.3 stored ONE pad under `airport.pad`; v1.4 stores a list under `airport.pads` (pads became
+ *  repeatable). Lift the old shape into the new one, in place, so everything
  *  downstream only ever sees `pads`.
  *
  *  The migrated pad gets an EMPTY name on purpose: the writer renders an unnamed pad as "FATO/TLOF",
@@ -378,8 +376,7 @@ function migratePads(airport: Record<string, unknown>): Record<string, unknown> 
 
 /** Every version up to v1.4.1 left `position` unset and let the airport FOLLOW its first pad
  *  (airport.ts airportPosition). From v1.5 the airport carries its own point and stops following anything
- *  (forum #255: "the airfield coordinates must not change if any other element changes coordinates"), so
- *  an older file has to be given the point it was effectively already at.
+ *  (the airfield's coordinates must not change when another element moves), so an older file has to be given the point it was effectively already at.
  *
  *  ★ IT MUST BE THE FIRST PAD'S, and nothing cleverer, because that is what the writers were resolving to
  *  a second ago. Both routes end in `shiftPoint(…, shift)` — explicit position and pad fallback alike — so
@@ -450,7 +447,7 @@ export function parseSettings(raw: unknown): Settings {
   return zSettings.parse(migrateSettings(raw));
 }
 
-/** The save-time safety net for Fable C1: the editor must NEVER write a document its own loader would
+/** The save-time safety net: the editor must NEVER write a document its own loader would
  *  reject (a lon/lat out of range, a non-finite coordinate), which would lock the whole project out of
  *  the app on the next open. Returns a short human reason a project is unsavable, or null if it's valid.
  *  A precise field path is included when zod supplies one ("objects → 0 → position → lat: …"). */

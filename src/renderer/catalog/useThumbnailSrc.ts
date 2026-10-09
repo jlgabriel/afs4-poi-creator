@@ -1,5 +1,5 @@
-// useThumbnailSrc.ts — resolves a catalog object's user photo (v0.6) to a data URL, or null when it has
-// none / hasn't loaded / failed. Extracted from Thumbnail so the hover-preview (forum #170) can reuse
+// useThumbnailSrc.ts — resolves a catalog object's user photo to a data URL, or null when it has
+// none / hasn't loaded / failed. Shared by Thumbnail and the hover-preview so both use
 // the SAME module-level cache: hovering a card that already drew its photo is a cache HIT, never a
 // second IPC fetch. The store holds only the SET of names that have a photo (one cheap IPC on
 // boot/focus); the image bytes are fetched lazily, per name, and cached here.

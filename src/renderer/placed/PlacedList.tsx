@@ -4,7 +4,7 @@
 // Inspector above follows selection[0]. Duplicate / Delete act on the current selection (the same
 // store actions Ctrl+D / Del already call from the keyboard).
 //
-// Not virtualized: a POI is tens-to-low-hundreds of objects, not the catalog's 911; if dense scenes
+// Not virtualized: a POI is tens-to-low-hundreds of objects, not the catalog's hundreds; if dense scenes
 // ever make this janky, it takes the same react-window treatment the catalog got.
 import { useMemo } from "react";
 import { editorStore, useEditor } from "../state/editorStore";
@@ -22,16 +22,13 @@ import { PARKING_TYPE_LABELS } from "../../core/project/airport";
 import { haversine, initialBearing } from "../../core/geo/geo";
 import { rowInfo } from "./rowInfo";
 
-/** The airport's own row — his submenu (1) DATA — pinned above every airport part, because the parts
- *  belong to it. Present whenever the block is, INCLUDING an airport with no geometry at all: PCT will
- *  not INSTALL that (Aerofly rejects it outright — "no valid runway or helipad defined"), but it is a
- *  perfectly ordinary thing to have half-built on the map, and since #278 it is what you are left with
- *  after deleting your last helipad. The row is what keeps such an airport visible and reachable instead
- *  of a block nobody can see.
+/** The airport's own row (DATA) — pinned above every airport part, because the parts belong to it.
+ *  Present whenever the block is, INCLUDING an airport with no geometry at all: PCT will not INSTALL that
+ *  (the sim rejects an airport with neither a runway nor a helipad), but it is a perfectly ordinary thing
+ *  to have half-built on the map, and it is what you are left with after deleting your last helipad. The
+ *  row is what keeps such an airport visible and reachable instead of a block nobody can see.
  *
- *  Double-click flies to it, like every other row here — the airport has had a point of its own since
- *  v1.5 (#255). Before that its position followed the first helipad, so flying "to the airport" would
- *  have flown to a pad while claiming otherwise, and this row deliberately had no fly-to at all. */
+ *  Double-click flies to the airport's own point, like every other row here. */
 function DataRow(): React.ReactElement | null {
   const airport = useEditor((s) => s.project.airport);
   const selected = useEditor((s) => s.airportSelection?.kind === "data");
@@ -73,13 +70,11 @@ function DataRow(): React.ReactElement | null {
   );
 }
 
-/** One row per helicopter start pad (v1.3, forum #173: "which is then listed on the right for editing";
- *  a LIST since #221). They are NOT objects and do not join their count — none of them goes into the
+/** One row per helicopter start pad. They are NOT objects and do not join their count — none of them goes into the
  *  cultivation and Duplicate means nothing for them — so they sit above the list rather than in it.
  *
- *  The label is the pad's own name, not the airport's. Through v1.3 it showed the AIRPORT's name and code
- *  here, which was the same shortcut the pad panel took: with one pad you cannot tell the two apart. With
- *  three you can, and the airport's name belongs to the Data row above. */
+ *  The label is the pad's own name, not the airport's: with several pads the airport's name would not
+ *  tell them apart, and it belongs to the Data row above. */
 function HelipadRows(): React.ReactElement | null {
   const pads = useEditor((s) => s.project.airport?.pads);
   const selectedId = useEditor((s) =>
@@ -122,9 +117,7 @@ function HelipadRows(): React.ReactElement | null {
 
 /** One row per parking position, pinned with the pads above the objects and for the same reasons: a stand
  *  is not an object, never joins their count, never goes into the cultivation, and Duplicate means
- *  nothing for it. This was the FIRST of the repeatable kinds to be built ("any number of parking
- *  positions can be created", forum #232) and the other four followed its shape — the pad last, because
- *  it was the one that already existed as a singleton. */
+ *  nothing for it. The other repeatable airport kinds follow the same row shape. */
 function ParkingRows(): React.ReactElement | null {
   const parkings = useEditor((s) => s.project.airport?.parkings);
   const selectedId = useEditor((s) =>
@@ -151,7 +144,7 @@ function ParkingRows(): React.ReactElement | null {
                 <span className="pct-placed-label">
                   {p.name.trim() === "" ? "Parking" : p.name.trim()}
                 </span>
-                {/* His word, not the file's token — see ParkingFields on why the user never sees
+                {/* The display label, not the file's token — see ParkingFields on why the user never sees
                     `parked_ga`. */}
                 <span className="pct-placed-code">{PARKING_TYPE_LABELS[p.type]}</span>
               </span>
@@ -168,7 +161,7 @@ function ParkingRows(): React.ReactElement | null {
 }
 
 /** One row per runway. Same contract as the stands', and the label is how anyone refers to a runway: its
- *  two identifiers. Both may be empty — legal, his 0001 sample leaves the second blank. */
+ *  two identifiers. Both may be empty — legal; the second is often left blank. */
 function RunwayRows(): React.ReactElement | null {
   const runways = useEditor((s) => s.project.airport?.runways);
   const selectedId = useEditor((s) =>
@@ -308,9 +301,9 @@ export function PlacedList(): React.ReactElement {
               whole airport, geometry and all, which is the only deliberate way to do that. Duplicate does
               not reach any of them.
 
-              ★ AND ON THAT ROW IT ASKS FIRST (#253c). The label is the question, so the second press is
-              answering something rather than repeating something — his "only with another click can it
-              really be deleted". The note beside it lives in the Airport panel, which is what the
+              ★ AND ON THAT ROW IT ASKS FIRST. The label is the question, so the second press is
+              answering something rather than repeating something. The note beside it lives in the
+              Airport panel, which is what the
               Inspector is showing whenever this state can be reached. */}
           <button
             type="button"
@@ -329,11 +322,9 @@ export function PlacedList(): React.ReactElement {
       </div>
 
       <div className="pct-placed-list">
-        {/* ★ THIS ORDER IS HALF OF A PAIR (#277). It must match the catalog's Airport section card for
-            card — he caught PARKING and RUNWAY sitting in opposite places in the two columns and asked
-            for one sequence: "I suggest that the sequences in both columns remain identical." The order
-            itself is his too, chosen as "the one that an average user expects". Changing it here without
-            changing AirportSection.tsx re-creates exactly the bug he reported. */}
+        {/* ★ THIS ORDER IS HALF OF A PAIR. It must match the catalog's Airport section card for card,
+            so both columns show the same sequence. Changing it here without changing AirportSection.tsx
+            puts the two columns out of step. */}
         <DataRow />
         <RunwayRows />
         <HelipadRows />
@@ -355,9 +346,8 @@ export function PlacedList(): React.ReactElement {
                 onClick={(e) => editorStore.getState().select([o.id], e.shiftKey)}
                 onDoubleClick={() => editorStore.getState().flyTo(o.position)}
               >
-                {/* v0.8: every kind resolves a photo, not just xref. `null` was never a "this kind has no
-                    photo" rule — it was "only an xref has a name I can use", and photoKey removes that
-                    limit. A placed plant now shows the same picture its catalog card does. */}
+                {/* Every kind resolves a photo, not just xref: photoKey gives each kind a usable name, so
+                    a placed plant shows the same picture its catalog card does. */}
                 <Thumbnail name={placedPhotoKey(o)} category={info.category} />
                 <span className="pct-placed-text">
                   <span className="pct-placed-name">

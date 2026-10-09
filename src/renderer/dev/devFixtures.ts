@@ -2,8 +2,7 @@
 // (`npm run preview:renderer`, where window.pct is undefined). `useBootstrap` seeds these when there
 // is no IPC bridge, so the map + panels are visible and interactive without a real scan. This is dev
 // scaffolding, NOT shipped behaviour: it is only referenced on the no-pct branch, which never runs
-// inside Electron (where getCachedCatalog / the wizard provide the real catalog). Extracted verbatim
-// from the M1e-4 App.tsx harness.
+// inside Electron (where getCachedCatalog / the wizard provide the real catalog).
 import type {
   Catalog,
   CatalogAirportLight,
@@ -14,7 +13,7 @@ import type {
 import { buildPlants } from "../../core/catalog/plants";
 import * as mutate from "../../core/project/mutate";
 
-// A couple of real object names/dimensions from the in-sim matrix (V2/V3), boxed symmetrically about
+// A couple of real object names/dimensions, boxed symmetrically about
 // the origin for the demo (the true asymmetric bbMin/bbMax come from the scanner in the real app).
 function demoObject(
   name: string,
@@ -46,9 +45,9 @@ function demoLight(typeName: string, displayName: string, category: string): Cat
 /** Demo plants, derived by running the REAL scanner over real install filenames rather than
  *  hand-writing CatalogPlant literals. Two reasons: the harness then exercises the same parse the app
  *  does (a filename the regex can't read shows up here, not only in-sim), and the values can't drift
- *  from the scanner's output. All 6 groups are represented, with 2 in the ones that have siblings —
+ *  from the scanner's output. Every group is represented, with 2 in the ones that have siblings —
  *  enough for the palette's group blocks and its "same tree, different height" cards to be visible.
- *  A 1-per-list fixture is how the last window bug hid from the harness. */
+ *  A 1-per-list fixture would hide bugs that only show with several rows. */
 const DEMO_PLANTS: CatalogPlant[] = buildPlants(
   [
     "alley__i00__h2740_color",

@@ -8,9 +8,8 @@ import type {
 import { buildToc } from "../../src/core/export/tocWriter";
 import { parseTm, child, findAll } from "../../src/core/tm/tmParser";
 
-// Height-resolved sample objects — the shape the exporter consumes. Coordinates + byte conventions
-// mirror the 2026-07-12 in-sim gate (KDAG desert, 584 m ASL), so this golden IS the proven byte shape:
-// buildToc's output for these objects renders correctly in Aerofly FS 4.
+// Height-resolved sample objects — the shape the exporter consumes (KDAG desert, 584 m ASL). This golden
+// is a known-good byte shape: buildToc's output for these objects renders correctly in Aerofly FS 4.
 const AIRPORT_LIGHT: ResolvedAirportLight = {
   id: "al1",
   kind: "airport_light",
@@ -42,9 +41,9 @@ const WITNESS: ResolvedXref = {
 };
 
 // GOLDEN — byte-exact poi.toc for a mixed POI. Sibling order is ALWAYS light → airport_light → xref
-// regardless of the input order. Field order/types are the canonical layout (Fable A): airport_light
-// leads with type_name and uses float64 orientation; light leads with position. Regenerate deliberately
-// only if an in-sim re-gate changes the format — never let it drift silently.
+// regardless of the input order. Field order/types are the canonical layout: airport_light leads with
+// type_name and uses float64 orientation; light leads with position. Regenerate deliberately only if
+// the format changes — never let it drift silently.
 const GOLDEN_LIGHTS_TOC = `<[file][][]
     <[cultivation][][]
         <[string8u][coordinate_system][lonlat]>
@@ -78,13 +77,13 @@ const GOLDEN_LIGHTS_TOC = `<[file][][]
 >
 `;
 
-describe("buildToc — v0.2 light lists", () => {
+describe("buildToc — light lists", () => {
   it("emits byte-exact list_light + list_airport_light in canonical order (input order ignored)", () => {
     // pass them xref-first / airport-first to prove the emitter reorders to light → airport_light → xref
     expect(buildToc([WITNESS, AIRPORT_LIGHT, POINT_LIGHT])).toBe(GOLDEN_LIGHTS_TOC);
   });
 
-  it("omits the light lists entirely for an xref-only POI (byte-identical to pre-v0.2)", () => {
+  it("omits the light lists entirely for an xref-only POI (byte-identical to a lights-free export)", () => {
     const toc = buildToc([WITNESS]);
     expect(toc).not.toContain("list_light");
     expect(toc).not.toContain("list_airport_light");

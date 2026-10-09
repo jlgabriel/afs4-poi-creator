@@ -6,15 +6,15 @@ import {
   rotateAzimuth,
 } from "../../src/core/geo/orientation";
 
-// The mapping was measured in-sim (2026-07-15 KDAG gate): heading = (90 − direction) mod 360.
-// These cases are exactly the gate readings Juan confirmed by flying them.
+// XREF `direction` is a rotation, not a heading: heading = (90 − direction) mod 360.
+// These cases are known-good in-sim cardinals.
 describe("XREF orientation conversion (heading = 90 − direction)", () => {
   it("faces East at direction 0 (the base)", () => {
     expect(XREF_BASE_HEADING).toBe(90);
     expect(directionToHeading(0)).toBe(90);
   });
 
-  it("reproduces the confirmed verify-gate cardinals", () => {
+  it("reproduces the known in-sim cardinals", () => {
     expect(directionToHeading(90)).toBe(0); // A320 dir 90 → North ✓
     expect(directionToHeading(0)).toBe(90); // truck dir 0 → East ✓
     expect(directionToHeading(270)).toBe(180); // hangar dir 270 → South ✓
@@ -41,8 +41,9 @@ describe("XREF orientation conversion (heading = 90 − direction)", () => {
   });
 });
 
-// The rotation SENSE lives in rotateAzimuth alone — footprint corners come through it too. v0.3.0's
-// #120 was exactly two copies of this fact drifting apart, so it gets pinned on its own.
+// The rotation SENSE lives in rotateAzimuth alone — footprint corners come through it too. Two copies
+// of this fact drifting apart is a real regression (footprint turning against its tick), so it gets
+// pinned on its own.
 describe("rotateAzimuth — the one home of the rotation sense", () => {
   it("turns a direction-0 azimuth AGAINST the compass", () => {
     expect(rotateAzimuth(0, 30)).toBe(330); // North turned by direction 30 → 330, NOT 30

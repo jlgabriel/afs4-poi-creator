@@ -1,10 +1,9 @@
 // TopBar.tsx — the spanning top bar (design §5): brand · editable project name · dirty dot ·
-// [New][Open][Save] │ [Undo][Redo] │ [Export /poi…] │ [Rescan]. (Settings is M2 — hidden, see below.)
-// Undo/redo were keyboard-only from M1e-5c until v1.5, when ApfelFlieger pointed out the obvious (#253c):
-// a shortcut nobody can see is a feature only its author has. The other edit verbs are still chords.
-// New/Open/Save delegate to app/commands.ts; Export/Rescan are handed
-// down as callbacks by AppShell (wired in M1e-5f / M1e-5e) so the button is disabled until its step
-// lands. IPC-backed buttons disable in the browser preview (no bridge).
+// [New][Open][Save] │ [Undo][Redo] │ [Export /poi…][Export /airports…] │ [Rescan][Settings].
+// Undo/redo are visible buttons (a shortcut nobody can see is a feature only its author has); the other
+// edit verbs are keyboard chords. New/Open/Save delegate to app/commands.ts; Export/Rescan are handed
+// down as callbacks by AppShell, and a button without its callback is disabled. IPC-backed buttons
+// disable in the browser preview (no bridge).
 import { useState } from "react";
 import { editorStore, useEditor } from "../state/editorStore";
 import type { HeightMode } from "../../core/project/types";
@@ -53,11 +52,11 @@ function MapStyleSwitch(): React.ReactElement {
   );
 }
 
-/** Height-mode switch (forum #142/#148, chrispriv): the PROJECT-level choice of how object heights export —
+/** Height-mode switch: the PROJECT-level choice of how object heights export —
  *  Baked ASL (default: absolute elevations, may look up terrain online) or Sim autoheight (beta: the sim
  *  grounds each object, fully offline). Kept in the bar, not just the Export dialog, so the choice is
- *  visible at all times and the inspector's Height control reflects it from the first object placed
- *  ("display it in the GUI for informational purposes", chrispriv #148). One source of truth: the document
+ *  visible at all times and the inspector's Height control reflects it from the first object placed.
+ *  One source of truth: the document
  *  (setHeightMode), so the Export dialog's radios and this switch always agree. */
 function HeightModeSwitch(): React.ReactElement {
   const mode: HeightMode = useEditor((s) => s.project.heightMode) ?? "baked-asl";
@@ -115,7 +114,7 @@ function ProjectNameField(): React.ReactElement {
 
 interface TopBarProps {
   onExport?: () => void; // wired in M1e-5f
-  onHeliport?: () => void; // forum #160
+  onHeliport?: () => void; // Export /airports…
   onRescan?: () => void; // wired in M1e-5e
   onSettings?: () => void; // wired in M2h
 }
@@ -161,15 +160,9 @@ export function TopBar({ onExport, onHeliport, onRescan, onSettings }: TopBarPro
         Save As…
       </button>
 
-      {/* ★ UNDO AND REDO ARE BUTTONS SINCE v1.5 (forum #253c). They have worked as chords since M1e-5c
-          and the toolbar comment above still says "keyboard-only, not buttons" for a reason that stopped
-          holding the moment someone tested PCT without reading anything: "In addition, there should
-          somehow be a visible function of being able to take a step back. CMD+Z works, which is very
-          good, but not all users know that."
-
-          A shortcut nobody can see is a feature only the author has. These sit beside Save because that
-          is the group of things that act on the DOCUMENT as a whole, and they disable when their stack is
-          empty — which is also the only readout in the window of whether there is anything to go back to. */}
+      {/* ★ UNDO AND REDO ARE BUTTONS as well as chords: not every user knows the shortcut exists.
+          They sit beside Save because that is the group of things that act on the DOCUMENT as a whole, and
+          they disable when their stack is empty — the only readout of whether there is anything to undo. */}
       <span className="pct-divider" />
       <button
         type="button"
@@ -189,12 +182,10 @@ export function TopBar({ onExport, onHeliport, onRescan, onSettings }: TopBarPro
       </button>
 
       <span className="pct-divider" />
-      {/* ★ THE TWO OUTPUT BUTTONS NAME THEIR DESTINATION (v1.8, forum #296). This one said "Export POI…",
-          and he asked the only question a name like that leaves open: "What is being exported where?" His
-          own answer is that the user does not care what PCT calls its output — only that something is
-          written, and into which of the two folders under the sim's own `scenery`. So the folder IS the
-          name. Short form on the button, where the toolbar has no room for a path; long form in the
-          tooltip, where it does. */}
+      {/* ★ THE TWO OUTPUT BUTTONS NAME THEIR DESTINATION. The user does not care what PCT calls its
+          output — only that something is written, and into which of the two folders under the sim's own
+          `scenery`. So the folder IS the name. Short form on the button, where the toolbar has no room
+          for a path; long form in the tooltip, where it does. */}
       <button
         type="button"
         onClick={onExport}
@@ -203,21 +194,10 @@ export function TopBar({ onExport, onHeliport, onRescan, onSettings }: TopBarPro
       >
         Export /poi…
       </button>
-      {/* The second thing a project can become (forum #160): an airport you can start a flight from,
-          installed into scenery/airports. Beside Export because it is a sibling output, not a step of it.
-          HELIPORT shouted, at ApfelFlieger's request (#172): he first wanted "Export AIRPORT…", then
-          argued himself out of it — "since only a heliport can be created at the moment, HELIPORT fits
-          better" — and the capitals are what separate this from Export POI… at a glance.
-
-          v1.3 changes the VERB, because the button's job changed: creating the heliport now starts at
-          the catalog's Start - Helicopter card (#173), so what is left behind this button is the install.
-          "Create" would now name something that happens somewhere else.
-
-          v1.8 retires BOTH halves (#296). The noun goes because "only a heliport can be created" stopped
-          being true at v1.4 — runways, parking, aerotow and winch launches all live behind this button
-          now. The verb goes because he no longer wants the two outputs told apart by what they ARE, but
-          by where they LAND. Nothing about the shouting is lost: /airports and /poi differ far more than
-          POI and HELIPORT ever did. */}
+      {/* The second thing a project can become: an airport you can start a flight from, installed into
+          scenery/airports. Beside Export because it is a sibling output, not a step of it. Building the
+          airport happens in the catalog and Inspector; what is left behind this button is the install.
+          Like its sibling it is named by where its output LANDS, not by what it is. */}
       <button
         type="button"
         onClick={onHeliport}

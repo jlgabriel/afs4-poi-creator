@@ -1,6 +1,6 @@
 // Airport reference data (fboes/aerofly-data). Just enough to recenter the map on a sim airport —
-// ICAO + display name + position. No elevation (map centering doesn't need it; elevation is a
-// separate track — the IPACS DEM). NOT part of the editable project; loaded reference data only.
+// ICAO + display name + position. No elevation (map centering doesn't need it). NOT part of the
+// editable project; loaded reference data only.
 
 export interface Airport {
   icao: string; // e.g. "LFPG"

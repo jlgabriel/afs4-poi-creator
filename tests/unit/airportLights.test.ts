@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { buildAirportLights, type AirportLightFile } from "../../src/core/catalog/airportLights";
 
-// The real 15-folder / 23-.tmb install layout (folder, base) — the exact filenames on Juan's disk.
+// The install layout (folder, base) — the exact filenames, verbatim.
 const REAL_FILES: AirportLightFile[] = (
   [
     ["al_center_line_light", "al_center_line_light"],
@@ -34,14 +34,14 @@ describe("buildAirportLights — enumerate the airport-light library", () => {
   const { lights, warnings } = buildAirportLights(REAL_FILES);
   const names = lights.map((l) => l.typeName);
 
-  it("yields 22 placeable type_names from 23 .tmb (excludes the _model helper)", () => {
+  it("yields one placeable type_name per .tmb, excluding the _model helper", () => {
     expect(lights).toHaveLength(22);
     expect(names).toContain("center_line_light");
     expect(names).not.toContain("center_line_light_model");
     expect(warnings).toEqual([]);
   });
 
-  it("includes runway_edge_light — in the install though missing from the bible's name list", () => {
+  it("includes runway_edge_light — present in the install though missing from the documented name list", () => {
     expect(names).toContain("runway_edge_light");
   });
 

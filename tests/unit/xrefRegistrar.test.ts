@@ -6,8 +6,7 @@ import { isSafeBundleName, planXrefRegistration, registerXref, xrefRoot } from "
 import { buildTmi } from "../../src/core/export/tmiWriter";
 
 // Synthetic `.tmb` fixtures — invented names, the real plain-text grammar (scene → optional
-// material_list/texture_list → geometry_list). No IPACS/community bytes enter the repo; the real pylon
-// files are exercised only by hand in a local scratch run.
+// material_list/texture_list → geometry_list). No IPACS/community bytes enter the repo.
 const IDENTITY = "1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1";
 function tmbText(name: string, points: string, texture?: string): string {
   const material = texture
@@ -52,7 +51,7 @@ afterEach(() => {
   rmSync(userData, { recursive: true, force: true });
 });
 const writeLoose = (file: string, content: string | Buffer): void => writeFileSync(path.join(root, file), content);
-/** Write into `<xref>/<folder>/` — the shape a real add-on ZIP extracts to (#122). */
+/** Write into `<xref>/<folder>/` — the shape a real add-on ZIP extracts to. */
 const writeIn = (folder: string, file: string, content: string | Buffer): void => {
   mkdirSync(path.join(root, folder), { recursive: true });
   writeFileSync(path.join(root, folder, file), content);
@@ -105,9 +104,9 @@ describe("planXrefRegistration", () => {
     });
   });
 
-  // ── #122: the layout real add-ons actually ship (a ZIP of a FOLDER). v0.3.0 walked the root only and
-  //    found NOTHING here, so the feature could not fire for a normally-installed object. ──
-  it("#122: a folder of .tmb with no .tmi is ONE registerable bundle named after the folder", () => {
+  // ── The layout real add-ons actually ship (a ZIP of a FOLDER). Walking only the root finds NOTHING
+  //    here, so subfolders must be scanned for a normally-installed object to register. ──
+  it("a folder of .tmb with no .tmi is ONE registerable bundle named after the folder", () => {
     writeIn("xref_air_race_pylons", "pylon_15m.tmb", tmbText("pylon_15m", "(-1 -1 0) (1 1 15)", "pylon"));
     writeIn("xref_air_race_pylons", "pylon_30m.tmb", tmbText("pylon_30m", "(-1 -1 0) (1 1 30)", "pylon"));
     writeIn("xref_air_race_pylons", "pylon.ttx", "fake-texture-bytes");
@@ -124,13 +123,13 @@ describe("planXrefRegistration", () => {
     expect(b.missingTextures).toEqual([]);
   });
 
-  it("#122: a folder that already has a .tmi is left completely alone", () => {
+  it("a folder that already has a .tmi is left completely alone", () => {
     writeIn("xref_air_race", "pylon_15m.tmb", tmbText("pylon_15m", "(-1 -1 0) (1 1 15)"));
     writeIn("xref_air_race", "xref_air_race.tmi", "<[file][][]>"); // already resolvable → findTmi's job
     expect(planXrefRegistration(tmp).registerable).toEqual([]);
   });
 
-  it("#122: an unreadable .tmb doesn't sink its readable siblings (partial index still helps)", () => {
+  it("an unreadable .tmb doesn't sink its readable siblings (partial index still helps)", () => {
     writeIn("pack", "good.tmb", tmbText("good", "(0 0 0) (1 1 1)"));
     writeIn("pack", "opaque.tmb", Buffer.from([0xb5, 0xfe, 0x24, 0xc7]));
     const plan = planXrefRegistration(tmp);
@@ -139,7 +138,7 @@ describe("planXrefRegistration", () => {
     expect(plan.skipped.map((s) => s.reason).join(" ")).toContain("opaque");
   });
 
-  it("#122: nested folders are walked too (symmetric with findTmi)", () => {
+  it("nested folders are walked too (symmetric with findTmi)", () => {
     writeIn(path.join("vendor", "deep_pack"), "thing.tmb", tmbText("thing", "(0 0 0) (1 1 1)"));
     const plan = planXrefRegistration(tmp);
     expect(plan.registerable).toHaveLength(1);
@@ -189,13 +188,13 @@ describe("registerXref", () => {
     expect(registerXref(tmp, userData, "t").registered).toHaveLength(0);
   });
 
-  // ── #122: registering a real add-on folder. This is the whole point of the fix — and note how much
-  //    LESS it does than the loose path: one file appears, nothing of the user's is touched. ──
-  it("#122: registering a folder bundle only ADDS the .tmi — every user file is untouched", () => {
+  // ── Registering a real add-on folder does much LESS than the loose path: one file appears, nothing
+  //    of the user's is touched. ──
+  it("registering a folder bundle only ADDS the .tmi — every user file is untouched", () => {
     writeIn("pylons", "pylon_15m.tmb", tmbText("pylon_15m", "(-1 -1 0) (1 1 15)", "pylon"));
     writeIn("pylons", "pylon_30m.tmb", tmbText("pylon_30m", "(-2 -2 0) (2 2 30)", "pylon"));
     writeIn("pylons", "pylon.ttx", "fake");
-    writeIn("pylons", "__readme.txt", "michael's notes");
+    writeIn("pylons", "__readme.txt", "pylon notes");
     const dir = path.join(root, "pylons");
     const before = readdirSync(dir).sort();
 
@@ -218,7 +217,7 @@ describe("registerXref", () => {
     expect(journal.pylons.sourceTmbPath).toBeUndefined();
   });
 
-  it("#122: registering a folder bundle is idempotent (its .tmi now makes it resolvable)", () => {
+  it("registering a folder bundle is idempotent (its .tmi now makes it resolvable)", () => {
     writeIn("pylons", "pylon_15m.tmb", tmbText("pylon_15m", "(0 0 0) (1 1 15)"));
     expect(registerXref(tmp, userData, "t").registered).toHaveLength(1);
     expect(registerXref(tmp, userData, "t").registered).toHaveLength(0); // the .tmi is there → left alone

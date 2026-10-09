@@ -1,14 +1,14 @@
 // elevation.ts — main-process terrain-elevation resolution for HeightSpec "terrain"/"terrain-offset"
-// (design §3.4 / R1). POI xref heights are absolute metres ASL (matrix V2), so before export every
+// (design §3.4 / R1). POI xref heights are absolute metres ASL, so before export every
 // terrain-relative object must be turned into an ASL number. The arithmetic lives in the pure core
 // (heights.ts `resolveHeight`); this module supplies the terrain elevation under each object by
-// querying Open-Meteo — the source the V2 matrix confirmed matches the AFS4 mesh.
+// querying Open-Meteo, whose elevations match the AFS4 mesh closely.
 //
 // Kept Electron-free (fs + fetch are injected/global, dirs passed in) so it unit-tests without a
 // running app. Fetch lives in MAIN, not the renderer: it keeps the renderer's CSP `connect-src` at
-// 'self' and centralizes batching/caching/provider-swap behind one seam (Fable review P1-6 / P2-9).
+// 'self' and centralizes batching/caching/provider-swap behind one seam (P1-6 / P2-9).
 //
-// Behaviour (Fable P2-9 pins): dedupe to a ~11 m grid, batch ≤100 points/request, ~10 s timeout, a
+// Behaviour (P2-9): dedupe to a ~11 m grid, batch ≤100 points/request, ~10 s timeout, a
 // descriptive User-Agent, a session+disk cache in userData (so repeat exports work offline). Any
 // provider "none" or network/shape failure → throw NeedsElevationError{points}; ipc.ts maps that to
 // the `needs-elevation` envelope and the UI asks for a manual base elevation instead.

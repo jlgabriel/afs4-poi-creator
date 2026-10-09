@@ -21,9 +21,8 @@ describe("parseTm", () => {
     expect(root.children[0].children).toHaveLength(2);
   });
 
-  // Comments are part of the format: a community helipad pack found installed on a user's disk annotates
-  // every line of its `.tsc`, and PCT's own heliport templates lead with a block of instructions. Before
-  // this, parseTm threw `expected '<' at offset 0` on both.
+  // `//` comments are part of the format: user-made `.tsc` files may annotate every line, and PCT's own
+  // heliport templates lead with a block of instructions.
   it("skips // line comments between tags — leading, trailing and whole-line", () => {
     const commented = `// what this file is
 <[file][][]

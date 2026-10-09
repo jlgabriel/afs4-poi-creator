@@ -4,7 +4,7 @@
 //
 // `<userData>/footprints.json`, deliberately NOT part of the catalog cache: the cache is rebuilt from
 // the install on every Rescan and these are the one thing in the app a Rescan must never touch. Same
-// standing as the object-photos folder — the user's own data about IPACS objects, on the user's own
+// standing as the object-photos folder — the user's own data about built-in objects, on the user's own
 // disk, never bundled and never exported into a POI (the `.toc` has no footprint field; this is an
 // editor visual and reaches the sim in no form whatsoever).
 import { existsSync, readFileSync } from "node:fs";

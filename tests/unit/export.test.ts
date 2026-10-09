@@ -37,8 +37,8 @@ const PLANT: ResolvedPlant = {
   heightRange: [17, 17],
 };
 
-// GOLDEN — byte-exact `poi.toc`. Regenerate deliberately if the in-sim matrix (§6.2) changes
-// the cultivation format; never let it drift silently.
+// GOLDEN — byte-exact `poi.toc`. Regenerate deliberately if the cultivation format changes; never let
+// it drift silently.
 const GOLDEN_TOC = `<[file][][]
     <[cultivation][][]
         <[string8u][coordinate_system][lonlat]>
@@ -60,9 +60,8 @@ const GOLDEN_TOC = `<[file][][]
 >
 `;
 
-// Byte-identical to the format author's own working `.tsl` (2026-07-17): no `name`, autoheight FALSE.
-// See tslWriter for why each of those two is load-bearing — the `autoheight` flag is what kept every
-// plant 584 m underground at KDAG for five flights.
+// The known-good `.tsl` layout: no `name`, autoheight FALSE. See tslWriter for why each of those two is
+// load-bearing — `autoheight=true` pins every plant to height 0, i.e. underground.
 const GOLDEN_TSL = `<[file][][]
     <[tmsimulator_scenery_place_simple][][]
         <[string8u][coordinate_system][lonlat]>
@@ -73,9 +72,9 @@ const GOLDEN_TSL = `<[file][][]
 `;
 
 // GOLDEN — the .tsl a POI WITH plants carries: the same wrapper plus the reference-POI anchor object at
-// terrain height (v0.4 plant-culling fix). autoheight stays FALSE and the anchor has NO
-// autoheight_override (absolute mode) — the in-sim-proven layout (gate 2026-07-17). Regenerate
-// deliberately if the anchor format changes; never let it drift silently.
+// terrain height (it keeps the POI's plants from blinking out). autoheight stays FALSE and the anchor has
+// NO autoheight_override (absolute mode) — the known-good layout. Regenerate deliberately if the anchor
+// format changes; never let it drift silently.
 const GOLDEN_TSL_ANCHORED = `<[file][][]
     <[tmsimulator_scenery_place_simple][][]
         <[string8u][coordinate_system][lonlat]>
@@ -92,11 +91,9 @@ const GOLDEN_TSL_ANCHORED = `<[file][][]
 >
 `;
 
-// GOLDEN — the .tsl an AUTOHEIGHT POI carries (v0.5, forum #142): autoheight=TRUE and the anchor is written
-// AGL — position z = -1.0 (buried, so it can't collide with anything on the surface — chrispriv #151) +
-// autoheight_override=-1 (inherit the place's true), which is what makes autoheight reach the cultivation.
-// Regenerated DELIBERATELY when the anchor was buried; the 2026-07-19 gate flew 0.1 and the buried value
-// awaits its own gate (docs/GATE_AUTOHEIGHT_LIGHTS_ANCHOR.md). Never let this drift silently.
+// GOLDEN — the .tsl an AUTOHEIGHT POI carries: autoheight=TRUE and the anchor is written AGL — position
+// z = -1.0 (buried, so it can't collide with anything on the surface) + autoheight_override=-1 (inherit
+// the place's true), which is what makes autoheight reach the cultivation. Never let this drift silently.
 const GOLDEN_TSL_AUTOHEIGHT = `<[file][][]
     <[tmsimulator_scenery_place_simple][][]
         <[string8u][coordinate_system][lonlat]>
@@ -129,7 +126,7 @@ describe("buildToc — cultivation list_xref", () => {
         ">\n",
     );
   });
-  it("sanitises a grammar-breaking ] in an object name so the .toc stays parseable (Fable A)", () => {
+  it("sanitises a grammar-breaking ] in an object name so the .toc stays parseable", () => {
     const toc = buildToc([{ ...TOWER, name: "lamp]evil" }]);
     expect(toc).toContain("<[string8u][name][lamp)evil]>"); // ] → ) ; the schema also rejects it on load
     const el = findAll(parseTm(toc), "xref")[0]; // the file still parses to ONE well-formed xref element
@@ -146,18 +143,16 @@ describe("buildTsl — place_simple wrapper", () => {
     expect(tsl).not.toContain("cultivation");
   });
   it("always writes autoheight FALSE — true forces every plant to height 0", () => {
-    // The v0.4 root cause, and it cost five in-sim flights. `true` made the sim ignore each plant's
-    // `altitude` and pin it to 0, i.e. 584 m underground at KDAG — so ~20 format variants all failed
-    // identically while tm.log stayed silent, because nothing was wrong with the file.
-    // Safe for the other kinds: PCT has always written explicit absolute ASL for every object, and
-    // repeated gates established autoheight never reached xref cultivation at all.
+    // `true` makes the sim ignore each plant's `altitude` and pin it to 0 — underground — with no error,
+    // because nothing is wrong with the file.
+    // Safe for the other kinds: PCT writes explicit absolute ASL for every object, and autoheight does
+    // not reach xref cultivation at all.
     expect(buildTsl({ tocFileName: "poi" })).toContain("<[bool][autoheight][false]>");
     expect(buildTsl({ tocFileName: null })).toContain("<[bool][autoheight][false]>");
   });
-  it("carries no `name` tag — so the export has no user-typed value at all (retires Fable C2)", () => {
-    // The format's author: the line "doesn't make any sense at all, I suggest deleting it without
-    // replacement". Dropping it removes the only free-text value the .tsl ever had, which is what
-    // the `]`-truncation guard existed for. The .toc's own sanitizeValue still covers object names.
+  it("carries no `name` tag — so the export has no user-typed value at all (no free text)", () => {
+    // The tag has no effect. Dropping it removes the only free-text value the .tsl ever had, which is
+    // what the `]`-truncation guard existed for. The .toc's own sanitizeValue still covers object names.
     const tsl = buildTsl({ tocFileName: "poi" });
     expect(tsl).not.toContain("[name]");
     const place = parseTm(tsl).children[0]; // <file> → <tmsimulator_scenery_place_simple>
@@ -165,20 +160,20 @@ describe("buildTsl — place_simple wrapper", () => {
     expect(child(place, "cultivation")?.value).toBe("poi"); // and the file still parses
   });
 
-  it("emits the plant anchor object at terrain height when given an anchor (v0.4 culling fix)", () => {
+  it("emits the plant anchor object at terrain height when given an anchor", () => {
     const anchor = { position: { lon: 11.85, lat: 48.376 }, heightAsl: 520 };
     expect(buildTsl({ tocFileName: "poi", anchor })).toBe(GOLDEN_TSL_ANCHORED);
   });
 
-  it("carries no objects when there is no anchor — absent and null are identical to before v0.4", () => {
+  it("carries no objects when there is no anchor — absent and null are byte-identical", () => {
     expect(buildTsl({ tocFileName: "poi", anchor: null })).toBe(GOLDEN_TSL);
     expect(buildTsl({ tocFileName: "poi" })).toBe(GOLDEN_TSL);
   });
 
-  it("keeps the anchor ABSOLUTE — autoheight FALSE, no autoheight_override (matches __af_abs)", () => {
-    // The in-sim gate (2026-07-17) proved the anchor holds in absolute mode, so PCT keeps its baked-ASL
-    // model: the place stays autoheight=false and the anchor object carries no override (it agrees with
-    // the place), exactly as IPACS's official exporter emits an absolute object.
+  it("keeps the anchor ABSOLUTE — autoheight FALSE, no autoheight_override", () => {
+    // The anchor holds in absolute mode, so PCT keeps its baked-ASL model: the place stays
+    // autoheight=false and the anchor object carries no override (it agrees with the place) — the
+    // standard form of an absolute object.
     const tsl = buildTsl({ tocFileName: "poi", anchor: { position: { lon: 11.85, lat: 48.376 }, heightAsl: 520 } });
     expect(tsl).toContain("<[bool][autoheight][false]>");
     expect(tsl).not.toContain("autoheight_override");
@@ -187,10 +182,9 @@ describe("buildTsl — place_simple wrapper", () => {
     expect(findAll(place, "tmsimulator_scenery_object").length).toBe(1);
   });
 
-  it("autoheight=true → place autoheight=true + the anchor AGL (z=-1.0, override=-1), byte-exact (v0.5)", () => {
-    // The override is what makes autoheight reach the cultivation (gate 2026-07-19), and heightAsl on the
-    // anchor is ignored (the AGL z is a fixed literal), so it can be 0. The z itself is BURIED (chrispriv
-    // #151) — the gate flew 0.1, so the buried value is pending its own (GATE_AUTOHEIGHT_LIGHTS_ANCHOR.md).
+  it("autoheight=true → place autoheight=true + the anchor AGL (z=-1.0, override=-1), byte-exact", () => {
+    // The override is what makes autoheight reach the cultivation, and heightAsl on the anchor is
+    // ignored (the AGL z is a fixed literal, BURIED at -1.0), so it can be 0.
     const anchor = { position: { lon: 11.85, lat: 48.376 }, heightAsl: 0 };
     expect(buildTsl({ tocFileName: "poi", anchor, autoheight: true })).toBe(GOLDEN_TSL_AUTOHEIGHT);
   });
@@ -250,7 +244,7 @@ describe("planExport", () => {
     expect(zero.files[1].content).toBe(GOLDEN_TOC);
   });
 
-  it("bakes the global shift into every object's .toc position (forum #12)", () => {
+  it("bakes the global shift into every object's .toc position", () => {
     const shift = { east: 12, north: -8 };
     const toc = planExport({ ...project, shift }, [TOWER, BARREL]).files[1].content;
     for (const o of [TOWER, BARREL]) {
@@ -262,7 +256,7 @@ describe("planExport", () => {
     expect(toc).not.toContain(fmtLonLat(TOWER.position.lon)); // original coord is gone
   });
 
-  it("a POI with plants emits the anchor object and ships the anchor assets (v0.4)", () => {
+  it("a POI with plants emits the anchor object and ships the anchor assets", () => {
     const plan = planExport(project, [PLANT]);
     const tsl = plan.files.find((f) => f.relPath === "poi.tsl")!.content;
     expect(tsl).toContain("<[list_tmsimulator_scenery_object][objects][]");
@@ -270,13 +264,13 @@ describe("planExport", () => {
     expect(plan.assets).toEqual([...ANCHOR_ASSETS]);
   });
 
-  it("a POI without plants emits no anchor and ships no assets (byte-identical to before v0.4)", () => {
+  it("a POI without plants emits no anchor and ships no assets (byte-identical to the plain golden)", () => {
     const plan = planExport(project, [TOWER, BARREL]);
     expect(plan.files.find((f) => f.relPath === "poi.tsl")!.content).toBe(GOLDEN_TSL);
     expect(plan.assets).toEqual([]);
   });
 
-  it("places the anchor at the centroid + mean ASL of the SHIFTED plants (forum #12)", () => {
+  it("places the anchor at the centroid + mean ASL of the SHIFTED plants", () => {
     const p2: ResolvedPlant = { ...PLANT, id: "p2", position: { lon: 11.8502, lat: 48.3762 }, heightAsl: 522 };
     const shift = { east: 12, north: -8 };
     const tsl = planExport({ ...project, shift }, [PLANT, p2]).files.find((f) => f.relPath === "poi.tsl")!.content;
@@ -286,7 +280,7 @@ describe("planExport", () => {
     expect(tsl).toContain(`<[vector3_float64][position][${fmtLonLat(c.lon)} ${fmtLonLat(c.lat)} ${fmtMeters(521)}]>`);
   });
 
-  // ── Autoheight mode (v0.5) — the caller resolves heights via resolveHeightsAgl (heightAsl = the AGL z),
+  // ── Autoheight mode — the caller resolves heights via resolveHeightsAgl (heightAsl = the AGL z),
   //    then planExport reads project.heightMode to emit autoheight=true + the always-present anchor. ──
   const ahProject: Project = { ...project, heightMode: "autoheight" };
   const AGL_TOWER: ResolvedXref = { ...TOWER, heightAsl: 0 }; // terrain → 0

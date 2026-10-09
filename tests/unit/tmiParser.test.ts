@@ -37,7 +37,7 @@ describe("parseTmi", () => {
     expect(entries[1].bsCenter).toEqual([0, 0, 0]); // defaulted when absent
   });
 
-  it("is tolerant: skips one malformed entry with a warning, keeps the rest (AC4)", () => {
+  it("is tolerant: skips one malformed entry with a warning, keeps the rest", () => {
     const BAD = GOOD.replace(
       "<[vector3_float64][bb_min][0 0 0]>", // widget_beta's bb_min
       "<[vector3_float64][bb_min][0 0]>", // now only 2 numbers

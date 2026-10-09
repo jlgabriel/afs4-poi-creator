@@ -1,7 +1,7 @@
 // settings.ts — read/write the app's settings.json in Electron userData, validated with the shared
 // zod schema (parseSettings). A missing/corrupt file falls back to defaults; patches DEEP-merge the
 // known nested objects so a partial patch (e.g. {tiles:{provider:"custom"}}) never drops sibling
-// keys like customUrl (Fable review nit). No Electron import — userData + documents dirs are passed
+// keys like customUrl. No Electron import — userData + documents dirs are passed
 // in (documents lets callers inject app.getPath("documents"), OneDrive-safe per R5) — so it
 // unit-tests directly.
 import { existsSync, readFileSync } from "node:fs";
@@ -28,10 +28,10 @@ export function defaultSettings(documentsDir?: string): Settings {
 }
 
 /** The AFS4 *user folder* is the one that CONTAINS `scenery/` — e.g. `Documents\Aerofly FS 4`. PCT then
- *  installs into `<it>/scenery/poi/`. Settings used to label the field "(POI install target)", which
- *  invites browsing straight to `…\scenery\poi` — and PCT then wrote into `…\scenery\poi\scenery\poi\`
- *  (PCT's own author did exactly this). The mis-nesting is unambiguous, so CORRECT it instead of failing
- *  on it: strip a trailing `scenery` or `scenery/poi`. Pure; case-insensitive, since Windows is. */
+ *  installs into `<it>/scenery/poi/`. Users naturally browse straight to `…\scenery\poi`, and PCT would
+ *  then write into `…\scenery\poi\scenery\poi\`. The mis-nesting is unambiguous, so CORRECT it instead
+ *  of failing on it: strip a trailing `scenery` or `scenery/poi`. Pure; case-insensitive, since Windows
+ *  is. */
 export function normalizeUserDir(dir: string): string {
   const d = path.resolve(dir);
   const parent = path.dirname(d);
@@ -42,7 +42,7 @@ export function normalizeUserDir(dir: string): string {
   return d;
 }
 
-/** Main-side sanity on the two directory fields before either becomes a write root (Fable I6). The
+/** Main-side sanity on the two directory fields before either becomes a write root. The
  *  renderer can send any string over IPC and `afs4UserDir` is where exportPoi/uninstallPoi create and
  *  delete folders; `resolvePoiPath` already bounds WHAT is written under it, this bounds WHERE.
  *

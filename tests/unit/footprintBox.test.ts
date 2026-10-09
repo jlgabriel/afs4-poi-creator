@@ -76,8 +76,8 @@ const PLANTS = new Map<string, CatalogPlant>([
   ["palm/08", { group: "palm", species: "08" } as CatalogPlant],
 ]);
 
-describe("boxFor — the v0.9 shape decision: a box, not a kind", () => {
-  it("draws an unmeasured light and plant as points, exactly as before v0.9", () => {
+describe("boxFor — the shape decision: a box, not a kind", () => {
+  it("draws an unmeasured light and plant as points", () => {
     expect(boxFor(lightAt(), XREFS, BARE_LIGHTS, PLANTS)).toBeNull();
     expect(boxFor(plantAt(), XREFS, BARE_LIGHTS, PLANTS)).toBeNull();
   });
@@ -101,7 +101,7 @@ describe("boxFor — the v0.9 shape decision: a box, not a kind", () => {
 });
 
 // The subtle half: the three kinds do NOT store their facing in the same units, and a box drawn with the
-// wrong one turns against its own tick — which is precisely bug #120, one family over.
+// wrong one turns against its own tick.
 describe("boxDirection — one rotation, whatever field the kind keeps it in", () => {
   it("passes an xref's raw .toc direction through untouched", () => {
     expect(boxDirection(xrefAt(), 35)).toBe(35);

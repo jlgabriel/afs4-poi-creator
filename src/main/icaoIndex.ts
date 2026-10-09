@@ -2,27 +2,19 @@
 //
 // This is the check that makes "Create heliport…" safe enough to exist. A user `.tsc` whose code
 // collides with an existing airport SILENTLY REPLACES it — the sim resolves the duplicate in favour of
-// the user folder and says so in one line of tm.log that nobody reads. The hand-written route has no
-// defence against that at all; PCT can at least refuse.
+// the user folder without any visible error. PCT refuses instead.
 //
-// ★ WHAT v1.1 GOT WRONG. It answered one question — "is this code on disk?" — and blocked the button on
-// it. But after PCT installs SHJK, SHJK *is* on disk, so PCT refused to let you build SHJK again: the
-// code it had just written was now forbidden. ApfelFlieger hit this immediately (forum #170): "the
-// airfield code must be changed every time", and his test zip is five folders deep — SHJH, SHJI, SHJJ,
-// SHJK, SHJL — one per attempt at raising a single rooftop pad. He also found the second half of it:
-// deleting the folder by hand did not release the code, because the memo below outlived the deletion.
-//
-// So the question is now split in two, and only one half is a refusal:
+// "Is this code on disk?" alone is the wrong question: after PCT installs a heliport its code IS on
+// disk, and refusing it would forbid re-installing the heliport PCT just wrote (the edit loop). So the
+// question is split in two, and only one half is a refusal:
 //
 //   `taken` — held by an airport PCT does NOT own. That one still gets a hard no; it is someone's
 //             scenery and installing over it makes it disappear.
 //   `ours`  — held by a heliport PCT installed. Replacing that is not a collision, it is the edit loop.
 //
 // ZERO IPACS BYTES. The index is built from FILENAMES — `readdir`, never `readFile`. A `.wad` on disk is
-// one airport, and its basename IS the code (`kdag.wad` → KDAG). That is the same accounting the sim
-// does: on this machine the scan below returns 8139, and the sim's own startup line reads
-// `scanning airport and poi folders: airports=8139`. Same universe, counted two ways. (The marker file
-// that identifies our own folders is READ, but it is a README.txt PCT itself wrote.)
+// one airport, and its basename IS the code (`kdag.wad` → KDAG). (The marker file that identifies our
+// own folders is READ, but it is a README.txt PCT itself wrote.)
 //
 // WHAT IT CANNOT DO, stated plainly: it describes the machine PCT is running on, at this moment. It says
 // nothing about a machine that later receives a copy of the folder, and nothing about an add-on installed
@@ -47,8 +39,8 @@ function wadRoots(installDir: string | null, afs4UserDir: string | null): string
 }
 
 /** Collect `<basename>` of every `*.wad` under `dir`, recursively, skipping any directory in `exclude`.
- *  Lowercased: the sim matches codes case-insensitively (IPACS writes `DE0869` in the file and
- *  `de0869.wad` on disk). */
+ *  Lowercased: the sim matches codes case-insensitively (the code may be uppercase inside the file and
+ *  lowercase in the filename). */
 function collectWads(dir: string, out: Set<string>, exclude: ReadonlySet<string>): void {
   if (exclude.has(dir)) return;
   let entries;
@@ -72,7 +64,7 @@ function heliportDir(afs4UserDir: string, h: InstalledHeliport): string {
 }
 
 /** Build the index from disk, NOT counting the heliports PCT installed. Costs one recursive readdir of
- *  the airport trees (~9.5k entries). `exclude` holds absolute directory paths to skip whole. */
+ *  the airport trees. `exclude` holds absolute directory paths to skip whole. */
 export function scanTakenIcaos(
   installDir: string | null,
   afs4UserDir: string | null,
@@ -87,8 +79,8 @@ export function scanTakenIcaos(
 // to remember to call forgetTakenIcaos():
 //
 //   • the KEY carries the excluded folders, so installing or removing a PCT heliport re-scans by itself;
-//   • the TTL bounds how long ANY answer can be wrong — which is the case forum #170 reported, a folder
-//     deleted in Finder while PCT sat open. Five seconds is short enough that nobody notices they waited
+//   • the TTL bounds how long ANY answer can be wrong — e.g. a folder deleted by hand while PCT sat
+//     open must release its code. Five seconds is short enough that nobody notices they waited
 //     and long enough that a burst of keystrokes costs one scan.
 //
 // Anything about to WRITE still passes `refresh: true`: the answer that matters there is the one true at

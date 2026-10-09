@@ -12,8 +12,8 @@ import { destination, initialBearing } from "../../core/geo/geo";
  *
  *  ★ `width` is the FULL width, and it is halved here. That is the one thing to get right and the one
  *  place the model differs from its neighbours — a pad's `radius` and a stand's `size` are radii, but a
- *  runway's `width` really is the whole strip (types.ts: "here it really is the full width"; his
- *  reference airports carry 40 for a 40 m runway). Reading it as a radius would draw every runway twice
+ *  runway's `width` really is the whole strip (types.ts: "here it really is the full width"; a 40 m
+ *  runway carries 40). Reading it as a radius would draw every runway twice
  *  as wide as the sim lands on.
  *
  *  Degenerate input is not special-cased: two identical thresholds give a zero-length strip (initialBearing

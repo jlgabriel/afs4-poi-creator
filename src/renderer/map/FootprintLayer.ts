@@ -3,18 +3,16 @@
 // from OUTSIDE React by a store subscription, and per-mousemove drag updates must never round-trip
 // through React state.
 //
-// Two entry shapes share one layer + one drag machinery (Fable v0.2: extend, don't add a sibling
-// layer): an object with a bounding box draws as a footprint POLYGON with an anchor, heading tick and
+// Two entry shapes share one layer + one drag machinery (extend, don't add a sibling layer): an object with a bounding box draws as a footprint POLYGON with an anchor, heading tick and
 // rotate handle; one without draws as a fixed-size point MARKER (a circleMarker coloured by the light
 // itself), with an amber halo ring for selection so the colour you're editing stays visible. Both use
 // the same select-click, the same layer-local move drag, and the same document-level mouseup.
 //
-// v0.9: the shape is chosen by "does this object HAVE a box", not by its kind. Until now the two were the
-// same question — only an XREF had one, because only an XREF is indexed in a `.tmi` — and that is why a
-// Runway Approach Light Center 5 (8 × 0.5 × 10 m) and a Center 1 (0.5 × 0.5 × 2 m) were the same 6-pixel
-// dot (forum #126/#129). A user who measures one by hand (core/catalog/footprints) gives it a box, and
-// from here on it is a footprint like any other. What differs per kind is only WHERE the facing is stored
-// and what it means — see boxDirection.
+// The shape is chosen by "does this object HAVE a box", not by its kind. Only an XREF gets a box from the
+// scan (only XREFs are indexed in a `.tmi`), but a user who measures any other object by hand
+// (core/catalog/footprints) gives it one, and from then on it is a footprint like any other — so two
+// lights of very different size stop being the same 6-pixel dot. What differs per kind is only WHERE the
+// facing is stored and what it means — see boxDirection.
 //
 // P1-5 contract honoured here:
 //   • Reference-diff sync — mutate.ts guarantees structural sharing, so an object whose reference AND
@@ -65,7 +63,7 @@ export interface FootprintCallbacks {
   onRotate(id: string, deg: number): void; // fired once on handle-drag END (undo-friendly)
 }
 
-const COLOR = "#3b82f6"; // normal footprint (blue, the ACT idiom)
+const COLOR = "#3b82f6"; // normal footprint (blue)
 const COLOR_SELECTED = "#f59e0b"; // amber highlight
 const COLOR_MISSING = "#ef4444"; // object not in the catalog → red dashed placeholder
 const COLOR_HANDLE = "#06b6d4"; // rotate grip — cyan (complementary to the amber selection) so the drag control never reads as the object itself
@@ -225,13 +223,12 @@ export class FootprintLayer {
     return footprintCorners(anchor, box.bbMin, box.bbMax, boxDirection(obj, facing), scaleOf(obj));
   }
 
-  // The orientation tick points where the object FACES in-sim (heading = 90 − direction, calibrated
-  // 2026-07-15) — not along the model +Y axis. It reaches the box's extent in that compass bearing, and
-  // the grip (handleAt, same bearing) sits just past it. footprintCorners turns the polygon through the
-  // same orientation.rotateAzimuth, so the box and this tick can never disagree. v0.3.0 shipped them
-  // disagreeing: the polygon kept the old clockwise guess on the theory that a 180°-symmetric rectangle
-  // hides its rotation sense. It does not — ±d are mirror images, and an off-centre bbox lands on the
-  // wrong side of the anchor outright — so users watched the box turn against its own tick (forum #120).
+  // The orientation tick points where the object FACES in the sim (heading = 90 − direction) — not along
+  // the model +Y axis. It reaches the box's extent in that compass bearing, and the grip (handleAt, same
+  // bearing) sits just past it. footprintCorners turns the polygon through the same
+  // orientation.rotateAzimuth, so the box and this tick can never disagree. Don't rotate the polygon any
+  // other way on the theory that a rectangle hides its rotation sense: ±d are mirror images, and an
+  // off-centre bbox lands on the wrong side of the anchor outright.
   private headingAt(
     anchor: LonLat,
     obj: PlacedObject,
@@ -262,7 +259,7 @@ export class FootprintLayer {
   }
 
   private add(obj: PlacedObject, selected: boolean): void {
-    // Shape follows the BOX, not the kind (v0.9). An xref always has one, so the point branch can only
+    // Shape follows the BOX, not the kind. An xref always has one, so the point branch can only
     // be reached by the kinds addPoint accepts; the `?? placeholder` keeps this total anyway.
     const box = boxFor(obj, this.index, this.lightIndex, this.plantIndex);
     if (box === null && obj.kind !== "xref") this.addPoint(obj, selected);
@@ -417,7 +414,7 @@ export class FootprintLayer {
 
   private syncPointHandle(entry: PointEntry, selected: boolean): void {
     // Only an airport_light has an orientation to drag (orientationOf); a parametric point light gets no
-    // grip. The Inspector has promised "drag the map handle" since v0.2 — this is what keeps that promise.
+    // grip. The Inspector promises "drag the map handle" — this is what keeps that promise.
     const want = selected && !entry.obj.locked && entry.obj.kind === "airport_light";
     if (want && !entry.handle) {
       const obj = entry.obj as PlacedAirportLight;
@@ -538,7 +535,7 @@ export class FootprintLayer {
       // xref that IS the facing the user wants, so the raw direction to store = headingToDirection(facing);
       // a light's orientation is the raw bearing itself. The tooltip shows that same compass value.
       //
-      // Branching on KIND, not on shape: since v0.9 a measured airport light draws as a footprint, and it
+      // Branching on KIND, not on shape: a measured airport light draws as a footprint, and it
       // still stores a raw compass bearing. Branching on shape here would have silently started writing
       // `90 − bearing` into its `orientation` the moment somebody gave it a box.
       let facing = initialBearing(d.anchor, { lon: e.latlng.lng, lat: e.latlng.lat });

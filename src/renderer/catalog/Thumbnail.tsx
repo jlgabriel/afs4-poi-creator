@@ -1,7 +1,6 @@
-// Thumbnail.tsx — the per-row object icon (v0.6). If the object's `name` has a user photo in the
-// configured folder it shows that photo (cover-cropped to the 40px square); otherwise it falls back to
-// the generated <CategoryIcon> glyph — the exact element every row drew before this feature, so a row
-// can only be upgraded, never broken. The photo load + cache lives in useThumbnailSrc, shared with the
+// Thumbnail.tsx — the per-row object icon. If the object's `name` has a user photo in the configured
+// folder it shows that photo (cover-cropped to the 40px square); otherwise it falls back to the
+// generated <CategoryIcon> glyph. The photo load + cache lives in useThumbnailSrc, shared with the
 // hover-preview so enlarging a card reuses the already-fetched bytes.
 import { memo } from "react";
 import { CategoryIcon } from "./categoryIcon";

@@ -1,6 +1,6 @@
-// previewPosition.ts — where the hover-preview popup lands relative to the card it describes (forum
-// #170/#166). PURE and viewport-only (all inputs are getBoundingClientRect coords), so the placement
-// rules unit-test without a DOM. The popup itself is portalled to <body> with position:fixed, which is
+// previewPosition.ts — where the hover-preview popup lands relative to the card it describes. PURE
+// and viewport-only (all inputs are getBoundingClientRect coords), so the placement rules unit-test
+// without a DOM. The popup itself is portalled to <body> with position:fixed, which is
 // why viewport coordinates are exactly right and no scroll offset enters here.
 
 /** The slice of DOMRect we read — the anchor (the hovered thumbnail) and, for clamping, the viewport. */

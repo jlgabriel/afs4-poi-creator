@@ -88,7 +88,7 @@ describe("searchAirports", () => {
     expect(icaos(searchAirports(A, "eg", 2))).toEqual(["EG", "EGLL"]);
   });
 
-  it("matches a name accent-insensitively (Fable A1)", () => {
+  it("matches a name accent-insensitively", () => {
     const withAccents: Airport[] = [
       { icao: "LSZH", name: "Zürich Airport", lat: 47.4647, lon: 8.5492 },
       { icao: "SCEL", name: "Comodoro Arturo Merino Benítez", lat: -33.393, lon: -70.7858 },

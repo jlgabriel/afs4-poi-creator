@@ -69,10 +69,10 @@ describe("parseProject — accepts valid input and round-trips", () => {
     const parsed = parseProject(raw) as unknown as Record<string, unknown>;
     expect(parsed.futureField).toEqual({ hello: 1 });
   });
-  it("accepts a catalog-style object name with . and - (the headroom charset, Fable A)", () => {
+  it("accepts a catalog-style object name with . and - (the headroom charset)", () => {
     expect(() => parseProject(withFirstObject({ name: "obj-name.v2_00" }))).not.toThrow();
   });
-  it("accepts and round-trips an autoheight heightMode (v0.5)", () => {
+  it("accepts and round-trips an autoheight heightMode", () => {
     const p = { ...validProject(), heightMode: "autoheight" as const };
     expect(parseProject(JSON.parse(JSON.stringify(p)))).toEqual(p);
   });
@@ -81,12 +81,12 @@ describe("parseProject — accepts valid input and round-trips", () => {
     expect(() => parseProject(validProject())).not.toThrow();
   });
   it("rejects an unknown heightMode value", () => {
-    // A forum-shared file must not smuggle a mode the exporter can't compile.
+    // A shared file must not smuggle a mode the exporter can't compile.
     expect(() => parseProject({ ...validProject(), heightMode: "agl" })).toThrow();
   });
 });
 
-describe("parseProject — rejects malformed input (untrusted forum files)", () => {
+describe("parseProject — rejects malformed input (untrusted shared files)", () => {
   const cases: Array<[string, unknown]> = [
     ["lat out of range", { ...validProject(), objects: [], reference: { lon: 0, lat: 200 } }],
     ["scale <= 0", withFirstObject({ scale: 0 })],
@@ -148,7 +148,7 @@ describe("parseSettings", () => {
     expect(got.tiles).toEqual({ provider: "custom", customUrl: "https://t/{z}/{x}/{y}.png" });
   });
 
-  // The saved window placement (forum #125) is cosmetic, and readSettings falls back to DEFAULTS on any
+  // The saved window placement is cosmetic, and readSettings falls back to DEFAULTS on any
   // throw — so a schema that rejected a bad rect would quietly reset the user's install dir and tile
   // provider along with it. It degrades to "no saved placement" instead, and nothing else moves.
   const win = { x: 100, y: 80, width: 1280, height: 820, maximized: false };
@@ -176,7 +176,7 @@ describe("parseSettings", () => {
   });
 });
 
-describe("clampLonLat — keep a coordinate in the range the loader enforces (Fable C1)", () => {
+describe("clampLonLat — keep a coordinate in the range the loader enforces", () => {
   it("clamps out-of-range values to the WGS84 edges", () => {
     expect(clampLonLat({ lon: 481.3, lat: 200 })).toEqual({ lon: 180, lat: 90 });
     expect(clampLonLat({ lon: -181, lat: -91 })).toEqual({ lon: -180, lat: -90 });
@@ -186,7 +186,7 @@ describe("clampLonLat — keep a coordinate in the range the loader enforces (Fa
   });
 });
 
-describe("firstProjectError — the save-time safety net (Fable C1)", () => {
+describe("firstProjectError — the save-time safety net", () => {
   it("returns null for a valid project", () => {
     expect(firstProjectError(validProject())).toBeNull();
   });
@@ -200,7 +200,7 @@ describe("firstProjectError — the save-time safety net (Fable C1)", () => {
   it("reports an unreadable schemaVersion in words", () => {
     expect(firstProjectError({ schemaVersion: 2 })).toContain("schemaVersion");
   });
-  it("rejects an object name that would break the .toc grammar (Fable A)", () => {
+  it("rejects an object name that would break the .toc grammar", () => {
     expect(firstProjectError(withFirstObject({ name: "lamp]evil" }))).not.toBeNull();
   });
 });
@@ -216,7 +216,7 @@ describe("isExportablePoiName", () => {
   });
 });
 
-// ── v0.2 lights (schemas defined + tested here; wired into zProject with the lights UI slice) ──
+// ── Lights ──
 
 describe("zPlacedAirportLight", () => {
   const valid = {
@@ -275,11 +275,9 @@ describe("CONFIGURATION_RE", () => {
   });
 });
 
-// ── The airport block (v1.2, forum #170) ─────────────────────────────────────────────────────────
-// ApfelFlieger's ask: PCT wrote only POI data, so the code, the name and the country had to be typed
-// again on every lap of "create → test in FS4 → adjust → test again". His own reasoning for putting it
-// in the file: the code needs checking once, the airport can be saved as often as a POI, and it can be
-// passed on like one — "the same function as the TAP file of the ACT, and at the same time more flexible".
+// ── The airport block ────────────────────────────────────────────────────────────────────────────
+// The airport identity (code, name, country) and its parts live in the project file, so they survive
+// every "create → test in FS4 → adjust" lap and travel with the project like any POI.
 describe("zProject — the airport block", () => {
   const AIRPORT = {
     icao: "shjl",
@@ -288,8 +286,8 @@ describe("zProject — the airport block", () => {
     pad: { position: { lon: -70.3130659, lat: -18.4827329 }, heading: 90, radius: 10 },
   };
 
-  // v1.4 (forum #221) made HELICOPTER repeatable, so the single `pad` became a `pads` list. AIRPORT above
-  // is the v1.2/v1.3 shape on purpose: it is what is sitting in users' files today.
+  // HELICOPTER is repeatable, so the single `pad` became a `pads` list. AIRPORT above is the older
+  // (PCT <= 1.3) single-pad shape on purpose: files in that shape still exist.
   it("lifts a v1.3 single pad into the pads list, keeping the mirror", () => {
     const p = parseProject({ ...validProject(), airport: AIRPORT });
     expect(p.airport?.pads).toHaveLength(1);
@@ -319,9 +317,9 @@ describe("zProject — the airport block", () => {
     const p = parseProject({ ...validProject(), airport });
     // Everything it had, unchanged...
     expect(p.airport).toMatchObject(airport);
-    // ...plus the point it was ALREADY at. Up to v1.4.1 the airport followed pads[0]; from v1.5 it has
-    // a point of its own (#255), so the file has to be handed the one it was effectively using or the
-    // airport would move the first time someone dragged that pad.
+    // ...plus the point it was ALREADY at. Older files have no airport point (it followed pads[0]), so
+    // the file has to be handed the one it was effectively using or the airport would move the first
+    // time someone dragged that pad.
     expect(p.airport!.position).toEqual({ lon: -70.58, lat: -33.38 });
   });
 
@@ -347,7 +345,7 @@ describe("zProject — the airport block", () => {
   });
 
   it("gives no point to an airport that has no pads to take one from", () => {
-    // His "(1) DATA" example. There is nothing to freeze, and the exporter's own fallback is still the
+    // A data-only airport. There is nothing to freeze, and the exporter's own fallback is still the
     // honest answer — inventing a coordinate here would be PCT deciding where the airfield is.
     const p = parseProject({
       ...validProject(),
@@ -368,7 +366,7 @@ describe("zProject — the airport block", () => {
   });
 
   it("accepts an airport with no pads at all", () => {
-    // His "(1) DATA" example is exactly that: identity plus a database entry, no helipad.
+    // A data-only airport: identity plus a database entry, no helipad.
     const p = parseProject({
       ...validProject(),
       airport: { icao: "sclc", name: "Vitacura", country: "cl", pads: [] },
@@ -376,7 +374,7 @@ describe("zProject — the airport block", () => {
     expect(p.airport?.pads).toEqual([]);
   });
 
-  // ── Parking positions (v1.4, forum #232) ───────────────────────────────────────────────────────
+  // ── Parking positions ──────────────────────────────────────────────────────────────────────────
   const STAND = {
     id: "prk-1",
     name: "Parking_W",
@@ -404,7 +402,7 @@ describe("zProject — the airport block", () => {
     expect("parkings" in p.airport!).toBe(false);
   });
 
-  // ── Runways (v1.4, forum #217 submenu (4)) ─────────────────────────────────────────────────────
+  // ── Runways ────────────────────────────────────────────────────────────────────────────────────
   const RWY_END = {
     endpoint: { lon: -70.58515, lat: -33.38115 },
     threshold: { lon: -70.58515, lat: -33.38115 },
@@ -437,9 +435,8 @@ describe("zProject — the airport block", () => {
   });
 
   it("REFUSES a lighting value the sim does not know", () => {
-    // Same reasoning as the parking tag, with a sharper edge: `reil_omni` is what IPACS's OWN .tap files
-    // say — but a .tap is the authoring format, and that spelling is in none of the sim's binary. Writing
-    // it into a .tsc gives a runway end whose REIL quietly does not exist.
+    // Same reasoning as the parking tag: `reil_omni` is the `.tap` authoring spelling, not a value the
+    // sim knows. Writing it into a .tsc gives a runway end whose REIL quietly does not exist.
     for (const bad of [
       { ...RWY_END, reil: "reil_omni" },
       { ...RWY_END, appltsys: "ALSF-2" },
@@ -447,14 +444,14 @@ describe("zProject — the airport block", () => {
     ]) {
       expect(() => parseProject(withRunways([{ ...RUNWAY, ends: [bad, RWY_END] }]))).toThrow();
     }
-    // …while every value the binary does carry is accepted, FS2 legacy systems included.
+    // …while every value the sim does know is accepted, FS2 legacy systems included.
     for (const good of ["std", "alsf-1", "alsf-2", "malsf", "malsr", "calvert", "calvert-2", "odals", "rail", "sals"]) {
       const ends = [{ ...RWY_END, appltsys: good }, RWY_END];
       expect(parseProject(withRunways([{ ...RUNWAY, ends }])).airport?.runways?.[0]?.ends[0]?.appltsys).toBe(good);
     }
   });
 
-  // ── Glider starts (v1.4, forum #237/#238) ──────────────────────────────────────────────────────
+  // ── Glider starts ──────────────────────────────────────────────────────────────────────────────
   const AEROTOW = { id: "ato-1", name: "26", position: { lon: -70.5783, lat: -33.38 }, heading: 260 };
   const WINCH = {
     id: "wnc-1",
@@ -498,8 +495,7 @@ describe("zProject — the airport block", () => {
   });
 
   it("REJECTS a parking tag the sim would never match", () => {
-    // ★ The one place a typo here can still be caught. `parking_ga` is not a strawman: it is the spelling
-    // ApfelFlieger himself used in the prose of #232, while all of his files — and all of IPACS's — say
+    // ★ The one place a typo here can still be caught. `parking_ga` is a plausible misspelling of
     // `parked_ga`. In the sim the wrong value makes a stand that silently does nothing: no error anywhere.
     expect(() => parseProject(withStands([{ ...STAND, type: "parking_ga" }]))).toThrow();
     expect(() => parseProject(withStands([{ ...STAND, type: "" }]))).toThrow();

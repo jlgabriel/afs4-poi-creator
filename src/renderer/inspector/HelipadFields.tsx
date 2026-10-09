@@ -1,19 +1,11 @@
 // HelipadFields.tsx — the Inspector's panel for ONE helicopter start pad.
 //
-// WHY IT EXISTS (forum #173, ApfelFlieger). Through v1.2 the whole heliport lived in a modal: you opened
-// "Create HELIPORT…" to place the pad, to type the code, to move it, to install it. He asked for the pad
-// to be created from the left column and "then listed on the right for editing", because that is how
-// every other thing in PCT works — and he is right that a full-screen overlay is a bad place to edit
-// something you have to see on the map to judge. The dialog covers the map; this panel does not.
+// The pad is created from the left column and edited here, like every other thing in PCT: a full-screen
+// dialog would cover the map you need to judge the pad by.
 //
-// ★ ONE pad, named by id (forum #221: "this element can now be used as often as desired" — his own SCLC
-// ships three). It was `HeliportFields` and reached for `pads[0]`; the file is renamed because "heliport"
-// now means the airport, which is AirportDataFields, and this is the pad.
-//
-// ★ WHAT LEFT, and why. This panel used to hold the airport's identity — code, name, country — and the
-// Install button, on the reasoning that "a project has exactly one airport, so the pad IS the airport as
-// far as anyone using this can tell". His submenu (1) DATA says otherwise and so does the model: one code
-// shown inside N pad panels reads as N codes. It all lives in AirportDataFields now.
+// ★ ONE pad, named by id: pads are repeatable. "Heliport" now means the airport, which is
+// AirportDataFields; this is the pad. The airport's identity (code, name, country) and its install button
+// live there too — one code shown inside N pad panels would read as N codes.
 import type { AirportPad } from "../../core/project/types";
 import { clampLonLat } from "../../core/project/schemas";
 import { editorStore, useEditor } from "../state/editorStore";
@@ -31,16 +23,14 @@ export function HelipadFields({ pad }: { pad: AirportPad }): React.ReactElement 
   return (
     // .pct-inspector-body is what every other kind's panel opens with, and it is not decoration: the
     // padding lives there, not on .pct-inspector. Returning a bare fragment put the fields flush against
-    // both edges of the panel while the object panels sat inset — spotted on screen, not by a test.
+    // both edges of the panel while the object panels sat inset.
     <div className="pct-inspector-body">
       <div className="pct-field-title">
         {pad.name.trim() === "" ? "Helipad" : pad.name.trim()}
       </div>
 
       <div className="pct-field pct-field-col">
-        {/* ⛔ Struck in #287, note and "?" together. ★ The sentence was also a TEST — it promised "click
-            to select, THEN the grip appears", which is exactly what HelipadLayer implements. Retiring the
-            promise does not retire the behaviour. */}
+        {/* HelipadLayer: click to select, THEN the rotation grip appears. */}
         <span className="pct-field-label">Helipad</span>
       </div>
 
@@ -70,8 +60,8 @@ export function HelipadFields({ pad }: { pad: AirportPad }): React.ReactElement 
         <label className="pct-field-col">
           <span className="pct-field-label">
             Heading — true
-            {/* Measured in-sim 2026-07-31: we wrote heading 40 and the sim's menu showed 028 — 40 minus
-                the local magnetic variation. So the field is TRUE and the sim's panel is magnetic. */}
+            {/* The field is TRUE heading; the sim's own panel shows it MAGNETIC (minus the local
+                variation). */}
             <Help>Aerofly shows this heading as MAGNETIC, so expect it to read a few degrees off.</Help>
           </span>
           <NumberInput
@@ -83,12 +73,8 @@ export function HelipadFields({ pad }: { pad: AirportPad }): React.ReactElement 
         <label className="pct-field-col">
           <span className="pct-field-label">
             Size — m
-            {/* ★ The one note here that carries a LIVE number, and it stays folded anyway: the surprise is
-                the radius/diameter convention, not the arithmetic, and the value is right beside it. */}
-            {/* His wording, verbatim (#295): "I did not find the content precise enough or misleading,
-                so I wrote new text suggestions in the blue-framed fields". The live arithmetic went with
-                it — he states the rule rather than the instance, and he says MAP rather than sim, which
-                is the surface the user is looking at while they type. */}
+            {/* States the radius/diameter convention, not the arithmetic: the surprise is the convention,
+                and the value is right beside it. */}
             <Help>This is the RADIUS - the map shows DIAMETER (= 2x RADIUS)</Help>
           </span>
           <NumberInput
@@ -103,10 +89,9 @@ export function HelipadFields({ pad }: { pad: AirportPad }): React.ReactElement 
           plain metres in the file — so nothing is missing beside it. */}
       <WadHeading heading={pad.heading} />
 
-      {/* #221: "the name can be freely assigned". It is what LOCATION shows for the pad, and with several
-          pads it is the only thing that tells them apart in the list — which is why it arrives with the
-          repeat and not before. Empty is normal: the writers render an unnamed pad as FATO/TLOF, the
-          literal v1.2 and v1.3 always wrote, so an old project still exports the same bytes. */}
+      {/* A free name. It is what LOCATION shows for the pad, and with several pads it is the only thing
+          that tells them apart in the list. Empty is normal: the writers render an unnamed pad as
+          FATO/TLOF, so an older project without names still exports the same bytes. */}
       <label className="pct-field pct-field-col">
         <span className="pct-field-label">
           Name
@@ -128,10 +113,6 @@ export function HelipadFields({ pad }: { pad: AirportPad }): React.ReactElement 
         </span>
       )}
 
-      {/* ⛔ "Where is the airport code?" stood here and #287 strikes it whole. It existed because he
-          asked that question himself when the identity fields left this panel in v1.4 — the panel invited
-          it and did not answer. He is striking his own signpost, so the answer now comes from the submenu
-          list itself, where Airport sits at the top. */}
     </div>
   );
 }

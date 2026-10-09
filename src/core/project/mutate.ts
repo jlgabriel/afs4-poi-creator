@@ -122,13 +122,10 @@ export function createLight(
  *  • `height: { mode: "terrain" }` — a tree stands ON the ground. (Contrast createLight, which floats
  *    its default 3 m up.) This is the mode the whole app already resolves to ASL at export.
  *
- *  • `heightRange: [naturalHeight, naturalHeight]` — NOT the bible's `[0, 0]`. The bible shows `[0 0]`
- *    as the plant element's default, but that same template shows `position [0.000000 0.000000]`, which
- *    is plainly a placeholder rather than a working value — so `[0 0]` may well mean "a plant 0 metres
- *    tall", i.e. invisible. We never have to find out: the natural height is right there in the
- *    filename, so writing it explicitly is correct under every reading of the field. If height_range
- *    scales, this reproduces the texture's own size; if it's ignored, so is this. The in-sim gate (P2)
- *    settles what `[0 0]` means, but nothing PCT emits depends on the answer. */
+ *  • `heightRange: [naturalHeight, naturalHeight]` — NOT `[0, 0]`, which could mean "a plant 0 metres
+ *    tall", i.e. invisible. The natural height is right there in the filename, so writing it explicitly
+ *    is correct under every reading of the field: if height_range scales, this reproduces the texture's
+ *    own size; if it's ignored, so is this. */
 export function createPlant(
   group: string,
   species: string,
@@ -381,7 +378,7 @@ export function setCamera(project: Project, camera: Project["camera"], now = now
   return { ...project, camera, modifiedAt: now };
 }
 
-// ── The airport block (v1.2, forum #170) ─────────────────────────────────────
+// ── The airport block (v1.2) ─────────────────────────────────────────────────
 //
 // Four mutations rather than one setter because they have different sources: the DIALOG writes the whole
 // block, while the MAP drags the pad and turns it. Splitting them keeps the map from having to know an
@@ -403,11 +400,10 @@ function withPadMirror(airport: ProjectAirport): ProjectAirport {
 
 /** Seed the AIRPORT's own point the first time the block gains any geometry — and never again.
  *
- *  ★ THE FREEZE IS THE WHOLE POINT (forum #255). Of his three reasons for wanting the airport to carry
- *  its own coordinate, the third is the one that decides behaviour: "the airfield coordinates must not
- *  change if any other element changes coordinates." Through v1.4 the airport had no point of its own in
- *  practice — `airportPosition` fell through to `pads[0]`, so dragging the first helipad dragged the
- *  airport with it, and deleting that helipad teleported the airport to whichever pad became first.
+ *  ★ THE FREEZE IS THE WHOLE POINT: the airfield's coordinates must not change when another element
+ *  moves. Without an own point, `airportPosition` falls through to `pads[0]`, so dragging the first
+ *  helipad would drag the airport with it, and deleting that helipad would teleport the airport to
+ *  whichever pad became first.
  *
  *  What replaces it is NOT "type coordinates before anything works". The first element placed hands the
  *  airport a starting point — the same point it would have ended up at anyway — and from that moment the
@@ -455,18 +451,16 @@ function newPad(position: LonLat, radius: number, id = randomId()): AirportPad {
 }
 
 /** Put the FIRST pad AT `position`, creating the airport block if the project has none. The one mutation
- *  allowed to bring the block into being from a map gesture, and it is deliberate: in v1.3 the pad is
- *  placed from the catalog like any other object (forum #173), so "click the map" is the user asking
- *  for it in as many words.
+ *  allowed to bring the block into being from a map gesture, and it is deliberate: the pad is placed
+ *  from the catalog like any other object, so "click the map" is the user asking for it in as many
+ *  words.
  *
  *  It still invents no IDENTITY — icao, name and country come in empty and the install refuses until
  *  they are filled, which is the rule heliportTemplate exists to keep. `updatePad` below stays a no-op
  *  on a padless project on purpose: a DRAG is not a request for an airport.
  *
  *  ⚠️ Placing again MOVES the first pad rather than adding a second — the v1.3 behaviour, kept because
- *  the v1.3 UI is still the one calling this and it has exactly one pad card. `addAirportPad` is the
- *  mutation that grows the list, and it is what the reworked AIRPORT menu (forum #219/#221, where
- *  HELICOPTER is repeatable) will call instead. */
+ *  callers of this have exactly one pad card. `addAirportPad` is the mutation that grows the list. */
 export function placeAirportPad(
   project: Project,
   position: LonLat,
@@ -486,8 +480,8 @@ export function placeAirportPad(
   return moveAirportPad(project, position, now);
 }
 
-/** APPEND a pad (forum #221 — "this element can now be used as often as desired"; his SCLC ships three).
- *  Creates the airport block when there is none, same rule as placeAirportPad. */
+/** APPEND a pad (pads are repeatable). Creates the airport block when there is none, same rule as
+ *  placeAirportPad. */
 export function addAirportPad(
   project: Project,
   position: LonLat,
@@ -504,8 +498,8 @@ export function addAirportPad(
   return { ...project, airport: withPadMirror(seededPosition(next, position)), modifiedAt: now };
 }
 
-/** Drop a pad by id. A pad-less airport stays a valid block — his "(1) DATA" example is an airport with
- *  no pads — so this never deletes the airport itself. */
+/** Drop a pad by id. A pad-less airport stays a valid block, so this never deletes the airport
+ *  itself. */
 export function removeAirportPad(project: Project, padId: string, now = nowIso()): Project {
   const airport = project.airport;
   if (airport === undefined) return project;
@@ -518,7 +512,7 @@ export function removeAirportPad(project: Project, padId: string, now = nowIso()
  *  same reference and the map's drag is a silent no-op rather than an invented airport — PCT never picks
  *  an identity (see heliportTemplate), and creating one from a drag would do exactly that.
  *
- *  `padId` undefined targets the FIRST pad, which is what every v1.3 caller means: that UI knows one. */
+ *  `padId` undefined targets the FIRST pad (for one-pad callers). */
 function updatePad(
   project: Project,
   patch: (pad: AirportPad) => AirportPad,
@@ -543,7 +537,7 @@ export function moveAirportPad(project: Project, position: LonLat, now = nowIso(
 }
 
 /** Turn a pad. `heading` is TRUE compass degrees, normalised into [0, 360) like every other facing
- *  in the model — the sim's `heading` field is true (gate 2026-07-31), so it is written verbatim and
+ *  in the model — the sim's `heading` field is true north, so it is written verbatim and
  *  what the user sees on the map is what the file gets. */
 export function rotateAirportPad(project: Project, heading: number, now = nowIso(), padId?: string): Project {
   const h = norm360(heading);
@@ -563,19 +557,18 @@ export function setAirportPadRadius(
   return updatePad(project, (pad) => (pad.radius === radius ? pad : { ...pad, radius }), now, padId);
 }
 
-/** Name a pad (forum #221 — "the name can be freely assigned"; it is what LOCATION shows). Empty is
- *  legal and means unnamed, which the writer renders as "FATO/TLOF". */
+/** Name a pad (free text; it is what LOCATION shows). Empty is legal and means unnamed, which the
+ *  writer renders as "FATO/TLOF". */
 export function setAirportPadName(project: Project, name: string, now = nowIso(), padId?: string): Project {
   return updatePad(project, (pad) => (pad.name === name ? pad : { ...pad, name }), now, padId);
 }
 
-// ── Runways (v1.4, forum #217 submenu (4)) ─────────────────────────────────────────────────────────
+// ── Runways (v1.4) ─────────────────────────────────────────────────────────────────────────────────
 //
 // A runway is a PAIR: the format has no single-ended one, so every mutation below addresses an end by
 // index (0 or 1) rather than letting the list grow. Same no-mirror, required-id rules as the stands.
 
-/** A fresh end: no lights, usable both ways — the defaults every runway end in ApfelFlieger's files
- *  carries. */
+/** A fresh end: no lights, usable both ways. */
 function newRunwayEnd(threshold: LonLat, identifier: string): AirportRunwayEnd {
   return {
     threshold,
@@ -589,7 +582,7 @@ function newRunwayEnd(threshold: LonLat, identifier: string): AirportRunwayEnd {
 }
 
 /** A runway between two points. `identifiers` is a pair of strings ("08"/"26"); both may be empty, which
- *  is legal — his 0001 sample leaves the second blank. Creates the airport block when there is none, the
+ *  is legal. Creates the airport block when there is none, the
  *  same rule the pad and the stand follow, and invents no identity either. */
 export function addAirportRunway(
   project: Project,
@@ -667,7 +660,7 @@ export function setAirportRunwayWidth(
 }
 
 /** Drag one END of the runway. One point per end — the writer puts it in both the `threshold` and the
- *  `endpoint` rows (forum #236: "in the PCT the leading variable is [threshold]"). */
+ *  `endpoint` rows (`threshold` is the leading value; see types.ts AirportRunwayEnd). */
 export function moveAirportRunwayEnd(
   project: Project,
   runwayId: string,
@@ -699,11 +692,11 @@ export function updateAirportRunwayEnd(
   );
 }
 
-// ── Glider starts: AEROTOW and WINCH LAUNCH (v1.4, forum #237/#238) ────────────────────────────────
+// ── Glider starts: AEROTOW and WINCH LAUNCH (v1.4) ─────────────────────────────────────────────────
 //
 // Both are `.wad`-only elements, both repeatable, both named by the user after the runway they serve —
-// "the user must enter this himself, PCT does not need to worry about it", so nothing here derives a name
-// from a nearby runway. The winch is the only element in the model defined by TWO points.
+// nothing here derives a name from a nearby runway. The winch is the only element in the model defined
+// by TWO points.
 
 /** APPEND an aerotow start. Creates the airport block when there is none, like every other placement. */
 export function addAirportAerotow(
@@ -721,10 +714,10 @@ export function addAirportAerotow(
   return { ...project, airport: seededPosition(next, position), modifiedAt: now };
 }
 
-/** APPEND a winch launch. `winch` is the far end of the rope — 800 to 1000 m away in his description, and
- *  the caller's job to place, because the length and direction come out of the two points and nothing
- *  else. A UI can offer two map clicks (his suggestion) or a length plus a pull direction; either way it
- *  resolves to this pair before it gets here. */
+/** APPEND a winch launch. `winch` is the far end of the rope (typically 800–1000 m away), and the
+ *  caller's job to place, because the length and direction come out of the two points and nothing
+ *  else. A UI can offer two map clicks or a length plus a pull direction; either way it resolves to this
+ *  pair before it gets here. */
 export function addAirportWinch(
   project: Project,
   position: LonLat,
@@ -744,7 +737,7 @@ export function addAirportWinch(
     airport === undefined
       ? { icao: "", name: "", country: "", pads: [], winches: [w] }
       : { ...airport, winches: [...winchesOf(airport), w] };
-  // The GLIDER end, not the winch: that is the one the click put down and the one he calls the start.
+  // The GLIDER end, not the winch: that is the one the click put down, and the start position.
   return { ...project, airport: seededPosition(next, position), modifiedAt: now };
 }
 
@@ -824,22 +817,21 @@ export function updateAirportWinch(
   return { ...project, airport: { ...airport, winches }, modifiedAt: now };
 }
 
-// ── Parking positions (v1.4, forum #232) ───────────────────────────────────────────────────────────
+// ── Parking positions (v1.4) ───────────────────────────────────────────────────────────────────────
 //
 // The same shape as the pad mutations above, with two deliberate differences:
 //
 //   • NO MIRROR. `parkings` has no compatibility twin to keep in step (types.ts), so these write the
 //     field directly instead of funnelling through withPadMirror.
-//   • THE ID IS REQUIRED. `updatePad` lets it default to the first pad because the v1.3 UI knows exactly
-//     one; there has never been a one-parking UI, so defaulting here would only hide a caller that forgot
-//     which stand it meant.
+//   • THE ID IS REQUIRED. `updatePad` lets it default to the first pad for one-pad callers; there is no
+//     one-parking UI, so defaulting here would only hide a caller that forgot which stand it meant.
 
 /** A fresh stand: unnamed, facing true north, sized from its type (airport.ts DEFAULT_PARKING_SIZE_M). */
 function newParking(position: LonLat, type: ParkingType, id = randomId()): AirportParking {
   return { id, name: "", position, heading: 0, size: DEFAULT_PARKING_SIZE_M[type], type };
 }
 
-/** APPEND a parking position ("any number of parking positions can be created" — forum #232). Creates the
+/** APPEND a parking position (any number can be created). Creates the
  *  airport block when the project has none, the same rule placeAirportPad follows and for the same reason:
  *  placing one from the catalog is the user asking for the airport in as many words. It still invents no
  *  identity — icao/name/country come in empty and the install refuses until they are filled. */
@@ -903,8 +895,8 @@ export function moveAirportParking(
 }
 
 /** Turn a stand. TRUE compass degrees, normalised into [0, 360) like every other facing in the model —
- *  ApfelFlieger's own files carry NEGATIVE headings (-195, -100, -200) and the `.wad` conversion takes
- *  them unchanged, so this normalisation changes the number the user sees, never the rotation written. */
+ *  hand-made files may carry NEGATIVE headings (-195) and the `.wad` conversion takes them unchanged, so
+ *  this normalisation changes the number the user sees, never the rotation written. */
 export function rotateAirportParking(
   project: Project,
   parkingId: string,
@@ -938,8 +930,8 @@ export function setAirportParkingName(
 }
 
 /** Change what a stand is for. The SIZE follows only when the user had left it on the previous type's
- *  default: switching GA → Jet on an untouched 7.5 m stand should give the 40 m one his note documents,
- *  but a size someone typed is theirs and survives the switch. */
+ *  default: switching GA → Jet on an untouched 7.5 m stand should give the 40 m jet default, but a size
+ *  someone typed is theirs and survives the switch. */
 export function setAirportParkingType(
   project: Project,
   parkingId: string,

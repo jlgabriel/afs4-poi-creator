@@ -51,7 +51,7 @@ describe("scanXref", () => {
     >
 >`;
     writeFileSync(path.join(userXref, "pct_widget.tmb"), plain);
-    // opaque/binary .tmb — first byte 0xB5, like the real IPACS box → classified without a full read
+    // opaque/binary .tmb — first byte 0xB5, not `<` → classified without a full read
     writeFileSync(path.join(userXref, "opaque_thing.tmb"), Buffer.from([0xb5, 0xfe, 0x24, 0xc7, 0x00, 0x01]));
 
     const { catalog } = scanXref(tmp, path.join(tmp, "user"), "t");
@@ -67,8 +67,8 @@ describe("scanXref", () => {
     expect(opaque?.bbMax).toEqual([0, 0, 0]);
   });
 
-  // ── #122: the layout a real add-on ZIP extracts to. v0.3.0 walked the xref ROOT only, so a normally
-  //    installed object was invisible and the whole register flow could never fire. ──
+  // ── The layout a real add-on ZIP extracts to. Walking only the xref ROOT would leave a normally
+  //    installed object invisible, and the register flow could never fire. ──
   const userTmbText = (name: string, points: string): string => `<[file][][]
     <[tmxglscene][][]
         <[pointer_list_tmxglgeometry][geometry_list][]
@@ -83,7 +83,7 @@ describe("scanXref", () => {
     >
 >`;
 
-  it("#122: surfaces .tmb from a SUBFOLDER with no .tmi, bundled under the folder name", () => {
+  it("surfaces .tmb from a SUBFOLDER with no .tmi, bundled under the folder name", () => {
     writeTmi("scenery/xref/xref_install.tmi", "");
     const userXref = path.join(tmp, "user", "scenery", "xref");
     const pack = path.join(userXref, "xref_air_race_pylons");
@@ -97,7 +97,7 @@ describe("scanXref", () => {
     expect(catalog.xref.find((o) => o.name === "pylon_30m")?.size).toEqual({ x: 3, y: 3, z: 30 });
   });
 
-  it("#122: a subfolder WITH a .tmi is read through the .tmi, never doubled as unregistered", () => {
+  it("a subfolder WITH a .tmi is read through the .tmi, never doubled as unregistered", () => {
     writeTmi("scenery/xref/xref_install.tmi", "");
     const userXref = path.join(tmp, "user", "scenery", "xref");
     const pack = path.join(userXref, "xref_air_race");

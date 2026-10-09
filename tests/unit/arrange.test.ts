@@ -123,17 +123,16 @@ describe("spaceEvenly — equalise the gaps", () => {
   });
 });
 
-// REAL DATA — three of the seven B747s ApfelFlieger parked at KMZJ (forum #152, positions read out of
-// the .toc he attached). He dragged each one by hand, so the row runs at 134.46° and is off by
-// centimetres: exactly the mess these two operations exist to clean up, and a check that the maths
-// behaves on coordinates from the field rather than ones this test built.
+// FIELD DATA — three B747s placed by hand at KMZJ (positions from a real .toc). The row runs at 134.46°
+// and is off by centimetres: exactly the mess these two operations exist to clean up, and a check that
+// the maths behaves on coordinates from the field rather than ones this test built.
 const KMZJ_ROW: LonLat[] = [
   { lon: -111.3285720348358, lat: 32.510263877778215 }, // b747_afr
   { lon: -111.32800340652467, lat: 32.50979792641912 }, // b747_baw
   { lon: -111.32742941379549, lat: 32.50931840114307 }, // b747_sia
 ];
 
-describe("arrange — ApfelFlieger's hand-dragged row at KMZJ", () => {
+describe("arrange — a hand-dragged row at KMZJ", () => {
   it("reads as a 150 m row at 134.5°, with the middle aircraft 36 cm off the line", () => {
     const axis = rowAxis(KMZJ_ROW)!;
     expect(axis.lengthM).toBeCloseTo(150.11, 1);

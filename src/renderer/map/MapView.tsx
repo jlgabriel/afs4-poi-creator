@@ -70,7 +70,7 @@ export function MapView(): React.ReactElement {
       onRotate: (id, deg) => editorStore.getState().rotateObject(id, deg),
     });
 
-    // The helicopter's start pads (v1.2, a LIST since v1.4 / forum #221). Their own layer, not
+    // The helicopter's start pads (a LIST). Their own layer, not
     // footprints: a pad is not a placed object and never joins `selection`. See HelipadLayer.
     const helipad = new HelipadLayer(map, {
       onMove: (id, p) => editorStore.getState().moveAirportPad(id, p),
@@ -78,7 +78,7 @@ export function MapView(): React.ReactElement {
       onSelect: (id) => editorStore.getState().selectAirportPart({ kind: "pad", id }),
     });
 
-    // The parking positions (v1.4, forum #232). Its own layer for the same reason the pad has one — a
+    // The parking positions. Its own layer for the same reason the pad has one — a
     // stand is not a placed object — but a LIST rather than a singleton, because any number can exist.
     const parking = new ParkingLayer(map, {
       onMove: (id, p) => editorStore.getState().moveAirportParking(id, p),
@@ -86,7 +86,7 @@ export function MapView(): React.ReactElement {
       onSelect: (id) => editorStore.getState().selectAirportPart({ kind: "parking", id }),
     });
 
-    // The two glider starts (v1.4, forum #237/#238). One layer for both — they are one family, and it
+    // The two glider starts. One layer for both — they are one family, and it
     // saves a fourth and fifth copy of the same drag state machine.
     const glider = new GliderLayer(map, {
       onMoveAerotow: (id, p) => editorStore.getState().moveAirportAerotow(id, p),
@@ -96,7 +96,7 @@ export function MapView(): React.ReactElement {
       onSelect: (kind, id) => editorStore.getState().selectAirportPart({ kind, id }),
     });
 
-    // The airport's own point (v1.5, forum #255). Created LAST so Leaflet stacks it on top: it is one
+    // The airport's own point. Created LAST so Leaflet stacks it on top: it is one
     // small symbol sitting over whatever the airport is made of, and being under a runway strip would
     // put it out of reach of the cursor.
     const airport = new AirportLayer(map, {
@@ -137,9 +137,8 @@ export function MapView(): React.ReactElement {
           ? { kind: sel.kind, id: sel.id }
           : null,
       );
-      // `position` and not airportPosition(): the fallback to pads[0] is what #255 asks us to stop, and
-      // drawing a ⊕ on a point the airport does not actually own would put the old behaviour back on
-      // screen after taking it out of the model.
+      // `position` and not airportPosition(): the airport's point must not follow pads[0], so
+      // never draw a ⊕ on a point the airport does not actually own.
       airport.sync(s.project.airport?.position ?? null, sel?.kind === "data");
     };
     paint();

@@ -1,6 +1,6 @@
 // ipc.ts — registers one ipcMain handler per PctApi method (design §3.5) and is the app's ONE trust
 // boundary: it resolves Electron-owned paths (userData, documents, dialogs), delegates to the pure
-// main modules, and maps their typed errors into PctResult envelopes (Fable review P0-1) — because a
+// main modules, and maps their typed errors into PctResult envelopes (P0-1) — because a
 // thrown error crossing ipcRenderer.invoke reaches the renderer as a flattened Error with its
 // discriminating fields gone. Paths are owned here and never accepted FROM the renderer (P0-2): the
 // renderer says WHAT (open / save / install / choose-folder), main decides WHERE via the dialogs.
@@ -175,10 +175,9 @@ async function guarded<T>(channel: string, fn: () => T | Promise<T>): Promise<Pc
 
 // ── Dialogs (parented to the focused window when there is one) ─────────────────
 // After a native dialog closes we explicitly refocus the webContents. On Windows, Electron can leave
-// the window looking focused while key events stop reaching the page until an OS-level refocus — the
-// prime suspect for Bug A ("search rejects typing after a wizard boot": the wizard's Browse is the only
-// native dialog on that path). Refocusing is a no-op when focus is already correct, so it is safe on all
-// paths. UNVERIFIED on-device — confirm via the in-sim protocol.
+// the window looking focused while key events stop reaching the page until an OS-level refocus (e.g.
+// the search box ignoring typing after the wizard's Browse). Refocusing is a no-op when focus is
+// already correct, so it is safe on all paths.
 async function showOpenFile(opts: OpenDialogOptions): Promise<string | null> {
   const win = BrowserWindow.getFocusedWindow();
   const r = await (win ? dialog.showOpenDialog(win, opts) : dialog.showOpenDialog(opts));
@@ -191,7 +190,7 @@ async function showSaveFile(opts: SaveDialogOptions): Promise<string | null> {
   win?.webContents.focus();
   return r.canceled || !r.filePath ? null : r.filePath;
 }
-/** Default the Open dialog to the AFS4 `scenery/poi/` folder (forum #89-4) — where most users keep
+/** Default the Open dialog to the AFS4 `scenery/poi/` folder — where most users keep
  *  their POIs. Best-effort: returns undefined (→ OS default / last-used dir) when the user folder isn't
  *  set/detected or scenery/poi doesn't exist yet. */
 function poiOpenDir(): string | undefined {
@@ -264,7 +263,7 @@ async function runExport(project: Project, opts: ExportOptions): Promise<Install
 
   if (opts.target === "install") {
     const w = writePoi(plan, poiRoot(afs4UserDirOrThrow()), { overwrite: opts.overwrite, assetsDir });
-    writeProjectSidecar(w.path, project); // #89-3: re-openable copy beside the POI
+    writeProjectSidecar(w.path, project); // re-openable copy beside the POI
     return done({ folderName: w.folderName, path: w.path, installed: true, warnings: plan.warnings });
   }
   const chosen = await pickExportFolder();
@@ -273,7 +272,7 @@ async function runExport(project: Project, opts: ExportOptions): Promise<Install
     return null;
   }
   const w = writePoi(plan, chosen, { overwrite: opts.overwrite, assetsDir });
-  writeProjectSidecar(w.path, project); // #89-3: re-openable copy beside the POI
+  writeProjectSidecar(w.path, project); // re-openable copy beside the POI
   return done({ folderName: w.folderName, path: w.path, installed: false, warnings: plan.warnings });
 }
 
@@ -322,8 +321,8 @@ async function runHeliportInstall(project: Project, opts: HeliportInstallOptions
   }
 
   // Our own heliports holding this code are RETIRED rather than refused: "create → fly → adjust →
-  // create again" is the loop ApfelFlieger was stuck in (forum #170), and v1.1 made him burn a fresh
-  // code on every lap. The subtle one is a folder whose name no longer matches — rename the heliport
+  // create again" is the edit loop, and it must not cost a fresh code on every lap. The subtle one is a
+  // folder whose name no longer matches — rename the heliport
   // and `heliportFolderName` produces a different directory, so the old one would sit there still
   // holding the code and the sim would load whichever it saw last. Removing it is what keeps ONE
   // airport per code on disk; the dialog says which folder goes before the user presses the button.
@@ -358,7 +357,7 @@ async function runHeliportInstall(project: Project, opts: HeliportInstallOptions
   return { folderName: w.folderName, path: w.path, installed: true, warnings };
 }
 
-/** Load the optional official overlay, scan, cache the catalog, and record lastScanAt. Shared by
+/** Load the optional object-table overlay, scan, cache the catalog, and record lastScanAt. Shared by
  *  pct:scan and the post-registration rescan so a freshly registered bundle appears with zero new read
  *  code. Scan warnings (a corrupt .tmi, an entry with no bbox) + any overlay-load warning are handed
  *  back — the wizard/result surface shows them, instead of an object silently missing looking like a bug. */
@@ -369,7 +368,7 @@ function scanAndCache(installDir: string, userXrefDir: string | null): ScanResul
   writeSettings(userData(), { lastScanAt: catalog.scannedAt }, documents());
   const all = [...load.warnings, ...warnings];
   // The per-KIND counts, not just a total: "plants 0" is the entire diagnosis of "trees don't load", and
-  // it is invisible in a total of 900. Warnings are listed, not counted — a scan that quietly dropped a
+  // it is invisible in a total. Warnings are listed, not counted — a scan that quietly dropped a
   // corrupt .tmi looks exactly like a PCT bug from the outside.
   log.info(
     `scan ok — ${catalog.xref.length} xref in ${catalog.bundles.length} bundles, ` +
@@ -433,7 +432,7 @@ export function registerIpc(): void {
     const dir = currentSettings().thumbnailsDir;
     thumbnailIndex = indexThumbnails(dir);
     // "my photos don't show up" splits cleanly on this line: no folder, a folder with 0 usable files, or
-    // files present and the name not matching — which is exactly how the dashed-XREF bug looked (#176).
+    // files present and the name not matching.
     //
     // Logged only when the ANSWER changes. This handler runs on every window focus, and the v0.7 photo
     // workflow is a loop of alt-tab → screenshot → alt-tab back; logging each call would bury the session
@@ -476,7 +475,7 @@ export function registerIpc(): void {
       writeFileAtomic(file, img.toPNG());
       thumbnailIndex = indexThumbnails(dir);
       // The FILE PCT chose, not the object the renderer named: the name PCT derives is the whole feature,
-      // and a photo written under a name the catalog then can't find is precisely bug #176.
+      // and a photo written under a name the catalog then can't find is the failure to diagnose.
       log.info(`photo pasted — ${name} → ${file}`);
     }),
   );
@@ -496,7 +495,7 @@ export function registerIpc(): void {
 
   // ── Footprint overrides (v0.9) ──
   // The user's own width × depth × height for the objects PCT cannot measure — every airport light and
-  // plant, which have no `.tmi` and therefore draw as bare dots on the map (forum #126/#129). Kept in
+  // plant, which have no `.tmi` and therefore draw as bare dots on the map. Kept in
   // their own userData file, NOT in the catalog cache, so a Rescan can't wipe them; applied over the scan
   // in the renderer (core/catalog/footprints). Nothing here ever reaches an exported POI.
   ipcMain.handle("pct:getFootprints", (): FootprintOverrides => readFootprints(userData()));
@@ -549,7 +548,7 @@ export function registerIpc(): void {
     const before = currentSettings();
     const after = writeSettings(userData(), patch, documents());
     // The SAVED value, and only the fields that moved. writeSettings silently keeps the previous path when
-    // the new one isn't on disk (Fable I6), so "I changed the folder and nothing happened" is a real
+    // the new one isn't on disk, so "I changed the folder and nothing happened" is a real
     // outcome — and this is the line that shows the change didn't take.
     for (const key of ["installDir", "afs4UserDir", "thumbnailsDir"] as const) {
       if (after[key] !== before[key]) log.info(`settings — ${key} is now ${after[key] ?? "— not set —"}`);

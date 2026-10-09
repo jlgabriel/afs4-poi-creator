@@ -1,12 +1,7 @@
-// udp-listen.ts — PROBE: does Aerofly FS 4 emit ForeFlight UDP telemetry (port 49002) DURING REPLAY?
+// udp-listen.ts — dev utility: log ForeFlight-protocol UDP telemetry (port 49002) once per second, to see
+// whether the sim keeps emitting a CHANGING position while a REPLAY is scrubbed.
 //
-// This is the one open question behind the in-sim capture design. If the sim keeps emitting a CHANGING
-// position while you scrub a REPLAY, the capture tool can auto-name each screenshot by WHERE the plane is
-// (project the live position onto the row's manifest). If it freezes/stops in replay, we fall back to
-// order + a review strip. Either way the capture is one deliberate key-press per photo — this only asks
-// whether the *naming* can lean on position.
-//
-// Run (usually launched for you, in the background, since Aerofly is on this machine):
+// Run:
 //   npx tsx scripts/udp-listen.ts [logFilePath]
 //
 // It prints ONE summary row per second (a heartbeat), so the phases are obvious in the log:

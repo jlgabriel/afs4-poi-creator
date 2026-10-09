@@ -1,4 +1,4 @@
-// The main-side half of v0.9: `<userData>/footprints.json`. The core module owns the shape (see
+// The main-side half of user footprints: `<userData>/footprints.json`. The core module owns the shape (see
 // footprints.test.ts); this covers what happens at the FILE — which is where the user's typed
 // measurements can actually be lost.
 import { afterEach, beforeEach, describe, expect, it } from "vitest";

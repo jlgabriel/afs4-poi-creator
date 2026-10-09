@@ -3,10 +3,10 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { parseUserTmb, isTextTmb } from "../../src/core/catalog/userTmb";
 
-// Opt-in LOCAL test — validates parseUserTmb against REAL community `.tmb` WITHOUT copying any of
-// their bytes into the repo (guardrail #8: the assertions check derived properties, never hardcoded
-// dimensions). Reads whatever `.tmb` sit under `_local_reference/` (gitignored); auto-skips when none
-// are present (e.g. the reference zips aren't extracted), so CI stays green and IPACS-free.
+// Opt-in LOCAL test — validates parseUserTmb against real `.tmb` files WITHOUT copying any of their
+// bytes into the repo (the assertions check derived properties, never hardcoded dimensions). Reads
+// whatever `.tmb` sit under `_local_reference/` (gitignored); auto-skips when none are present, so CI
+// stays green and IPACS-free.
 // Point elsewhere — e.g. a folder of extracted `.tmb` — with PCT_TMB_DIR=<dir>.
 const ROOTS = [process.env.PCT_TMB_DIR, path.resolve("_local_reference")].filter(
   (x): x is string => Boolean(x),
@@ -31,7 +31,7 @@ describe.skipIf(files.length === 0)("parseUserTmb vs real .tmb files (local, opt
     const base = path.basename(file, path.extname(file));
 
     if (!isTextTmb(text)) {
-      // Compiled/opaque class (e.g. the IPACS box) — nothing derivable; that's the whole point.
+      // Compiled/opaque class — nothing derivable.
       expect(parseUserTmb(text).geometries).toEqual([]);
       return;
     }
@@ -46,7 +46,7 @@ describe.skipIf(files.length === 0)("parseUserTmb vs real .tmb files (local, opt
       }
     }
 
-    // The MDIvey/Rodeo pylons are single-geometry, internal name == basename. Loose bounds only —
+    // A `pylon_15m` file, if present, is single-geometry, internal name == basename. Loose bounds only —
     // no exact dimension is hardcoded into the repo.
     if (/^pylon_15m$/i.test(base)) {
       expect(geometries).toHaveLength(1);

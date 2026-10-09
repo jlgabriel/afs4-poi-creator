@@ -15,12 +15,11 @@ import {
 } from "../../src/core/export/heliportTemplate";
 import { parseTm, type TmNode } from "../../src/core/tm/tmParser";
 
-// ── The CONTROL: the heliport that actually flew ─────────────────────────────────────────────────
-// On 2026-07-31 a hand-written pct001.tsc/.wad pair was installed at KDAG and flown. These are the exact
-// numbers in those files. If a change to the projection, the heading convention or the emitter moves any
-// of them, it moves away from something a simulator has already accepted — so this test is the only real
-// authority here, and the goldens below are downstream of it.
-const FLOWN = {
+// ── The CONTROL: a heliport known to load ────────────────────────────────────────────────────────
+// The exact numbers of a pct001.tsc/.wad pair at KDAG that the simulator accepts. If a change to the
+// projection, the heading convention or the emitter moves any of them, it moves away from a known-good
+// file — so this test is the authority here, and the goldens below are downstream of it.
+const KNOWN_GOOD = {
   lon: -116.7947,
   lat: 34.8536,
   headingDeg: 40, // TRUE. The sim showed 028 for this, i.e. minus the local magnetic variation.
@@ -31,20 +30,20 @@ const FLOWN = {
 };
 
 const SPEC: HeliportSpec = {
-  position: { lon: FLOWN.lon, lat: FLOWN.lat },
+  position: { lon: KNOWN_GOOD.lon, lat: KNOWN_GOOD.lat },
   pads: [
     {
       name: "",
-      position: { lon: FLOWN.lon, lat: FLOWN.lat },
-      headingDeg: FLOWN.headingDeg,
-      radiusM: FLOWN.radiusM,
+      position: { lon: KNOWN_GOOD.lon, lat: KNOWN_GOOD.lat },
+      headingDeg: KNOWN_GOOD.headingDeg,
+      radiusM: KNOWN_GOOD.radiusM,
     },
   ],
   cultivationFileName: "poi",
   anchor: null,
   autoheight: false,
-  // Required since #278 took the templates away — a spec without an identity used to mean "write the
-  // placeholders", and there is nothing left that wants them. These are the flown file's own values.
+  // Required: there are no placeholder templates, so every spec names its airport. These are the
+  // control file's own values.
   identity: { icao: "pct001", name: "PCT Test Helipad", country: "us" },
 };
 
@@ -66,40 +65,40 @@ function valuesOf(text: string, name: string): string[] {
   return nodesByName(parseTm(text), name).map((n) => n.value);
 }
 
-/** The runway ends' `identifier` rows only. Since #342 the `.wad` ALSO carries a top-level `identifier`
- *  (the airport's code, formerly `icao`), so a whole-tree search would mix the two. */
+/** The runway ends' `identifier` rows only. The `.wad` ALSO carries a top-level `identifier` (the
+ *  airport's code), so a whole-tree search would mix the two. */
 function runwayIdentifiers(wad: string): string[] {
   return nodesByName(parseTm(wad), "runway_pair").flatMap((pair) =>
     pair.children.flatMap((end) => end.children.filter((c) => c.name === "identifier").map((c) => c.value)),
   );
 }
 
-describe("heliport template — the flown control", () => {
-  it("reproduces the .wad numbers of the heliport that flew at KDAG", () => {
+describe("heliport template — the known-good control", () => {
+  it("reproduces the .wad numbers of the known-good KDAG heliport", () => {
     const wad = buildHeliportWad(SPEC);
     const [lon, lat] = valuesOf(wad, "position")[0].split(" ").map(Number);
-    expect(lon).toBeCloseTo(FLOWN.wadLon, 9);
-    expect(lat).toBeCloseTo(FLOWN.wadLat, 9);
-    expect(Number(valuesOf(wad, "direction")[0])).toBeCloseTo(FLOWN.wadDirection, 9);
-    expect(Number(valuesOf(wad, "radius")[0])).toBe(FLOWN.radiusM);
+    expect(lon).toBeCloseTo(KNOWN_GOOD.wadLon, 9);
+    expect(lat).toBeCloseTo(KNOWN_GOOD.wadLat, 9);
+    expect(Number(valuesOf(wad, "direction")[0])).toBeCloseTo(KNOWN_GOOD.wadDirection, 9);
+    expect(Number(valuesOf(wad, "radius")[0])).toBe(KNOWN_GOOD.radiusM);
   });
 
   it("writes the pad heading into the .tsc as TRUE degrees, unconverted", () => {
     // The .tsc takes the compass heading and the .wad the same rotation in radians. Getting these two
     // out of step is the failure that would put the helicopter on the pad facing the wrong way.
-    expect(Number(valuesOf(buildHeliportTsc(SPEC), "heading")[0])).toBe(FLOWN.headingDeg);
+    expect(Number(valuesOf(buildHeliportTsc(SPEC), "heading")[0])).toBe(KNOWN_GOOD.headingDeg);
   });
 
   it("keeps degrees in the .tsc and grid units in the .wad", () => {
     const [tscLon] = valuesOf(buildHeliportTsc(SPEC), "position")[0].split(" ").map(Number);
-    expect(tscLon).toBeCloseTo(FLOWN.lon, 7);
-    expect(tscLon).not.toBeCloseTo(FLOWN.wadLon, 0);
+    expect(tscLon).toBeCloseTo(KNOWN_GOOD.lon, 7);
+    expect(tscLon).not.toBeCloseTo(KNOWN_GOOD.wadLon, 0);
   });
 });
 
-// v1.4, forum #219/#221: HELICOPTER became a repeatable element with a free name, and the airport's own
-// point was split off from the pad's. SCLC ships three pads — FATO/TLOF, Helipad_W1, Helipad_W2.
-describe("heliport template — several pads (v1.4)", () => {
+// HELICOPTER is a repeatable element with a free name, and the airport's own point is separate from the
+// pads'. The SCLC reference has three pads — FATO/TLOF, Helipad_W1, Helipad_W2.
+describe("heliport template — several pads", () => {
   const THREE: HeliportSpec = {
     ...SPEC,
     position: { lon: -70.582247, lat: -33.380724 },
@@ -119,17 +118,17 @@ describe("heliport template — several pads (v1.4)", () => {
     }
   });
 
-  it("renders an unnamed pad as FATO/TLOF — the literal v1.2/v1.3 hard-coded", () => {
+  it("renders an unnamed pad as FATO/TLOF — the literal single-pad projects always wrote", () => {
     // The bytes of an existing one-pad project must not move just because pads can now be named.
     expect(nodesByName(parseTm(buildHeliportTsc(SPEC)), "name").map((n) => n.value)).toEqual(["FATO/TLOF"]);
   });
 
   it("converts each pad's heading independently, negative ones included", () => {
-    // ApfelFlieger's own SCLC carries heading -110, which our norm360 turns into 200° = 3.4906585 rad.
-    // Verified against his file: -110 → 3.49065850398866 and 70 → 0.349065850398866.
+    // Heading -110 → norm360 200° = 3.49065850398866 rad; 70 → 0.349065850398866 (the reference file's
+    // values).
     //
-    // Nine decimals, not his fourteen: formatWad prints ten and the tenth rounds. That is not a loss
-    // worth chasing — 1e-10 rad across a 10 m pad is 1e-9 m.
+    // Nine decimals, not fourteen: formatWad prints ten and the tenth rounds. That is not a loss worth
+    // chasing — 1e-10 rad across a 10 m pad is 1e-9 m.
     const dirs = valuesOf(buildHeliportWad(THREE), "direction").map(Number);
     expect(dirs[0]).toBeCloseTo(3.49065850398866, 9);
     expect(dirs[1]).toBeCloseTo(0.349065850398866, 9);
@@ -140,23 +139,23 @@ describe("heliport template — several pads (v1.4)", () => {
   });
 
   it("puts the AIRPORT's point in the place and the .wad, not the first pad's", () => {
-    // The whole point of the #15 split: his #220/#221 files carry -70.582247 -33.380724 even though the
-    // field has three pads elsewhere. Reading a pad here would silently move the airport.
+    // The airport's point is its own: the reference carries -70.582247 -33.380724 even though the field
+    // has three pads elsewhere. Reading a pad here would silently move the airport.
     const [tscLon, tscLat] = valuesOf(buildHeliportTsc(THREE), "position")[0].split(" ").map(Number);
     expect(tscLon).toBeCloseTo(-70.582247, 9);
     expect(tscLat).toBeCloseTo(-33.380724, 9);
-    // …and the .wad's own position is that same point, projected — his exact printed values.
+    // …and the .wad's own position is that same point, projected — the reference's exact values.
     const [wadLon, wadLat] = valuesOf(buildHeliportWad(THREE), "position")[0].split(" ").map(Number);
     expect(wadLon).toBeCloseTo(19918.89405724, 7);
     expect(wadLat).toBeCloseTo(26282.05536889, 7);
   });
 
-  it("writes no IATA row — it is not a member of the .wad's type (forum #342)", () => {
+  it("writes no IATA row — it is not a member of the .wad's type", () => {
     expect(valuesOf(buildHeliportWad(THREE), "iata")).toEqual([]);
   });
 
   it("accepts an airport with no pads at all", () => {
-    // His "(1) DATA" example: identity plus a database entry, an empty `helipads` list and nothing else.
+    // A data-only airport: identity plus a database entry, an empty `helipads` list and nothing else.
     const none = { ...THREE, pads: [] };
     for (const text of [buildHeliportTsc(none), buildHeliportWad(none)]) {
       expect(nodesByName(parseTm(text), "helipads")).toHaveLength(1); // the list is still there…
@@ -165,19 +164,18 @@ describe("heliport template — several pads (v1.4)", () => {
   });
 });
 
-// ── Runways (v1.4, forum #217 submenu (4)) ───────────────────────────────────────────────────────
+// ── Runways ──────────────────────────────────────────────────────────────────────────────────────
 //
-// TWO controls, both his: the runway he wrote BY HAND for SCLC (thresholds undisplaced, "ENDPOINT =
-// THRESHOLD = NO EXTENSION" in his own margin), and the same runway as his ACT COMPILED it, where the 26
-// end has a displaced threshold. The second is the one that matters — it is the only file in evidence
-// where endpoint and threshold differ, so it is the only thing that can catch us collapsing the two.
-const HIS_RUNWAY = {
+// TWO reference runways at SCLC: one with undisplaced thresholds (endpoint = threshold), and the same
+// runway with a displaced threshold on the 26 end. The second is the one that matters — endpoint and
+// threshold differ, so it is what catches us collapsing the two.
+const REF_RUNWAY = {
   width: 10,
   end1: { lon: -70.58515, lat: -33.38115, id: "08", wadLon: 19918.3655822, wadLat: 26281.9613071 },
   end2: { lon: -70.57934, lat: -33.38024, id: "26", wadLon: 19919.4232604, wadLat: 26282.1622367 },
 };
-const HIS_DISPLACED = {
-  // …ACT output: endpoint2 is 170 m beyond threshold2.
+const REF_DISPLACED = {
+  // endpoint2 is 170 m beyond threshold2.
   endpointLon: -70.577225758912,
   endpointLat: -33.3799059672464,
   thresholdLon: -70.57933859379,
@@ -205,24 +203,24 @@ function end(
   };
 }
 
-describe("heliport template — runways (v1.4)", () => {
+describe("heliport template — runways", () => {
   const RWY: HeliportSpec = {
     ...SPEC,
     position: { lon: -70.582247, lat: -33.380724 },
     runways: [
       {
-        widthM: HIS_RUNWAY.width,
+        widthM: REF_RUNWAY.width,
         ends: [
-          end(HIS_RUNWAY.end1.lon, HIS_RUNWAY.end1.lat, "08"),
-          end(HIS_RUNWAY.end2.lon, HIS_RUNWAY.end2.lat, "26"),
+          end(REF_RUNWAY.end1.lon, REF_RUNWAY.end1.lat, "08"),
+          end(REF_RUNWAY.end2.lon, REF_RUNWAY.end2.lat, "26"),
         ],
       },
     ],
   };
 
-  it("writes the list EMPTY when there are no runways (forum #236)", () => {
-    // It used to write nothing at all. "I'm in favor of PCT writing all the lines, even if some of them
-    // are just DEFAULT at the moment" — so the block is always there, and empty is a state, not an absence.
+  it("writes the list EMPTY when there are no runways", () => {
+    // Every row is written, DEFAULT ones included — so the block is always there, and empty is a state,
+    // not an absence.
     const tsc = parseTm(buildHeliportTsc(SPEC));
     expect(nodesByName(tsc, "runways")).toHaveLength(1);
     expect(nodesByName(tsc, "runways")[0]!.children).toEqual([]);
@@ -231,16 +229,16 @@ describe("heliport template — runways (v1.4)", () => {
     expect(nodesByName(wad, "runway_pairs")[0]!.children).toEqual([]);
   });
 
-  it("reproduces his hand-written SCLC runway in the .tsc — one element for the PAIR", () => {
+  it("reproduces the reference SCLC runway in the .tsc — one element for the PAIR", () => {
     const tsc = buildHeliportTsc(RWY);
     const list = nodesByName(parseTm(tsc), "runways");
     expect(list).toHaveLength(1);
     expect(list[0]!.children).toHaveLength(1); // ONE element, two ends inside it
     const [e1lon, e1lat] = valuesOf(tsc, "endpoint1")[0].split(" ").map(Number);
     const [e2lon] = valuesOf(tsc, "endpoint2")[0].split(" ").map(Number);
-    expect(e1lon).toBeCloseTo(HIS_RUNWAY.end1.lon, 6);
-    expect(e1lat).toBeCloseTo(HIS_RUNWAY.end1.lat, 6);
-    expect(e2lon).toBeCloseTo(HIS_RUNWAY.end2.lon, 6);
+    expect(e1lon).toBeCloseTo(REF_RUNWAY.end1.lon, 6);
+    expect(e1lat).toBeCloseTo(REF_RUNWAY.end1.lat, 6);
+    expect(e2lon).toBeCloseTo(REF_RUNWAY.end2.lon, 6);
     // Undisplaced: the threshold rows repeat the endpoints exactly.
     expect(valuesOf(tsc, "threshold1")).toEqual(valuesOf(tsc, "endpoint1"));
     expect(valuesOf(tsc, "threshold2")).toEqual(valuesOf(tsc, "endpoint2"));
@@ -249,7 +247,7 @@ describe("heliport template — runways (v1.4)", () => {
     expect(valuesOf(tsc, "width")).toEqual(["10"]);
   });
 
-  it("reproduces his projected endpoints in the .wad, and the pair's shared width", () => {
+  it("reproduces the reference's projected endpoints in the .wad, and the pair's shared width", () => {
     const wad = buildHeliportWad(RWY);
     const pair = nodesByName(parseTm(wad), "runway_pair");
     expect(pair).toHaveLength(1);
@@ -257,16 +255,16 @@ describe("heliport template — runways (v1.4)", () => {
     const endpoints = valuesOf(wad, "endpoint");
     const [a] = [endpoints[0]!.split(" ").map(Number)];
     const [b] = [endpoints[1]!.split(" ").map(Number)];
-    expect(a[0]).toBeCloseTo(HIS_RUNWAY.end1.wadLon, 6);
-    expect(a[1]).toBeCloseTo(HIS_RUNWAY.end1.wadLat, 6);
-    expect(b[0]).toBeCloseTo(HIS_RUNWAY.end2.wadLon, 6);
-    expect(b[1]).toBeCloseTo(HIS_RUNWAY.end2.wadLat, 6);
+    expect(a[0]).toBeCloseTo(REF_RUNWAY.end1.wadLon, 6);
+    expect(a[1]).toBeCloseTo(REF_RUNWAY.end1.wadLat, 6);
+    expect(b[0]).toBeCloseTo(REF_RUNWAY.end2.wadLon, 6);
+    expect(b[1]).toBeCloseTo(REF_RUNWAY.end2.wadLat, 6);
     expect(runwayIdentifiers(wad)).toEqual(["08", "26"]);
     expect(valuesOf(wad, "width")).toEqual(["10"]);
-    // `landing`, not `approach` (forum #342) — the project keeps its own key, only the row is renamed.
+    // The .wad row is `landing`, not `approach` — the project keeps its own key, only the row is renamed.
     expect(valuesOf(wad, "landing")).toEqual(["true", "true"]);
     expect(valuesOf(wad, "approach")).toEqual([]);
-    // The four DEFAULT flags the IPACS converter writes after `takeoff` on every end (forum #350).
+    // Every end carries four DEFAULT flags after `takeoff`.
     const endRows = nodesByName(parseTm(wad), "runway_pair")[0]!.children[0]!.children.map((c) => c.name);
     expect(endRows.slice(-6)).toEqual(["landing", "takeoff", "navigation", "departures", "non_precision", "precision"]);
     expect(valuesOf(wad, "navigation")).toEqual(["true", "true"]);
@@ -287,9 +285,9 @@ describe("heliport template — runways (v1.4)", () => {
         {
           widthM: 10,
           ends: [
-            end(HIS_RUNWAY.end1.lon, HIS_RUNWAY.end1.lat, "08"),
-            end(HIS_DISPLACED.endpointLon, HIS_DISPLACED.endpointLat, "26", {
-              threshold: { lon: HIS_DISPLACED.thresholdLon, lat: HIS_DISPLACED.thresholdLat },
+            end(REF_RUNWAY.end1.lon, REF_RUNWAY.end1.lat, "08"),
+            end(REF_DISPLACED.endpointLon, REF_DISPLACED.endpointLat, "26", {
+              threshold: { lon: REF_DISPLACED.thresholdLon, lat: REF_DISPLACED.thresholdLat },
             }),
           ],
         },
@@ -297,20 +295,19 @@ describe("heliport template — runways (v1.4)", () => {
     };
     const tsc = buildHeliportTsc(displaced);
     expect(valuesOf(tsc, "endpoint2")[0]).not.toBe(valuesOf(tsc, "threshold2")[0]);
-    expect(Number(valuesOf(tsc, "threshold2")[0].split(" ")[0])).toBeCloseTo(HIS_DISPLACED.thresholdLon, 6);
+    expect(Number(valuesOf(tsc, "threshold2")[0].split(" ")[0])).toBeCloseTo(REF_DISPLACED.thresholdLon, 6);
 
     const wad = buildHeliportWad(displaced);
-    expect(Number(valuesOf(wad, "endpoint")[1]!.split(" ")[0])).toBeCloseTo(HIS_DISPLACED.wadEndpointLon, 6);
+    expect(Number(valuesOf(wad, "endpoint")[1]!.split(" ")[0])).toBeCloseTo(REF_DISPLACED.wadEndpointLon, 6);
     expect(Number(valuesOf(wad, "threshold")[1]!.split(" ")[0])).toBeCloseTo(
-      HIS_DISPLACED.wadThresholdLon,
+      REF_DISPLACED.wadThresholdLon,
       6,
     );
   });
 
-  it("writes the lighting vocabulary verbatim, including the FS2 systems his ACT will not offer", () => {
-    // ★ Every value here is a literal in aerofly_fs_4.exe (types.ts ApproachLightSystem) — that is the
-    // authority, not a forum post. And REIL is `omni`/`uni`: IPACS's own .tap files say `reil_omni`, but a
-    // .tap is the AUTHORING file and those spellings appear nowhere in the binary.
+  it("writes the lighting vocabulary verbatim, including the FS2 systems", () => {
+    // ★ Every value here is a valid sim enum value (types.ts ApproachLightSystem). REIL is `omni`/`uni`,
+    // NOT `reil_omni`: that spelling belongs to the `.tap` authoring format, not to the `.tsc`.
     const lit: HeliportSpec = {
       ...RWY,
       runways: [
@@ -330,7 +327,7 @@ describe("heliport template — runways (v1.4)", () => {
     expect(valuesOf(tsc, "papi2")).toEqual(["left"]);
     expect(valuesOf(tsc, "reil1")).toEqual(["omni"]);
     expect(valuesOf(tsc, "reil2")).toEqual(["uni"]);
-    // The four PAPI rows per end that his ACT always writes, at its own defaults.
+    // The four PAPI rows per end, always written, at their defaults.
     expect(valuesOf(tsc, "papi1_glide_slope")).toEqual(["3"]);
     expect(valuesOf(tsc, "papi2_spacing")).toEqual(["6"]);
     expect(valuesOf(tsc, "papi1_has_custom_position")).toEqual(["false"]);
@@ -355,46 +352,46 @@ describe("heliport template — runways (v1.4)", () => {
   });
 });
 
-// ── Glider starts: AEROTOW and WINCH LAUNCH (v1.4, forum #237/#238) ──────────────────────────────
+// ── Glider starts: AEROTOW and WINCH LAUNCH ──────────────────────────────────────────────────────
 //
-// THE CONTROL is his `sclc_0_demo` pair. Both elements exist ONLY in the `.wad`, so he publishes no
-// degrees for them at all — these coordinates are his printed grid values run back through the
-// projection, and the test asserts they come out as the exact strings he shipped.
-const HIS_GLIDER = {
-  // The glider stands at the same spot for both starts in his file; the winch is 800-ish m down the strip.
+// THE CONTROL is a reference `sclc_0_demo` pair. Both elements exist ONLY in the `.wad`, so there are no
+// degrees for them — these coordinates are the reference grid values run back through the projection,
+// and the test asserts they come out as the exact reference strings.
+const REF_GLIDER = {
+  // The glider stands at the same spot for both starts; the winch is 800-ish m down the strip.
   winchGlider: { lon: -70.57713, lat: -33.3800928995, wad: [19919.82557867, 26282.19471649] },
   winchWinch: { lon: -70.58609, lat: -33.3811, wad: [19918.19446044, 26281.97234722] },
   aerotow: { lon: -70.5783086328, lat: -33.3800358697, wad: [19919.61101511, 26282.20730868] },
-  // 260 deg TRUE — which is what the sim's own LOCATION panel shows in his screenshot.
+  // 260 deg TRUE — what the sim's LOCATION panel shows for this start.
   headingDeg: 260,
   direction: 3.31612557878923,
   spacingM: 25,
 };
 
-/** A `.wad` "lon lat" pair against his printed one, to half a millimetre. */
+/** A `.wad` "lon lat" pair against the reference one, to half a millimetre. */
 function expectWad(actual: string, expected: readonly number[]): void {
   const [lon, lat] = actual.split(" ").map(Number);
   expect(lon).toBeCloseTo(expected[0]!, 6);
   expect(lat).toBeCloseTo(expected[1]!, 6);
 }
 
-describe("heliport template — glider starts (v1.4)", () => {
+describe("heliport template — glider starts", () => {
   const GLIDERS: HeliportSpec = {
     ...SPEC,
     position: { lon: -70.582247, lat: -33.380724 },
     aerotows: [
       {
         name: "26",
-        position: { lon: HIS_GLIDER.aerotow.lon, lat: HIS_GLIDER.aerotow.lat },
-        headingDeg: HIS_GLIDER.headingDeg,
+        position: { lon: REF_GLIDER.aerotow.lon, lat: REF_GLIDER.aerotow.lat },
+        headingDeg: REF_GLIDER.headingDeg,
       },
     ],
     winches: [
       {
         name: "26",
-        position: { lon: HIS_GLIDER.winchGlider.lon, lat: HIS_GLIDER.winchGlider.lat },
-        winch: { lon: HIS_GLIDER.winchWinch.lon, lat: HIS_GLIDER.winchWinch.lat },
-        spacingM: HIS_GLIDER.spacingM,
+        position: { lon: REF_GLIDER.winchGlider.lon, lat: REF_GLIDER.winchGlider.lat },
+        winch: { lon: REF_GLIDER.winchWinch.lon, lat: REF_GLIDER.winchWinch.lat },
+        spacingM: REF_GLIDER.spacingM,
       },
     ],
   };
@@ -410,9 +407,8 @@ describe("heliport template — glider starts (v1.4)", () => {
   });
 
   it("puts BOTH of them in the .wad only — the .tsc has no such rows", () => {
-    // ★ "The code lines for this submenu only appear in the WAD" (#237, and again in #238). A .tsc that
-    // grew these blocks would not be an extra feature; it would be rows the sim's place parser does not
-    // know, in the file that decides whether the airport loads at all.
+    // ★ Glider starts are `.wad`-only. A .tsc that grew these blocks would carry rows the sim's place
+    // parser does not know, in the file that decides whether the airport loads at all.
     const tsc = buildHeliportTsc(GLIDERS);
     expect(tsc).not.toContain("glider");
     expect(tsc).not.toContain("waypoints");
@@ -421,29 +417,29 @@ describe("heliport template — glider starts (v1.4)", () => {
     expect(nodesByName(parseTm(wad), "glider_winches")).toHaveLength(1);
   });
 
-  it("reproduces his AEROTOW row, and writes the empty waypoints list he marks DEFAULT", () => {
+  it("reproduces the reference AEROTOW row, and writes the empty DEFAULT waypoints list", () => {
     const wad = buildHeliportWad(GLIDERS);
     const aerotow = nodesByName(parseTm(wad), "glider_aerotows")[0]!.children[0]!;
     const value = (name: string): string => aerotow.children.find((c) => c.name === name)!.value;
     expect(value("name")).toBe("26");
-    // Six decimals of a grid unit is half a millimetre; his file prints eight, and the coordinates here
-    // are his own values run backwards through the projection, so the last digits are our arithmetic.
-    expectWad(value("position"), HIS_GLIDER.aerotow.wad);
-    expect(Number(value("direction"))).toBeCloseTo(HIS_GLIDER.direction, 9);
-    // Written even though PCT offers nothing for it: he asked for all the lines, DEFAULT ones included.
+    // Six decimals of a grid unit is half a millimetre; the reference prints eight, and the coordinates
+    // here are its values run backwards through the projection, so the last digits are our arithmetic.
+    expectWad(value("position"), REF_GLIDER.aerotow.wad);
+    expect(Number(value("direction"))).toBeCloseTo(REF_GLIDER.direction, 9);
+    // Written even though PCT offers nothing for it: every row is written, DEFAULT ones included.
     expect(value("waypoints")).toBe("");
   });
 
-  it("reproduces his WINCH row — two points, no heading", () => {
+  it("reproduces the reference WINCH row — two points, no heading", () => {
     const wad = buildHeliportWad(GLIDERS);
     const winch = nodesByName(parseTm(wad), "glider_winches")[0]!.children[0]!;
     const value = (name: string): string => winch.children.find((c) => c.name === name)!.value;
     expect(value("name")).toBe("26");
-    expectWad(value("position"), HIS_GLIDER.winchGlider.wad);
-    expectWad(value("winch"), HIS_GLIDER.winchWinch.wad);
+    expectWad(value("position"), REF_GLIDER.winchGlider.wad);
+    expectWad(value("winch"), REF_GLIDER.winchWinch.wad);
     expect(value("spacing")).toBe("25");
-    // ★ No `direction` anywhere in the element: "the length and direction then result from the two
-    // positions GLIDER and WINCH". A heading here could disagree with the points and nothing would say so.
+    // ★ No `direction` anywhere in the element: length and direction follow from the two positions,
+    // GLIDER and WINCH. A heading here could disagree with the points and nothing would say so.
     expect(winch.children.some((c) => c.name === "direction")).toBe(false);
   });
 
@@ -461,12 +457,12 @@ describe("heliport template — glider starts (v1.4)", () => {
   });
 });
 
-// ── Parking positions (v1.4, forum #232) ─────────────────────────────────────────────────────────
+// ── Parking positions ────────────────────────────────────────────────────────────────────────────
 //
-// THE CONTROL here is ApfelFlieger's own sclc_apt_hpd_prk pair: the three stands he published with the
-// submenu, with the values his `.tsc` and `.wad` print side by side. Same role as FLOWN above — if a
-// change moves any of these, it moves away from a file the author of the format wrote by hand.
-const HIS_PARKINGS = [
+// THE CONTROL here is a reference sclc_apt_hpd_prk pair: three stands, with the values its `.tsc` and
+// `.wad` print side by side. Same role as KNOWN_GOOD above — if a change moves any of these, it moves away
+// from a known-good file.
+const REF_PARKINGS = [
   {
     name: "Parking_W",
     lon: -70.5842423116,
@@ -499,11 +495,11 @@ const HIS_PARKINGS = [
   },
 ] as const;
 
-describe("heliport template — parking positions (v1.4)", () => {
+describe("heliport template — parking positions", () => {
   const STANDS: HeliportSpec = {
     ...SPEC,
     position: { lon: -70.582247, lat: -33.380724 },
-    parkings: HIS_PARKINGS.map((p) => ({
+    parkings: REF_PARKINGS.map((p) => ({
       name: p.name,
       position: { lon: p.lon, lat: p.lat },
       headingDeg: p.headingDeg,
@@ -512,10 +508,9 @@ describe("heliport template — parking positions (v1.4)", () => {
     })),
   };
 
-  it("writes the list EMPTY when there are no stands (forum #236)", () => {
-    // ⚠️ This assertion is the INVERSE of what it was one commit ago, and deliberately so — see the note
-    // on HeliportSpec.parkings. Writing every line is what he asked for, and it is what moves the bytes
-    // of an already-flown file, which is why this change wants the tm.log gate the others did not.
+  it("writes the list EMPTY when there are no stands", () => {
+    // Every row is written, so an empty list is present, not absent — see the note on
+    // HeliportSpec.parkings.
     for (const text of [buildHeliportTsc(SPEC), buildHeliportWad(SPEC)]) {
       const list = nodesByName(parseTm(text), "parking_positions");
       expect(list).toHaveLength(1);
@@ -523,7 +518,7 @@ describe("heliport template — parking positions (v1.4)", () => {
     }
   });
 
-  it("reproduces his three stands in the .tsc — degrees, his headings, his names", () => {
+  it("reproduces the three reference stands in the .tsc — degrees, headings, names", () => {
     const tsc = buildHeliportTsc(STANDS);
     const list = nodesByName(parseTm(tsc), "parking_positions");
     expect(list).toHaveLength(1);
@@ -532,9 +527,9 @@ describe("heliport template — parking positions (v1.4)", () => {
     const positions = valuesOf(tsc, "position").slice(-3);
     // The pad has a `heading` too (SPEC's 40), and it is written first — stands are the tail.
     const headings = valuesOf(tsc, "heading").slice(-3);
-    HIS_PARKINGS.forEach((p, i) => {
+    REF_PARKINGS.forEach((p, i) => {
       const [lon, lat] = positions[i]!.split(" ").map(Number);
-      // SEVEN decimals, where his file prints ten: fmtLonLat is fixed at 7 for every coordinate PCT
+      // SEVEN decimals, where the reference prints ten: fmtLonLat is fixed at 7 for every coordinate PCT
       // writes anywhere (~1 cm here), and widening it for stands alone would move the bytes of every
       // `.toc` and `.tsl` already in the wild. A centimetre on a 7.5 m stand is not the constraint.
       expect(lon).toBeCloseTo(p.lon, 6);
@@ -546,12 +541,12 @@ describe("heliport template — parking positions (v1.4)", () => {
     expect(valuesOf(tsc, "name").slice(-3)).toEqual(["Parking_W", "FuelStation", "Parking_E"]);
   });
 
-  it("reproduces his projected positions and radian directions in the .wad", () => {
+  it("reproduces the reference's projected positions and radian directions in the .wad", () => {
     const wad = buildHeliportWad(STANDS);
     const positions = valuesOf(wad, "position").slice(-3);
     // The pad carries a `direction` too, and it comes first — the stands are the tail here as well.
     const directions = valuesOf(wad, "direction").slice(-3).map(Number);
-    HIS_PARKINGS.forEach((p, i) => {
+    REF_PARKINGS.forEach((p, i) => {
       const [lon, lat] = positions[i]!.split(" ").map(Number);
       expect(lon).toBeCloseTo(p.wadLon, 7);
       expect(lat).toBeCloseTo(p.wadLat, 7);
@@ -563,9 +558,8 @@ describe("heliport template — parking positions (v1.4)", () => {
   });
 
   it("writes the type into `tags` as a string8u, spelled `parked_`, never `parking_`", () => {
-    // ★ The row is hashed by the sim (types.ts ParkingType): a wrong literal produces a stand that does
-    // nothing, with no error anywhere. His prose in #232 says `parking_ga`; all five of his FILES say
-    // `parked_ga`. This test is what stops the prose from winning later.
+    // ★ The value is an enum (types.ts ParkingType): a wrong literal produces a stand that does nothing,
+    // with no error anywhere. The spelling is `parked_ga`, never `parking_ga`.
     for (const text of [buildHeliportTsc(STANDS), buildHeliportWad(STANDS)]) {
       // The .wad has an airport-level `tags` row too (a uint64 DEFAULT), so take the stands off the tail.
       const tags = nodesByName(parseTm(text), "tags").slice(-3);
@@ -588,7 +582,7 @@ describe("heliport template — parking positions (v1.4)", () => {
   });
 });
 
-// ── Every line, including the DEFAULT ones (forum #217 → #236) ───────────────────────────────────
+// ── Every line, including the DEFAULT ones ───────────────────────────────────────────────────────
 describe("heliport template — the full row set", () => {
   /** The TOP-LEVEL rows in file order — the direct children of the one block inside `<[file]`. Names only:
    *  the values are covered by the tests above, and what this one is about is whether a ROW is there. */
@@ -596,12 +590,11 @@ describe("heliport template — the full row set", () => {
     return parseTm(text).children[0]!.children.map((c) => c.name);
   }
 
-  // Taken from his sclc_0_demo, which is an airport that loads in FS 4 — so this is not a wish list, it
-  // is the row set of a working file. `icao` sits after sname/lname again (#342): it led from #172 to
-  // #342, and he moved it back so the `.tsc` reads row for row against the `.tap`.
+  // The row set of the reference sclc_0_demo, an airport that loads in FS 4 — not a wish list. `icao`
+  // sits after sname/lname, the `.tap`'s order.
   //
-  // The `.wad` lost nine rows in #342 — the nine his tm.log called "not a member of type
-  // 'tmworld_airport_detailed'" in #257 — and its code row is spelled `identifier`.
+  // The `.wad` carries only members of `tmworld_airport_detailed` (anything else is rejected as "not a
+  // member of type"), and its code row is spelled `identifier`.
   const TSC_ROWS = [
     "sname", "lname", "icao", "country", "coordinate_system", "position",
     "height", "tower_position", "autoheight", "autoheight_method", "geometry",
@@ -613,9 +606,7 @@ describe("heliport template — the full row set", () => {
     "runway_pairs", "helipads", "glider_winches", "glider_aerotows", "parking_positions",
   ];
 
-  it("writes every row his own working file carries, even the empty ones", () => {
-    // ⚠️ THIS IS THE CHANGE THAT MOVES BYTES IN A FILE THAT HAS ALREADY FLOWN. Everything before it was
-    // additive-only by construction. See the gate note in the commit that introduced it.
+  it("writes every row the reference working file carries, even the empty ones", () => {
     expect(rowNames(buildHeliportTsc({ ...SPEC, cultivationFileName: null }))).toEqual(TSC_ROWS);
     expect(rowNames(buildHeliportWad({ ...SPEC, pads: [] }))).toEqual(WAD_ROWS);
   });
@@ -633,16 +624,14 @@ describe("heliport template — the full row set", () => {
 });
 
 describe("heliport files — structure", () => {
-  // ⛔ THIS USED TO ASSERT THE OPPOSITE: "names no airport: every identity field is a placeholder". That
-  // was the templates' defining property — PCT must not pick an ICAO for a file it does not install — and
-  // #278 removed the only writer that ever wanted it. What is left is the rule that always mattered, and
-  // it is enforced a layer up: planHeliport throws unless validateIdentity passes.
+  // PCT must not pick an ICAO for a file it does not install; that rule is enforced a layer up:
+  // planHeliport throws unless validateIdentity passes. The writers just carry the identity they get.
   it("carries the identity it was given, in capitals, in both files", () => {
     const tsc = buildHeliportTsc(SPEC);
     expect(valuesOf(tsc, "icao")).toEqual(["PCT001"]);
     expect(valuesOf(tsc, "country")).toEqual(["us"]);
     expect(tsc).toContain("PCT Test Helipad");
-    // The `.wad` carries the code only, as `identifier` (#342); name and country live in the `.tsc`.
+    // The `.wad` carries the code only, as `identifier`; name and country live in the `.tsc`.
     const wad = buildHeliportWad(SPEC);
     expect(valuesOf(wad, "identifier")).toEqual(["PCT001"]);
     // Top level only: the pads keep a `name` row of their own.
@@ -650,7 +639,7 @@ describe("heliport files — structure", () => {
     for (const gone of ["icao", "name", "country", "iata", "uid"]) expect(top).not.toContain(gone);
   });
 
-  it("is pure ASCII — the sim mangles non-ASCII in its own text files (tm.log: 'Stra?e')", () => {
+  it("is pure ASCII — the sim mangles non-ASCII in its own text files", () => {
     for (const text of [buildHeliportTsc(SPEC), buildHeliportWad(SPEC)]) {
       // eslint-disable-next-line no-control-regex
       expect(text).not.toMatch(/[^\x00-\x7F]/);
@@ -659,7 +648,7 @@ describe("heliport files — structure", () => {
 
   it("points the place at the POI's own cultivation, and leaves the list EMPTY for an empty POI", () => {
     expect(valuesOf(buildHeliportTsc(SPEC), "filename")).toEqual(["poi"]);
-    // The LIST is always written now (#236); the ELEMENT is not, because naming a `.toc` that is not
+    // The LIST is always written; the ELEMENT is not, because naming a `.toc` that is not
     // beside the file would be worse than saying nothing.
     const empty = parseTm(buildHeliportTsc({ ...SPEC, cultivationFileName: null }));
     expect(nodesByName(empty, "cultivation_files")).toHaveLength(1);
@@ -716,7 +705,7 @@ const PROJECT: Project = {
   objects: [],
 };
 
-/** A pad of its own, deliberately NOT on top of either placed object (forum #168). */
+/** A pad of its own, deliberately NOT on top of either placed object. */
 const PAD: AirportPad = {
   id: "pad-1",
   name: "",
@@ -734,10 +723,8 @@ const WAD = "pct001.wad";
 const fileOf = (p: { files: { relPath: string; content: string }[] }, rel: string): string =>
   p.files.find((f) => f.relPath === rel)!.content;
 
-// ★ A POI IS A POI (#278). The option that let one carry `heliport.tsc.txt` + `heliport.wad.txt` is gone
-// without replacement — "it could be that a user thinks that a POI with TSC and WAD files could also be
-// directly useable as an airfield" — so the plan has exactly three files and there is no longer a
-// parameter that could add a fourth.
+// ★ A POI IS A POI. A POI export never carries airport files (a POI with `.tsc`/`.wad` beside it could
+// be mistaken for a usable airfield), so the plan has exactly three files and no parameter adds a fourth.
 describe("planExport — a POI carries no airport files", () => {
   it("writes the three POI files and nothing else", () => {
     const plan = planExport(PROJECT, [HANGAR]);
@@ -751,9 +738,8 @@ describe("planExport — a POI carries no airport files", () => {
   });
 });
 
-// The geometry these tests hold used to be reached through the export templates, which were the cheapest
-// way to call the writers. They are the INSTALL's business now, and always were — the shift traps below
-// are the ones that put a helipad `shift` metres from the objects it belongs among.
+// Airport geometry is the INSTALL's business. The shift traps below are the ones that would put a
+// helipad `shift` metres from the objects it belongs among.
 describe("planHeliport — pads, stands and the export shift", () => {
   it("writes the project's own pad — position, TRUE heading and radius", () => {
     const plan = planHeliport(PROJECT, [HANGAR], { identity: ID, heliport: { pads: [PAD] } });
@@ -766,10 +752,10 @@ describe("planHeliport — pads, stands and the export shift", () => {
   });
 
   // ★★ THE MIGRATION'S PROMISE, held here instead of only asserted in a comment (schemas.ts,
-  // migratePosition). From v1.5 the airport carries its own point (#255) and opening an older project
-  // seeds that point from pads[0] — the value the exporter was already resolving to. The two routes
-  // through heliportPosition are different lines of code, so if they disagreed by so much as a rounding
-  // step, every project made before 1.5 would quietly move the first time it was opened.
+  // migratePosition). The airport carries its own point, and opening an older project without one seeds
+  // it from pads[0] — the value the export used to fall back to. The two routes through heliportPosition
+  // are different lines of code, so if they disagreed by so much as a rounding step, every older project
+  // would quietly move the first time it was opened.
   it("a seeded position writes the same bytes as the pad fallback it replaces", () => {
     const followed = planHeliport(PROJECT, [HANGAR], { identity: ID, heliport: { pads: [PAD] } });
     const seeded = planHeliport(PROJECT, [HANGAR], {
@@ -792,9 +778,8 @@ describe("planHeliport — pads, stands and the export shift", () => {
     expect(fileOf(seeded, WAD)).toBe(fileOf(followed, WAD));
   });
 
-  // ★ forum #168: "the functional starting position for Helicopter should be independent of XREF objects
-  // because this will lead to collisions too quickly". v1.1 copied a placed object's coordinates, so the
-  // helicopter spawned inside whatever the pad had been aimed at. The pad must be able to sit where no
+  // ★ The helicopter start is independent of the XREF objects: a pad that copied a placed object's
+  // coordinates would spawn the helicopter inside that object. The pad must be able to sit where no
   // object is — and deleting every object must not move it.
   it("is independent of the placed objects", () => {
     const withPad = planHeliport(PROJECT, [HANGAR], { identity: ID, heliport: { pads: [PAD] } });
@@ -818,10 +803,8 @@ describe("planHeliport — pads, stands and the export shift", () => {
     expect(lon).toBeCloseTo(objLon, 7); // …and by exactly as much as the object beside it
   });
 
-  // ⛔ "falls back to the POI anchor, facing true north, when there is no pad" STOOD HERE. That was
-  // `templatePads`, the one place PCT ever INVENTED a helipad: a heliport template with none had nowhere
-  // to spawn the helicopter. The install has always refused to invent one (#255 asks for the bare airfield
-  // by name), and with the template gone nothing does — heliportInstall.test.ts holds that line.
+  // ⛔ PCT never INVENTS a helipad when there is none (no fallback to the POI anchor) —
+  // heliportInstall.test.ts holds that line.
 
   it("moves the STANDS with the scene too, and writes no block without them", () => {
     // Same trap as the pad: a stand read unshifted parks the aircraft `shift` metres from the apron it
@@ -845,7 +828,7 @@ describe("planHeliport — pads, stands and the export shift", () => {
     expect(standLon).toBeCloseTo(objLon, 7);
     expect(valuesOf(tsc, "tags")).toEqual(["parked_ga"]);
 
-    // With no stands the list is still written, and empty (#236).
+    // With no stands the list is still written, and empty.
     const none = planHeliport(PROJECT, [HANGAR], { identity: ID, heliport: { pads: [PAD] } });
     for (const f of [TSC, WAD]) {
       const list = nodesByName(parseTm(fileOf(none, f)), "parking_positions");
@@ -854,7 +837,7 @@ describe("planHeliport — pads, stands and the export shift", () => {
     }
   });
 
-  it("warns that autoheight was never gated, but still writes the files", () => {
+  it("warns that autoheight is unverified for airports, but still writes the files", () => {
     const auto = { ...PROJECT, heightMode: "autoheight" as const };
     const plan = planHeliport(auto, [PALM], { identity: ID, heliport: { pads: [PAD] } });
     expect(plan.warnings.some((w) => w.includes("baked-asl"))).toBe(true);
@@ -862,20 +845,20 @@ describe("planHeliport — pads, stands and the export shift", () => {
   });
 });
 
-// ── The comment banner ApfelFlieger asked for (forum #167) ───────────────────────────────────────
+// ── The comment banner ───────────────────────────────────────────────────────────────────────────
 describe("heliport template — the Informations banner", () => {
   const tsc = buildHeliportTsc(SPEC);
   const wad = buildHeliportWad(SPEC);
 
   it("puts nothing before the root <[file] tag", () => {
     // The one thing that is not a preference: a .tsc whose first line is not `<[file]` is refused
-    // WHOLE, with only `ERROR: (error loading …)` in tm.log (measured 2026-07-31).
+    // WHOLE, with only a generic loading error.
     expect(tsc.startsWith("<[file][][]\n")).toBe(true);
     expect(wad.startsWith("<[file][][]\n")).toBe(true);
   });
 
   it("uses spaces, never a TAB", () => {
-    // Jan (IPACS), relayed by ApfelFlieger: "TAB characters could lead to interference".
+    // TAB characters in these files can interfere with parsing.
     expect(tsc).not.toContain("\t");
     expect(wad).not.toContain("\t");
   });
@@ -889,9 +872,8 @@ describe("heliport template — the Informations banner", () => {
     expect(tsc.indexOf("<[tmsimulator_scenery_place]")).toBeLessThan(tsc.indexOf("//  Informations:"));
   });
 
-  it("puts icao after both names, the order of the .tap (forum #342)", () => {
-    // It led from #167 to #342 ("I put the line <[string8u][icao][....]> up"); he moved it back so the
-    // `.tsc` lines up with the `.tap` the IPACS converter reads: name, name_short, icao.
+  it("puts icao after both names, the order of the .tap", () => {
+    // So the `.tsc` lines up row for row with the `.tap`: name, name_short, icao.
     expect(tsc.indexOf("<[string8][sname]")).toBeLessThan(tsc.indexOf("<[string8][lname]"));
     expect(tsc.indexOf("<[string8][lname]")).toBeLessThan(tsc.indexOf("<[string8u][icao]"));
   });
@@ -900,8 +882,8 @@ describe("heliport template — the Informations banner", () => {
     // The banner must be commentary, not content: comments and blank lines are skipped by the reader,
     // so every tag survives the reshuffle unchanged.
     expect(valuesOf(tsc, "icao")).toEqual(["PCT001"]);
-    expect(Number(valuesOf(tsc, "heading")[0])).toBe(FLOWN.headingDeg);
-    expect(Number(valuesOf(tsc, "radius")[0])).toBe(FLOWN.radiusM);
+    expect(Number(valuesOf(tsc, "heading")[0])).toBe(KNOWN_GOOD.headingDeg);
+    expect(Number(valuesOf(tsc, "radius")[0])).toBe(KNOWN_GOOD.radiusM);
     expect(valuesOf(tsc, "coordinate_system")).toEqual(["flat"]);
   });
 });

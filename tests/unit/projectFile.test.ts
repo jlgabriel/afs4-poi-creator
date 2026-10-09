@@ -132,7 +132,7 @@ describe("autosaveShadow / loadShadow", () => {
   });
 });
 
-describe("writeProjectSidecar (forum #89-3)", () => {
+describe("writeProjectSidecar", () => {
   it("writes <poiName>.json into the folder and round-trips through openProject", async () => {
     const name = writeProjectSidecar(tmp, proj({ name: "Shared", poiName: "obbi_rw30r" }));
     expect(name).toBe("obbi_rw30r.json");
@@ -152,11 +152,10 @@ describe("writeProjectSidecar (forum #89-3)", () => {
   });
 });
 
-// Fable I5. Every durable write went straight at its destination, so a crash mid-write replaced a good
-// file with a truncated one — worst of all for the SHADOW, whose entire job is to survive a crash. They
-// now write to a scratch file and rename it into place; a rename is atomic, so a reader only ever sees the
-// old file or the new one. These assert the observable half of that: the scratch never survives a write,
-// and a second write genuinely replaces the first.
+// Durable writes go to a scratch file and are renamed into place: a rename is atomic, so a crash
+// mid-write never leaves a truncated file — which matters most for the SHADOW, whose job is to survive a
+// crash. These assert the observable half of that: the scratch never survives a write, and a second
+// write genuinely replaces the first.
 describe("durable writes are atomic", () => {
   const scratch = (f: string): string => `${f}.pct-tmp`;
 

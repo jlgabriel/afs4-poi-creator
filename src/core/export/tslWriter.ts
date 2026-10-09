@@ -1,56 +1,47 @@
 // tslWriter.ts — Project → `poi.tsl`, the AFS4 `tmsimulator_scenery_place_simple` that
-// AFS4 loads for a POI (design §3.4, format bible FILES - POI - POI.TSL).
+// AFS4 loads for a POI (design §3.4).
 //
 // For PCT the .tsl is a thin wrapper around the `poi.toc` cultivation file (referenced via the
 // `cultivation` field), where the whole payload lives. The ONE exception is the plant anchor: a POI
-// with plants also carries a single reference-POI object here at terrain height, so the sim anchors the
-// cultivation's bounding volume and the plants stop blinking (v0.4 — see plantAnchor.ts). (The Race App
-// put ALL objects inline here; PCT ships none of its own except that anchor.)
-//
-// Both remaining details came from the format's author (ApfelFlieger, 2026-07-17), with a real
-// working file attached — see the two notes below. The place-level empty `geometry` tag the Race
-// App's proven .tsl carried was likewise dropped on his word (2026-07-08).
+// with plants also carries a single reference-POI object here at terrain height, so the plants stop
+// blinking (see plantAnchor.ts). PCT places no other objects inline here. No place-level `geometry`
+// tag is written — it is not needed.
 
 import { tag, block, fmtLonLat, fmtMeters } from "../tm/tmEmit";
 import { ANCHOR_GEOMETRY, type Anchor } from "./plantAnchor";
 
 /** The AGL z of the anchor object in autoheight mode: 1 m BELOW ground, paired with autoheight_override=-1.
- *  Buried so the invisible disc can't collide with anything on the surface — an aircraft taxiing over the
- *  POI's centroid — which is where chrispriv asked for it (#151). The anchor only has to supply a terrain
- *  reference; nothing about that job needs it above ground. A literal string, so the emitted bytes are
- *  exactly what was flown.
+ *  Buried so the invisible disc can't collide with anything on the surface, e.g. an aircraft taxiing over
+ *  the POI's centroid. The anchor only has to supply a terrain reference; nothing about that job needs it
+ *  above ground. A literal string so the emitted bytes are fixed.
  *
- *  ⚠️ The 2026-07-19 gate flew 0.1 (just ABOVE ground). This is a change to the ONE object that makes
- *  autoheight reach the cultivation at all: if a buried anchor stops anchoring, autoheight breaks for
- *  every POI — not just for this value. Re-gate before releasing (docs/GATE_AUTOHEIGHT_LIGHTS_ANCHOR.md,
- *  probe B). */
+ *  ⚠️ This is the ONE object that makes autoheight reach the cultivation at all: if a change here stops it
+ *  anchoring, autoheight breaks for every POI. Verify in-sim before releasing a change to this value. */
 const ANCHOR_AGL_Z = "-1.0";
 
 /** Build the `poi.tsl` text.
  *  @param opts.tocFileName  cultivation reference (the .toc basename), or null for no toc.
  *  @param opts.anchor       the reference-POI anchor (plantAnchor.ts), or null/absent for no anchor object
- *                           — then the .tsl carries no objects, exactly as before v0.4.
+ *                           — then the .tsl carries no objects.
  *  @param opts.autoheight   true → the place is autoheight=true and the anchor is written AGL (see below).
  *
  *  ── Two things this deliberately does NOT do ──────────────────────────────────────────────────
  *
- *  1. **No `<[string8][name]>`.** It used to carry project.name. The format's author: *"In this line
- *     was initially the file name again, but that doesn't make any sense at all. => I suggest
- *     deleting this line without replacement."* Dropping it also retires the export's only
- *     user-typed value, so the `]`-truncation hazard that `sanitizeValue` guarded here (Fable C2) no
- *     longer exists in the .tsl at all — the remaining values are our own literals and a slug.
+ *  1. **No `<[string8][name]>`.** The row is redundant (it would only repeat the file name), so it is
+ *     not written. That also keeps every user-typed value out of the .tsl, so there is no `]`-truncation
+ *     hazard here — the remaining values are our own literals and a slug.
  *
  *  2. **`autoheight` reflects the project's height mode** (`opts.autoheight`, default false):
  *
  *       baked-asl (default) → `autoheight=false`. Each object carries its own absolute ASL height (design
- *         R1); the flag is inert for xref cultivation (five gates) — and false is REQUIRED for plants:
- *         `autoheight=true` ALONE forces EVERY plant to height 0 and ignores its `altitude`, which at KDAG
- *         (583 m) buries them 583 m underground (five flights + ~20 silent-log variants to find, v0.4).
+ *         R1); the flag is inert for xref cultivation — and false is REQUIRED for plants:
+ *         `autoheight=true` ALONE forces EVERY plant to height 0 and ignores its `altitude`, which buries
+ *         them underground at any elevated site.
  *       autoheight → `autoheight=true` + the pct_anchor (always present here). The anchor makes the flag
- *         REACH the cultivation, so each object written at z=0 snaps to the terrain (AGL) — forum #142,
- *         gate 2026-07-19. Plants at altitude 0 land at ground level too (not buried), because the anchor
- *         supplies the terrain reference the bare flag lacked. `asl` heights are rejected upstream
- *         (resolveHeightsAgl) — they have no AGL meaning under this flag. */
+ *         REACH the cultivation, so each object written at z=0 snaps to the terrain (AGL). Plants at
+ *         altitude 0 land at ground level too (not buried), because the anchor supplies the terrain
+ *         reference the bare flag lacks. `asl` heights are rejected upstream (resolveHeightsAgl) — they
+ *         have no AGL meaning under this flag. */
 export function buildTsl(opts: {
   tocFileName: string | null;
   anchor?: Anchor | null;
@@ -72,14 +63,13 @@ export function buildTsl(opts: {
 }
 
 /** The reference-POI anchor object (`pct_anchor`) a POI carries in its .tsl. One `tmsimulator_scenery_object`
- *  whose real geometry anchors the cultivation's bounding volume. Two shapes, one per mode:
+ *  with real geometry. Two shapes, one per mode:
  *
  *    ABSOLUTE (baked-asl / plants): position z = terrain ASL, NO `autoheight_override` — object and place
- *      agree at autoheight=false, exactly as IPACS's official exporter emits `__af_abs`. Anchors the
- *      plants' bounding volume so they stop blinking (in-sim gate 2026-07-17).
- *    AGL (autoheight): position z = ANCHOR_AGL_Z (just above ground) + `autoheight_override=-1` (inherit the
+ *      agree at autoheight=false. Keeps the plants from blinking.
+ *    AGL (autoheight): position z = ANCHOR_AGL_Z (1 m below ground) + `autoheight_override=-1` (inherit the
  *      place's autoheight=true). This is what makes autoheight REACH the cultivation, grounding every object
- *      written at z=0 (in-sim gate 2026-07-19). See plantAnchor.ts for the why. */
+ *      written at z=0. See plantAnchor.ts for the why. */
 function anchorObjects(anchor: Anchor, autoheight: boolean): string[] {
   const z = autoheight ? ANCHOR_AGL_Z : fmtMeters(anchor.heightAsl);
   const pos = `${fmtLonLat(anchor.position.lon)} ${fmtLonLat(anchor.position.lat)} ${z}`;

@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { buildTmi, type TmiEntrySpec } from "../../src/core/export/tmiWriter";
 import { parseTmi } from "../../src/core/catalog/tmiParser";
 
-// Synthetic — INVENTED object names + values (never Rodeo/IPACS/Michael numbers), real tag structure.
+// Synthetic — INVENTED object names + values (no IPACS-derived numbers), real tag structure.
 // Keeps IPACS-derived data out of the repo (.gitignore). Real-file validation is the opt-in LOCAL test.
 const FIXTURES: TmiEntrySpec[] = [
   { name: "pct_fixture_obj", bbMin: [-0.5, -0.5, 0], bbMax: [0.5, 0.5, 3] },
@@ -12,7 +12,7 @@ const FIXTURES: TmiEntrySpec[] = [
 // GOLDEN — byte-exact `.tmi`. bs_center = bbox midpoint; bs_radius = half the space diagonal:
 //   pct_fixture_obj:     hypot(1,1,3)/2 = √11/2 = 1.658312 ; center (0, 0, 1.5)
 //   pct_fixture_obj_two: hypot(2,4,6)/2 = √56/2 = 3.741657 ; center (1, 2, 3)
-// Regenerate deliberately if the §1.1 grammar changes; never let it drift silently.
+// Regenerate deliberately if the .tmi grammar changes; never let it drift silently.
 const GOLDEN = `<[file][][]
     <[tmxglscene_info][][]
         <[string8][filename][pct_fixture_bundle]>

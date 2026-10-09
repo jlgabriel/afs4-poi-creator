@@ -1,6 +1,6 @@
 // categoryIcon.tsx — a generic per-category glyph for each catalog row. The scanner only recovers a
-// name + bounding box from the .tmi index files; the real 3D meshes are opaque IPACS .tmb binaries
-// with no reader, so we CAN'T draw the actual object. A category icon at least tells the user WHAT a
+// name + bounding box from the .tmi index files; compiled .tmb meshes are not readable, so we CAN'T
+// draw the actual object. A category icon at least tells the user WHAT a
 // row is (tower vs car vs plane) at a glance — the "x × y × z m" text carries the real size. Icons are
 // inline SVG (no assets, sandbox-safe) in a shared line style; several categories share a glyph where
 // the distinction doesn't help (e.g. every reservoir/fuel/water tank is a cylinder).
@@ -113,7 +113,7 @@ const ICONS: Record<IconKey, React.ReactElement> = {
       <line x1="9" y1="21" x2="15" y2="21" />
     </>
   ),
-  // A broadleaf silhouette: the one glyph stands for all 6 groups (palm and shrub included) — the
+  // A broadleaf silhouette: the one glyph stands for every group (palm and shrub included) — the
   // group name is right next to it in every surface that draws this, so the icon only has to say
   // "plant", not which.
   tree: (
@@ -159,11 +159,9 @@ export const CategoryIcon = memo(function CategoryIcon({
   );
 });
 
-/** The airport's identity — his submenu (1) DATA (v1.4, forum #217/#232). Deliberately NOT a circle like
- *  the helipad's and the stand's: those two are things you put somewhere on the map, and this one is the
- *  record behind them. It is drawn as a card with two lines of writing on it, which is what the panel it
- *  opens actually is — a name and a code. His own description of the submenu is the database entry, and a
- *  pictogram that promised a point on the map would be promising a gesture this card does not have. */
+/** The airport's identity card. Deliberately NOT a circle like the helipad's and the stand's: those are
+ *  things you put somewhere on the map, and this one is the record behind them. It is drawn as a card with
+ *  two lines of writing on it, which is what the panel it opens actually is — a name and a code. */
 export const DataIcon = memo(function DataIcon(): React.ReactElement {
   return (
     <svg
@@ -183,12 +181,11 @@ export const DataIcon = memo(function DataIcon(): React.ReactElement {
   );
 });
 
-/** The helipad (v1.3). It gets its own export rather than an ICONS entry because it is keyed by nothing
- *  — there is no catalog category behind it; the pad is PCT's own idea of a start position, not an
- *  object from the install. Same 0 0 24 24 line style as every glyph above, deliberately: the first cut
- *  drew it as a solid dark disc with a white H, which was the shape the MAP uses and read as a much
- *  heavier thing than the rows around it. On the map the pad is white-on-satellite and needs the weight;
- *  in a list of line icons it just needs to say "H in a circle". */
+/** The helipad. It gets its own export rather than an ICONS entry because it is keyed by nothing — there
+ *  is no catalog category behind it; the pad is PCT's own idea of a start position, not an object from
+ *  the install. Same 0 0 24 24 line style as every glyph above, deliberately NOT the map's solid disc:
+ *  on the map the pad is white-on-satellite and needs the weight; in a list of line icons it just needs
+ *  to say "H in a circle". */
 export const HelipadIcon = memo(function HelipadIcon(): React.ReactElement {
   return (
     <svg
@@ -209,7 +206,7 @@ export const HelipadIcon = memo(function HelipadIcon(): React.ReactElement {
   );
 });
 
-/** A parking position (v1.4, forum #232). Same reasoning as HelipadIcon — no catalog category behind it —
+/** A parking position. Same reasoning as HelipadIcon — no catalog category behind it —
  *  and the same circle, so the two read as siblings in the Airport section. The P is the universal parking
  *  glyph and needs no translation, which matters for a UI that is English-only for now. */
 export const ParkingIcon = memo(function ParkingIcon(): React.ReactElement {
@@ -230,14 +227,11 @@ export const ParkingIcon = memo(function ParkingIcon(): React.ReactElement {
   );
 });
 
-/** A runway (v1.4, forum #242). Not a circle, because a runway is not a point — the strip in perspective
- *  is the shape everyone already reads as "runway", and it distinguishes this card from its two round
- *  siblings at a glance. The dashes are a centre line, which is a liberty: PCT draws no markings. It is a
- *  pictogram for a menu, not a promise about the output, and the panel says so in words.
- *
- *  ★ IT LEANS THE OTHER WAY SINCE v1.4.1 (#253a): "it bothers me that it goes from top left to bottom
- *  right. I think it's better from bottom left to top right." Mirrored about x=12, dashes included — the
- *  same drawing, read the way a heading is read. */
+/** A runway. Not a circle, because a runway is not a point — the strip in perspective is the shape
+ *  everyone already reads as "runway", and it distinguishes this card from its two round siblings at a
+ *  glance. The dashes are a centre line, which is a liberty: PCT draws no markings. It is a pictogram for
+ *  a menu, not a promise about the output, and the panel says so in words. It leans bottom-left to
+ *  top-right, the way a heading is read. */
 export const RunwayIcon = memo(function RunwayIcon(): React.ReactElement {
   return (
     <svg
@@ -256,15 +250,11 @@ export const RunwayIcon = memo(function RunwayIcon(): React.ReactElement {
   );
 });
 
-/** An AEROTOW start (v1.4, forum #237; redrawn v1.4.1, #261).
+/** An AEROTOW start.
  *
- *  ★ THE RULE FOR BOTH GLIDER ICONS IS HIS, and he found it by looking at the map: "I noticed that the
- *  symbol for WINCH LAUNCH actually corresponds to how it looks on the map. Therefore, I suggest doing it
- *  at AEROTOW exactly like this." The v1.4.0 drawing — a glider seen from above with a rope leading off —
- *  was a picture of the THING; these two are pictures of what the element LOOKS LIKE ON THE MAP, which is
- *  what the user is about to see. His spec, to the degree: "small circle at the bottom left, from there
- *  starting line at an angle of 20° upwards" — the circle is the glider's point, the line is the rope the
- *  layer draws 60 m in the tug's direction. */
+ *  ★ BOTH GLIDER ICONS draw what the element LOOKS LIKE ON THE MAP, not the thing itself — that is what
+ *  the user is about to see. Here: a small circle at the bottom left (the glider's point) and a line
+ *  rising at 20° (the rope the layer draws 60 m in the tug's direction). */
 export const AerotowIcon = memo(function AerotowIcon(): React.ReactElement {
   return (
     <svg
@@ -284,14 +274,12 @@ export const AerotowIcon = memo(function AerotowIcon(): React.ReactElement {
   );
 });
 
-/** A WINCH LAUNCH (v1.4, forum #238; adjusted v1.4.1, #261): two points and the rope between them, which
- *  is exactly what the element is — the only one in the model with no heading of its own.
+/** A WINCH LAUNCH: two points and the rope between them, which is exactly what the element is — the only
+ *  one in the model with no heading of its own.
  *
- *  ★ THE TWO ENDS ARE NO LONGER INTERCHANGEABLE. Two identical circles said "a rope between two points"
- *  but not which end was which; his adjustment names them by shape: "the small circle on the left remains,
- *  on the right comes at the same height a small square (= winch), both are connected with a horizontal
- *  line". Same instinct as the ruler's diamond and triangle (#264) — tell two ends apart by SHAPE, never
- *  by colour. Horizontal, not diagonal, because a winch launch on the map is a straight pull. */
+ *  ★ THE TWO ENDS ARE TOLD APART BY SHAPE: a circle on the left (the glider), a square on the right (the
+ *  winch), joined by a horizontal line. Same rule as the ruler's diamond and triangle — SHAPE, never
+ *  colour. Horizontal, not diagonal, because a winch launch on the map is a straight pull. */
 export const WinchIcon = memo(function WinchIcon(): React.ReactElement {
   return (
     <svg
