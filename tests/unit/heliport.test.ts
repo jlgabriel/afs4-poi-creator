@@ -670,6 +670,21 @@ describe("heliport files — structure", () => {
     expect(valuesOf(buildHeliportTsc(SPEC), "auto_height")).toEqual(["false"]);
     expect(valuesOf(buildHeliportTsc({ ...SPEC, autoheight: true }), "auto_height")).toEqual(["true"]);
   });
+
+  it("mirrors the project's height mode onto the place's own autoheight row too", () => {
+    // A fixed `true` here, together with the anchor, turned a baked-ASL project's point lights AGL.
+    const anchor = { position: { lon: 11.85, lat: 48.376 }, heightAsl: 520 };
+    expect(valuesOf(buildHeliportTsc({ ...SPEC, anchor }), "autoheight")).toEqual(["false"]);
+    expect(valuesOf(buildHeliportTsc({ ...SPEC, anchor, autoheight: true }), "autoheight")).toEqual(["true"]);
+  });
+
+  it("spells the objects list list_tmsimulator_scenery_object, with or without the anchor", () => {
+    const anchor = { position: { lon: 11.85, lat: 48.376 }, heightAsl: 520 };
+    for (const tsc of [buildHeliportTsc(SPEC), buildHeliportTsc({ ...SPEC, anchor })]) {
+      expect(tsc).toContain("<[list_tmsimulator_scenery_object][objects][]");
+      expect(tsc).not.toContain("objecttmslist");
+    }
+  });
 });
 
 // ── planExport wiring ────────────────────────────────────────────────────────────────────────────

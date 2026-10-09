@@ -9,8 +9,10 @@
 // Format facts the writers depend on:
 //   `coordinate_system` = `flat` · `uid` 0 is fine · `airports/<continent>/<country>/<name>/` works ·
 //   `radius` is METRES (the sim shows the diameter as "Size") · `heading` is TRUE degrees (the sim
-//   displays magnetic), so PCT's stored true heading goes in verbatim · the `objects` block, spelled
-//   `tmsimulator_scenery_objecttmslist`, reaches the cultivation (it carries the plant anchor).
+//   displays magnetic), so PCT's stored true heading goes in verbatim · the `objects` block is a
+//   `list_tmsimulator_scenery_object`, the same spelling as the `.tsl`; it carries the plant anchor.
+//   · the place's `autoheight` row MIRRORS the project's height mode, as in the `.tsl`: with the anchor
+//   present, a place-level `autoheight=true` reaches the cultivation and turns point lights AGL.
 
 import type { ApproachLightSystem, LonLat, PapiSide, ParkingType, ReilKind } from "../project/types";
 import { tag, block, fmtLonLat, fmtNum, sanitizeValue } from "../tm/tmEmit";
@@ -429,7 +431,10 @@ export function buildHeliportTsc(spec: HeliportSpec): string {
     // PCT writes every row, even those it offers no field for, using the format's default values.
     tag("float64", "height", "0"),
     tag("vector2_float64", "tower_position", "0 0"),
-    tag("bool", "autoheight", "true"),
+    // Mirrors the project's height mode, never a fixed `true`: with the anchor present, `true` reaches the
+    // cultivation and a baked-ASL project's point lights are then read AGL (they float). Same rule as the
+    // `.tsl` (tslWriter.ts).
+    tag("bool", "autoheight", spec.autoheight ? "true" : "false"),
     tag("string8u", "autoheight_method", ""),
     tag("string8u", "geometry", ""),
   ];
@@ -446,12 +451,8 @@ export function buildHeliportTsc(spec: HeliportSpec): string {
       tag("float64", "height", "0"),
     ]),
   );
-  // ★ The `objects` list has two spellings, each used only where it is known to work: WITH an anchor,
-  // `tmsimulator_scenery_objecttmslist` (resolves the anchor's geometry; plants stay steady); WITHOUT
-  // one, the empty `list_tmsimulator_scenery_object` default. Exactly one `objects` entry either way,
-  // which is the part that matters.
-  if (spec.anchor !== null) body.push(...anchorObjects(spec.anchor));
-  else body.push(...block("list_tmsimulator_scenery_object", "objects", "", []));
+  // Exactly one `objects` list: the anchor when the POI carries one, otherwise empty.
+  body.push(...block("list_tmsimulator_scenery_object", "objects", "", spec.anchor ? anchorObject(spec.anchor) : []));
   body.push(...block("list_tmsimulator_scenery_object_animated", "objects_animated", "", []));
 
   // Runways BEFORE helipads, then: start_positions, parking, cultivation.
@@ -541,8 +542,8 @@ export function buildHeliportWad(spec: HeliportSpec): string {
 }
 
 /** The anchor object, repeated from the `.tsl` because the `.tsc` replaces it as the entry point. Written
- *  with an ABSOLUTE height, in the `tmsimulator_scenery_objecttmslist` spelling this place type accepts. */
-function anchorObjects(anchor: Anchor): string[] {
+ *  with an ABSOLUTE height. */
+function anchorObject(anchor: Anchor): string[] {
   const children = [
     tag("string8", "type", "object"),
     tag("string8", "geometry", ANCHOR_GEOMETRY),
@@ -552,12 +553,7 @@ function anchorObjects(anchor: Anchor): string[] {
       `${fmtLonLat(anchor.position.lon)} ${fmtLonLat(anchor.position.lat)} ${anchor.heightAsl.toFixed(2)}`,
     ),
   ];
-  return block(
-    "tmsimulator_scenery_objecttmslist",
-    "objects",
-    "",
-    block("tmsimulator_scenery_object", "element", "0", children),
-  );
+  return block("tmsimulator_scenery_object", "element", "0", children);
 }
 
 /** ★ NOTHING may precede the root `<[file]` tag — not even `//` comments. The sim rejects the WHOLE
