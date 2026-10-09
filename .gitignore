@@ -44,3 +44,6 @@ docs/
 # The AFS4 knowledge base (how the simulator stores and loads things). Kept on disk as local
 # reference; the public docs cover the app, not the sim's internals.
 /reference/
+
+# In-sim experiment scripts (flight logs, probes). Local only, like the rest of the gate material.
+/scripts/gate-*.ts
