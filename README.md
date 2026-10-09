@@ -244,16 +244,15 @@ The order is the same in the catalog on the left and in the placed list on the r
 stay out of the object count — they aren't scenery.
 
 - **Aerofly's own floor: one helipad or one runway.** An airport with neither is rejected outright by
-  the simulator — *"no valid runway or helipad defined"* — so PCT refuses to write one. Stands and
+  the simulator, so PCT refuses to write one. Stands and
   glider starts don't count towards it. Everything else, objects included, is optional.
 - **The code has teeth.** If an airport already installed on your machine uses it, Aerofly quietly
-  **replaces that airport** and mentions it only in a log nobody reads. PCT counts the airports actually
+  **replaces that airport**. PCT counts the airports actually
   on your disk and refuses a code that's taken — the one thing the by-hand route can't do for you. What it
   **can't** promise is anyone else's machine: pass the folder on and the code has to be free there too.
-- **A real-world code searches better than an invented one.** Aerofly takes the text it shows in
-  LOCATION's *search* from its own world database, so a code that database knows appears under **its**
-  name, while an invented one comes up as a **blank row**. It still works, and the map panel shows your
-  name correctly — it just looks broken in the search list. Looking one up on ourairports.com or
+- **A real-world code searches better than an invented one.** In LOCATION's *search*, a code Aerofly
+  already knows appears under **its** name, while an invented one comes up as a **blank row**. It still
+  works, and the map panel shows your name correctly — it just looks broken in the search list. Looking one up on ourairports.com or
   metar-taf.com costs a minute. **Search by name, never by code**: the search matches names only.
 - **The name is capped at 29 characters.** Past Aerofly's own limit the sim drops the whole airport, so
   PCT counts them for you.
@@ -299,8 +298,7 @@ A couple of things worth knowing about the editor:
     so you find out in the Export dialog rather than in the air.
     Suggested and worked out on the forum by **@chrispriv**, with **@ApfelFlieger**.
 - **FS4 internal (.wad)** *(v0.9.1)* — a read-out, collapsed at the foot of the inspector, giving the
-  selected object's position in the projected units Aerofly keeps inside its own **world-airport
-  database**, and its rotation in radians. It changes nothing: it's the same projection PCT works out
+  selected object's position and rotation in the units Aerofly's own **airport files** use. It changes nothing: it's the same projection PCT works out
   for itself when it installs an airport, surfaced here because a handful of people hand-build those
   entries and were converting the coordinates in a spreadsheet. Every coordinate and heading in the
   **Airport** panels carries the same read-out as a small `WAD:` chip — double-click one to copy it.
@@ -339,12 +337,12 @@ here for anyone who wants to check it or [build it themselves](#build-it-yoursel
 ## How PCT came to be
 
 PCT started as a **community idea**. On the Aerofly FS 4 forum, **Michael (@ApfelFlieger)** had long
-wanted a simple way to dress up the world with the sim's *own* built-in objects, without editing a single file by hand. He didn't just ask for it: he
-handed over the complete file-format specification for POI scenery (the `.tsl` / `.toc` files) and
-argued for a pragmatic starting scope (the static "XREF" objects that cover the large majority of
-what people want to place). He did it a second time for the **airport** side — the `.tsc` / `.wad`
-grammar, the field mask for every one of the six submenus, the order they appear in, and the rule that
-the left column and the right column must always agree — and has tested every release since, twice
+wanted a simple way to dress up the world with the sim's *own* built-in objects, without editing a
+single file by hand. He didn't just ask for it: he guided it from the first sketch and argued for a
+pragmatic starting scope (the static "XREF" objects that cover the large majority of what people want
+to place). He did it a second time for the **airport** side — the fields of every one of the six
+submenus, the order they appear in, and the rule that the left column and the right column must
+always agree — and has tested every release since, twice
 each: once without reading anything, then guided. He also coined the family name: PCT is the
 POI-only cousin of the "Racing Creation Tool" (the sibling
 [afs4-pylon-race](https://github.com/jlgabriel/afs4-pylon-race)).
@@ -358,7 +356,7 @@ As it took shape, more of the community pitched in:
   explicit height written in, there's no auto-height to lean on), which set PCT on the correct path;
   and Rodeo's hands-on method for reading real terrain elevation inside the sim is how those heights
   were validated on the ground. Christophe went on to design the **Sim-autoheight** mode added in v0.5 —
-  the project-level approach and the exact `.tsl` / `.toc` behaviour behind it — with **@ApfelFlieger**.
+  the project-level approach behind it — with **@ApfelFlieger**.
 
 The code itself was built by Anthropic's **Claude** models working in tandem: **Fable 5** designed the
 architecture and reviewed every milestone, and **Claude Opus** wrote the implementation — all under
@@ -366,8 +364,8 @@ the direction of **Juan Luis Gabriel (@Jugac64)**, who created and steers the pr
 
 ## Thanks
 
-- **Michael — @ApfelFlieger** — the driving idea, the file-format specification, and the scope that
-  made a first release realistic.
+- **Michael — @ApfelFlieger** — the driving idea, the guidance from the first sketch to the airports, and
+  the scope that made a first release realistic.
 - **Frank Boës — @Armitage (forum), `fboes` (GitHub)** — the [aerofly-data](https://github.com/fboes/aerofly-data) airport
   dataset (MIT), reused with permission.
 - **Christophe — @chrispriv** — the object-height mechanics for library objects, and the design of the
@@ -440,7 +438,6 @@ npm run build:win        # or build:mac (on macOS) / build:linux  → dist/
 
 There's also a headless CLI: `npm run scan` reads your install's object catalog and writes a
 `catalog.json`, and `npm run export` builds a POI folder from a project file — handy for scripting.
-On a stock install the scan finds **911 objects** across 7 XREF bundles.
 
 ## License
 
@@ -464,5 +461,5 @@ POI's plants so Aerofly doesn't cull them at altitude (v0.4). Its geometry and t
 work** — © 2026 Juan Luis Gabriel, **GPL-3.0-or-later**, same as PCT — compiled into Aerofly's binary
 format with IPACS's official **Aerofly FS 4 Content Converter**. That converter is IPACS's software and
 is **not** redistributed here; only its output, built entirely from our own source mesh and texture,
-ships in this repo (confirmed OK with IPACS via ApfelFlieger). See
+ships in this repo. See
 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).

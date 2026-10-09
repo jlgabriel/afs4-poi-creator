@@ -61,7 +61,7 @@ Three things are worth knowing up front:
   Share them, post them, sell them.
 - **Nothing is permanent.** PCT installs POI and airport folders, and can uninstall the ones it made.
 
-A stock install gives PCT about **911 objects**, **41 plants** and **22 airport light fixtures** to
+A stock install gives PCT **several hundred objects**, **41 plants** and **22 airport light fixtures** to
 work with, plus a parametric point light of PCT's own.
 
 ---
@@ -188,10 +188,10 @@ spelled out.
 
 ![Shot 15 — the Catalog panel with its first three sections open: the search box, the category tree, and cards carrying each object's name, footprint and category](images/15_catalog_objects.jpg)
 
-The Objects count reads about **850**, not the 911 the scan reported. The difference is the flexible
-jetways: some 60 of those parts are bends and passenger bridges that only line up when an airport's own
-scenery assembles them, and on their own they're noise in a browser. PCT hides those and keeps the 20
-free-standing footway pieces you can place yourself. Nothing is lost — a hidden object stays in the
+The Objects count reads a little lower than the number the scan reported. The difference is the
+flexible jetways: most of those parts are bends and passenger bridges that only line up when an
+airport's own scenery assembles them, and on their own they're noise in a browser. PCT hides those and
+keeps the free-standing footway pieces you can place yourself. Nothing is lost — a hidden object stays in the
 catalog, so an old project that used one still opens, exports and flies.
 
 **The map**, in the middle. Satellite imagery from Esri by default; switch to streets when the
@@ -204,10 +204,11 @@ height, a free-text label, and a lock. Select more than one object and it turns 
 panel instead — section 5; select an airport part and it shows that part's own fields — section 9.
 Collapsed at the bottom, **FS4 internal (.wad)** reads the same position back in the projected units
 the sim uses inside its own airport database; it changes nothing and is there for the few people who
-hand-build those files (section 14 says where that's documented). Double-click a `.wad` read-out to
-copy it.
+hand-build those files. Double-click a `.wad` read-out to copy it.
 
 ![Shot 16 — the Inspector with one object selected: the object's name and category, Lon/Lat, Heading °, Scale ×, the Height control, Label, Lock, and the FS4 internal (.wad) row shut at the bottom](images/16_inspector_object.jpg)
+
+![Shot 25 — the FS4 internal (.wad) block expanded: the projected longitude and latitude, and the rotation in radians](images/25_wad_readout.jpg)
 
 Below the Inspector, **the placed list** is everything in the project. Click a row to select it,
 shift-click to add to the selection, **double-click to send the map to it** — handy once a project has
@@ -817,9 +818,6 @@ figure.
 
 **Name** — the runway again, with a letter added if it needs one: `26`, `26W`.
 
-The winch bug that made this element unusable was fixed by IPACS in Aerofly FS 4 itself, so there is no
-longer anything to warn about here.
-
 ### Installing it
 
 **Export /airports…** in the top bar opens the dialog, and so does the button at the foot of the
@@ -836,8 +834,8 @@ argument for measuring one. On a project set to **Sim autoheight** the field dis
 everything follows the sim's terrain.
 
 **One rule is Aerofly's, and PCT will not let you past it: an airport needs at least one helipad or one
-runway.** With neither, the simulator rejects the whole thing outright — *"no valid runway or helipad
-defined"* — and does not add it to its list. Parking positions and glider starts do not count towards
+runway.** With neither, the simulator rejects the whole thing outright and does not add it to its
+list. Parking positions and glider starts do not count towards
 that floor, however many you place. PCT refuses the install rather than writing something the sim will
 throw away.
 
@@ -853,16 +851,15 @@ map, and **Save** never argues with you about it.
 
 Then **restart Aerofly FS 4**, open **LOCATION**, and **search for the name — not the code.**
 
-Aerofly's location search matches airport *names* only. And the row it hands back can come up
-**blank**: your airport really is there — its distance is right, and the map panel draws it under your
-own name and code — but that particular list takes its text from the sim's own world database, which
-has never heard of a code you invented. That one is Aerofly, not you.
+Aerofly's location search matches airport *names* only. And for a code you invented, the row it hands
+back can come up **blank**: your airport really is there — its distance is right, and the map panel
+draws it under your own name and code. That one is Aerofly, not you.
 
 This is the single most common "it didn't work" — including for people who built the feature. If the
 row is blank, look at the map panel, and you will see your airfield sitting exactly where you put it.
 
 If the blank row bothers you, there is a way around it: use the **real** code of the place you are
-building, looked up on ourairports.com or metar-taf.com. The sim's database knows that one, so the
+building, looked up on ourairports.com or metar-taf.com. Aerofly already knows that one, so the
 search row comes back filled in — under *its* name rather than yours. It costs a minute, and it is the
 only difference an invented code makes.
 
@@ -891,16 +888,11 @@ for positions, radians for directions. It changes nothing. It is there because a
 build these entries by hand and were converting the numbers in a spreadsheet. **Double-click a chip to
 copy it**; it flashes green when the copy has actually happened.
 
-Older versions of PCT could also drop a pair of `heliport.tsc.txt` / `heliport.wad.txt` templates into
-a POI folder for you to finish by hand. That is gone, at ApfelFlieger's request: a POI folder holding
-files with those names *looks* like an airfield and is not one. Everything it was for, the install
-above now does properly.
-
 ---
 
 ## 10. Cookbook — eight things worth building
 
-A map and 850 names is a blank canvas, and a blank canvas is the hardest place to start. Here are
+A map and several hundred names is a blank canvas, and a blank canvas is the hardest place to start. Here are
 eight scenes that take minutes and teach the tool. The first three are all rows, because rows are most
 of what anyone builds — and the three of them together are a tour of section 5.
 
@@ -1090,9 +1082,8 @@ coincident points has no direction to line up along.
 when PCT works out where the row runs, but they never move; clear the lock in the Inspector if you
 want it included.
 
-**The catalog says fewer objects than the scan did.** Expected: the scan reports 911, the Objects
-list browses about 850. The gap is the flexible-jetway parts, which PCT hides because they only line
-up assembled inside an airport's own scenery. Section 4 has the detail.
+**The catalog says fewer objects than the scan did.** Expected: the Objects list hides the
+flexible-jetway parts, which only line up assembled inside an airport's own scenery. Section 4 has the detail.
 
 **I installed an airport and can't find it in LOCATION.** Restart the sim first — an airport is read
 at startup just like a POI. Then search for the **name**, not the code: Aerofly's location search
@@ -1140,18 +1131,11 @@ into a forum post saves a round of questions.
 Questions, bug reports and scenes you've built are all welcome:
 https://www.aerofly.com/community/
 
-**The Inspector's FS4 internal (.wad) read-out.** It shows the projected 0–65536 grid and the
-radians the sim keeps inside its own world-airport database. It is the same projection PCT works out
-for you when it installs an airport (section 9); the read-out exists because a handful of people
-build those entries by hand and were converting the coordinates in a spreadsheet.
-
-![Shot 25 — the FS4 internal (.wad) block expanded: the projected longitude and latitude, and the rotation in radians](images/25_wad_readout.jpg)
-
 **The source.** PCT is GPL-3.0, Electron + TypeScript:
 https://github.com/jlgabriel/afs4-poi-creator
 
-**Credit where it's due.** PCT is a community tool. Michael (@ApfelFlieger) had the idea, supplied
-the complete file-format specification and argued for a scope that made a first release realistic.
+**Credit where it's due.** PCT is a community tool. Michael (@ApfelFlieger) had the idea, guided
+it from the first sketch to the airports, and argued for a scope that made a first release realistic.
 Frank Boës (@Armitage) let PCT bundle his open airport dataset. Christophe (@chrispriv) and Rodeo
 untangled how Aerofly decides an object's height, and Christophe went on to design the
 Sim-autoheight mode. The full list is in the project README.
