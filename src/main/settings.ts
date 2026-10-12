@@ -20,6 +20,7 @@ export function defaultSettings(documentsDir?: string): Settings {
     installDir: installs[0] ?? null,
     afs4UserDir: detectUserDir(documentsDir),
     thumbnailsDir: null, // v0.6 object-photo folder — opt-in, chosen in Settings; no default location
+    tapDir: null, // "Export TAP" folder — opt-in, no default location
     tiles: { provider: "esri" },
     elevation: { provider: "open-meteo" },
     recentProjects: [],
@@ -66,6 +67,10 @@ function sanitizeDirs(patch: Partial<Settings>, base: Settings): Partial<Setting
   // good value, same as the two dirs above. `null` passes through untouched: clearing the folder is allowed.
   if (typeof out.thumbnailsDir === "string" && !existsSync(out.thumbnailsDir)) {
     out.thumbnailsDir = base.thumbnailsDir;
+  }
+  // The TAP folder IS a write root (Export TAP writes `<ICAO>.tap` into it): same rule.
+  if (typeof out.tapDir === "string" && !existsSync(out.tapDir)) {
+    out.tapDir = base.tapDir;
   }
   return out;
 }

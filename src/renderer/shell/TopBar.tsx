@@ -1,5 +1,5 @@
 // TopBar.tsx — the spanning top bar (design §5): brand · editable project name · dirty dot ·
-// [New][Open][Save] │ [Undo][Redo] │ [Export /poi…][Export /airports…] │ [Rescan][Settings].
+// [New][Open][Save] │ [Undo][Redo] │ [Export /poi…][Export /airports…][Export TAP…] │ [Rescan][Settings].
 // Undo/redo are visible buttons (a shortcut nobody can see is a feature only its author has); the other
 // edit verbs are keyboard chords. New/Open/Save delegate to app/commands.ts; Export/Rescan are handed
 // down as callbacks by AppShell, and a button without its callback is disabled. IPC-backed buttons
@@ -115,11 +115,12 @@ function ProjectNameField(): React.ReactElement {
 interface TopBarProps {
   onExport?: () => void; // wired in M1e-5f
   onHeliport?: () => void; // Export /airports…
+  onTap?: () => void; // Export TAP…
   onRescan?: () => void; // wired in M1e-5e
   onSettings?: () => void; // wired in M2h
 }
 
-export function TopBar({ onExport, onHeliport, onRescan, onSettings }: TopBarProps): React.ReactElement {
+export function TopBar({ onExport, onHeliport, onTap, onRescan, onSettings }: TopBarProps): React.ReactElement {
   const dirty = useEditor((s) => s.dirty);
   const objCount = useEditor((s) => s.project.objects.length);
   const projectPath = useEditor((s) => s.projectPath);
@@ -205,6 +206,17 @@ export function TopBar({ onExport, onHeliport, onRescan, onSettings }: TopBarPro
         title={pct ? "Export to '…FS 4/scenery/airports' — an airport you can start a flight from" : NO_PCT}
       >
         Export /airports…
+      </button>
+      {/* The third output, and the one that installs nothing: a `.tap` file for the TAP converter, written
+          into a folder the user chose. Named for its FORMAT rather than a destination, because its
+          destination is the user's own and not a folder of the sim. */}
+      <button
+        type="button"
+        onClick={onTap}
+        disabled={!onTap || !pct}
+        title={pct ? "Write the airport as an <ICAO>.tap file for the TAP converter" : NO_PCT}
+      >
+        Export TAP…
       </button>
 
       <span className="pct-divider" />

@@ -41,6 +41,7 @@ const validSettings = (): Settings => ({
   installDir: null,
   afs4UserDir: null,
   thumbnailsDir: null,
+  tapDir: null,
   tiles: { provider: "esri" },
   elevation: { provider: "open-meteo" },
   recentProjects: [],
@@ -144,6 +145,7 @@ describe("parseSettings", () => {
     };
     const got = parseSettings(preV06);
     expect(got.thumbnailsDir).toBeNull();
+    expect(got.tapDir).toBeNull(); // same default for the Export TAP folder (pre-2.1 file)
     expect(got.installDir).toBe("/afs4"); // the real settings survived the upgrade
     expect(got.tiles).toEqual({ provider: "custom", customUrl: "https://t/{z}/{x}/{y}.png" });
   });

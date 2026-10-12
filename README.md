@@ -124,6 +124,7 @@ The short version is below. For the whole thing walked through with pictures, se
    If you'd rather **start** a flight there than fly to it, **Export /airports…** writes the same
    project as a small airfield — see [Airports you can fly from](#airports-you-can-fly-from).
    The two buttons are named for the folder under the sim's own `scenery` that each one writes into.
+   A third, **Export TAP…**, installs nothing: it saves the airport as a `.tap` file for a TAP converter.
 5. **Optional: photograph what you placed** — once you're out there looking at your objects,
    screenshot one to the clipboard and right-click its card in PCT to paste it in. From then on the
    catalog shows the real thing instead of a drawn icon. See
@@ -270,6 +271,13 @@ stay out of the object count — they aren't scenery.
   only ever lists — or deletes — folders PCT wrote itself.
 
 Restart Aerofly after installing: airports are read once, at startup.
+
+**Export TAP…** *(v2.1)* saves the same airport, and every object around it, as one `<CODE>.tap` file —
+the format a TAP converter builds an airport folder from. It installs nothing: the file goes into the
+folder you pick (it's also under *Settings → TAP folder*), and PCT asks before replacing a `.tap` of the
+same name. Glider starts, an XREF's scale and the heights of XREFs and plants are not in it yet, and the
+dialog says so when your project has them. Asked for by **@ApfelFlieger**.
+[The guide](guide/GUIDE.md#a-tap-file-for-a-converter) has the details.
 
 ### Good to know
 

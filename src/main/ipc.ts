@@ -21,6 +21,8 @@ import type {
   PctError,
   PctResult,
   ScanResult,
+  TapExportOptions,
+  TapExportResult,
   XrefRegistrationPlan,
   XrefRegistrationResult,
 } from "../shared/pctApi";
@@ -39,7 +41,13 @@ import {
   resolveHeightsAgl,
   resolveHeightsFlat,
 } from "../core/export/heights";
-import { InvalidHeliportIdentityError, planExport, planHeliport } from "../core/export/planExport";
+import {
+  InvalidHeliportIdentityError,
+  NoAirportError,
+  planExport,
+  planHeliport,
+  planTap,
+} from "../core/export/planExport";
 import { identityProblemText, isSafeAirportFolderName } from "../core/export/heliportTemplate";
 import { UnsupportedSchemaVersionError } from "../core/project/schemas";
 import { detectInstallDirs, detectUserDir } from "./afs4Paths";
@@ -83,6 +91,7 @@ import { planXrefRegistration, registerXref } from "./xrefRegistrar";
 import { defaultXrefTableCandidates, loadXrefTable } from "./xrefTableSource";
 import { normalizeUserDir, readSettings, writeSettings } from "./settings";
 import { writeFileAtomic } from "./fsAtomic";
+import { NoTapDirError, TapFileExistsError, writeTap } from "./tapExport";
 
 const PROJECT_FILTER = [{ name: "PCT project", extensions: ["json"] }];
 const FOOTPRINTS_FILTER = [{ name: "PCT footprints", extensions: ["json"] }];
@@ -149,6 +158,11 @@ function toPctError(e: unknown): PctError {
     return { code: "icao-taken", message: e.message, icao: e.icao };
   }
   if (e instanceof UnsafeCountryError) return { code: "invalid-identity", message: e.message };
+  if (e instanceof NoAirportError) return { code: "invalid-project", message: e.message };
+  if (e instanceof NoTapDirError) return { code: "no-tap-dir", message: e.message };
+  if (e instanceof TapFileExistsError) {
+    return { code: "file-exists", message: e.message, fileName: e.fileName };
+  }
   if (e instanceof UnsafeFolderNameError) return { code: "invalid-project", message: e.message };
   if (e instanceof ZodError) return { code: "invalid-project", message: e.message };
   return { code: "io", message: e instanceof Error ? e.message : String(e) };
@@ -357,6 +371,35 @@ async function runHeliportInstall(project: Project, opts: HeliportInstallOptions
   return { folderName: w.folderName, path: w.path, installed: true, warnings };
 }
 
+/** "Export TAP": the project's airport as `<ICAO>.tap` in the TAP folder, and nothing else.
+ *
+ *  Only the point and airport lights carry a height in a `.tap`, so only they go through height
+ *  resolution — a project without lights never needs the elevation service here. */
+async function runTapExport(project: Project, opts: TapExportOptions): Promise<TapExportResult> {
+  const settings = currentSettings();
+  const lights = project.objects.filter((o) => o.kind === "light" || o.kind === "airport_light");
+  log.info(
+    `tap export "${project.airport?.icao ?? ""}" — ${project.objects.length} objects ` +
+      `(${lights.length} lights), overwrite ${opts.overwrite}, folder ${settings.tapDir ?? "— none —"}`,
+  );
+  const resolved =
+    lights.length === 0
+      ? []
+      : project.heightMode === "autoheight"
+        ? resolveHeightsAgl(lights)
+        : opts.baseElevation != null
+          ? resolveHeightsFlat(lights, opts.baseElevation)
+          : await resolveHeights(lights, settings.elevation.provider, {
+              cacheDir: userData(),
+              version: app.getVersion(),
+            });
+  const plan = planTap(project, resolved);
+  const file = writeTap(settings.tapDir, plan, { overwrite: opts.overwrite });
+  log.info(`tap export ok — written to ${file}`);
+  for (const w of plan.warnings) log.warn(`tap export warning: ${w}`);
+  return { fileName: plan.fileName, path: file, warnings: plan.warnings };
+}
+
 /** Load the optional object-table overlay, scan, cache the catalog, and record lastScanAt. Shared by
  *  pct:scan and the post-registration rescan so a freshly registered bundle appears with zero new read
  *  code. Scan warnings (a corrupt .tmi, an entry with no bbox) + any overlay-load warning are handed
@@ -550,7 +593,7 @@ export function registerIpc(): void {
     // The SAVED value, and only the fields that moved. writeSettings silently keeps the previous path when
     // the new one isn't on disk, so "I changed the folder and nothing happened" is a real
     // outcome — and this is the line that shows the change didn't take.
-    for (const key of ["installDir", "afs4UserDir", "thumbnailsDir"] as const) {
+    for (const key of ["installDir", "afs4UserDir", "thumbnailsDir", "tapDir"] as const) {
       if (after[key] !== before[key]) log.info(`settings — ${key} is now ${after[key] ?? "— not set —"}`);
     }
     if (after.tiles.provider !== before.tiles.provider) log.info(`settings — tiles ${after.tiles.provider}`);
@@ -561,13 +604,15 @@ export function registerIpc(): void {
   });
   ipcMain.handle(
     "pct:chooseDirectory",
-    async (_e, purpose: "install-dir" | "user-dir" | "thumbnails-dir"): Promise<string | null> => {
+    async (_e, purpose: "install-dir" | "user-dir" | "thumbnails-dir" | "tap-dir"): Promise<string | null> => {
       const title =
         purpose === "install-dir"
           ? "Select the Aerofly FS 4 install folder"
           : purpose === "user-dir"
             ? "Select the Aerofly FS 4 user folder — the one that CONTAINS scenery/"
-            : "Select the folder that holds your object photos";
+            : purpose === "tap-dir"
+              ? "Select the folder Export TAP writes into"
+              : "Select the folder that holds your object photos";
       const dir = await pickDirectory(title);
       // Correct the path HERE, where main hands it back: browse to …\scenery\poi (the old "POI install
       // target" label invited exactly that) and Settings now shows the corrected …\Aerofly FS 4 straight
@@ -646,6 +691,9 @@ export function registerIpc(): void {
       forgetTakenIcaos(); // its code is free again
       log.info(`uninstalled heliport "${folderName}" (${country})`);
     }),
+  );
+  ipcMain.handle("pct:exportTap", (_e, project: Project, opts: TapExportOptions) =>
+    guarded("exportTap", () => runTapExport(project, opts)),
   );
   // ── The session log ──
   // The renderer can WRITE to it (its own uncaught errors — otherwise they die in a DevTools console

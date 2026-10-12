@@ -30,6 +30,7 @@ export function SettingsDialog({
   const [installDir, setInstallDir] = useState<string | null>(null);
   const [userDir, setUserDir] = useState<string | null>(null);
   const [thumbnailsDir, setThumbnailsDir] = useState<string | null>(null);
+  const [tapDir, setTapDir] = useState<string | null>(null);
   const [provider, setProvider] = useState<TileProvider>("esri");
   const [customUrl, setCustomUrl] = useState("");
   const [customAttr, setCustomAttr] = useState("");
@@ -90,6 +91,7 @@ export function SettingsDialog({
       setInstallDir(s.installDir);
       setUserDir(s.afs4UserDir);
       setThumbnailsDir(s.thumbnailsDir);
+      setTapDir(s.tapDir);
       setProvider(s.tiles.provider);
       setCustomUrl(s.tiles.customUrl ?? "");
       setCustomAttr(s.tiles.customAttribution ?? "");
@@ -104,12 +106,13 @@ export function SettingsDialog({
     };
   }, [pct]);
 
-  const changeDir = async (which: "install-dir" | "user-dir" | "thumbnails-dir"): Promise<void> => {
+  const changeDir = async (which: "install-dir" | "user-dir" | "thumbnails-dir" | "tap-dir"): Promise<void> => {
     if (!pct) return;
     const p = await pct.chooseDirectory(which);
     if (p === null) return; // cancelled
     if (which === "install-dir") setInstallDir(p);
     else if (which === "user-dir") setUserDir(p);
+    else if (which === "tap-dir") setTapDir(p);
     else setThumbnailsDir(p);
   };
 
@@ -136,11 +139,13 @@ export function SettingsDialog({
       installDir,
       afs4UserDir: userDir,
       thumbnailsDir,
+      tapDir,
       tiles,
       elevation: { provider: elevation },
     });
     editorStore.getState().setTiles(tiles); // swap the map tile layer live (MapView subscribes)
     setThumbnailsDir(saved.thumbnailsDir); // main may have refused a vanished folder → show what stuck
+    setTapDir(saved.tapDir);
     refreshThumbnails(); // re-index the (possibly new) photo folder so the catalog updates immediately
     setBusy(false);
 
@@ -224,6 +229,23 @@ export function SettingsDialog({
                 Drop a photo named after the object's exact id — e.g. <code>UH60_usarmy.jpg</code> — in this
                 folder and PCT shows it instead of the drawn icon. Formats: <code>jpg</code> / <code>png</code>{" "}
                 / <code>webp</code>. The photos are yours and stay on your disk — never bundled or exported.
+              </span>
+            </div>
+
+            <div className="pct-field pct-field-col">
+              <span className="pct-field-label">TAP folder (optional)</span>
+              <code className="pct-path">{dash(tapDir)}</code>
+              <div className="pct-settings-actions">
+                <button type="button" disabled={!pct} onClick={() => void changeDir("tap-dir")}>
+                  Change…
+                </button>
+                <button type="button" disabled={!pct || tapDir === null} onClick={() => setTapDir(null)}>
+                  Clear
+                </button>
+              </div>
+              <span className="pct-field-meta">
+                Where <strong>Export TAP…</strong> writes <code>&lt;ICAO&gt;.tap</code> — usually the TAP
+                converter's input folder.
               </span>
             </div>
 

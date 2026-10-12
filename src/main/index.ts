@@ -188,6 +188,7 @@ function logEnvironment(): void {
         `install dir  ${dash(s.installDir)}`,
         `user dir     ${dash(s.afs4UserDir)}`,
         `photos dir   ${dash(s.thumbnailsDir)}`,
+        `tap dir      ${dash(s.tapDir)}`,
         `tiles ${s.tiles.provider} · elevation ${s.elevation.provider} · last scan ${dash(s.lastScanAt)}`,
         `${"─".repeat(78)}`,
       ].join("\n"),

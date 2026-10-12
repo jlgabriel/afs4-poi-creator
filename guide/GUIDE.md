@@ -158,14 +158,16 @@ Four areas, and that's the whole app.
 
 ![Shot 05 — the whole editor: top bar, catalog, map, inspector](images/05_editor_overview.jpg)
 
-**The top bar** holds the project (name, New / Open / Save / Save As…), **Undo** and **Redo**, the two
+**The top bar** holds the project (name, New / Open / Save / Save As…), **Undo** and **Redo**, the three
 output buttons, **Rescan**, **Settings**, **Help ↗**, the airport search, the **Heights** mode switch,
 the map style switch (Satellite / Streets / Custom), and a running count of what you've placed.
 
-**The two output buttons are named for where they write**, because that is the only difference that
-matters: **Export /poi…** writes scenery you fly to, into `…FS 4/scenery/poi`, and **Export /airports…**
-writes an airfield you can start a flight from, into `…FS 4/scenery/airports`. Sections
-[8](#8-exporting-and-installing) and [9](#9-airports--somewhere-to-fly-from) are one button each.
+**The first two output buttons are named for where they write**, because that is the only difference
+that matters: **Export /poi…** writes scenery you fly to, into `…FS 4/scenery/poi`, and **Export
+/airports…** writes an airfield you can start a flight from, into `…FS 4/scenery/airports`. Sections
+[8](#8-exporting-and-installing) and [9](#9-airports--somewhere-to-fly-from) are one button each. The
+third, **Export TAP…**, installs nothing: it saves the airport as one `.tap` file for a TAP converter —
+see [A TAP file for a converter](#a-tap-file-for-a-converter).
 
 ![Shot 14 — the top bar: project, New / Open / Save / Save As…, Undo, Redo, Export /poi…, Export /airports…, Rescan, Settings, Help, the airport search, the Heights switch, the map style switch, and the object count](images/14_topbar.jpg)
 
@@ -879,6 +881,30 @@ only removes — folders it made itself, so somebody else's airport can never ap
 
 You can zip that folder and hand it over the same way you would a POI, as long as its code is not
 already an airport on the other machine.
+
+### A TAP file for a converter
+
+**Export TAP…** writes the same airport a third way: as one text file, `<CODE>.tap`, for a TAP
+converter, which builds an airport folder from it. This time PCT installs nothing. The file goes into a
+folder you choose — usually the converter's input folder — and what happens next is the converter's job.
+
+The first time, the dialog asks for that folder (**Choose…**). PCT remembers it, and **Settings → TAP
+folder** shows it and changes it.
+
+What goes in: the airport, its runways, helipads and parking positions, and every object you placed.
+The code, the name and the country follow the same rules as for **Export /airports…**, and the airport
+needs its point on the map. Three things a `.tap` does not carry, and the dialog tells you when your
+project has them:
+
+- **Glider starts** (aerotow and winch) are not written to it yet.
+- **An XREF's scale** — it comes out at its normal size.
+- **A height for XREFs and plants.** Point lights and airport lights keep theirs.
+
+Runways are written as standard asphalt with the standard markings: PCT has no fields for the surface
+or the paint yet.
+
+If a file with that name is already in the folder, PCT asks before replacing it — you may have edited it
+by hand since the last export. Nothing else in the folder is ever touched.
 
 ### The numbers underneath
 

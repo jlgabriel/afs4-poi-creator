@@ -464,6 +464,9 @@ export interface Settings {
   // the user's OWN sim screenshots, read from their disk, never bundled or exported — the zero-IPACS-assets
   // line is untouched (same status as the scanned catalog cache). null = not set → every row keeps its glyph.
   thumbnailsDir: string | null;
+  // Where "Export TAP" writes `<ICAO>.tap` — usually the TAP converter's input folder. Opt-in, chosen in
+  // Settings or in the Export TAP dialog; null = not set yet.
+  tapDir: string | null;
   tiles: {
     provider: "esri" | "osm" | "custom"; // esri satellite (default) · OSM streets · custom XYZ URL
     customUrl?: string; // XYZ template, user-supplied

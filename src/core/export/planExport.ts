@@ -37,6 +37,7 @@ import {
   type HeliportWinchSpec,
   type IdentityProblem,
 } from "./heliportTemplate";
+import { buildTap, tapFileName, type TapSpec } from "./tapWriter";
 
 // A POI's two payload files are named `poi.tsl` / `poi.toc`, and the .tsl
 // references the .toc by this basename.
@@ -313,4 +314,98 @@ export function planHeliport(
     assets: anchor ? [...ANCHOR_ASSETS] : [],
     warnings,
   };
+}
+
+/** What "Export TAP" writes: ONE file, `<ICAO>.tap`, for the TAP converter. */
+export interface TapPlan {
+  fileName: string;
+  content: string;
+  warnings: string[];
+}
+
+/** Thrown when a project without an airport, or without the airport's own point, reaches planTap. The
+ *  dialog refuses both first; this keeps every other path from writing a `.tap` with no `model_center`. */
+export class NoAirportError extends Error {
+  constructor() {
+    super("This project has no airport on the map yet.");
+    this.name = "NoAirportError";
+  }
+}
+
+/** The identity as the writers take it — trimmed, code and country lowercase. */
+export function airportIdentity(airport: NonNullable<Project["airport"]>): HeliportIdentity {
+  return {
+    icao: airport.icao.trim().toLowerCase(),
+    name: airport.name,
+    country: airport.country.trim().toLowerCase(),
+  };
+}
+
+/** Plan the `.tap`. The airport comes from `project.airport`; every point is shifted with the scene.
+ *
+ *  `resolvedLights` carries the point and airport lights with their heights resolved (the same pipeline as
+ *  the `.toc`) — the only objects whose `.tap` element has a height. Plants and XREFs are read straight
+ *  from `project.objects`: their `.tap` element has a 2-D position and nothing else that needs resolving,
+ *  so a project without lights exports with no elevation lookup at all. */
+export function planTap(project: Project, resolvedLights: ResolvedObject[]): TapPlan {
+  const airport = project.airport;
+  if (airport === undefined || airport.position === undefined) throw new NoAirportError();
+  const identity = airportIdentity(airport);
+  const problem = validateIdentity(identity);
+  if (problem !== null) throw new InvalidHeliportIdentityError(problem);
+
+  const shift = project.shift;
+  const warnings: string[] = [];
+  const pads = mapPads(airport.pads, shift);
+  const runways = heliportRunways(airport.runways, shift);
+  if (pads.length === 0 && runways.length === 0) {
+    warnings.push(
+      "Aerofly rejects an airport with no helipad and no runway — the converter's airport will need at least one of the two.",
+    );
+  }
+  const gliders = (airport.aerotows ?? []).length + (airport.winches ?? []).length;
+  if (gliders > 0) {
+    warnings.push(
+      `${gliders} glider start${gliders === 1 ? " is" : "s are"} not in the TAP — aerotow and winch starts are not written to it yet.`,
+    );
+  }
+
+  const placedXrefs = project.objects.filter((o) => o.kind === "xref");
+  const placedPlants = project.objects.filter((o) => o.kind === "plant");
+  const scaled = placedXrefs.filter((o) => o.scale !== 1).length;
+  if (scaled > 0) {
+    warnings.push(
+      `${scaled} XREF${scaled === 1 ? " has" : "s have"} a scale other than 1 — a TAP has no scale, so ${scaled === 1 ? "it comes" : "they come"} out at normal size.`,
+    );
+  }
+  const raised = [...placedXrefs, ...placedPlants].filter((o) => o.height.mode !== "terrain").length;
+  if (raised > 0) {
+    warnings.push(
+      `${raised} XREF${raised === 1 ? " or plant is" : "s or plants are"} set above the terrain (Terrain + offset or a fixed ASL height) — a TAP stores no height for XREFs and plants.`,
+    );
+  }
+
+  const lights = applyShift(resolvedLights, shift);
+  const spec: TapSpec = {
+    identity,
+    position: shiftPoint(airport.position, shift),
+    autoheight: project.heightMode === "autoheight",
+    runways,
+    pads,
+    parkings: heliportParkings(airport.parkings, shift),
+    plants: placedPlants.map((p) => ({
+      position: shiftPoint(p.position, shift),
+      heightRange: p.heightRange,
+      group: p.group,
+      species: p.species,
+    })),
+    lights: lights.filter((o) => o.kind === "light"),
+    airportLights: lights.filter((o) => o.kind === "airport_light"),
+    xrefs: placedXrefs.map((x) => ({
+      name: x.name,
+      position: shiftPoint(x.position, shift),
+      direction: x.direction,
+    })),
+  };
+  return { fileName: tapFileName(identity.icao), content: buildTap(spec), warnings };
 }

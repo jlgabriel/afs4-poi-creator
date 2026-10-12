@@ -115,4 +115,11 @@ describe("writeSettings — main-side sanity on the directory fields", () => {
     // null passes through untouched — the user is turning the feature off.
     expect(writeSettings(tmp, { thumbnailsDir: null }).thumbnailsDir).toBeNull();
   });
+
+  // The TAP folder is a WRITE root (Export TAP writes into it), so the same rule applies.
+  it("keeps a real tapDir, refuses a vanished one, and allows clearing to null", () => {
+    expect(writeSettings(tmp, { tapDir: realDir }).tapDir).toBe(realDir);
+    expect(writeSettings(tmp, { tapDir: path.join(tmp, "gone") }).tapDir).toBe(realDir);
+    expect(writeSettings(tmp, { tapDir: null }).tapDir).toBeNull();
+  });
 });

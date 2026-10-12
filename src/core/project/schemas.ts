@@ -283,6 +283,9 @@ export const zSettings = z.looseObject({
   // has no such key, and without the default a required field would fail parse → readSettings would fall
   // back to DEFAULTS, silently wiping the user's install dir + tile provider. Absent → null (not set).
   thumbnailsDir: z.string().nullable().default(null),
+  // The "Export TAP" folder. `.default(null)` for the same reason as thumbnailsDir: an older settings.json
+  // has no such key, and failing the parse would reset every other setting.
+  tapDir: z.string().nullable().default(null),
   tiles: z.looseObject({
     provider: z.enum(["esri", "osm", "custom"]),
     customUrl: z.string().optional(),

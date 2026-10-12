@@ -47,6 +47,10 @@ export type PctError =
   // disappear with no visible error, and the person who loses it is not necessarily this user.
   | { code: "invalid-identity"; message: string }
   | { code: "icao-taken"; message: string; icao: string }
+  // "Export TAP": no TAP folder chosen yet, or `<ICAO>.tap` is already in it (the renderer asks, then
+  // re-sends with overwrite).
+  | { code: "no-tap-dir"; message: string }
+  | { code: "file-exists"; message: string; fileName: string }
   | { code: "io"; message: string };
 
 export type PctResult<T> = { ok: true; value: T } | { ok: false; error: PctError };
@@ -144,6 +148,20 @@ export interface HeliportInstallOptions {
   baseElevation?: number; // same offline fallback as ExportOptions
 }
 
+/** "Export TAP": the project's airport as `<ICAO>.tap` in the TAP folder from Settings. Main reads the
+ *  airport from the project itself, so nothing else travels. */
+export interface TapExportOptions {
+  overwrite: boolean;
+  baseElevation?: number; // same offline fallback as ExportOptions — only the lights need a height
+}
+
+/** Where the `.tap` landed (main-produced, display only) and what the user should know about it. */
+export interface TapExportResult {
+  fileName: string;
+  path: string;
+  warnings: string[];
+}
+
 export interface ExportOptions {
   target: "install" | "choose-folder"; // main resolves the destination; renderer names no path
   overwrite: boolean;
@@ -167,7 +185,7 @@ export interface PctApi {
   // Native folder picker for the first-run wizard / Settings — main runs the dialog. Returns the
   // chosen path OUTward for display + a follow-up scan(installDir, …) / setSettings; the P0-2 rule
   // forbids paths flowing IN, not out (same as detectPaths → scan). null = the user cancelled.
-  chooseDirectory(purpose: "install-dir" | "user-dir" | "thumbnails-dir"): Promise<string | null>;
+  chooseDirectory(purpose: "install-dir" | "user-dir" | "thumbnails-dir" | "tap-dir"): Promise<string | null>;
 
   // Object photos (v0.6). listThumbnails re-scans the settings.thumbnailsDir folder and returns the
   // lowercased catalog names that have a `<name>.<ext>` photo; getThumbnail resolves one name to a small
@@ -224,6 +242,9 @@ export interface PctApi {
   installHeliport(project: Project, opts: HeliportInstallOptions): Promise<PctResult<InstallResult>>;
   listInstalledHeliports(): Promise<InstalledHeliport[]>;
   uninstallHeliport(country: string, folderName: string): Promise<PctResult<void>>;
+  // "Export TAP": writes ONLY `<ICAO>.tap` into settings.tapDir — no install, no other file. Refuses with
+  // "no-tap-dir" before the folder is chosen and "file-exists" unless `overwrite`.
+  exportTap(project: Project, opts: TapExportOptions): Promise<PctResult<TapExportResult>>;
   revealInFolder(folderName: string): Promise<void>; // main validates + resolves within known roots
 
   // The session log (main/log.ts): one plain-text file in userData, rewritten from scratch at every

@@ -7,6 +7,7 @@ const settings = (over: Partial<Settings> = {}): Settings => ({
   installDir: "/afs4",
   afs4UserDir: "/user",
   thumbnailsDir: null,
+  tapDir: null,
   tiles: { provider: "esri" },
   elevation: { provider: "open-meteo" },
   recentProjects: [],

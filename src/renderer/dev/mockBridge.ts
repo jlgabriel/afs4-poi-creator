@@ -12,6 +12,7 @@ import { categorize, displayName } from "../../core/catalog/categorize";
 import { photoKey } from "../../core/catalog/photoKey";
 import { EMPTY_FOOTPRINTS, setFootprint, type FootprintOverrides } from "../../core/catalog/footprints";
 import type { InstalledHeliport, InstalledPoi, PctApi } from "../../shared/pctApi";
+import { planTap } from "../../core/export/planExport";
 
 // A spread of real-ish name stems across the catalog's categories, expanded with numeric suffixes so
 // the list is production-scale.
@@ -188,6 +189,7 @@ function mockSettings(installDir: string | null): Settings {
     installDir,
     afs4UserDir: null,
     thumbnailsDir: null,
+    tapDir: null,
     tiles: { provider: "esri" },
     elevation: { provider: "open-meteo" },
     recentProjects: [],
@@ -243,6 +245,8 @@ export function installMockBridge(): void {
     { folderName: "e00698n4627_suiza", byPct: true },
     { folderName: "toulouse_city", byPct: false },
   ];
+  // "Export TAP" files already "written", so the replace confirmation is exercisable.
+  const writtenTaps = new Set<string>();
   let installedHeliports: InstalledHeliport[] = [
     { folderName: "e00367n4801_france", country: "fr", icao: "fr0001" },
   ];
@@ -276,7 +280,7 @@ export function installMockBridge(): void {
       };
       return settings;
     },
-    chooseDirectory: async () => "C:/Mock/Aerofly FS 4",
+    chooseDirectory: async (purpose) => (purpose === "tap-dir" ? "C:/Mock/airports_tap" : "C:/Mock/Aerofly FS 4"),
     // Synthetic photos for a few stems (PHOTO_STEMS) so the preview exercises the object-photo path and
     // the hover-preview's enlarged image; every other card still falls back to its glyph.
     listThumbnails: async () => [...mockPhotos],
@@ -408,6 +412,30 @@ export function installMockBridge(): void {
         (h) => !(h.folderName === folderName && h.country === country),
       );
       return { ok: true, value: undefined };
+    },
+    // The REAL planner, so the preview produces the exact `.tap` text; it is kept on
+    // `window.__pctLastTap` for inspection. Lights get a flat 100 m, like resolveHeights above.
+    exportTap: async (project, opts) => {
+      if (settings.tapDir === null) {
+        return { ok: false, error: { code: "no-tap-dir", message: "No TAP folder is set — choose one first." } };
+      }
+      try {
+        const lights = project.objects
+          .filter((o) => o.kind === "light" || o.kind === "airport_light")
+          .map((o) => ({ ...o, heightAsl: 100 }));
+        const plan = planTap(project, lights);
+        if (!opts.overwrite && writtenTaps.has(plan.fileName)) {
+          return {
+            ok: false,
+            error: { code: "file-exists", fileName: plan.fileName, message: `"${plan.fileName}" already exists in the TAP folder.` },
+          };
+        }
+        writtenTaps.add(plan.fileName);
+        (window as unknown as { __pctLastTap?: string }).__pctLastTap = plan.content;
+        return { ok: true, value: { fileName: plan.fileName, path: `${settings.tapDir}/${plan.fileName}`, warnings: plan.warnings } };
+      } catch (e) {
+        return { ok: false, error: { code: "invalid-project", message: e instanceof Error ? e.message : String(e) } };
+      }
     },
     revealInFolder: noop,
     // No file in the preview harness — send the log to the console the previewer already has open.
