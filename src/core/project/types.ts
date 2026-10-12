@@ -365,6 +365,10 @@ export interface ProjectAirport {
    *  ABSENT ≡ the first pad's position, which is exactly how v1.2/v1.3 behaved — so a migrated project
    *  keeps writing the same coordinates until someone moves this point on purpose. */
   position?: LonLat;
+  /** The airport's elevation, metres ASL. ABSENT ≡ the terrain under `position`, looked up at export.
+   *  Only Export TAP reads it (the place's `elevation` and every runway end's): the TAP converter places
+   *  XREFs at this height. The `.tsc`/`.wad` writers do not use it. */
+  elevation?: number;
   /** Every helipad, in document order. May be EMPTY: an airport with no pads at all (identity plus a
    *  database entry) is complete. */
   pads: AirportPad[];

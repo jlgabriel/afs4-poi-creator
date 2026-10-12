@@ -26,6 +26,7 @@ import {
   setAirportPadName,
   setAirportPadRadius,
   setAirportPosition,
+  setAirportElevation,
   setLocked,
   setPoiName,
   setReference,
@@ -426,6 +427,17 @@ describe("the airport block", () => {
     // Cleared → the block follows the first pad again.
     p = setAirportPosition(p, null, LATER);
     expect("position" in p.airport!).toBe(false);
+  });
+
+  it("sets and clears the airport's elevation", () => {
+    let p = setAirport(baseProject(), AIRPORT, NOW);
+    p = setAirportElevation(p, 75.5, LATER);
+    expect(p.airport!.elevation).toBe(75.5);
+    expect(setAirportElevation(p, 75.5, LATER)).toBe(p); // unchanged ⇒ same reference
+    // Cleared → back to the terrain under the point: the key goes, it is not stored as undefined.
+    p = setAirportElevation(p, null, LATER);
+    expect("elevation" in p.airport!).toBe(false);
+    expect(setAirportElevation(baseProject(), 10)).toEqual(baseProject());
   });
 
   it("does nothing at all to a project with no airport", () => {

@@ -4,7 +4,7 @@
 // safe; the buttons are also disabled there, this is belt-and-suspenders.
 import * as mutate from "../../core/project/mutate";
 import { firstProjectError } from "../../core/project/schemas";
-import type { PlacedObject, Project } from "../../core/project/types";
+import type { LonLat, PlacedObject, Project } from "../../core/project/types";
 import type { PctError } from "../../shared/pctApi";
 import { editorStore } from "../state/editorStore";
 import { DEFAULT_CAMERA } from "../state/store";
@@ -102,6 +102,27 @@ export function setTileProvider(provider: "esri" | "osm" | "custom"): void {
 }
 
 export type FetchResult = { ok: true; asl: number } | { ok: false; message: string };
+
+/** The terrain elevation under a point, for the airport's Elevation field. Same lookup as fetchElevation
+ *  below — a terrain-mode probe through resolveHeights — but nothing is cached in the store: the field
+ *  keeps the answer for as long as the point does not move. */
+export async function fetchTerrainAt(position: LonLat): Promise<FetchResult> {
+  const pct = getPct();
+  if (!pct) return { ok: false, message: "Elevation lookup needs the desktop app." };
+  const probe: PlacedObject = {
+    id: "airport",
+    kind: "xref",
+    name: "airport",
+    position,
+    height: { mode: "terrain" },
+    direction: 0,
+    scale: 1,
+  };
+  const res = await pct.resolveHeights([probe]);
+  if (!res.ok) return { ok: false, message: res.error.message };
+  const asl = res.value[0]?.heightAsl;
+  return asl === undefined ? { ok: false, message: "No elevation returned." } : { ok: true, asl };
+}
 
 /** Fetch the terrain elevation under one object and cache it for the inspector (design §5: the height
  *  control "shows the resolved effective ASL value once elevation is known, fetched lazily"). The store

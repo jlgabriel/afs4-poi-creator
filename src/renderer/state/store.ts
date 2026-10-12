@@ -344,6 +344,8 @@ export interface EditorState {
   //    The AIRPORT's own point. It takes no id because there is one airport per project,
   //    and it is the only airport mutation the MAP drives as well as the Inspector.
   moveAirportPosition: (position: LonLat) => void;
+  //    The airport's elevation, metres ASL; `null` = the terrain under its point (looked up at export).
+  setAirportElevation: (elevation: number | null) => void;
   //    Parking positions. Every one takes an id: letting it default would only hide a caller that forgot which stand it meant (mutate.ts).
   moveAirportParking: (id: string, position: LonLat) => void;
   rotateAirportParking: (id: string, heading: number) => void;
@@ -899,6 +901,9 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
         // project.
         moveAirportPosition: (position) =>
           commitCoalesced("airport:position", (proj) => mutate.setAirportPosition(proj, position)),
+        // Coalesced so a run of ±nudges is one undo step, like the object height buttons.
+        setAirportElevation: (elevation) =>
+          commitCoalesced("airport:elevation", (proj) => mutate.setAirportElevation(proj, elevation)),
 
         // Every coalesce key carries the STAND'S ID. Without it, dragging stand A and then stand B would
         // fold into one undo entry and a single Ctrl+Z would put both back.

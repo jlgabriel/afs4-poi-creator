@@ -17,6 +17,7 @@ import { identityProblemText, validateIdentity, SNAME_MAX } from "../../core/exp
 import { editorStore, useEditor } from "../state/editorStore";
 import { NumberInput } from "./NumberInput";
 import { WadPosition } from "./WadReadout";
+import { AirportElevationField } from "./AirportElevationField";
 import { getPct } from "../app/pct";
 
 const fmtDeg = (n: number): string => n.toFixed(6);
@@ -198,6 +199,8 @@ export function AirportDataFields({ airport }: { airport: ProjectAirport }): Rea
           <span className="pct-warn">{identityProblemText("country-format")}</span>
         )}
       </label>
+
+      <AirportElevationField elevation={airport.elevation} position={point} />
 
       {/* The one act that writes outside the project. It stays in a dialog because that is where the
           things that belong to WRITING live: the destination, the installed list with Uninstall, the

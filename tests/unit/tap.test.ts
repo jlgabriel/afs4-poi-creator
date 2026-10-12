@@ -3,7 +3,12 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import type { Project, ResolvedAirportLight, ResolvedLight } from "../../src/core/project/types";
-import { InvalidHeliportIdentityError, NoAirportError, planTap } from "../../src/core/export/planExport";
+import {
+  InvalidHeliportIdentityError,
+  NeedsAirportElevationError,
+  NoAirportError,
+  planTap,
+} from "../../src/core/export/planExport";
 import { tapFileName } from "../../src/core/export/tapWriter";
 import { NoTapDirError, TapFileExistsError, writeTap } from "../../src/main/tapExport";
 import { parseTm, type TmNode } from "../../src/core/tm/tmParser";
@@ -75,6 +80,7 @@ const TAP_PROJECT: Project = {
     name: "Santo Domingo Test",
     country: "cl",
     position: { lon: -71.6153, lat: -33.6564 },
+    elevation: 75,
     pads: [{ id: "h1", name: "Helipad_W", position: { lon: -71.616, lat: -33.656 }, heading: 92, radius: 8 }],
     runways: [
       {
@@ -127,9 +133,9 @@ const GOLDEN_TAP = `<[file][][]
         <[string8][name_short][Santo Domingo Test]>
         <[stringt8c][icao][PCTT01]>
         <[stringt8c][country][cl]>
-        <[float64][elevation][0]>
+        <[float64][elevation][75]>
         <[vector2_float64][model_center][-71.6153000 -33.6564000]>
-        <[bool][auto_height][false]>
+        <[bool][auto_height][true]>
         <[vector2_float64][offset][0 0]>
         <[list_tm_airport_pd_rwy_pair][runway_pairs][]
             <[tm_airport_pd_rwy_pair][element][0]
@@ -142,7 +148,7 @@ const GOLDEN_TAP = `<[file][][]
                         <[string8][reil][omni]>
                         <[string8][papi][left]>
                         <[float64][direction][56.14]>
-                        <[float64][elevation][0]>
+                        <[float64][elevation][75]>
                         <[bool][landing][true]>
                         <[bool][takeoff][true]>
                         <[bool][navigation][true]>
@@ -164,7 +170,7 @@ const GOLDEN_TAP = `<[file][][]
                         <[string8][reil][none]>
                         <[string8][papi][none]>
                         <[float64][direction][236.14]>
-                        <[float64][elevation][0]>
+                        <[float64][elevation][75]>
                         <[bool][landing][false]>
                         <[bool][takeoff][true]>
                         <[bool][navigation][true]>
@@ -233,7 +239,7 @@ const GOLDEN_TAP = `<[file][][]
             <[tm_airport_pd_xref][element][0]
                 <[string8][name][airport_windsock_large1]>
                 <[vector2_float64][position][-71.6183000 -33.6575000]>
-                <[float64][direction][37]>
+                <[float64][direction][53]>
             >
         >
     >
@@ -258,7 +264,7 @@ describe("Export TAP — the .tap file", () => {
     expect(tapFileName(" pct001 ")).toBe("PCT001.tap");
   });
 
-  it("gives each runway end the compass direction from its threshold toward the other one", () => {
+  it("gives an end without a runway number the direction from its threshold toward the other one", () => {
     // A north-south runway: the south end lands north (0), the north end lands south (180).
     const runway = TAP_PROJECT.airport!.runways![0]!;
     const ns: Project = {
@@ -276,13 +282,73 @@ describe("Export TAP — the .tap file", () => {
         ],
       },
     };
-    expect(valuesOf(planTap(ns, []).content, "direction").slice(0, 2)).toEqual(["0", "180"]);
+    const unnamed = (n: Project): Project => ({
+      ...n,
+      airport: {
+        ...n.airport!,
+        runways: n.airport!.runways!.map((r) => ({
+          ...r,
+          ends: [{ ...r.ends[0], identifier: "" }, { ...r.ends[1], identifier: "ALSF2" }],
+        })),
+      },
+    });
+    expect(valuesOf(planTap(unnamed(ns), []).content, "direction").slice(0, 2)).toEqual(["0", "180"]);
   });
 
-  it("mirrors the height mode in auto_height", () => {
+  it("gives a numbered end the axis direction that matches its number, whichever threshold it sits at", () => {
+    // "05" at the NORTH-EAST threshold and "23" at the south-west one: 05 still gets ~056, 23 ~236.
+    const runway = TAP_PROJECT.airport!.runways![0]!;
+    const swapped: Project = {
+      ...TAP_PROJECT,
+      airport: {
+        ...TAP_PROJECT.airport!,
+        runways: [
+          {
+            ...runway,
+            ends: [
+              { ...runway.ends[0], identifier: "05", threshold: runway.ends[1].threshold },
+              { ...runway.ends[1], identifier: "23", threshold: runway.ends[0].threshold },
+            ],
+          },
+        ],
+      },
+    };
+    const dirs = valuesOf(planTap(swapped, []).content, "direction").slice(0, 2).map(Number);
+    expect(dirs[0]).toBeCloseTo(56.14, 1);
+    expect(dirs[1]).toBeCloseTo(236.14, 1);
+    // A side letter does not hide the number.
+    const lettered: Project = {
+      ...swapped,
+      airport: {
+        ...swapped.airport!,
+        runways: [{ ...swapped.airport!.runways![0]!, ends: [{ ...swapped.airport!.runways![0]!.ends[0], identifier: "05L" }, swapped.airport!.runways![0]!.ends[1]] }],
+      },
+    };
+    expect(Number(valuesOf(planTap(lettered, []).content, "direction")[0])).toBeCloseTo(56.14, 1);
+  });
+
+  it("writes an XREF's compass heading, not its .toc rotation", () => {
+    // .toc direction 37 ⇒ heading 90 − 37 = 53; .toc 120 ⇒ heading 330.
+    const xref = TAP_PROJECT.objects.find((o) => o.kind === "xref")!;
+    const p: Project = { ...TAP_PROJECT, objects: [{ ...xref, direction: 120 } as Project["objects"][number]] };
+    const xrefs = nodesByName(parseTm(planTap(p, []).content), "xrefs")[0]!;
+    expect(nodesByName(xrefs, "direction").map((n) => n.value)).toEqual(["330"]);
+  });
+
+  it("is always auto_height true, whatever the project's height mode", () => {
     const auto = planTap({ ...TAP_PROJECT, heightMode: "autoheight" }, TAP_LIGHTS).content;
     expect(valuesOf(auto, "auto_height")).toEqual(["true"]);
-    expect(valuesOf(planTap(TAP_PROJECT, TAP_LIGHTS).content, "auto_height")).toEqual(["false"]);
+    expect(valuesOf(planTap(TAP_PROJECT, TAP_LIGHTS).content, "auto_height")).toEqual(["true"]);
+  });
+
+  it("takes the airport's elevation, else the terrain passed in, else refuses", () => {
+    const { elevation: _e, ...noElev } = TAP_PROJECT.airport!;
+    const terrainOnly: Project = { ...TAP_PROJECT, airport: noElev };
+    // Airport + both runway ends.
+    expect(valuesOf(planTap(terrainOnly, TAP_LIGHTS, 71.34).content, "elevation")).toEqual(["71.34", "71.34", "71.34"]);
+    // A typed elevation wins over the terrain.
+    expect(valuesOf(planTap(TAP_PROJECT, TAP_LIGHTS, 10).content, "elevation")[0]).toBe("75");
+    expect(() => planTap(terrainOnly, TAP_LIGHTS)).toThrow(NeedsAirportElevationError);
   });
 
   it("omits empty lists and never writes a boundary", () => {

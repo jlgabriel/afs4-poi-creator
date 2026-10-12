@@ -12,7 +12,8 @@ import type { Catalog, Project, Settings } from "../src/core/project/types";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const MAIN = path.join(ROOT, "out", "main", "index.js");
 
-/** An airport with a helipad and one XREF — no lights, so the export needs no elevation lookup. */
+/** An airport with a helipad and one XREF — no lights and a typed elevation, so the export needs no
+ *  elevation lookup. */
 const PROJECT: Project = {
   schemaVersion: 1,
   app: "pct",
@@ -38,6 +39,7 @@ const PROJECT: Project = {
     name: "TAP E2E Field",
     country: "ch",
     position: { lon: 6.988, lat: 46.2554 },
+    elevation: 512,
     pads: [{ id: "h1", name: "", position: { lon: 6.988, lat: 46.2554 }, heading: 92, radius: 10 }],
   },
 };
@@ -96,6 +98,7 @@ test("Export TAP writes <ICAO>.tap into the TAP folder, and replaces it only whe
     expect(text.startsWith("<[file][][]\n    <[tm_airport_pd][][]\n")).toBe(true);
     expect(text).toContain("<[stringt8c][icao][PCTE2E]>");
     expect(text).toContain("<[string8][name][tower_e2e]>");
+    expect(text).toContain("<[float64][elevation][512]>");
 
     writeFileSync(path.join(tapDir, "PCTE2E.tap"), "edited by hand");
     const again = (await exportTap(false)) as { ok: boolean; error: { code: string; fileName: string } };

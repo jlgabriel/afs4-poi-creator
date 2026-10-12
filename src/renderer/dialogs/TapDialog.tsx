@@ -55,6 +55,10 @@ export function TapDialog({ onClose }: { onClose: () => void }): React.ReactElem
   const identity = airport === undefined ? null : airportIdentity(airport);
   const problem = identity === null ? null : validateIdentity(identity);
   const lightCount = objects.filter((o) => o.kind === "light" || o.kind === "airport_light").length;
+  // The manual base elevation stands in for the elevation service: for the lights (Baked ASL only) and for
+  // an airport whose elevation is left on Terrain.
+  const lightsNeedTerrain = heightMode !== "autoheight" && lightCount > 0;
+  const airportNeedsTerrain = airport !== undefined && airport.elevation === undefined;
 
   const write = async (overwrite: boolean): Promise<void> => {
     if (!pct || airport === undefined || problem !== null) return;
@@ -80,7 +84,7 @@ export function TapDialog({ onClose }: { onClose: () => void }): React.ReactElem
     }
 
     const opts: TapExportOptions = { overwrite };
-    if (heightMode !== "autoheight" && baseElevation !== undefined) opts.baseElevation = baseElevation;
+    if (baseElevation !== undefined) opts.baseElevation = baseElevation;
     setBusy(true);
     const res = await pct.exportTap(project, opts);
     setBusy(false);
@@ -179,6 +183,14 @@ export function TapDialog({ onClose }: { onClose: () => void }): React.ReactElem
                       </span>
                     </li>
                     <li>
+                      <span className="pct-field-meta">Elevation</span>
+                      <span>
+                        {airport.elevation !== undefined
+                          ? `${airport.elevation.toFixed(1)} m ASL`
+                          : "terrain under the airport point"}
+                      </span>
+                    </li>
+                    <li>
                       <span className="pct-field-meta">Objects</span>
                       <span>{objects.length}</span>
                     </li>
@@ -196,9 +208,12 @@ export function TapDialog({ onClose }: { onClose: () => void }): React.ReactElem
                   )}
                 </div>
 
-                {heightMode !== "autoheight" && lightCount > 0 && (
+                {(lightsNeedTerrain || airportNeedsTerrain) && (
                   <label className="pct-field pct-field-col">
-                    <span className="pct-field-label">Base elevation for the lights — m ASL (optional)</span>
+                    <span className="pct-field-label">
+                      Base elevation for {lightsNeedTerrain && airportNeedsTerrain ? "the airport and the lights" : lightsNeedTerrain ? "the lights" : "the airport"}{" "}
+                      — m ASL (optional)
+                    </span>
                     <input
                       className="pct-num"
                       value={baseElev}

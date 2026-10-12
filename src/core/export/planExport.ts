@@ -323,6 +323,14 @@ export interface TapPlan {
   warnings: string[];
 }
 
+/** Thrown when planTap has no elevation for the airport: none typed, and no terrain value passed in. */
+export class NeedsAirportElevationError extends Error {
+  constructor() {
+    super("The airport's elevation is unknown — type it in the Airport panel (Elevation → ASL).");
+    this.name = "NeedsAirportElevationError";
+  }
+}
+
 /** Thrown when a project without an airport, or without the airport's own point, reaches planTap. The
  *  dialog refuses both first; this keeps every other path from writing a `.tap` with no `model_center`. */
 export class NoAirportError extends Error {
@@ -343,16 +351,21 @@ export function airportIdentity(airport: NonNullable<Project["airport"]>): Helip
 
 /** Plan the `.tap`. The airport comes from `project.airport`; every point is shifted with the scene.
  *
+ *  The elevation is the airport's own (`airport.elevation`) or, when that is unset, `terrainAsl` — the
+ *  terrain under the airport point, looked up by the caller. Neither ⇒ NeedsAirportElevationError.
+ *
  *  `resolvedLights` carries the point and airport lights with their heights resolved (the same pipeline as
  *  the `.toc`) — the only objects whose `.tap` element has a height. Plants and XREFs are read straight
  *  from `project.objects`: their `.tap` element has a 2-D position and nothing else that needs resolving,
  *  so a project without lights exports with no elevation lookup at all. */
-export function planTap(project: Project, resolvedLights: ResolvedObject[]): TapPlan {
+export function planTap(project: Project, resolvedLights: ResolvedObject[], terrainAsl?: number): TapPlan {
   const airport = project.airport;
   if (airport === undefined || airport.position === undefined) throw new NoAirportError();
   const identity = airportIdentity(airport);
   const problem = validateIdentity(identity);
   if (problem !== null) throw new InvalidHeliportIdentityError(problem);
+  const elevation = airport.elevation ?? terrainAsl;
+  if (elevation === undefined) throw new NeedsAirportElevationError();
 
   const shift = project.shift;
   const warnings: string[] = [];
@@ -381,7 +394,7 @@ export function planTap(project: Project, resolvedLights: ResolvedObject[]): Tap
   const raised = [...placedXrefs, ...placedPlants].filter((o) => o.height.mode !== "terrain").length;
   if (raised > 0) {
     warnings.push(
-      `${raised} XREF${raised === 1 ? " or plant is" : "s or plants are"} set above the terrain (Terrain + offset or a fixed ASL height) — a TAP stores no height for XREFs and plants.`,
+      `${raised} XREF${raised === 1 ? " or plant is" : "s or plants are"} set above the terrain (Terrain + offset or a fixed ASL height) — a TAP stores no height for XREFs and plants: the converter places XREFs at the airport's elevation.`,
     );
   }
 
@@ -389,7 +402,7 @@ export function planTap(project: Project, resolvedLights: ResolvedObject[]): Tap
   const spec: TapSpec = {
     identity,
     position: shiftPoint(airport.position, shift),
-    autoheight: project.heightMode === "autoheight",
+    elevation,
     runways,
     pads,
     parkings: heliportParkings(airport.parkings, shift),

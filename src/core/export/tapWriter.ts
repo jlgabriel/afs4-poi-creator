@@ -16,15 +16,21 @@
 //   • objects: plants and XREFs carry a 2-D `position` and no height; an XREF has no `scale_factor`; an
 //     airport light's fixture is `name` (not type_name); plant `group`/`species` are `string8`.
 //     Point and airport lights keep a 3-D position with the same height the `.toc` gets.
+//   • an XREF's `direction` is the COMPASS HEADING, not the `.toc` rotation: the converter applies the
+//     heading → `.toc` direction conversion itself (orientation.ts), so writing the `.toc` value would
+//     convert it twice.
+//   • the place is always `auto_height` true, and its `elevation` is the reference height the converter
+//     places XREFs at — so it must be the airport's real elevation, not 0.
 //
 // Rows PCT has no data for are written with the converter's neutral defaults (see TAP_* below). The two
-// derived rows are a runway end's `direction` (from its two thresholds) and `marking_nonumbers` (an
-// unnamed end paints no numbers). Empty lists are OMITTED: the converter accepts a `.tap` without them.
-// No boundary polygon is written — PCT has none.
+// derived rows are a runway end's `direction` (see endDirection) and `marking_nonumbers` (an unnamed end
+// paints no numbers). Empty lists are OMITTED: the converter accepts a `.tap` without them. No boundary
+// polygon is written — PCT has none, and the converter does not need one for what PCT writes.
 
 import type { LonLat, ResolvedAirportLight, ResolvedLight } from "../project/types";
 import { tag, block, fmtLonLat, fmtMeters, fmtNum, sanitizeValue } from "../tm/tmEmit";
 import { initialBearing } from "../geo/geo";
+import { directionToHeading } from "../geo/orientation";
 import type {
   HeliportIdentity,
   HeliportPadSpec,
@@ -40,8 +46,8 @@ export interface TapPlantSpec {
   species: string;
 }
 
-/** An XREF as the `.tap` wants it: 2-D position, rotation, no height, no scale. `direction` is the same
- *  rotation value the `.toc` gets (PlacedXref.direction), not a compass heading. */
+/** An XREF as the `.tap` wants it: 2-D position, rotation, no height, no scale. `direction` is the raw
+ *  `.toc` rotation (PlacedXref.direction); the writer turns it into the compass heading the `.tap` stores. */
 export interface TapXrefSpec {
   name: string;
   position: LonLat;
@@ -52,8 +58,8 @@ export interface TapSpec {
   identity: HeliportIdentity;
   /** The airport's own point, degrees, shifted with the scene → `model_center`. */
   position: LonLat;
-  /** The project's height mode → `auto_height`. */
-  autoheight: boolean;
+  /** Metres ASL → the place's `elevation` and every runway end's. */
+  elevation: number;
   runways: HeliportRunwaySpec[];
   pads: HeliportPadSpec[];
   parkings: HeliportParkingSpec[];
@@ -68,10 +74,6 @@ export interface TapSpec {
 export function tapFileName(icao: string): string {
   return `${icao.trim().toUpperCase()}.tap`;
 }
-
-/** Elevation rows (airport and each runway end). PCT has no elevation data, so 0 — the same value the
- *  `.tsc`/`.wad` writers use. */
-const TAP_ELEVATION = "0";
 
 /** Per-end rows PCT offers nothing for. The four flags match the `.wad` defaults (heliportTemplate.ts
  *  RUNWAY_END_WAD_DEFAULTS); the markings are the converter's standard set. */
@@ -98,10 +100,31 @@ const deg = (p: LonLat): string => `${fmtLonLat(p.lon)} ${fmtLonLat(p.lat)}`;
 const deg3 = (p: LonLat, h: number): string => `${deg(p)} ${fmtMeters(h)}`;
 const text = (s: string): string => sanitizeValue(s).trim();
 
-/** Compass bearing, degrees [0, 360), from one end's threshold toward the other's: the direction an
- *  aircraft lands at this end. */
-function endDirection(from: LonLat, to: LonLat): string {
-  const s = fmtNum(initialBearing(from, to), 2);
+/** The runway number an identifier starts with ("05", "23L", "9"), 1–36; null for anything else
+ *  (empty, "ALSF2"…). */
+function runwayNumber(identifier: string): number | null {
+  const m = /^(\d{1,2})(?!\d)/.exec(identifier);
+  if (m === null) return null;
+  const n = Number(m[1]);
+  return n >= 1 && n <= 36 ? n : null;
+}
+
+/** Absolute difference of two compass bearings, degrees [0, 180]. */
+function bearingGap(a: number, b: number): number {
+  const d = Math.abs(a - b) % 360;
+  return d > 180 ? 360 - d : d;
+}
+
+/** A runway end's `direction`: compass degrees [0, 360) along the runway axis, matching its NAME — end
+ *  "05" gets ~050, end "23" ~230, wherever on the map the user put that end's threshold. Of the axis's two
+ *  bearings (this threshold → the other, and back) the one closer to the runway number wins. An end with
+ *  no runway number in its name gets the bearing from its own threshold toward the other one. */
+function endDirection(own: LonLat, other: LonLat, identifier: string): string {
+  const toOther = initialBearing(own, other);
+  const fromOther = initialBearing(other, own);
+  const n = runwayNumber(identifier);
+  const b = n !== null && bearingGap(fromOther, n * 10) < bearingGap(toOther, n * 10) ? fromOther : toOther;
+  const s = fmtNum(b, 2);
   return s === "360" ? "0" : s; // 359.996 rounds up
 }
 
@@ -110,7 +133,7 @@ function list(type: string, name: string, elements: string[][]): string[] {
   return elements.length === 0 ? [] : block(type, name, "", elements.flat());
 }
 
-function runwayPairs(runways: HeliportRunwaySpec[]): string[] {
+function runwayPairs(runways: HeliportRunwaySpec[], elevation: string): string[] {
   return list(
     "list_tm_airport_pd_rwy_pair",
     "runway_pairs",
@@ -125,8 +148,8 @@ function runwayPairs(runways: HeliportRunwaySpec[]): string[] {
           tag("string8", "appltsys", e.appltsys),
           tag("string8", "reil", e.reil),
           tag("string8", "papi", e.papi),
-          tag("float64", "direction", endDirection(e.threshold, other.threshold)),
-          tag("float64", "elevation", TAP_ELEVATION),
+          tag("float64", "direction", endDirection(e.threshold, other.threshold, identifier)),
+          tag("float64", "elevation", elevation),
           // `landing` is the project's `approach` (types.ts AirportRunwayEnd).
           tag("bool", "landing", e.approach ? "true" : "false"),
           tag("bool", "takeoff", e.takeoff ? "true" : "false"),
@@ -232,7 +255,7 @@ function xrefs(xrefList: TapXrefSpec[]): string[] {
       block("tm_airport_pd_xref", "element", String(i), [
         tag("string8", "name", sanitizeValue(o.name)),
         tag("vector2_float64", "position", deg(o.position)),
-        tag("float64", "direction", fmtNum(o.direction, 3)),
+        tag("float64", "direction", fmtNum(directionToHeading(o.direction), 3)),
       ]),
     ),
   );
@@ -241,17 +264,19 @@ function xrefs(xrefList: TapXrefSpec[]): string[] {
 /** The whole `.tap` text. Pure; the caller has already validated the identity and shifted every point. */
 export function buildTap(spec: TapSpec): string {
   const name = text(spec.identity.name);
+  const elevation = fmtNum(spec.elevation, 2);
   const body = [
     tag("string8", "name", name),
     tag("string8", "name_short", name),
     // The code in CAPITALS, as in the `.tsc`/`.wad`; the country stays lowercase.
     tag("stringt8c", "icao", spec.identity.icao.toUpperCase()),
     tag("stringt8c", "country", spec.identity.country),
-    tag("float64", "elevation", TAP_ELEVATION),
+    tag("float64", "elevation", elevation),
     tag("vector2_float64", "model_center", deg(spec.position)),
-    tag("bool", "auto_height", spec.autoheight ? "true" : "false"),
+    // Always true, whatever the project's height mode: the converter's airport sits on the terrain.
+    tag("bool", "auto_height", "true"),
     tag("vector2_float64", "offset", "0 0"),
-    ...runwayPairs(spec.runways),
+    ...runwayPairs(spec.runways, elevation),
     ...helipads(spec.pads),
     ...parkingPositions(spec.parkings),
     ...plants(spec.plants),

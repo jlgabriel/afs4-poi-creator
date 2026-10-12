@@ -444,6 +444,21 @@ export function setAirportPosition(project: Project, position: LonLat | null, no
   return { ...project, airport: { ...airport, position }, modifiedAt: now };
 }
 
+/** Set the airport's elevation (metres ASL), or clear it with `null` — back to the terrain under the
+ *  airport point, looked up at export. No airport block ⇒ unchanged. */
+export function setAirportElevation(project: Project, elevation: number | null, now = nowIso()): Project {
+  const airport = project.airport;
+  if (airport === undefined) return project;
+  if (elevation === null) {
+    if (airport.elevation === undefined) return project;
+    const next = { ...airport };
+    delete next.elevation;
+    return { ...project, airport: next, modifiedAt: now };
+  }
+  if (airport.elevation === elevation) return project;
+  return { ...project, airport: { ...airport, elevation }, modifiedAt: now };
+}
+
 /** A fresh pad, unnamed and facing true north. Unnamed is not a placeholder: the writer renders it as
  *  "FATO/TLOF", the literal v1.2/v1.3 always emitted, so a one-pad project's files do not move. */
 function newPad(position: LonLat, radius: number, id = randomId()): AirportPad {

@@ -414,7 +414,8 @@ export function installMockBridge(): void {
       return { ok: true, value: undefined };
     },
     // The REAL planner, so the preview produces the exact `.tap` text; it is kept on
-    // `window.__pctLastTap` for inspection. Lights get a flat 100 m, like resolveHeights above.
+    // `window.__pctLastTap` for inspection. Lights — and an airport with no elevation of its own — get a
+    // flat 100 m, like resolveHeights above.
     exportTap: async (project, opts) => {
       if (settings.tapDir === null) {
         return { ok: false, error: { code: "no-tap-dir", message: "No TAP folder is set — choose one first." } };
@@ -423,7 +424,7 @@ export function installMockBridge(): void {
         const lights = project.objects
           .filter((o) => o.kind === "light" || o.kind === "airport_light")
           .map((o) => ({ ...o, heightAsl: 100 }));
-        const plan = planTap(project, lights);
+        const plan = planTap(project, lights, 100);
         if (!opts.overwrite && writtenTaps.has(plan.fileName)) {
           return {
             ok: false,

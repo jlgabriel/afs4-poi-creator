@@ -276,7 +276,8 @@ Restart Aerofly after installing: airports are read once, at startup.
 the format a TAP converter builds an airport folder from. It installs nothing: the file goes into the
 folder you pick (it's also under *Settings → TAP folder*), and PCT asks before replacing a `.tap` of the
 same name. Glider starts, an XREF's scale and the heights of XREFs and plants are not in it yet, and the
-dialog says so when your project has them. Asked for by **@ApfelFlieger**.
+dialog says so when your project has them. The airport's **Elevation** (Airport panel, *v2.1.1*) goes
+in too: the converter places the XREFs at that height. Asked for by **@ApfelFlieger**.
 [The guide](guide/GUIDE.md#a-tap-file-for-a-converter) has the details.
 
 ### Good to know

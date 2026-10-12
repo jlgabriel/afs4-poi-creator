@@ -43,6 +43,7 @@ import {
 } from "../core/export/heights";
 import {
   InvalidHeliportIdentityError,
+  NeedsAirportElevationError,
   NoAirportError,
   planExport,
   planHeliport,
@@ -159,6 +160,7 @@ function toPctError(e: unknown): PctError {
   }
   if (e instanceof UnsafeCountryError) return { code: "invalid-identity", message: e.message };
   if (e instanceof NoAirportError) return { code: "invalid-project", message: e.message };
+  if (e instanceof NeedsAirportElevationError) return { code: "needs-elevation", message: e.message, points: [] };
   if (e instanceof NoTapDirError) return { code: "no-tap-dir", message: e.message };
   if (e instanceof TapFileExistsError) {
     return { code: "file-exists", message: e.message, fileName: e.fileName };
@@ -374,7 +376,8 @@ async function runHeliportInstall(project: Project, opts: HeliportInstallOptions
 /** "Export TAP": the project's airport as `<ICAO>.tap` in the TAP folder, and nothing else.
  *
  *  Only the point and airport lights carry a height in a `.tap`, so only they go through height
- *  resolution — a project without lights never needs the elevation service here. */
+ *  resolution. The airport's own elevation is the one typed in the project; when there is none, the
+ *  terrain under the airport point (the manual base elevation, else the elevation service). */
 async function runTapExport(project: Project, opts: TapExportOptions): Promise<TapExportResult> {
   const settings = currentSettings();
   const lights = project.objects.filter((o) => o.kind === "light" || o.kind === "airport_light");
@@ -393,11 +396,40 @@ async function runTapExport(project: Project, opts: TapExportOptions): Promise<T
               cacheDir: userData(),
               version: app.getVersion(),
             });
-  const plan = planTap(project, resolved);
+  const plan = planTap(project, resolved, await tapAirportTerrain(project, opts));
   const file = writeTap(settings.tapDir, plan, { overwrite: opts.overwrite });
   log.info(`tap export ok — written to ${file}`);
   for (const w of plan.warnings) log.warn(`tap export warning: ${w}`);
   return { fileName: plan.fileName, path: file, warnings: plan.warnings };
+}
+
+/** The terrain under the airport point, for a project whose airport has no elevation of its own;
+ *  undefined when it is not needed (or there is no point — planTap reports that). A failed lookup becomes
+ *  NeedsAirportElevationError, whose message says where to type the value. */
+async function tapAirportTerrain(project: Project, opts: TapExportOptions): Promise<number | undefined> {
+  const airport = project.airport;
+  if (airport?.position === undefined || airport.elevation !== undefined) return undefined;
+  if (opts.baseElevation != null) return opts.baseElevation;
+  // A terrain-mode probe at the airport point: resolveHeights takes placed objects, nothing else.
+  const probe: PlacedObject = {
+    id: "airport",
+    kind: "xref",
+    name: "airport",
+    position: airport.position,
+    height: { mode: "terrain" },
+    direction: 0,
+    scale: 1,
+  };
+  try {
+    const [r] = await resolveHeights([probe], currentSettings().elevation.provider, {
+      cacheDir: userData(),
+      version: app.getVersion(),
+    });
+    return r?.heightAsl;
+  } catch (e) {
+    if (e instanceof NeedsElevationError) throw new NeedsAirportElevationError();
+    throw e;
+  }
 }
 
 /** Load the optional object-table overlay, scan, cache the catalog, and record lastScanAt. Shared by

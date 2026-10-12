@@ -220,6 +220,7 @@ export const zAirport = z.looseObject({
   name: z.string().max(IDENTITY_MAX),
   country: z.string().max(IDENTITY_MAX),
   position: zLonLat.optional(),
+  elevation: z.number().finite().optional(),
   // Defaulted rather than required: an airport with no pads is legal, and a hand-edited file missing the
   // key should land on the empty list, not fail to open.
   pads: z.array(zPad).default([]),

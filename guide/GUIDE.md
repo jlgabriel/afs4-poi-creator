@@ -687,6 +687,11 @@ work today because Aerofly accepts them; four is the safe length if you would ra
 **Country code** is two letters — `us`, `de`, `cl`. All it decides is which folder your airport is
 filed under, the way Aerofly files its own: `scenery/airports/de/…`.
 
+**Elevation** is the airport's height above sea level, and only **Export TAP…** uses it (see
+[A TAP file for a converter](#a-tap-file-for-a-converter)). Leave it on **Terrain** and PCT looks up the
+ground under the airport's point when you export; pick **ASL** to type the number yourself — it starts
+from the ground height, and **Fetch elevation** shows that height any time.
+
 **Lon / Lat is the airport's own point**, and it behaves differently from everything else on this
 panel:
 
@@ -893,12 +898,20 @@ folder** shows it and changes it.
 
 What goes in: the airport, its runways, helipads and parking positions, and every object you placed.
 The code, the name and the country follow the same rules as for **Export /airports…**, and the airport
-needs its point on the map. Three things a `.tap` does not carry, and the dialog tells you when your
-project has them:
+needs its point on the map.
+
+**Set the airport's elevation** in the Airport panel. The converter places every XREF at that height,
+so an elevation of 0 puts them at sea level. On **Terrain**, PCT looks the height up when you export; if
+the lookup cannot be made (offline, say), the dialog takes a base elevation instead.
+
+Three things a `.tap` does not carry, and the dialog tells you when your project has them:
 
 - **Glider starts** (aerotow and winch) are not written to it yet.
 - **An XREF's scale** — it comes out at its normal size.
 - **A height for XREFs and plants.** Point lights and airport lights keep theirs.
+
+Each runway end's direction follows its identifier: an end named `05` points about 050°, whichever
+threshold on the map it belongs to. An end without a runway number points toward the other end.
 
 Runways are written as standard asphalt with the standard markings: PCT has no fields for the surface
 or the paint yet.
