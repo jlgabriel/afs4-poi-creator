@@ -131,7 +131,8 @@ body {
 }
 /* The helicopter start pad (HelipadLayer): the whole circle is the drag target, so it wants the same
    grab cursor the rotate grip has. */
-.pct-helipad {
+.pct-helipad,
+.pct-mark {
   cursor: grab;
 }
 /* The airport's point-by-point shapes — boundary, tarmacs, lines (PolyShape): a click selects, the points
@@ -207,6 +208,34 @@ body {
   height: 100%;
   border: 2px solid;
   cursor: grab;
+}
+
+/* The marking inside a ground text, jetway or car lot (MarkLayer). Centred on the point by its own
+   transform, which the layer writes inline with the rotation; never a click target, so the outline under
+   it keeps the drag. */
+.pct-mark-glyph {
+  background: none;
+  border: none;
+  pointer-events: none;
+  overflow: visible;
+}
+.pct-groundtext,
+.pct-mark-label {
+  position: absolute;
+  left: 0;
+  top: 0;
+  white-space: nowrap;
+  font-weight: 700;
+  font-family: system-ui, sans-serif;
+  user-select: none;
+}
+.pct-mark-label {
+  transform: translate(-50%, -50%);
+  color: #ffffff;
+  font-size: 12px;
+  text-shadow:
+    0 0 0.18em #0f172a,
+    0 0 0.12em #0f172a;
 }
 
 /* A runway end's name ("05") just past its threshold — see RunwayLayer. A dark tag with white digits,

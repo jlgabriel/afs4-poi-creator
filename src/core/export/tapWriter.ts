@@ -29,6 +29,9 @@
 //   • `tarmacs` (closed polygons, like the boundary) and `lines` (open polylines) come right after
 //     `parking_positions`. Their material and line names, and the runway's material, are the converter's
 //     vocabulary (surfaces.ts). `brightness` is a `string8` here, and EMPTY for a material that takes none.
+//   • `groundtexts` and `jetways` follow the lines; `carlots` is the one list written AFTER `xrefs`. The
+//     jetway's and car lot's `direction` is the compass heading. A ground text's `pointing` row is typed
+//     `string`, not `string8`.
 //   • glider starts are NOT in the `.tap`: they go in a second file, `<ICAO>_addendum.tap`, which the
 //     converter merges when both sit side by side in its input folder (see buildTapAddendum).
 //
@@ -37,7 +40,15 @@
 // paints no numbers). Empty lists are OMITTED (the converter accepts a `.tap` without them), except
 // `custom_models`.
 
-import type { LonLat, ResolvedAirportLight, ResolvedLight } from "../project/types";
+import type {
+  AirportCarlot,
+  AirportGroundText,
+  AirportJetway,
+  LonLat,
+  ResolvedAirportLight,
+  ResolvedLight,
+} from "../project/types";
+import { cleanGroundTextValue, groundTextTapDirection } from "../project/marks";
 import { tag, block, fmtLonLat, fmtMeters, fmtNum, sanitizeValue } from "../tm/tmEmit";
 import { initialBearing } from "../geo/geo";
 import { directionToHeading } from "../geo/orientation";
@@ -88,6 +99,12 @@ export interface TapLineSpec {
   name: string;
 }
 
+/** The three one-point elements, as the project has them with the position shifted. `heading` is the
+ *  project's compass heading; the writer turns it into the `.tap` `direction`. */
+export type TapGroundTextSpec = Omit<AirportGroundText, "id">;
+export type TapJetwaySpec = Omit<AirportJetway, "id">;
+export type TapCarlotSpec = Omit<AirportCarlot, "id">;
+
 export interface TapSpec {
   identity: HeliportIdentity;
   /** The airport's own point, degrees, shifted with the scene → `model_center`. */
@@ -102,6 +119,9 @@ export interface TapSpec {
   parkings: HeliportParkingSpec[];
   tarmacs: TapTarmacSpec[];
   lines: TapLineSpec[];
+  groundTexts: TapGroundTextSpec[];
+  jetways: TapJetwaySpec[];
+  carlots: TapCarlotSpec[];
   plants: TapPlantSpec[];
   /** Height already resolved, exactly as the `.toc` writes it. */
   lights: ResolvedLight[];
@@ -353,6 +373,66 @@ function lines(lineList: TapLineSpec[]): string[] {
   );
 }
 
+/** The `groundtexts` list. `pointing` is a `string` row, not `string8` like the others. */
+function groundTexts(list_: TapGroundTextSpec[]): string[] {
+  return list(
+    "list_tm_airport_pd_groundtext",
+    "groundtexts",
+    list_.map((g, i) =>
+      block("tm_airport_pd_groundtext", "element", String(i), [
+        tag("vector2_float64", "position", deg(g.position)),
+        tag("vector2_float64", "size", `${fmtNum(g.size[0])} ${fmtNum(g.size[1])}`),
+        tag("float64", "direction", fmtNum(groundTextTapDirection(g.heading), 3)),
+        tag("string8", "name", text(g.name) || "GROUNDTEXT"),
+        tag("string8", "value", cleanGroundTextValue(g.value)),
+        tag("string8", "textcolor", g.textColor),
+        tag("string8", "background", g.background),
+        tag("string8", "backgroundcolor", g.backgroundColor),
+        tag("string8", "strokecolor", g.strokeColor),
+        tag("string", "pointing", g.pointing),
+      ]),
+    ),
+  );
+}
+
+/** The `jetways` list. `direction` is the compass heading. */
+function jetways(list_: TapJetwaySpec[]): string[] {
+  return list(
+    "list_tm_airport_pd_jetway",
+    "jetways",
+    list_.map((j, i) =>
+      block("tm_airport_pd_jetway", "element", String(i), [
+        tag("vector2_float64", "position", deg(j.position)),
+        tag("float64", "mounting_elevation", fmtNum(j.mountingElevation, 3)),
+        tag("float64", "direction", fmtNum(j.heading, 3)),
+        tag("float64", "extension_direction", fmtNum(j.extensionDirection, 3)),
+        tag("float64", "extension_pitch", fmtNum(j.extensionPitch, 3)),
+        tag("float64", "extension_amount", fmtNum(j.extensionAmount, 3)),
+        tag("float64", "exit_direction", fmtNum(j.exitDirection, 3)),
+        tag("bool", "docked", j.docked ? "true" : "false"),
+      ]),
+    ),
+  );
+}
+
+/** The `carlots` list. `direction` is the compass heading; `pattern` is always empty, and `rows` and
+ *  `columns` are `string8` rows. */
+function carlots(list_: TapCarlotSpec[]): string[] {
+  return list(
+    "list_tm_airport_pd_carlot",
+    "carlots",
+    list_.map((c, i) =>
+      block("tm_airport_pd_carlot", "element", String(i), [
+        tag("vector2_float64", "position", deg(c.position)),
+        tag("float64", "direction", fmtNum(c.heading, 3)),
+        tag("string8", "pattern", ""),
+        tag("string8", "rows", String(c.rows)),
+        tag("string8", "columns", String(c.columns)),
+      ]),
+    ),
+  );
+}
+
 /** The whole `.tap` text. Pure; the caller has already validated the identity and shifted every point. */
 export function buildTap(spec: TapSpec): string {
   const name = text(spec.identity.name);
@@ -376,10 +456,14 @@ export function buildTap(spec: TapSpec): string {
     ...parkingPositions(spec.parkings),
     ...tarmacs(spec.tarmacs),
     ...lines(spec.lines),
+    ...groundTexts(spec.groundTexts),
+    ...jetways(spec.jetways),
     ...plants(spec.plants),
     ...lights(spec.lights),
     ...airportLights(spec.airportLights),
     ...xrefs(spec.xrefs),
+    // After the XREFs, unlike every other element list.
+    ...carlots(spec.carlots),
   ];
   return block("file", "", "", block("tm_airport_pd", "", "", body)).join("\n") + "\n";
 }

@@ -10,6 +10,9 @@
 
 import type {
   AirportAerotow,
+  AirportCarlot,
+  AirportGroundText,
+  AirportJetway,
   AirportLine,
   AirportPad,
   AirportParking,
@@ -36,6 +39,9 @@ import {
   DEFAULT_RUNWAY_WIDTH_M,
   DEFAULT_WINCH_SPACING_M,
   aerotowsOf,
+  carlotsOf,
+  groundTextsOf,
+  jetwaysOf,
   linesOf,
   parkingsOf,
   runwaysOf,
@@ -50,6 +56,25 @@ import {
   DEFAULT_TARMAC_MATERIAL,
   clampBrightness,
 } from "./surfaces";
+import {
+  DEFAULT_CARLOT_COLUMNS,
+  DEFAULT_CARLOT_ROWS,
+  DEFAULT_GROUNDTEXT_BACKGROUND,
+  DEFAULT_GROUNDTEXT_BACKGROUND_COLOR,
+  DEFAULT_GROUNDTEXT_POINTING,
+  DEFAULT_GROUNDTEXT_SIZE,
+  DEFAULT_GROUNDTEXT_STROKE_COLOR,
+  DEFAULT_GROUNDTEXT_TEXT_COLOR,
+  DEFAULT_GROUNDTEXT_VALUE,
+  DEFAULT_JETWAY,
+  JETWAY_EXIT_DIRECTION_RANGE,
+  JETWAY_EXTENSION_AMOUNT_RANGE,
+  JETWAY_EXTENSION_DIRECTION_RANGE,
+  JETWAY_MOUNTING_RANGE,
+  clampTo,
+  cleanCarlotCount,
+  cleanGroundTextValue,
+} from "./marks";
 
 const nowIso = (): string => new Date().toISOString();
 
@@ -825,9 +850,12 @@ const copyPoints = (points: readonly LonLat[]): LonLat[] => points.map((p) => ({
 
 /** Replace one element of the tarmac or line list by id. No airport, no element with that id, or a patch
  *  that changes nothing → the same project reference. */
+/** The airport lists edited through updateListItem / removeListItem. */
+type ListKey = "tarmacs" | "lines" | MarkKey;
+
 function updateListItem<T extends { id: string }>(
   project: Project,
-  key: "tarmacs" | "lines",
+  key: ListKey,
   read: (a: ProjectAirport) => T[],
   id: string,
   patch: (item: T) => T,
@@ -848,7 +876,7 @@ function updateListItem<T extends { id: string }>(
 
 function removeListItem(
   project: Project,
-  key: "tarmacs" | "lines",
+  key: ListKey,
   read: (a: ProjectAirport) => { id: string }[],
   id: string,
   now: string,
@@ -966,6 +994,183 @@ export function setAirportLinePoints(
 
 export function setAirportLineName(project: Project, lineId: string, name: string, now = nowIso()): Project {
   return updateListItem(project, "lines", linesOf, lineId, (l) => (l.name === name ? l : { ...l, name }), now);
+}
+
+// ── GROUND TEXTs, JETWAYs and CAR LOTs (types.ts) — one-point elements only Export TAP reads ──────────
+//
+// All three are a point plus a heading, placed and dragged like a stand, so they share one set of
+// mutations for what they have in common (add, remove, move, turn) and each has its own `update…` for its
+// fields.
+
+/** The three lists, by the airport key they live under. */
+export type MarkKey = "groundtexts" | "jetways" | "carlots";
+type MarkOf<K extends MarkKey> = NonNullable<ProjectAirport[K]>[number];
+
+const MARK_READERS: { [K in MarkKey]: (a: ProjectAirport) => MarkOf<K>[] } = {
+  groundtexts: groundTextsOf,
+  jetways: jetwaysOf,
+  carlots: carlotsOf,
+};
+
+/** APPEND one element. Creates the airport block when there is none and seeds the airport's point at the
+ *  element, like every other placement. */
+function addMark<K extends MarkKey>(project: Project, key: K, item: MarkOf<K>, now: string): Project {
+  const airport = project.airport;
+  const next: ProjectAirport =
+    airport === undefined
+      ? { icao: "", name: "", country: "", pads: [], [key]: [item] }
+      : { ...airport, [key]: [...MARK_READERS[key](airport), item] };
+  return { ...project, airport: seededPosition(next, item.position), modifiedAt: now };
+}
+
+export function addAirportGroundText(
+  project: Project,
+  position: LonLat,
+  opts: { id?: string } = {},
+  now = nowIso(),
+): Project {
+  const item: AirportGroundText = {
+    id: opts.id ?? randomId(),
+    position,
+    heading: 0,
+    size: [DEFAULT_GROUNDTEXT_SIZE[0], DEFAULT_GROUNDTEXT_SIZE[1]],
+    name: "",
+    value: DEFAULT_GROUNDTEXT_VALUE,
+    textColor: DEFAULT_GROUNDTEXT_TEXT_COLOR,
+    background: DEFAULT_GROUNDTEXT_BACKGROUND,
+    backgroundColor: DEFAULT_GROUNDTEXT_BACKGROUND_COLOR,
+    strokeColor: DEFAULT_GROUNDTEXT_STROKE_COLOR,
+    pointing: DEFAULT_GROUNDTEXT_POINTING,
+  };
+  return addMark(project, "groundtexts", item, now);
+}
+
+export function addAirportJetway(
+  project: Project,
+  position: LonLat,
+  opts: { id?: string } = {},
+  now = nowIso(),
+): Project {
+  const item: AirportJetway = { id: opts.id ?? randomId(), position, heading: 0, ...DEFAULT_JETWAY };
+  return addMark(project, "jetways", item, now);
+}
+
+export function addAirportCarlot(
+  project: Project,
+  position: LonLat,
+  opts: { id?: string } = {},
+  now = nowIso(),
+): Project {
+  const item: AirportCarlot = {
+    id: opts.id ?? randomId(),
+    position,
+    heading: 0,
+    rows: DEFAULT_CARLOT_ROWS,
+    columns: DEFAULT_CARLOT_COLUMNS,
+  };
+  return addMark(project, "carlots", item, now);
+}
+
+export function removeAirportMark(project: Project, key: MarkKey, id: string, now = nowIso()): Project {
+  return removeListItem(project, key, MARK_READERS[key], id, now);
+}
+
+export function moveAirportMark(
+  project: Project,
+  key: MarkKey,
+  id: string,
+  position: LonLat,
+  now = nowIso(),
+): Project {
+  return updateListItem<MarkOf<MarkKey>>(project, key, MARK_READERS[key], id, (m) => ({ ...m, position }), now);
+}
+
+/** Turn one element. TRUE compass degrees, normalised into [0, 360) like every other facing. */
+export function rotateAirportMark(
+  project: Project,
+  key: MarkKey,
+  id: string,
+  heading: number,
+  now = nowIso(),
+): Project {
+  if (!Number.isFinite(heading)) return project;
+  const h = norm360(heading);
+  return updateListItem<MarkOf<MarkKey>>(
+    project,
+    key,
+    MARK_READERS[key],
+    id,
+    (m) => (m.heading === h ? m : { ...m, heading: h }),
+    now,
+  );
+}
+
+/** True when every key of `patch` already holds the same value in `item` (arrays compared by element). */
+function samePatch(item: object, patch: object): boolean {
+  return Object.entries(patch).every(([k, v]) => {
+    const cur = (item as Record<string, unknown>)[k];
+    return Array.isArray(v) && Array.isArray(cur)
+      ? v.length === cur.length && v.every((x, i) => x === cur[i])
+      : cur === v;
+  });
+}
+
+export type GroundTextPatch = Partial<Omit<AirportGroundText, "id" | "position" | "heading">>;
+
+/** A ground text's fields. The value is cleaned to the converter's characters (marks.ts); a size with a
+ *  non-positive or non-finite side is refused. */
+export function updateAirportGroundText(
+  project: Project,
+  id: string,
+  patch: GroundTextPatch,
+  now = nowIso(),
+): Project {
+  const p: GroundTextPatch = { ...patch };
+  if (p.size !== undefined) {
+    if (!p.size.every((v) => Number.isFinite(v) && v > 0)) return project;
+    p.size = [p.size[0], p.size[1]];
+  }
+  if (p.value !== undefined) p.value = cleanGroundTextValue(p.value);
+  return updateListItem(project, "groundtexts", groundTextsOf, id, (g) => (samePatch(g, p) ? g : { ...g, ...p }), now);
+}
+
+export type JetwayPatch = Partial<Omit<AirportJetway, "id" | "position" | "heading">>;
+
+const JETWAY_RANGES = {
+  mountingElevation: JETWAY_MOUNTING_RANGE,
+  extensionDirection: JETWAY_EXTENSION_DIRECTION_RANGE,
+  extensionAmount: JETWAY_EXTENSION_AMOUNT_RANGE,
+  exitDirection: JETWAY_EXIT_DIRECTION_RANGE,
+} as const;
+
+/** A jetway's fields. Each ranged number is clamped into its range (marks.ts); a non-finite number is
+ *  refused. */
+export function updateAirportJetway(project: Project, id: string, patch: JetwayPatch, now = nowIso()): Project {
+  const p: JetwayPatch = { ...patch };
+  for (const k of Object.keys(JETWAY_RANGES) as (keyof typeof JETWAY_RANGES)[]) {
+    const v = p[k];
+    if (v === undefined) continue;
+    const c = clampTo(v, JETWAY_RANGES[k]);
+    if (c === null) return project;
+    p[k] = c;
+  }
+  if (p.extensionPitch !== undefined && !Number.isFinite(p.extensionPitch)) return project;
+  return updateListItem(project, "jetways", jetwaysOf, id, (j) => (samePatch(j, p) ? j : { ...j, ...p }), now);
+}
+
+export type CarlotPatch = Partial<Pick<AirportCarlot, "rows" | "columns">>;
+
+/** A car lot's rows and spaces per row: rounded to integers inside marks.ts CARLOT_COUNT_RANGE. */
+export function updateAirportCarlot(project: Project, id: string, patch: CarlotPatch, now = nowIso()): Project {
+  const p: CarlotPatch = {};
+  for (const k of ["rows", "columns"] as const) {
+    const v = patch[k];
+    if (v === undefined) continue;
+    const c = cleanCarlotCount(v);
+    if (c === null) return project;
+    p[k] = c;
+  }
+  return updateListItem(project, "carlots", carlotsOf, id, (c) => (samePatch(c, p) ? c : { ...c, ...p }), now);
 }
 
 export function removeAirportAerotow(project: Project, aerotowId: string, now = nowIso()): Project {

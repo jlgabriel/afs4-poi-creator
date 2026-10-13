@@ -3,7 +3,8 @@
 //
 // These cards behave exactly like a light or a plant: click to arm, click the map to drop, Escape to
 // cancel — the same procedure as placing POI objects, so nothing new has to be learned. Order:
-// Airport · Boundary · Runway · Helipad · Parking · Tarmac · Line · Aerotow · Winch Launch.
+// Airport · Boundary · Runway · Helipad · Parking · Tarmac · Line · Ground Text · Jetway · Car Lot · Aerotow ·
+// Winch Launch.
 //
 // ★ THE ORDER IS A PAIR, NOT A LIST: the catalog and the placed list must show the same sequence.
 // Neither column owns it, so changing one of them alone is the bug — PlacedList.tsx carries the same
@@ -19,14 +20,18 @@
 // out whole (a runway, a winch launch) disarm so the next thing you do is drag an end. Each card says
 // which it is in its own subtitle rather than leaving it to be discovered.
 import { useCallback } from "react";
+import type { MarkKind } from "../state/store";
 import type { ParkingType } from "../../core/project/types";
 import { PARKING_TYPES, PARKING_TYPE_LABELS } from "../../core/project/airport";
 import { editorStore, useEditor } from "../state/editorStore";
 import {
   AerotowIcon,
   BoundaryIcon,
+  CarlotIcon,
   DataIcon,
+  GroundTextIcon,
   HelipadIcon,
+  JetwayIcon,
   LineIcon,
   ParkingIcon,
   RunwayIcon,
@@ -49,7 +54,10 @@ const PARKING_TERMS = `parking stand gate apron aircraft ${PARKING_TYPES.map(
 const RUNWAY_TERMS = "runway strip threshold papi reil approach lighting";
 const TARMAC_TERMS = "tarmac apron taxiway pavement asphalt concrete grass surface material flatten polygon";
 const LINE_TERMS = "line marking taxiway centre center centerline edge hold short paint";
-const AEROTOW_TERMS ="aerotow glider tow towing sailplane dr400 start";
+const GROUNDTEXT_TERMS = "ground text marking letter paint taxiway sign painted";
+const JETWAY_TERMS = "jetway jet bridge gate terminal boarding";
+const CARLOT_TERMS = "car lot park parking cars vehicles";
+const AEROTOW_TERMS = "aerotow glider tow towing sailplane dr400 start";
 const WINCH_TERMS = "winch launch glider cable rope sailplane start";
 
 /** A drawing card's subtitle while it is armed: how far along the shape is and how to finish it. */
@@ -73,6 +81,9 @@ export function AirportSection(): React.ReactElement {
   const boundaryPoints = useEditor((s) => s.project.airport?.boundary?.length ?? 0);
   const tarmacCount = useEditor((s) => s.project.airport?.tarmacs?.length ?? 0);
   const lineCount = useEditor((s) => s.project.airport?.lines?.length ?? 0);
+  const groundTextCount = useEditor((s) => s.project.airport?.groundtexts?.length ?? 0);
+  const jetwayCount = useEditor((s) => s.project.airport?.jetways?.length ?? 0);
+  const carlotCount = useEditor((s) => s.project.airport?.carlots?.length ?? 0);
   const draftPoints = useEditor((s) => s.shapeDraft.length);
   const query = useEditor((s) => s.filter.query);
 
@@ -100,6 +111,9 @@ export function AirportSection(): React.ReactElement {
   const winchMatches = q === "" || WINCH_TERMS.includes(q);
   const tarmacMatches = q === "" || TARMAC_TERMS.includes(q);
   const lineMatches = q === "" || LINE_TERMS.includes(q);
+  const groundTextMatches = q === "" || GROUNDTEXT_TERMS.includes(q);
+  const jetwayMatches = q === "" || JETWAY_TERMS.includes(q);
+  const carlotMatches = q === "" || CARLOT_TERMS.includes(q);
   const count =
     (dataMatches ? 1 : 0) +
     (boundaryMatches ? 1 : 0) +
@@ -107,6 +121,9 @@ export function AirportSection(): React.ReactElement {
     (parkingMatches ? 1 : 0) +
     (tarmacMatches ? 1 : 0) +
     (lineMatches ? 1 : 0) +
+    (groundTextMatches ? 1 : 0) +
+    (jetwayMatches ? 1 : 0) +
+    (carlotMatches ? 1 : 0) +
     (runwayMatches ? 1 : 0) +
     (aerotowMatches ? 1 : 0) +
     (winchMatches ? 1 : 0);
@@ -161,6 +178,12 @@ export function AirportSection(): React.ReactElement {
   const armLine = useCallback(() => {
     const cur = editorStore.getState().placing;
     editorStore.getState().armPlacement(cur?.kind === "line" ? null : { kind: "line" });
+  }, []);
+
+  // A ground text, a jetway or a car lot: drop, select, stay armed — a stand's card.
+  const armMark = useCallback((kind: MarkKind) => {
+    const cur = editorStore.getState().placing;
+    editorStore.getState().armPlacement(cur?.kind === kind ? null : { kind });
   }, []);
 
   const armAerotow = useCallback(() => {
@@ -336,6 +359,63 @@ export function AirportSection(): React.ReactElement {
                   : lineCount === 0
                     ? "a painted marking: centre line, edge, hold…"
                     : `${lineCount} placed · click to draw another`}
+              </span>
+            </span>
+          </button>
+        )}
+        {groundTextMatches && (
+          <button
+            type="button"
+            className={placing?.kind === "groundtext" ? "pct-obj-card armed" : "pct-obj-card"}
+            aria-pressed={placing?.kind === "groundtext"}
+            title="Letters painted on the pavement, for Export TAP. Click, then click the map"
+            onClick={() => armMark("groundtext")}
+          >
+            <GroundTextIcon />
+            <span className="pct-obj-text">
+              <span className="pct-obj-name">Ground Text</span>
+              <span className="pct-obj-cat">
+                {groundTextCount === 0
+                  ? "letters painted on the ground"
+                  : `${groundTextCount} placed · click the map to add another`}
+              </span>
+            </span>
+          </button>
+        )}
+        {jetwayMatches && (
+          <button
+            type="button"
+            className={placing?.kind === "jetway" ? "pct-obj-card armed" : "pct-obj-card"}
+            aria-pressed={placing?.kind === "jetway"}
+            title="A jetway on a terminal, for Export TAP. Click, then click the map where it is mounted"
+            onClick={() => armMark("jetway")}
+          >
+            <JetwayIcon />
+            <span className="pct-obj-text">
+              <span className="pct-obj-name">Jetway</span>
+              <span className="pct-obj-cat">
+                {jetwayCount === 0
+                  ? "a boarding bridge on a terminal"
+                  : `${jetwayCount} placed · click the map to add another`}
+              </span>
+            </span>
+          </button>
+        )}
+        {carlotMatches && (
+          <button
+            type="button"
+            className={placing?.kind === "carlot" ? "pct-obj-card armed" : "pct-obj-card"}
+            aria-pressed={placing?.kind === "carlot"}
+            title="A car park filled with cars at random, for Export TAP. Click, then click the map"
+            onClick={() => armMark("carlot")}
+          >
+            <CarlotIcon />
+            <span className="pct-obj-text">
+              <span className="pct-obj-name">Car Lot</span>
+              <span className="pct-obj-cat">
+                {carlotCount === 0
+                  ? "rows of parked cars"
+                  : `${carlotCount} placed · click the map to add another`}
               </span>
             </span>
           </button>

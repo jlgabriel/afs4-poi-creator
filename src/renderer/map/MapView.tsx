@@ -9,12 +9,15 @@ import * as L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { shallow } from "zustand/shallow";
 import { editorStore, useEditor } from "../state/editorStore";
-import type { TilesConfig } from "../state/store";
+import type { MarkKind, TilesConfig } from "../state/store";
+import type { LonLat } from "../../core/project/types";
 import { wrapLon } from "../../core/geo/geo";
 import { tileSourceFor } from "./tileProviders";
 import { FootprintLayer } from "./FootprintLayer";
 import { HelipadLayer } from "./HelipadLayer";
 import { ParkingLayer } from "./ParkingLayer";
+import { MarkLayer } from "./MarkLayer";
+import { CARLOT_LOOK, GROUNDTEXT_LOOK, JETWAY_LOOK } from "./markLooks";
 import { AirportLayer } from "./AirportLayer";
 import { RunwayLayer } from "./RunwayLayer";
 import { GliderLayer } from "./GliderLayer";
@@ -118,6 +121,16 @@ export function MapView(): React.ReactElement {
       onSelect: (id) => editorStore.getState().selectAirportPart({ kind: "parking", id }),
     });
 
+    // The ground texts, jetways and car lots: one layer class, one instance per kind (MarkLayer).
+    const markCallbacks = (kind: MarkKind) => ({
+      onMove: (id: string, p: LonLat) => editorStore.getState().moveAirportMark(kind, id, p),
+      onRotate: (id: string, deg: number) => editorStore.getState().rotateAirportMark(kind, id, deg),
+      onSelect: (id: string) => editorStore.getState().selectAirportPart({ kind, id }),
+    });
+    const groundText = new MarkLayer(map, GROUNDTEXT_LOOK, markCallbacks("groundtext"));
+    const jetway = new MarkLayer(map, JETWAY_LOOK, markCallbacks("jetway"));
+    const carlot = new MarkLayer(map, CARLOT_LOOK, markCallbacks("carlot"));
+
     // The two glider starts. One layer for both — they are one family, and it
     // saves a fourth and fifth copy of the same drag state machine.
     const glider = new GliderLayer(map, {
@@ -169,6 +182,10 @@ export function MapView(): React.ReactElement {
           ? { kind: sel.kind, id: sel.id }
           : null,
       );
+      const markSel = (kind: MarkKind): string | null => (sel?.kind === kind ? sel.id : null);
+      groundText.sync(s.project.airport?.groundtexts ?? [], markSel("groundtext"));
+      jetway.sync(s.project.airport?.jetways ?? [], markSel("jetway"));
+      carlot.sync(s.project.airport?.carlots ?? [], markSel("carlot"));
       const editable = s.placing === null;
       boundary.sync(s.project.airport?.boundary ?? null, sel?.kind === "boundary", editable);
       tarmac.sync(s.project.airport?.tarmacs ?? [], sel?.kind === "tarmac" ? sel.id : null, editable);
@@ -258,6 +275,9 @@ export function MapView(): React.ReactElement {
       unsubDraw();
       airport.destroy();
       glider.destroy();
+      carlot.destroy();
+      jetway.destroy();
+      groundText.destroy();
       parking.destroy();
       helipad.destroy();
       layer.destroy();

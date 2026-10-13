@@ -31,6 +31,7 @@ import { RunwayFields } from "./RunwayFields";
 import { AerotowFields, WinchFields } from "./GliderFields";
 import { BoundaryFields } from "./BoundaryFields";
 import { LineFields, TarmacFields } from "./SurfaceFields";
+import { CarlotFields, GroundTextFields, JetwayFields } from "./MarkFields";
 
 /** Object note — local draft committed on blur/Enter (one undo entry, not one per key; Escape reverts).
  *  Empty/whitespace clears the field (mutate.setLabel drops it). Mirrors TopBar's ProjectNameField. */
@@ -856,6 +857,27 @@ export function Inspector(): React.ReactElement {
     const sel = s.airportSelection;
     return sel?.kind === "line" ? s.project.airport?.lines?.find((l) => l.id === sel.id) : undefined;
   });
+  // A ground text, jetway or car lot, and its number in its list (the panel title, like the placed row).
+  const groundText = useEditor((s) => {
+    const sel = s.airportSelection;
+    return sel?.kind === "groundtext" ? s.project.airport?.groundtexts?.find((m) => m.id === sel.id) : undefined;
+  });
+  const jetway = useEditor((s) => {
+    const sel = s.airportSelection;
+    return sel?.kind === "jetway" ? s.project.airport?.jetways?.find((m) => m.id === sel.id) : undefined;
+  });
+  const carlot = useEditor((s) => {
+    const sel = s.airportSelection;
+    return sel?.kind === "carlot" ? s.project.airport?.carlots?.find((m) => m.id === sel.id) : undefined;
+  });
+  const markIndex = useEditor((s) => {
+    const sel = s.airportSelection;
+    const a = s.project.airport;
+    if (sel?.kind === "groundtext") return a?.groundtexts?.findIndex((m) => m.id === sel.id) ?? -1;
+    if (sel?.kind === "jetway") return a?.jetways?.findIndex((m) => m.id === sel.id) ?? -1;
+    if (sel?.kind === "carlot") return a?.carlots?.findIndex((m) => m.id === sel.id) ?? -1;
+    return -1;
+  });
   const plantMeta = useEditor((s) => (obj?.kind === "plant" ? s.plantIndex.get(plantKey(obj)) : undefined));
   const resolvedAsl = useEditor((s) => (obj ? s.resolvedElev.get(obj.id) : undefined));
 
@@ -870,6 +892,12 @@ export function Inspector(): React.ReactElement {
         <TarmacFields key={tarmac.id} tarmac={tarmac} index={surfaceIndex} />
       ) : surfaceLine !== undefined ? (
         <LineFields key={surfaceLine.id} line={surfaceLine} index={surfaceIndex} />
+      ) : groundText !== undefined ? (
+        <GroundTextFields key={groundText.id} text={groundText} index={markIndex} />
+      ) : jetway !== undefined ? (
+        <JetwayFields key={jetway.id} jetway={jetway} index={markIndex} />
+      ) : carlot !== undefined ? (
+        <CarlotFields key={carlot.id} carlot={carlot} index={markIndex} />
       ) : pad !== undefined ? (
         // Keyed by id like every other repeatable part's panel: the numeric drafts reset when the
         // selection moves to another pad, and editing THIS one keeps the panel alive.

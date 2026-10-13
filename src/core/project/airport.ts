@@ -8,6 +8,9 @@
 
 import type {
   AirportAerotow,
+  AirportCarlot,
+  AirportGroundText,
+  AirportJetway,
   AirportLine,
   AirportParking,
   AirportRunway,
@@ -53,6 +56,17 @@ export function tarmacsOf(airport: ProjectAirport | undefined): AirportTarmac[] 
 }
 export function linesOf(airport: ProjectAirport | undefined): AirportLine[] {
   return airport?.lines ?? [];
+}
+
+/** The ground texts, jetways and car lots, absent and empty collapsed — same contract as parkingsOf. */
+export function groundTextsOf(airport: ProjectAirport | undefined): AirportGroundText[] {
+  return airport?.groundtexts ?? [];
+}
+export function jetwaysOf(airport: ProjectAirport | undefined): AirportJetway[] {
+  return airport?.jetways ?? [];
+}
+export function carlotsOf(airport: ProjectAirport | undefined): AirportCarlot[] {
+  return airport?.carlots ?? [];
 }
 
 // Deleting a part never drops the whole airport block: editing changes only the affected elements. The

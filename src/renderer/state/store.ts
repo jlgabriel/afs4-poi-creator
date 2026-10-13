@@ -45,7 +45,17 @@ import {
 import { destination } from "../../core/geo/geo";
 import { lineUp, spaceEvenly } from "../../core/geo/arrange";
 import { DEFAULT_PAD_RADIUS_M } from "../../core/export/planExport";
-import { aerotowsOf, linesOf, parkingsOf, runwaysOf, tarmacsOf, winchesOf } from "../../core/project/airport";
+import {
+  aerotowsOf,
+  carlotsOf,
+  groundTextsOf,
+  jetwaysOf,
+  linesOf,
+  parkingsOf,
+  runwaysOf,
+  tarmacsOf,
+  winchesOf,
+} from "../../core/project/airport";
 import * as mutate from "../../core/project/mutate";
 
 export type Camera = Project["camera"];
@@ -93,6 +103,9 @@ export type PlacingSpec =
   // selects the new shape and disarms: the next thing you do is edit it.
   | { kind: "tarmac" }
   | { kind: "line" }
+  // A GROUND TEXT, a JETWAY and a CAR LOT: a point plus a heading each, so a stand's gesture — drop,
+  // select, stay armed.
+  | { kind: MarkKind }
   // `naturalHeight` rides along rather than being looked up at place time. The palette has the
   // CatalogPlant in hand when it arms, so carrying it removes the only path where a plant could be
   // created with height 0 — the one value that may mean "invisible" (see mutate.createPlant).
@@ -114,7 +127,18 @@ export type AirportSelection =
   | { kind: "data" }
   // One per airport, so no id.
   | { kind: "boundary" }
-  | { kind: "pad" | "runway" | "parking" | "aerotow" | "winch" | "tarmac" | "line"; id: string };
+  | { kind: "pad" | "runway" | "parking" | "aerotow" | "winch" | "tarmac" | "line" | MarkKind; id: string };
+
+/** The three one-point TAP elements, by the kind the selection and the placement use, and the airport
+ *  list each lives in (mutate.ts MarkKey). */
+export type MarkKind = "groundtext" | "jetway" | "carlot";
+export const MARK_KEY: Record<MarkKind, mutate.MarkKey> = {
+  groundtext: "groundtexts",
+  jetway: "jetways",
+  carlot: "carlots",
+};
+export const isMarkKind = (kind: string | undefined): kind is MarkKind =>
+  kind === "groundtext" || kind === "jetway" || kind === "carlot";
 
 /** The cards drawn point by point into `shapeDraft`, and how many points each needs to finish. */
 export const SHAPE_MIN_POINTS = { boundary: 3, tarmac: 3, line: 2 } as const;
@@ -150,6 +174,10 @@ function removeAirportPart(project: Project, sel: AirportSelection): Project {
       return mutate.removeAirportTarmac(project, sel.id);
     case "line":
       return mutate.removeAirportLine(project, sel.id);
+    case "groundtext":
+    case "jetway":
+    case "carlot":
+      return mutate.removeAirportMark(project, MARK_KEY[sel.kind], sel.id);
   }
 }
 
@@ -385,6 +413,12 @@ export interface EditorState {
   setAirportLinePoints: (id: string, points: LonLat[]) => void;
   setAirportLineName: (id: string, name: string) => void;
   setAirportRunwaySurface: (id: string, patch: { material?: string; brightness?: number }) => void;
+  //    GROUND TEXTs, JETWAYs and CAR LOTs: one move and one turn for the three, and each one's fields.
+  moveAirportMark: (kind: MarkKind, id: string, position: LonLat) => void;
+  rotateAirportMark: (kind: MarkKind, id: string, heading: number) => void;
+  updateAirportGroundText: (id: string, patch: mutate.GroundTextPatch) => void;
+  updateAirportJetway: (id: string, patch: mutate.JetwayPatch) => void;
+  updateAirportCarlot: (id: string, patch: mutate.CarlotPatch) => void;
   //    Parking positions. Every one takes an id: letting it default would only hide a caller that forgot which stand it meant (mutate.ts).
   moveAirportParking: (id: string, position: LonLat) => void;
   rotateAirportParking: (id: string, heading: number) => void;
@@ -725,6 +759,20 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
             set({ placing: null, selection: [], airportSelection: { kind: "runway", id: rwyId } });
             return;
           }
+          // A ground text, jetway or car lot: a stand's gesture too.
+          if (isMarkKind(spec.kind)) {
+            const kind = spec.kind;
+            const markId = deps.newId();
+            const add =
+              kind === "groundtext"
+                ? mutate.addAirportGroundText
+                : kind === "jetway"
+                  ? mutate.addAirportJetway
+                  : mutate.addAirportCarlot;
+            commit((proj) => add(proj, p, { id: markId }));
+            set({ selection: [], airportSelection: { kind, id: markId } });
+            return;
+          }
           // An aerotow is a point and a heading — a stand's gesture: drop, select, stay armed.
           if (spec.kind === "aerotow") {
             const towId = deps.newId();
@@ -847,6 +895,14 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
               if (rwy !== undefined) {
                 self.moveAirportRunway(sel.id, to(rwy.ends[0].threshold), to(rwy.ends[1].threshold));
               }
+              return;
+            }
+            if (isMarkKind(sel.kind)) {
+              const kind = sel.kind;
+              const list =
+                kind === "groundtext" ? groundTextsOf(a) : kind === "jetway" ? jetwaysOf(a) : carlotsOf(a);
+              const mark = list.find((m) => m.id === sel.id);
+              if (mark !== undefined) self.moveAirportMark(kind, sel.id, to(mark.position));
               return;
             }
             if (sel.kind === "aerotow") {
@@ -1082,6 +1138,31 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
         setAirportRunwayWidth: (id, width) =>
           commitCoalesced(`airport:runway:width:${id}`, (proj) =>
             mutate.setAirportRunwayWidth(proj, id, width),
+          ),
+
+        // Keys carry the kind and the id, like the stands' — two elements dragged one after the other are two
+        // undo entries.
+        moveAirportMark: (kind, id, position) =>
+          commitCoalesced(`airport:${kind}:pos:${id}`, (proj) =>
+            mutate.moveAirportMark(proj, MARK_KEY[kind], id, position),
+          ),
+        rotateAirportMark: (kind, id, heading) =>
+          commitCoalesced(`airport:${kind}:rot:${id}`, (proj) =>
+            mutate.rotateAirportMark(proj, MARK_KEY[kind], id, heading),
+          ),
+        // Coalesced per element and per FIELD, so typing a value is one undo entry but changing the colour
+        // after it is another.
+        updateAirportGroundText: (id, patch) =>
+          commitCoalesced(`airport:groundtext:${Object.keys(patch).join(",")}:${id}`, (proj) =>
+            mutate.updateAirportGroundText(proj, id, patch),
+          ),
+        updateAirportJetway: (id, patch) =>
+          commitCoalesced(`airport:jetway:${Object.keys(patch).join(",")}:${id}`, (proj) =>
+            mutate.updateAirportJetway(proj, id, patch),
+          ),
+        updateAirportCarlot: (id, patch) =>
+          commitCoalesced(`airport:carlot:${Object.keys(patch).join(",")}:${id}`, (proj) =>
+            mutate.updateAirportCarlot(proj, id, patch),
           ),
 
         moveAirportAerotow: (id, position) =>

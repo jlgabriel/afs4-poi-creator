@@ -2,6 +2,8 @@
 // Geometry primitives + the scanned object catalog (M0), plus the editable Project, the
 // export plan, and Settings (design §2.2–§2.4 / §3.4) — the M1 data model.
 
+import type { GroundTextBackground, GroundTextColor, GroundTextPointing } from "./marks";
+
 export type Vec3 = [number, number, number];
 
 export interface LonLat {
@@ -303,6 +305,57 @@ export interface AirportLine {
   name: string;
 }
 
+/** A GROUND TEXT: letters painted on the pavement, centred on `position`. Any number per airport. Only
+ *  Export TAP reads it. The colour, background and pointing values are marks.ts's vocabulary. */
+export interface AirportGroundText {
+  id: string;
+  position: LonLat;
+  /** TRUE compass degrees: the direction the tops of the letters point to. */
+  heading: number;
+  /** Metres PER LETTER, [width, height]. Both positive. */
+  size: [number, number];
+  /** Free text, the element's name in the `.tap`. Empty ≡ the writer's "GROUNDTEXT". */
+  name: string;
+  /** What is painted: A–Z, 0–9, space, `+`, `-` (marks.ts cleanGroundTextValue). */
+  value: string;
+  textColor: GroundTextColor;
+  background: GroundTextBackground;
+  backgroundColor: GroundTextColor;
+  strokeColor: GroundTextColor;
+  pointing: GroundTextPointing;
+}
+
+/** A JETWAY, mounted on a terminal wall at `position`. Any number per airport. Only Export TAP reads it. */
+export interface AirportJetway {
+  id: string;
+  position: LonLat;
+  /** TRUE compass degrees. */
+  heading: number;
+  /** Metres, 3.6–6: the height of the mounting point. */
+  mountingElevation: number;
+  /** Degrees relative to `heading`, counter-clockwise, 0–45. */
+  extensionDirection: number;
+  /** Degrees. */
+  extensionPitch: number;
+  /** Metres, 0–24.5. */
+  extensionAmount: number;
+  /** Degrees relative to `heading`, 0–45. */
+  exitDirection: number;
+  docked: boolean;
+}
+
+/** A CAR LOT: rows of parking spaces filled with cars at random. Any number per airport. Only Export TAP
+ *  reads it. */
+export interface AirportCarlot {
+  id: string;
+  position: LonLat;
+  /** TRUE compass degrees. */
+  heading: number;
+  /** Integers ≥ 1 (marks.ts CARLOT_COUNT_RANGE): rows, and spaces per row. */
+  rows: number;
+  columns: number;
+}
+
 /** A glider AEROTOW start: where the glider stands to be pulled into the air by the tow plane.
  *
  *  ★ THIS ONE LIVES ONLY IN THE `.wad` — unlike a pad or a stand there is nothing to write into the
@@ -415,6 +468,10 @@ export interface ProjectAirport {
   /** TARMAC polygons and painted LINEs, in document order. Only Export TAP reads them. Absent ≡ none. */
   tarmacs?: AirportTarmac[];
   lines?: AirportLine[];
+  /** GROUND TEXTs, JETWAYs and CAR LOTs, in document order. Only Export TAP reads them. Absent ≡ none. */
+  groundtexts?: AirportGroundText[];
+  jetways?: AirportJetway[];
+  carlots?: AirportCarlot[];
   /** Every parking position, in document order. Absent ≡ none, which is what every project
    *  written before v1.4 has — and the writers emit no `parking_positions` block at all in that case, so
    *  those projects keep exporting the same bytes.

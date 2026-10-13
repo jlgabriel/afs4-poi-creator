@@ -367,3 +367,62 @@ export const LineIcon = memo(function LineIcon(): React.ReactElement {
     </svg>
   );
 });
+
+/** A GROUND TEXT: a letter painted in a box on the pavement. */
+export const GroundTextIcon = memo(function GroundTextIcon(): React.ReactElement {
+  return (
+    <svg
+      className="pct-thumb"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <rect x="4" y="5" width="16" height="14" rx="1.5" fill="currentColor" fillOpacity="0.2" />
+      <path d="M8.5 16 L12 8 L15.5 16 M9.8 13.2 H14.2" strokeWidth="2" />
+    </svg>
+  );
+});
+
+/** A JETWAY: the terminal wall and the tunnel reaching out from it. */
+export const JetwayIcon = memo(function JetwayIcon(): React.ReactElement {
+  return (
+    <svg
+      className="pct-thumb"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M4 3 V21" strokeWidth="2.4" />
+      <path d="M4 10 L17 6 L18.5 10.5 L5.5 14.5 Z" fill="currentColor" fillOpacity="0.25" />
+      <path d="M15 17 V21 M18 16 V21" />
+    </svg>
+  );
+});
+
+/** A CAR LOT: rows of parking spaces. */
+export const CarlotIcon = memo(function CarlotIcon(): React.ReactElement {
+  return (
+    <svg
+      className="pct-thumb"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M3 11.5 H21 M3 4 V11.5 M8 4 V11.5 M13 4 V11.5 M18 4 V11.5 M3 12.5 V20 M8 12.5 V20 M13 12.5 V20 M18 12.5 V20" />
+      <rect x="9.2" y="5.5" width="2.6" height="4.5" rx="0.8" fill="currentColor" />
+      <rect x="14.2" y="14" width="2.6" height="4.5" rx="0.8" fill="currentColor" />
+    </svg>
+  );
+});

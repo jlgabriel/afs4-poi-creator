@@ -8,12 +8,16 @@
 // ever make this janky, it takes the same react-window treatment the catalog got.
 import { useMemo } from "react";
 import { editorStore, useEditor } from "../state/editorStore";
+import type { MarkKind } from "../state/store";
 import { Thumbnail } from "../catalog/Thumbnail";
 import {
   AerotowIcon,
   BoundaryIcon,
+  CarlotIcon,
   DataIcon,
+  GroundTextIcon,
   HelipadIcon,
+  JetwayIcon,
   LineIcon,
   ParkingIcon,
   RunwayIcon,
@@ -47,7 +51,10 @@ function DataRow(): React.ReactElement | null {
     (airport.winches?.length ?? 0) +
     (airport.boundary !== undefined ? 1 : 0) +
     (airport.tarmacs?.length ?? 0) +
-    (airport.lines?.length ?? 0);
+    (airport.lines?.length ?? 0) +
+    (airport.groundtexts?.length ?? 0) +
+    (airport.jetways?.length ?? 0) +
+    (airport.carlots?.length ?? 0);
   return (
     <button
       type="button"
@@ -246,6 +253,80 @@ function SurfaceRows(): React.ReactElement | null {
   );
 }
 
+/** One row per ground text, jetway and car lot, numbered like the Inspector numbers them. Double-click
+ *  flies to the element. */
+function MarkRows(): React.ReactElement | null {
+  const groundtexts = useEditor((s) => s.project.airport?.groundtexts);
+  const jetways = useEditor((s) => s.project.airport?.jetways);
+  const carlots = useEditor((s) => s.project.airport?.carlots);
+  const sel = useEditor((s) => s.airportSelection);
+  const row = (
+    kind: MarkKind,
+    id: string,
+    label: string,
+    code: string,
+    meta: string,
+    at: LonLat,
+  ): React.ReactElement => {
+    const selected = sel !== null && sel.kind === kind && sel.id === id;
+    return (
+      <button
+        key={id}
+        type="button"
+        className={selected ? "pct-placed-row pct-placed-pad sel" : "pct-placed-row pct-placed-pad"}
+        aria-pressed={selected}
+        title={MARK_TITLES[kind]}
+        onClick={() => editorStore.getState().selectAirportPart({ kind, id })}
+        onDoubleClick={() => editorStore.getState().flyTo(at)}
+      >
+        {kind === "groundtext" ? <GroundTextIcon /> : kind === "jetway" ? <JetwayIcon /> : <CarlotIcon />}
+        <span className="pct-placed-text">
+          <span className="pct-placed-name">
+            <span className="pct-placed-label">{label}</span>
+            <span className="pct-placed-code">{code}</span>
+          </span>
+          <span className="pct-placed-meta">{meta}</span>
+        </span>
+      </button>
+    );
+  };
+  const bearing = (h: number): string => `${String(Math.round(h) % 360).padStart(3, "0")}°`;
+  if ((groundtexts?.length ?? 0) + (jetways?.length ?? 0) + (carlots?.length ?? 0) === 0) return null;
+  return (
+    <>
+      {(groundtexts ?? []).map((g, i) =>
+        row(
+          "groundtext",
+          g.id,
+          `Ground Text ${i + 1}`,
+          g.value === "" ? "—" : g.value,
+          `${g.textColor} on ${g.backgroundColor} · ${bearing(g.heading)}`,
+          g.position,
+        ),
+      )}
+      {(jetways ?? []).map((j, i) =>
+        row(
+          "jetway",
+          j.id,
+          `Jetway ${i + 1}`,
+          j.docked ? "docked" : "",
+          `${bearing(j.heading)} · ${j.extensionAmount} m`,
+          j.position,
+        ),
+      )}
+      {(carlots ?? []).map((c, i) =>
+        row("carlot", c.id, `Car Lot ${i + 1}`, `${c.rows} × ${c.columns}`, bearing(c.heading), c.position),
+      )}
+    </>
+  );
+}
+
+const MARK_TITLES: Record<MarkKind, string> = {
+  groundtext: "Letters painted on the ground",
+  jetway: "A jetway",
+  carlot: "A car lot",
+};
+
 /** One row per runway. Same contract as the stands', and the label is how anyone refers to a runway: its
  *  two identifiers. Both may be empty — legal; the second is often left blank. */
 function RunwayRows(): React.ReactElement | null {
@@ -417,6 +498,7 @@ export function PlacedList(): React.ReactElement {
         <HelipadRows />
         <ParkingRows />
         <SurfaceRows />
+        <MarkRows />
         <GliderRows />
         {objects.length === 0 ? (
           <p className="pct-empty">No objects yet — click the map to place one.</p>

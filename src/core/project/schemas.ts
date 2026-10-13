@@ -11,6 +11,7 @@
 import { z } from "zod";
 import type { LonLat, Project, Settings } from "./types";
 import { APPROACH_LIGHT_SYSTEMS, PAPI_SIDES, PARKING_TYPES, REIL_KINDS } from "./airport";
+import { GROUNDTEXT_BACKGROUNDS, GROUNDTEXT_COLORS, GROUNDTEXT_POINTING } from "./marks";
 import type { FootprintOverrides } from "../catalog/footprints";
 import { isValidPhotoKey } from "../catalog/photoKey";
 
@@ -202,6 +203,43 @@ const zLine = z.looseObject({
   name: z.string().max(IDENTITY_MAX),
 });
 
+/** The three one-point TAP elements (types.ts AirportGroundText / AirportJetway / AirportCarlot). The
+ *  colour, background and pointing fields are ENUMS, for the parking `type`'s reason: the converter
+ *  compares them against literals, so a typo is a mark that silently comes out wrong. */
+const zGroundText = z.looseObject({
+  id: z.string().min(1),
+  position: zLonLat,
+  heading: z.number().finite(),
+  size: z.tuple([z.number().finite().positive(), z.number().finite().positive()]),
+  name: z.string().max(IDENTITY_MAX),
+  value: z.string().max(IDENTITY_MAX),
+  textColor: z.enum(GROUNDTEXT_COLORS),
+  background: z.enum(GROUNDTEXT_BACKGROUNDS),
+  backgroundColor: z.enum(GROUNDTEXT_COLORS),
+  strokeColor: z.enum(GROUNDTEXT_COLORS),
+  pointing: z.enum(GROUNDTEXT_POINTING),
+});
+
+const zJetway = z.looseObject({
+  id: z.string().min(1),
+  position: zLonLat,
+  heading: z.number().finite(),
+  mountingElevation: z.number().finite(),
+  extensionDirection: z.number().finite(),
+  extensionPitch: z.number().finite(),
+  extensionAmount: z.number().finite(),
+  exitDirection: z.number().finite(),
+  docked: z.boolean(),
+});
+
+const zCarlot = z.looseObject({
+  id: z.string().min(1),
+  position: zLonLat,
+  heading: z.number().finite(),
+  rows: z.number().int().positive(),
+  columns: z.number().int().positive(),
+});
+
 /** The two glider starts (types.ts AirportAerotow / AirportWinch). Both are `.wad`-only elements, so
  *  nothing here has a `.tsc` counterpart to keep in step. The winch carries TWO points and no heading —
  *  its direction is the line between them. */
@@ -254,6 +292,9 @@ export const zAirport = z.looseObject({
   boundary: z.array(zLonLat).optional(),
   tarmacs: z.array(zTarmac).optional(),
   lines: z.array(zLine).optional(),
+  groundtexts: z.array(zGroundText).optional(),
+  jetways: z.array(zJetway).optional(),
+  carlots: z.array(zCarlot).optional(),
   parkings: z.array(zParking).optional(),
   // The compatibility mirror (types.ts ProjectAirport.pad). Validated so a malformed one is caught here
   // rather than silently shipped to an older PCT, and normalised by migrateAirport before it gets here.

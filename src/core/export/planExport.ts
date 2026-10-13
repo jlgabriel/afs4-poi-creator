@@ -47,6 +47,8 @@ import {
   type TapTarmacSpec,
 } from "./tapWriter";
 import { ringSelfIntersects } from "../geo/polygon";
+import { carlotsOf, groundTextsOf, jetwaysOf } from "../project/airport";
+import { cleanGroundTextValue } from "../project/marks";
 import {
   DEFAULT_BRIGHTNESS,
   DEFAULT_RUNWAY_MATERIAL,
@@ -435,6 +437,18 @@ export function planTap(project: Project, resolvedLights: ResolvedObject[], terr
     lines.push({ points: l.points.map((p) => shiftPoint(p, shift)), name: l.name });
   });
 
+  // The one-point elements: the position shifted with the scene, everything else as the project has it.
+  const shifted = <T extends { id: string; position: LonLat }>(list: T[]): Omit<T, "id">[] =>
+    list.map(({ id: _id, ...m }) => ({ ...m, position: shiftPoint(m.position, shift) }));
+  const groundTexts = shifted(groundTextsOf(airport));
+  groundTexts.forEach((g, i) => {
+    if (cleanGroundTextValue(g.value).trim() === "") {
+      warnings.push(`Ground Text ${i + 1} has no text, so it paints nothing.`);
+    }
+  });
+  const jetways = shifted(jetwaysOf(airport));
+  const carlots = shifted(carlotsOf(airport));
+
   const placedXrefs = project.objects.filter((o) => o.kind === "xref");
   const placedPlants = project.objects.filter((o) => o.kind === "plant");
   const scaled = placedXrefs.filter((o) => o.scale !== 1).length;
@@ -466,6 +480,9 @@ export function planTap(project: Project, resolvedLights: ResolvedObject[], terr
     parkings: heliportParkings(airport.parkings, shift),
     tarmacs,
     lines,
+    groundTexts,
+    jetways,
+    carlots,
     plants: placedPlants.map((p) => ({
       position: shiftPoint(p.position, shift),
       heightRange: p.heightRange,

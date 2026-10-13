@@ -1602,3 +1602,51 @@ describe("TARMAC polygons and painted LINEs", () => {
     expect(store.getState().project.airport?.runways?.[0]).toMatchObject({ material: "grass01", brightness: 0.3 });
   });
 });
+
+describe("GROUND TEXT, JETWAY and CAR LOT", () => {
+  const A = { lon: 10, lat: 48 };
+  const B = { lon: 10.001, lat: 48 };
+
+  it("drops one per click, selects it and stays armed, for each of the three", () => {
+    const { store } = makeStore();
+    for (const kind of ["groundtext", "jetway", "carlot"] as const) {
+      store.getState().armPlacement({ kind });
+      store.getState().placeAt(A);
+      store.getState().placeAt(B);
+      expect(store.getState().placing).toEqual({ kind });
+    }
+    const a = store.getState().project.airport!;
+    expect(a.groundtexts?.map((g) => g.position)).toEqual([A, B]);
+    expect(a.jetways?.map((j) => j.id)).toEqual(["id2", "id3"]);
+    expect(a.carlots?.map((c) => c.id)).toEqual(["id4", "id5"]);
+    expect(store.getState().airportSelection).toEqual({ kind: "carlot", id: "id5" });
+  });
+
+  it("moves with the arrows as one undo entry, turns, edits, and Del removes only the selected one", () => {
+    const { store } = makeStore();
+    store.getState().armPlacement({ kind: "jetway" });
+    store.getState().placeAt(A);
+    store.getState().placeAt(B);
+    store.getState().armPlacement(null);
+    store.getState().selectAirportPart({ kind: "jetway", id: "id0" });
+    const before = store.getState().undoStack.length;
+    store.getState().nudgeSelection(10, 0);
+    store.getState().nudgeSelection(10, 0);
+    expect(store.getState().undoStack.length).toBe(before + 1);
+    near(haversine(store.getState().project.airport!.jetways![0]!.position, A), 20, 0.1);
+    store.getState().rotateAirportMark("jetway", "id0", 135);
+    store.getState().updateAirportJetway("id0", { docked: true });
+    expect(store.getState().project.airport!.jetways![0]).toMatchObject({ heading: 135, docked: true });
+    store.getState().deleteSelection();
+    expect(store.getState().project.airport!.jetways!.map((j) => j.id)).toEqual(["id1"]);
+    expect(store.getState().airportSelection).toBeNull();
+  });
+
+  it("edits a ground text's value through the store, cleaned", () => {
+    const { store } = makeStore();
+    store.getState().armPlacement({ kind: "groundtext" });
+    store.getState().placeAt(A);
+    store.getState().updateAirportGroundText("id0", { value: "b2" });
+    expect(store.getState().project.airport!.groundtexts![0]!.value).toBe("B2");
+  });
+});
