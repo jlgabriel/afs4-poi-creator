@@ -108,6 +108,7 @@ export function TapDialog({ onClose }: { onClose: () => void }): React.ReactElem
   const tarmacCount = airport?.tarmacs?.length ?? 0;
   const lineCount = airport?.lines?.length ?? 0;
   const groundTextCount = airport?.groundtexts?.length ?? 0;
+  const taxisignCount = airport?.taxisigns?.length ?? 0;
   const jetwayCount = airport?.jetways?.length ?? 0;
   const carlotCount = airport?.carlots?.length ?? 0;
   const blocked =
@@ -213,7 +214,8 @@ export function TapDialog({ onClose }: { onClose: () => void }): React.ReactElem
                     <li>
                       <span className="pct-field-meta">Markings</span>
                       <span>
-                        {groundTextCount} ground text{groundTextCount === 1 ? "" : "s"} · {jetwayCount} jetway
+                        {groundTextCount} ground text{groundTextCount === 1 ? "" : "s"} · {taxisignCount} taxi sign
+                        {taxisignCount === 1 ? "" : "s"} · {jetwayCount} jetway
                         {jetwayCount === 1 ? "" : "s"} · {carlotCount} car lot{carlotCount === 1 ? "" : "s"}
                       </span>
                     </li>

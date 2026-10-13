@@ -1,10 +1,11 @@
-// marks.ts — the TAP converter's vocabulary for the three one-point airport elements that only Export TAP
-// reads: a GROUND TEXT painted on the pavement, a JETWAY mounted on a terminal, and a CAR LOT.
+// marks.ts — the TAP converter's vocabulary for the one-point airport elements that only Export TAP reads:
+// a GROUND TEXT painted on the pavement, a TAXI SIGN, a JETWAY mounted on a terminal, and a CAR LOT.
 //
-// All three are a point plus a facing, edited on the map like a parking position. Their values are rows of
+// All four are a point plus a facing, edited on the map like a parking position. Their values are rows of
 // the `.tap` format, not data from the user's install, so they are listed here like surfaces.ts lists the
 // materials. A value the converter does not know is not reported as an error, so the menus only offer
 // these, and the loader (schemas.ts) refuses the enum fields when they hold anything else.
+import { headingToDirection } from "../geo/orientation";
 
 /** The colours a ground text's letters, background and outline take. `none` leaves that part out. */
 export const GROUNDTEXT_COLORS = ["none", "black", "blue", "green", "red", "white", "yellow"] as const;
@@ -66,6 +67,107 @@ export const DEFAULT_JETWAY = {
 export const CARLOT_COUNT_RANGE: readonly [number, number] = [1, 100];
 export const DEFAULT_CARLOT_ROWS = 2;
 export const DEFAULT_CARLOT_COLUMNS = 10;
+
+// ── TAXISIGN ──────────────────────────────────────────────────────────────────────────────────────
+
+/** The components a taxi sign is built from, shown left to right. Each type has its own colours:
+ *  runway = white on red, destination = black on yellow, location = yellow on black, remainingrunway =
+ *  white on black. `linebreak` carries no value: the components after it go on the BACK face. */
+export const TAXISIGN_ELEMENT_TYPES = ["runway", "destination", "location", "remainingrunway", "linebreak"] as const;
+export type TaxisignElementType = (typeof TAXISIGN_ELEMENT_TYPES)[number];
+
+/** The sign sizes the converter takes. */
+export const TAXISIGN_SIZE_TYPES = [1, 2, 3, 4] as const;
+export const DEFAULT_TAXISIGN_SIZE_TYPE = 3;
+/** The `level` row. Always this value: its use is unknown, so PCT offers nothing for it. */
+export const TAXISIGN_LEVEL = 0;
+/** The sign's brightness: 0.0 to 1.0 in steps of 0.1 — unlike a tarmac's, 0.0 is allowed. */
+export const TAXISIGN_BRIGHTNESS_STEPS: readonly number[] = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1];
+export const DEFAULT_TAXISIGN_BRIGHTNESS = 0.5;
+/** A fresh sign faces SOUTH, so its front reads upright on a north-up map. */
+export const DEFAULT_TAXISIGN_HEADING = 180;
+/** A fresh sign: one location component reading "A". */
+export const DEFAULT_TAXISIGN_ELEMENTS: readonly { type: TaxisignElementType; value: string }[] = [
+  { type: "location", value: "A" },
+];
+
+/** Snap a taxi sign brightness onto TAXISIGN_BRIGHTNESS_STEPS; a non-finite value is null. */
+export function clampTaxisignBrightness(b: number): number | null {
+  return Number.isFinite(b) ? Math.min(1, Math.max(0, Math.round(b * 10) / 10)) : null;
+}
+
+/** The arrows and hold marks a DESTINATION value can carry, written inline: `B<RIGHT90>` reads "B →".
+ *  The number is the arrow's angle from straight up, in steps of 45°, turned right or left. */
+export const TAXISIGN_TOKENS: readonly string[] = [
+  ...[0, 45, 90, 135, 180].map((a) => `<LEFT${a}>`),
+  ...[0, 45, 90, 135, 180].map((a) => `<RIGHT${a}>`),
+  "<HOLD0>",
+  "<HOLD1>",
+];
+
+/** The characters each component type takes. The destination also takes TAXISIGN_TOKENS. */
+const TAXISIGN_CHARS: Record<TaxisignElementType, RegExp> = {
+  runway: /[0-9 -]/,
+  destination: /[A-Z0-9 -]/,
+  location: /[A-Z]/,
+  remainingrunway: /[0-9]/,
+  linebreak: /(?!)/, // takes nothing
+};
+
+/** A component's value WHILE IT IS TYPED: lowercase raised, characters its type never takes dropped. A
+ *  destination keeps `<` and `>` so a token can be typed one letter at a time; the writer drops anything
+ *  that is not a whole token (cleanTaxisignValue). Nothing here can put `]` or a line break in the `.tap`. */
+export function editTaxisignValue(type: TaxisignElementType, value: string): string {
+  const keep = (ch: string): boolean =>
+    TAXISIGN_CHARS[type].test(ch) || (type === "destination" && (ch === "<" || ch === ">"));
+  return [...value.toUpperCase()].filter(keep).join("");
+}
+
+/** A destination value split into text and tokens, in order. Anything between `<` and `>` that is not a
+ *  known token comes out as `bad`. */
+export function taxisignValueParts(value: string): { kind: "text" | "token" | "bad"; text: string }[] {
+  const out: { kind: "text" | "token" | "bad"; text: string }[] = [];
+  for (const m of value.matchAll(/<[^<>]*>?|[^<]+/g)) {
+    const t = m[0];
+    out.push({ kind: !t.startsWith("<") ? "text" : TAXISIGN_TOKENS.includes(t) ? "token" : "bad", text: t });
+  }
+  return out;
+}
+
+/** A component's value as the `.tap` gets it: editTaxisignValue, and for a destination every `<…>` that
+ *  is not one of TAXISIGN_TOKENS dropped. */
+export function cleanTaxisignValue(type: TaxisignElementType, value: string): string {
+  const v = editTaxisignValue(type, value);
+  if (type !== "destination") return v;
+  return taxisignValueParts(v)
+    .filter((p) => p.kind !== "bad")
+    .map((p) => p.text)
+    .join("");
+}
+
+/** What is wrong with a component's value, or null. */
+export function taxisignValueProblem(type: TaxisignElementType, value: string): string | null {
+  if (type === "linebreak") return null;
+  const clean = cleanTaxisignValue(type, value);
+  if (clean.trim() === "") return "Empty: this component shows nothing.";
+  if (clean !== editTaxisignValue(type, value)) return "A <…> that is not one of the arrows or holds is left out.";
+  return null;
+}
+
+/** The components on each face: the front, and the back (after the first `linebreak`; a later
+ *  `linebreak` is ignored). */
+export function taxisignFaces<T extends { type: TaxisignElementType }>(elements: readonly T[]): [T[], T[]] {
+  const i = elements.findIndex((e) => e.type === "linebreak");
+  if (i < 0) return [[...elements], []];
+  return [elements.slice(0, i), elements.slice(i + 1).filter((e) => e.type !== "linebreak")];
+}
+
+/** The `.tap` `direction` of a taxi sign, from the compass heading its FRONT face looks toward. Unlike
+ *  the other one-point elements it uses the convention of objects — 0 = east, 90 = north, 180 = west,
+ *  270 = south — so it goes through orientation.ts like an XREF's `.toc` rotation. */
+export function taxisignTapDirection(heading: number): number {
+  return headingToDirection(heading);
+}
 
 /** Clamp into [lo, hi]; a non-finite value is null (the caller refuses it). */
 export function clampTo(v: number, [lo, hi]: readonly [number, number]): number | null {

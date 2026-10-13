@@ -1650,3 +1650,31 @@ describe("GROUND TEXT, JETWAY and CAR LOT", () => {
     expect(store.getState().project.airport!.groundtexts![0]!.value).toBe("B2");
   });
 });
+
+describe("TAXI SIGN", () => {
+  const A = { lon: 10, lat: 48 };
+
+  it("drops one per click and stays armed; typing a value is one undo entry, adding a component another", () => {
+    const { store } = makeStore({ coalesceMs: 800 });
+    store.getState().armPlacement({ kind: "taxisign" });
+    store.getState().placeAt(A);
+    expect(store.getState().placing).toEqual({ kind: "taxisign" });
+    expect(store.getState().airportSelection).toEqual({ kind: "taxisign", id: "id0" });
+    store.getState().armPlacement(null);
+    const before = store.getState().undoStack.length;
+    store.getState().updateAirportTaxisign("id0", { elements: [{ type: "location", value: "B" }] }, 0);
+    store.getState().updateAirportTaxisign("id0", { elements: [{ type: "location", value: "BC" }] }, 0);
+    expect(store.getState().undoStack.length).toBe(before + 1);
+    store.getState().updateAirportTaxisign("id0", {
+      elements: [
+        { type: "location", value: "BC" },
+        { type: "destination", value: "" },
+      ],
+    });
+    expect(store.getState().undoStack.length).toBe(before + 2);
+    store.getState().undo();
+    expect(store.getState().project.airport!.taxisigns![0]!.elements).toEqual([{ type: "location", value: "BC" }]);
+    store.getState().deleteSelection();
+    expect(store.getState().project.airport!.taxisigns).toEqual([]);
+  });
+});

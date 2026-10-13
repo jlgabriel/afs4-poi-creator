@@ -17,7 +17,7 @@ import { FootprintLayer } from "./FootprintLayer";
 import { HelipadLayer } from "./HelipadLayer";
 import { ParkingLayer } from "./ParkingLayer";
 import { MarkLayer } from "./MarkLayer";
-import { CARLOT_LOOK, GROUNDTEXT_LOOK, JETWAY_LOOK } from "./markLooks";
+import { CARLOT_LOOK, GROUNDTEXT_LOOK, JETWAY_LOOK, TAXISIGN_LOOK } from "./markLooks";
 import { AirportLayer } from "./AirportLayer";
 import { RunwayLayer } from "./RunwayLayer";
 import { GliderLayer } from "./GliderLayer";
@@ -121,13 +121,14 @@ export function MapView(): React.ReactElement {
       onSelect: (id) => editorStore.getState().selectAirportPart({ kind: "parking", id }),
     });
 
-    // The ground texts, jetways and car lots: one layer class, one instance per kind (MarkLayer).
+    // The ground texts, taxi signs, jetways and car lots: one layer class, one instance per kind (MarkLayer).
     const markCallbacks = (kind: MarkKind) => ({
       onMove: (id: string, p: LonLat) => editorStore.getState().moveAirportMark(kind, id, p),
       onRotate: (id: string, deg: number) => editorStore.getState().rotateAirportMark(kind, id, deg),
       onSelect: (id: string) => editorStore.getState().selectAirportPart({ kind, id }),
     });
     const groundText = new MarkLayer(map, GROUNDTEXT_LOOK, markCallbacks("groundtext"));
+    const taxisign = new MarkLayer(map, TAXISIGN_LOOK, markCallbacks("taxisign"));
     const jetway = new MarkLayer(map, JETWAY_LOOK, markCallbacks("jetway"));
     const carlot = new MarkLayer(map, CARLOT_LOOK, markCallbacks("carlot"));
 
@@ -184,6 +185,7 @@ export function MapView(): React.ReactElement {
       );
       const markSel = (kind: MarkKind): string | null => (sel?.kind === kind ? sel.id : null);
       groundText.sync(s.project.airport?.groundtexts ?? [], markSel("groundtext"));
+      taxisign.sync(s.project.airport?.taxisigns ?? [], markSel("taxisign"));
       jetway.sync(s.project.airport?.jetways ?? [], markSel("jetway"));
       carlot.sync(s.project.airport?.carlots ?? [], markSel("carlot"));
       const editable = s.placing === null;
@@ -277,6 +279,7 @@ export function MapView(): React.ReactElement {
       glider.destroy();
       carlot.destroy();
       jetway.destroy();
+      taxisign.destroy();
       groundText.destroy();
       parking.destroy();
       helipad.destroy();

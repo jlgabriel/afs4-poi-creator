@@ -15,6 +15,7 @@ import type {
   AirportParking,
   AirportRunway,
   AirportTarmac,
+  AirportTaxisign,
   AirportWinch,
   LonLat,
   ParkingType,
@@ -58,9 +59,13 @@ export function linesOf(airport: ProjectAirport | undefined): AirportLine[] {
   return airport?.lines ?? [];
 }
 
-/** The ground texts, jetways and car lots, absent and empty collapsed — same contract as parkingsOf. */
+/** The ground texts, taxi signs, jetways and car lots, absent and empty collapsed — same contract as
+ *  parkingsOf. */
 export function groundTextsOf(airport: ProjectAirport | undefined): AirportGroundText[] {
   return airport?.groundtexts ?? [];
+}
+export function taxisignsOf(airport: ProjectAirport | undefined): AirportTaxisign[] {
+  return airport?.taxisigns ?? [];
 }
 export function jetwaysOf(airport: ProjectAirport | undefined): AirportJetway[] {
   return airport?.jetways ?? [];

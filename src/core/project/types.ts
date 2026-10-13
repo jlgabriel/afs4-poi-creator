@@ -2,7 +2,7 @@
 // Geometry primitives + the scanned object catalog (M0), plus the editable Project, the
 // export plan, and Settings (design §2.2–§2.4 / §3.4) — the M1 data model.
 
-import type { GroundTextBackground, GroundTextColor, GroundTextPointing } from "./marks";
+import type { GroundTextBackground, GroundTextColor, GroundTextPointing, TaxisignElementType } from "./marks";
 
 export type Vec3 = [number, number, number];
 
@@ -325,6 +325,30 @@ export interface AirportGroundText {
   pointing: GroundTextPointing;
 }
 
+/** One component of a taxi sign: its type sets the colours, its value the text (marks.ts). */
+export interface AirportTaxisignElement {
+  type: TaxisignElementType;
+  /** Per type (marks.ts editTaxisignValue); always empty for a `linebreak`. */
+  value: string;
+}
+
+/** A TAXI SIGN standing at `position` (its middle). Any number per airport. Only Export TAP reads it. */
+export interface AirportTaxisign {
+  id: string;
+  position: LonLat;
+  /** TRUE compass degrees: the direction the FRONT face looks toward. The `.tap` stores it in the
+   *  convention of objects (marks.ts taxisignTapDirection). */
+  heading: number;
+  /** Free text, the element's name in the `.tap`. Empty ≡ the writer's "TAXISIGN". */
+  name: string;
+  /** 1–4 (marks.ts TAXISIGN_SIZE_TYPES). */
+  sizeType: number;
+  /** 0.0–1.0 in steps of 0.1. */
+  brightness: number;
+  /** Left to right; a `linebreak` turns to the back face. */
+  elements: AirportTaxisignElement[];
+}
+
 /** A JETWAY, mounted on a terminal wall at `position`. Any number per airport. Only Export TAP reads it. */
 export interface AirportJetway {
   id: string;
@@ -468,8 +492,10 @@ export interface ProjectAirport {
   /** TARMAC polygons and painted LINEs, in document order. Only Export TAP reads them. Absent ≡ none. */
   tarmacs?: AirportTarmac[];
   lines?: AirportLine[];
-  /** GROUND TEXTs, JETWAYs and CAR LOTs, in document order. Only Export TAP reads them. Absent ≡ none. */
+  /** GROUND TEXTs, TAXI SIGNs, JETWAYs and CAR LOTs, in document order. Only Export TAP reads them.
+   *  Absent ≡ none. */
   groundtexts?: AirportGroundText[];
+  taxisigns?: AirportTaxisign[];
   jetways?: AirportJetway[];
   carlots?: AirportCarlot[];
   /** Every parking position, in document order. Absent ≡ none, which is what every project

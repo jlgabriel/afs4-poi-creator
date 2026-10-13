@@ -1,12 +1,24 @@
-// MarkFields.tsx — the Inspector's panels for the three one-point TAP elements: GROUND TEXT, JETWAY and
-// CAR LOT. Everything here is for Export TAP only.
+// MarkFields.tsx — the Inspector's panels for the four one-point TAP elements: GROUND TEXT, TAXI SIGN,
+// JETWAY and CAR LOT. Everything here is for Export TAP only.
 //
 // Each panel starts with the position and the heading, like a stand's, and then the element's own fields.
 // The menus offer exactly the converter's vocabulary (marks.ts) and show it verbatim.
 //
 // ★ THE HELP TEXTS ARE TESTS: each one names gestures MarkLayer must answer (drag the shape, turn the cyan
 // grip).
-import type { AirportCarlot, AirportGroundText, AirportJetway, LonLat } from "../../core/project/types";
+//
+// The taxi sign's COMPONENTS are an ordered list edited in place: a row per component (type, value, move
+// up, move down, remove), the add buttons under it, and the arrow and hold buttons under the destination
+// row being edited. Every edit replaces the whole list in one store call.
+import { useState } from "react";
+import type {
+  AirportCarlot,
+  AirportGroundText,
+  AirportJetway,
+  AirportTaxisign,
+  AirportTaxisignElement,
+  LonLat,
+} from "../../core/project/types";
 import {
   CARLOT_COUNT_RANGE,
   GROUNDTEXT_BACKGROUNDS,
@@ -17,6 +29,12 @@ import {
   JETWAY_EXTENSION_AMOUNT_RANGE,
   JETWAY_EXTENSION_DIRECTION_RANGE,
   JETWAY_MOUNTING_RANGE,
+  TAXISIGN_BRIGHTNESS_STEPS,
+  TAXISIGN_ELEMENT_TYPES,
+  TAXISIGN_SIZE_TYPES,
+  TAXISIGN_TOKENS,
+  type TaxisignElementType,
+  taxisignValueProblem,
 } from "../../core/project/marks";
 import { clampLonLat } from "../../core/project/schemas";
 import { editorStore } from "../state/editorStore";
@@ -34,12 +52,14 @@ function PlaceFields({
   position,
   heading,
   label,
+  headingLabel = "Heading",
 }: {
   kind: MarkKind;
   id: string;
   position: LonLat;
   heading: number;
   label: string;
+  headingLabel?: string;
 }): React.ReactElement {
   const store = editorStore.getState;
   return (
@@ -65,11 +85,11 @@ function PlaceFields({
         </label>
       </div>
       <label className="pct-field pct-field-col">
-        <span className="pct-field-label">Heading — true</span>
+        <span className="pct-field-label">{headingLabel} — true</span>
         <NumberInput
           value={heading}
           onCommit={(h) => store().rotateAirportMark(kind, id, h)}
-          ariaLabel={`${label} heading, true degrees`}
+          ariaLabel={`${label} ${headingLabel.toLowerCase()}, true degrees`}
         />
       </label>
     </>
@@ -211,6 +231,217 @@ export function GroundTextFields({ text, index }: { text: AirportGroundText; ind
           value={text.name}
           placeholder="GROUNDTEXT"
           aria-label="Ground text name"
+          onChange={(e) => patch({ name: e.target.value })}
+        />
+      </label>
+    </div>
+  );
+}
+
+/** What each component type looks like and takes, for its menu entry and its placeholder. */
+const TAXISIGN_TYPE_HINTS: Record<TaxisignElementType, { look: string; takes: string }> = {
+  runway: { look: "white on red", takes: "0–9, space, -" },
+  destination: { look: "black on yellow", takes: "A–Z, 0–9, space, -, arrows" },
+  location: { look: "yellow on black", takes: "A–Z" },
+  remainingrunway: { look: "white on black", takes: "0–9" },
+  linebreak: { look: "turns to the back face", takes: "" },
+};
+
+/** A token's button face: an arrow turned like the sign turns it, or the hold mark's name. */
+function TokenFace({ token }: { token: string }): React.ReactElement {
+  const m = /^<(LEFT|RIGHT)(\d+)>$/.exec(token);
+  if (m === null) return <>{token.slice(1, -1)}</>;
+  const deg = (m[1] === "RIGHT" ? 1 : -1) * Number(m[2]);
+  return <span style={{ display: "inline-block", transform: `rotate(${deg}deg)` }}>↑</span>;
+}
+
+export function TaxisignFields({ sign, index }: { sign: AirportTaxisign; index: number }): React.ReactElement {
+  const store = editorStore.getState;
+  const patch = (p: Parameters<ReturnType<typeof store>["updateAirportTaxisign"]>[1], typing?: number): void =>
+    store().updateAirportTaxisign(sign.id, p, typing);
+  const elements = sign.elements;
+  const setElements = (next: AirportTaxisignElement[], typing?: number): void => patch({ elements: next }, typing);
+  const edit = (i: number, e: Partial<AirportTaxisignElement>, typing?: number): void =>
+    setElements(
+      elements.map((x, k) => (k === i ? { ...x, ...e } : x)),
+      typing,
+    );
+  const swap = (i: number, j: number): void => {
+    const next = [...elements];
+    [next[i], next[j]] = [next[j], next[i]];
+    setElements(next);
+  };
+  // The destination row the arrow buttons write into: the one last focused, else the first.
+  const [active, setActive] = useState<number | null>(null);
+  const tokenRow =
+    active !== null && elements[active]?.type === "destination"
+      ? active
+      : elements.findIndex((e) => e.type === "destination");
+  const back = elements.findIndex((e) => e.type === "linebreak");
+
+  return (
+    <div className="pct-inspector-body">
+      <div className="pct-field-title">Taxi Sign {index + 1}</div>
+
+      <div className="pct-field pct-field-col">
+        <span className="pct-field-label">
+          Taxi Sign
+          <Help>
+            A taxiway sign, for Export TAP. Drag the shape to move it, and the cyan grip to turn it: the front face
+            looks toward the grip.
+          </Help>
+        </span>
+      </div>
+
+      <div className="pct-field pct-field-col">
+        <span className="pct-field-label">
+          Components
+          <Help>
+            Shown left to right on the front face. After a linebreak the rest goes on the back face, again left to
+            right. Arrows and hold marks go inside a destination: click in its text, then on an arrow.
+          </Help>
+        </span>
+        {elements.length === 0 && <span className="pct-warn">No components: the sign is blank.</span>}
+        {elements.map((e, i) => {
+          const problem = taxisignValueProblem(e.type, e.value);
+          return (
+            <div key={i} className="pct-sign-item">
+              {back >= 0 && i === back + 1 && <span className="pct-field-meta">Back face</span>}
+              <div className="pct-sign-row">
+                <select
+                  className="pct-num"
+                  value={e.type}
+                  aria-label={`Component ${i + 1} type`}
+                  title={TAXISIGN_TYPE_HINTS[e.type].look}
+                  onChange={(ev) => edit(i, { type: ev.target.value as TaxisignElementType })}
+                >
+                  {TAXISIGN_ELEMENT_TYPES.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+                {e.type === "linebreak" ? (
+                  <span className="pct-num pct-num-off">→ back</span>
+                ) : (
+                  <input
+                    className="pct-text"
+                    value={e.value}
+                    placeholder={TAXISIGN_TYPE_HINTS[e.type].takes}
+                    aria-label={`Component ${i + 1} value`}
+                    onFocus={() => setActive(i)}
+                    onChange={(ev) => edit(i, { value: ev.target.value }, i)}
+                  />
+                )}
+                <button
+                  type="button"
+                  title="Move up (left on the sign)"
+                  aria-label={`Move component ${i + 1} up`}
+                  disabled={i === 0}
+                  onClick={() => swap(i, i - 1)}
+                >
+                  ▲
+                </button>
+                <button
+                  type="button"
+                  title="Move down (right on the sign)"
+                  aria-label={`Move component ${i + 1} down`}
+                  disabled={i === elements.length - 1}
+                  onClick={() => swap(i, i + 1)}
+                >
+                  ▼
+                </button>
+                <button
+                  type="button"
+                  title="Remove"
+                  aria-label={`Remove component ${i + 1}`}
+                  onClick={() => setElements(elements.filter((_, k) => k !== i))}
+                >
+                  ✕
+                </button>
+              </div>
+              {problem !== null && <span className="pct-warn">{problem}</span>}
+              {i === tokenRow && (
+                <div className="pct-nudge-row pct-sign-tokens">
+                  {TAXISIGN_TOKENS.map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      title={`Add ${t}`}
+                      aria-label={`Add ${t}`}
+                      onClick={() => edit(i, { value: e.value + t })}
+                    >
+                      <TokenFace token={t} />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+        <div className="pct-nudge-row pct-sign-add">
+          {TAXISIGN_ELEMENT_TYPES.map((t) => (
+            <button
+              key={t}
+              type="button"
+              title={`Add a ${t} component: ${TAXISIGN_TYPE_HINTS[t].look}`}
+              onClick={() => setElements([...elements, { type: t, value: "" }])}
+            >
+              + {t}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <PlaceFields
+        kind="taxisign"
+        id={sign.id}
+        position={sign.position}
+        heading={sign.heading}
+        label="Taxi sign"
+        headingLabel="Facing"
+      />
+
+      <div className="pct-field pct-field-row">
+        <label className="pct-field-col">
+          <span className="pct-field-label">Size type</span>
+          <select
+            className="pct-num"
+            value={sign.sizeType}
+            aria-label="Taxi sign size type"
+            onChange={(ev) => patch({ sizeType: Number(ev.target.value) })}
+          >
+            {TAXISIGN_SIZE_TYPES.map((n) => (
+              <option key={n} value={n}>
+                {n}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="pct-field-col">
+          <span className="pct-field-label">Brightness</span>
+          <select
+            className="pct-num"
+            value={sign.brightness.toFixed(1)}
+            aria-label="Taxi sign brightness"
+            onChange={(ev) => patch({ brightness: Number(ev.target.value) })}
+          >
+            {TAXISIGN_BRIGHTNESS_STEPS.map((b) => (
+              <option key={b} value={b.toFixed(1)}>
+                {b.toFixed(1)}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      <label className="pct-field pct-field-col">
+        <span className="pct-field-label">Name</span>
+        <input
+          className="pct-text"
+          value={sign.name}
+          placeholder="TAXISIGN"
+          aria-label="Taxi sign name"
           onChange={(e) => patch({ name: e.target.value })}
         />
       </label>

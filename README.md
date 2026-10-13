@@ -118,7 +118,7 @@ The short version is below. For the whole thing walked through with pictures, se
    **light or a plant** a size too, by measuring it yourself: see
    [Footprints you measure yourself](#footprints-you-measure-yourself).
    Below the catalog, the **Lights** section holds the airport-light fixtures and the custom point light,
-   **Plants** holds the trees and shrubs, and **Airport** holds the twelve pieces an airfield is made of.
+   **Plants** holds the trees and shrubs, and **Airport** holds the thirteen pieces an airfield is made of.
 4. **Export & install** — **Export /poi…** writes the folder into your `scenery/poi/`. Restart Aerofly
    and fly to the spot. The same dialog can **uninstall** POIs that PCT made, so nothing is permanent.
    If you'd rather **start** a flight there than fly to it, **Export /airports…** writes the same
@@ -229,9 +229,9 @@ with pictures.
 **Export /airports… writes the airfield's data, not its asphalt** — no markings, no centre line, no
 surface. Aerofly draws the ground; this tells it where the runway is and how to use it. The surfaces —
 a runway's material, **Tarmac** areas and painted **Lines** — go only into **Export TAP…**, for the
-converter to bake into the ground. So do the **Ground Texts**, **Jetways** and **Car Lots**.
+converter to bake into the ground. So do the **Ground Texts**, **Taxi Signs**, **Jetways** and **Car Lots**.
 
-The catalog's **Airport** section holds twelve cards, and every one of them behaves like a tree or a light:
+The catalog's **Airport** section holds thirteen cards, and every one of them behaves like a tree or a light:
 click the card, click the map, edit it in the inspector.
 
 | Card | What it is |
@@ -244,6 +244,7 @@ click the card, click the map, edit it in the inspector.
 | **Tarmac** | An apron, taxiway, ground or flattened area, for Export TAP. Drawn like the Boundary, as many as you like; each has a level, a material and a brightness. |
 | **Line** | A painted line — centre line, edge, hold position… — for Export TAP. Click its points, double-click the last; pick the marking in the inspector. |
 | **Ground Text** | Letters painted on the pavement — `A`, `B2`, `TAXI B` — for Export TAP: letter size, colours, a box or circle behind them, an arrow. |
+| **Taxi Sign** | A taxiway sign, for Export TAP, built from components left to right — location, destination with arrows, runway, distance remaining — with a back face after a line break. |
 | **Jetway** | A boarding bridge, for Export TAP, placed where it is mounted on the terminal and turned to face out. |
 | **Car Lot** | Rows of parking spaces filled with cars at random, for Export TAP. |
 | **Aerotow** | A glider start, towed into the air along its heading by the DR400. |
@@ -283,7 +284,7 @@ Restart Aerofly after installing: airports are read once, at startup.
 **Export TAP…** *(v2.1)* saves the same airport, and every object around it, as a `<CODE>.tap` file —
 the format a TAP converter builds an airport folder from — with its **Boundary** *(v2.2)*, its
 **Tarmac** areas, painted **Lines** and each runway's material *(v2.3)*, its **Ground Texts**, **Jetways**
-and **Car Lots** *(v2.4)*, and its glider starts in
+and **Car Lots** *(v2.4)*, its **Taxi Signs** *(v2.5)*, and its glider starts in
 `<CODE>_addendum.tap` beside it. It installs nothing: the files go into the folder you pick
 (it's also under *Settings → TAP folder*), and PCT asks before replacing them. An XREF's scale and the
 heights of XREFs and plants are not in it, and the dialog says so when your project has them. The airport's **Elevation** (Airport panel, *v2.1.1*) goes

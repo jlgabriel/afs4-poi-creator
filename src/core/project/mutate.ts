@@ -19,6 +19,8 @@ import type {
   AirportRunway,
   AirportRunwayEnd,
   AirportTarmac,
+  AirportTaxisign,
+  AirportTaxisignElement,
   AirportWinch,
   HeightMode,
   HeightSpec,
@@ -46,6 +48,7 @@ import {
   parkingsOf,
   runwaysOf,
   tarmacsOf,
+  taxisignsOf,
   winchesOf,
 } from "./airport";
 import { centroid } from "../geo/poiName";
@@ -67,13 +70,20 @@ import {
   DEFAULT_GROUNDTEXT_TEXT_COLOR,
   DEFAULT_GROUNDTEXT_VALUE,
   DEFAULT_JETWAY,
+  DEFAULT_TAXISIGN_BRIGHTNESS,
+  DEFAULT_TAXISIGN_ELEMENTS,
+  DEFAULT_TAXISIGN_HEADING,
+  DEFAULT_TAXISIGN_SIZE_TYPE,
+  TAXISIGN_SIZE_TYPES,
   JETWAY_EXIT_DIRECTION_RANGE,
   JETWAY_EXTENSION_AMOUNT_RANGE,
   JETWAY_EXTENSION_DIRECTION_RANGE,
   JETWAY_MOUNTING_RANGE,
   clampTo,
   cleanCarlotCount,
+  clampTaxisignBrightness,
   cleanGroundTextValue,
+  editTaxisignValue,
 } from "./marks";
 
 const nowIso = (): string => new Date().toISOString();
@@ -996,18 +1006,19 @@ export function setAirportLineName(project: Project, lineId: string, name: strin
   return updateListItem(project, "lines", linesOf, lineId, (l) => (l.name === name ? l : { ...l, name }), now);
 }
 
-// ── GROUND TEXTs, JETWAYs and CAR LOTs (types.ts) — one-point elements only Export TAP reads ──────────
+// ── GROUND TEXTs, TAXI SIGNs, JETWAYs and CAR LOTs (types.ts) — one-point elements only Export TAP reads ─
 //
-// All three are a point plus a heading, placed and dragged like a stand, so they share one set of
+// All four are a point plus a heading, placed and dragged like a stand, so they share one set of
 // mutations for what they have in common (add, remove, move, turn) and each has its own `update…` for its
 // fields.
 
-/** The three lists, by the airport key they live under. */
-export type MarkKey = "groundtexts" | "jetways" | "carlots";
+/** The four lists, by the airport key they live under. */
+export type MarkKey = "groundtexts" | "taxisigns" | "jetways" | "carlots";
 type MarkOf<K extends MarkKey> = NonNullable<ProjectAirport[K]>[number];
 
 const MARK_READERS: { [K in MarkKey]: (a: ProjectAirport) => MarkOf<K>[] } = {
   groundtexts: groundTextsOf,
+  taxisigns: taxisignsOf,
   jetways: jetwaysOf,
   carlots: carlotsOf,
 };
@@ -1043,6 +1054,24 @@ export function addAirportGroundText(
     pointing: DEFAULT_GROUNDTEXT_POINTING,
   };
   return addMark(project, "groundtexts", item, now);
+}
+
+export function addAirportTaxisign(
+  project: Project,
+  position: LonLat,
+  opts: { id?: string } = {},
+  now = nowIso(),
+): Project {
+  const item: AirportTaxisign = {
+    id: opts.id ?? randomId(),
+    position,
+    heading: DEFAULT_TAXISIGN_HEADING,
+    name: "",
+    sizeType: DEFAULT_TAXISIGN_SIZE_TYPE,
+    brightness: DEFAULT_TAXISIGN_BRIGHTNESS,
+    elements: DEFAULT_TAXISIGN_ELEMENTS.map((e) => ({ ...e })),
+  };
+  return addMark(project, "taxisigns", item, now);
 }
 
 export function addAirportJetway(
@@ -1132,6 +1161,37 @@ export function updateAirportGroundText(
   }
   if (p.value !== undefined) p.value = cleanGroundTextValue(p.value);
   return updateListItem(project, "groundtexts", groundTextsOf, id, (g) => (samePatch(g, p) ? g : { ...g, ...p }), now);
+}
+
+export type TaxisignPatch = Partial<Pick<AirportTaxisign, "name" | "sizeType" | "brightness" | "elements">>;
+
+/** A taxi sign's fields. The size type must be one of the four (anything else is refused), the brightness
+ *  is snapped onto its steps, and each component's value is cleaned to what its type takes as it is typed
+ *  (marks.ts editTaxisignValue) — a line break's value is always empty. The components are replaced as a
+ *  whole list: adding, removing and reordering them is the caller's array. */
+export function updateAirportTaxisign(project: Project, id: string, patch: TaxisignPatch, now = nowIso()): Project {
+  const p: TaxisignPatch = { ...patch };
+  if (p.sizeType !== undefined && !(TAXISIGN_SIZE_TYPES as readonly number[]).includes(p.sizeType)) return project;
+  if (p.brightness !== undefined) {
+    const b = clampTaxisignBrightness(p.brightness);
+    if (b === null) return project;
+    p.brightness = b;
+  }
+  const elements = p.elements?.map(
+    (e): AirportTaxisignElement => ({
+      type: e.type,
+      value: e.type === "linebreak" ? "" : editTaxisignValue(e.type, e.value),
+    }),
+  );
+  delete p.elements;
+  return updateListItem(project, "taxisigns", taxisignsOf, id, (t) => {
+    const sameElements =
+      elements === undefined ||
+      (elements.length === t.elements.length &&
+        elements.every((e, i) => e.type === t.elements[i].type && e.value === t.elements[i].value));
+    if (samePatch(t, p) && sameElements) return t;
+    return sameElements ? { ...t, ...p } : { ...t, ...p, elements };
+  }, now);
 }
 
 export type JetwayPatch = Partial<Omit<AirportJetway, "id" | "position" | "heading">>;

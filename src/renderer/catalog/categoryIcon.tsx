@@ -387,6 +387,27 @@ export const GroundTextIcon = memo(function GroundTextIcon(): React.ReactElement
   );
 });
 
+/** A TAXI SIGN: a sign board on two legs, a letter and an arrow on it. */
+export const TaxisignIcon = memo(function TaxisignIcon(): React.ReactElement {
+  return (
+    <svg
+      className="pct-thumb"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <rect x="2.5" y="5" width="19" height="10" rx="1" fill="currentColor" fillOpacity="0.2" />
+      <path d="M6 18 V15 M18 18 V15" strokeWidth="2" />
+      <path d="M6 12.5 L8 7.5 L10 12.5 M6.8 10.8 H9.2" />
+      <path d="M13 10 H19 M16.5 7.5 L19 10 L16.5 12.5" />
+    </svg>
+  );
+});
+
 /** A JETWAY: the terminal wall and the tunnel reaching out from it. */
 export const JetwayIcon = memo(function JetwayIcon(): React.ReactElement {
   return (

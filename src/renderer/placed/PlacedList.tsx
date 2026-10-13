@@ -22,10 +22,12 @@ import {
   ParkingIcon,
   RunwayIcon,
   TarmacIcon,
+  TaxisignIcon,
   WinchIcon,
 } from "../catalog/categoryIcon";
 import { photoKeyForPlaced as placedPhotoKey } from "../../core/catalog/photoKey";
 import { PARKING_TYPE_LABELS } from "../../core/project/airport";
+import { cleanTaxisignValue, taxisignFaces } from "../../core/project/marks";
 import { haversine, initialBearing } from "../../core/geo/geo";
 import type { LonLat } from "../../core/project/types";
 import { rowInfo } from "./rowInfo";
@@ -53,6 +55,7 @@ function DataRow(): React.ReactElement | null {
     (airport.tarmacs?.length ?? 0) +
     (airport.lines?.length ?? 0) +
     (airport.groundtexts?.length ?? 0) +
+    (airport.taxisigns?.length ?? 0) +
     (airport.jetways?.length ?? 0) +
     (airport.carlots?.length ?? 0);
   return (
@@ -257,6 +260,7 @@ function SurfaceRows(): React.ReactElement | null {
  *  flies to the element. */
 function MarkRows(): React.ReactElement | null {
   const groundtexts = useEditor((s) => s.project.airport?.groundtexts);
+  const taxisigns = useEditor((s) => s.project.airport?.taxisigns);
   const jetways = useEditor((s) => s.project.airport?.jetways);
   const carlots = useEditor((s) => s.project.airport?.carlots);
   const sel = useEditor((s) => s.airportSelection);
@@ -279,7 +283,7 @@ function MarkRows(): React.ReactElement | null {
         onClick={() => editorStore.getState().selectAirportPart({ kind, id })}
         onDoubleClick={() => editorStore.getState().flyTo(at)}
       >
-        {kind === "groundtext" ? <GroundTextIcon /> : kind === "jetway" ? <JetwayIcon /> : <CarlotIcon />}
+        {MARK_ICONS[kind]}
         <span className="pct-placed-text">
           <span className="pct-placed-name">
             <span className="pct-placed-label">{label}</span>
@@ -291,7 +295,9 @@ function MarkRows(): React.ReactElement | null {
     );
   };
   const bearing = (h: number): string => `${String(Math.round(h) % 360).padStart(3, "0")}°`;
-  if ((groundtexts?.length ?? 0) + (jetways?.length ?? 0) + (carlots?.length ?? 0) === 0) return null;
+  const count =
+    (groundtexts?.length ?? 0) + (taxisigns?.length ?? 0) + (jetways?.length ?? 0) + (carlots?.length ?? 0);
+  if (count === 0) return null;
   return (
     <>
       {(groundtexts ?? []).map((g, i) =>
@@ -304,6 +310,14 @@ function MarkRows(): React.ReactElement | null {
           g.position,
         ),
       )}
+      {(taxisigns ?? []).map((t, i) => {
+        const [front, back] = taxisignFaces(t.elements);
+        const say = (face: typeof front): string =>
+          face.map((e) => cleanTaxisignValue(e.type, e.value)).filter((v) => v !== "").join(" | ");
+        const text = say(front) + (back.length > 0 ? ` / ${say(back)}` : "");
+        const meta = `size ${t.sizeType} · ${bearing(t.heading)}`;
+        return row("taxisign", t.id, `Taxi Sign ${i + 1}`, text === "" ? "—" : text, meta, t.position);
+      })}
       {(jetways ?? []).map((j, i) =>
         row(
           "jetway",
@@ -321,8 +335,16 @@ function MarkRows(): React.ReactElement | null {
   );
 }
 
+const MARK_ICONS: Record<MarkKind, React.ReactElement> = {
+  groundtext: <GroundTextIcon />,
+  taxisign: <TaxisignIcon />,
+  jetway: <JetwayIcon />,
+  carlot: <CarlotIcon />,
+};
+
 const MARK_TITLES: Record<MarkKind, string> = {
   groundtext: "Letters painted on the ground",
+  taxisign: "A taxiway sign",
   jetway: "A jetway",
   carlot: "A car lot",
 };

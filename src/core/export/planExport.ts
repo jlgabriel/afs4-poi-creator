@@ -47,8 +47,8 @@ import {
   type TapTarmacSpec,
 } from "./tapWriter";
 import { ringSelfIntersects } from "../geo/polygon";
-import { carlotsOf, groundTextsOf, jetwaysOf } from "../project/airport";
-import { cleanGroundTextValue } from "../project/marks";
+import { carlotsOf, groundTextsOf, jetwaysOf, taxisignsOf } from "../project/airport";
+import { cleanGroundTextValue, cleanTaxisignValue, taxisignValueProblem } from "../project/marks";
 import {
   DEFAULT_BRIGHTNESS,
   DEFAULT_RUNWAY_MATERIAL,
@@ -446,6 +446,14 @@ export function planTap(project: Project, resolvedLights: ResolvedObject[], terr
       warnings.push(`Ground Text ${i + 1} has no text, so it paints nothing.`);
     }
   });
+  const taxisigns = shifted(taxisignsOf(airport));
+  taxisigns.forEach((t, i) => {
+    const shown = t.elements.filter((e) => e.type !== "linebreak" && cleanTaxisignValue(e.type, e.value).trim() !== "");
+    if (shown.length === 0) warnings.push(`Taxi Sign ${i + 1} has nothing on it, so it shows a blank sign.`);
+    else if (t.elements.some((e) => taxisignValueProblem(e.type, e.value) !== null)) {
+      warnings.push(`Taxi Sign ${i + 1} has a component that is empty or carries a <…> that is left out.`);
+    }
+  });
   const jetways = shifted(jetwaysOf(airport));
   const carlots = shifted(carlotsOf(airport));
 
@@ -481,6 +489,7 @@ export function planTap(project: Project, resolvedLights: ResolvedObject[], terr
     tarmacs,
     lines,
     groundTexts,
+    taxisigns,
     jetways,
     carlots,
     plants: placedPlants.map((p) => ({

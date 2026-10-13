@@ -580,18 +580,18 @@ order to list a place: a code, a name, a country, and at least one spot to start
 **Install one or the other, not both.** The airport takes its own copy of everything you placed, so a
 project installed as a POI *and* as an airport puts every object into the world twice.
 
-This section is long because there are twelve pieces to describe. You do not need all twelve: an airport with
+This section is long because there are thirteen pieces to describe. You do not need all thirteen: an airport with
 one helipad on it is a complete, working airport, and that is where most people stop.
 
 | | |
 |---|---|
 | [What PCT writes, and what it doesn't](#what-pct-writes-and-what-it-doesnt) | Read this one first. |
-| [The twelve cards](#the-twelve-cards) | The rule they share, and the ways they differ. |
+| [The thirteen cards](#the-thirteen-cards) | The rule they share, and the ways they differ. |
 | [Airport — the name and the code](#airport--the-name-and-the-code) | Identity, and the point the whole field is filed under. |
 | [Boundary](#boundary) | The polygon around the whole field, for Export TAP. |
 | [Runway](#runway) · [Helipad](#helipad) · [Parking](#parking) | The three you are most likely to place. |
 | [Tarmac](#tarmac) · [Line](#line) | Paved areas and painted lines, for Export TAP. |
-| [Ground Text](#ground-text) · [Jetway](#jetway) · [Car Lot](#car-lot) | Painted letters, boarding bridges and car parks, for Export TAP. |
+| [Ground Text](#ground-text) · [Taxi Sign](#taxi-sign) · [Jetway](#jetway) · [Car Lot](#car-lot) | Painted letters, taxiway signs, boarding bridges and car parks, for Export TAP. |
 | [Aerotow](#aerotow) · [Winch Launch](#winch-launch) | The two glider starts. |
 | [Installing it](#installing-it) | The dialog, and the one rule Aerofly enforces. |
 | [Finding it in the sim](#finding-it-in-the-sim) | Why the row in LOCATION may come up blank. |
@@ -616,22 +616,23 @@ flight at.
 
 Painting the ground — tarmac, markings — is a different job, done with a different file: a `.tap`, which
 a TAP converter turns into the airport's ground. PCT writes that file too, with **Export TAP…**, and
-the [Tarmac](#tarmac), [Line](#line), [Ground Text](#ground-text), [Jetway](#jetway) and [Car Lot](#car-lot)
-cards are what go into it. **Export /airports…** leaves them out.
+the [Tarmac](#tarmac), [Line](#line), [Ground Text](#ground-text), [Taxi Sign](#taxi-sign), [Jetway](#jetway)
+and [Car Lot](#car-lot) cards are what go into it. **Export /airports…** leaves them out.
 
-### The twelve cards
+### The thirteen cards
 
-Open **Airport** in the catalog and there are twelve.
+Open **Airport** in the catalog and there are thirteen.
 
 ![Shot 27 — the Airport section: Airport, Runway, Helipad, Parking, Aerotow and Winch Launch, each with a line saying what it does](images/27_airport_section.jpg)
 
-All twelve behave the way the rest of PCT behaves: **click the card to arm it, click the map to drop it,
+All thirteen behave the way the rest of PCT behaves: **click the card to arm it, click the map to drop it,
 Esc to cancel.** Nothing here lives in a dialog, and nothing needs filling in before you can put it on
 the map.
 
 They differ in how many clicks they take, and each card says which it is on its own second line:
 
-- **Six are repeatable and stay armed** — Helipad, Parking, Ground Text, Jetway, Car Lot, Aerotow. Drop
+- **Seven are repeatable and stay armed** — Helipad, Parking, Ground Text, Taxi Sign, Jetway, Car Lot,
+  Aerotow. Drop
   one, drop another, keep going. Each click puts down one more.
 - **Two lay out a whole shape and then disarm** — Runway and Winch Launch. Both are made of *two*
   points, so the click cannot put the finished thing under the cursor. It drops a starter — a 200 m
@@ -645,7 +646,7 @@ code, and the single point the whole thing is filed under. Its card puts that po
 first time, and after that it is the way back to the identity fields.
 
 **The order is the same in both columns.** Airport · Boundary · Runway · Helipad · Parking · Tarmac ·
-Line · Ground Text · Jetway · Car Lot · Aerotow · Winch Launch, in the catalog on the left and in the
+Line · Ground Text · Taxi Sign · Jetway · Car Lot · Aerotow · Winch Launch, in the catalog on the left and in the
 placed list on the right. That is deliberate, and it is
 ApfelFlieger's rule: the sequences match so that finding a thing in one column tells you where it is in
 the other.
@@ -661,7 +662,8 @@ On the map each part is drawn at its real size, and each one looks like itself:
   runway, a faint dashed outline for flatten — and lies under everything else;
 - a **line** is drawn in its paint colour (yellow, white, blue, orange, red), dashed when the marking is;
 - the **helipad** is a white circle with an **H** in it, the **stand** a violet one with a **P**;
-- a **ground text** is its letters, painted in its own colours and turned with it; a **jetway** an indigo
+- a **ground text** is its letters, painted in its own colours and turned with it; a **taxi sign** its
+  front face laid flat, in the sign's own colours, readable from the side it faces; a **jetway** an indigo
   tunnel from its mounting point, as long as its extension; a **car lot** a green rectangle about the
   size of its spaces, with its rows × spaces written inside;
 - the two **glider starts** are pink — the aerotow a dot with a short rope, the winch launch a dot, a
@@ -917,6 +919,44 @@ In the Inspector:
 - **Arrow** — `none`, `left` or `right`: an arrow at that end of the text.
 - **Name** — the element's name in the file. Empty is written as `GROUNDTEXT`.
 
+### Taxi Sign
+
+*(v2.5)* A taxiway sign: a location, a destination with its arrow, a runway, the distance remaining. Only
+**Export TAP…** uses it. Any number per airport.
+
+**Placing one.** Click the **Taxi Sign** card and click the map where the middle of the sign stands. It
+starts as a location sign reading `A`, facing south. Drag the sign to move it, and the cyan grip to turn
+it: **the front face looks toward the grip**. On the map the front face is drawn laid flat, so it reads
+the right way up from the grip's side.
+
+**Components.** A sign is built from components, shown left to right on its front face. Each one is a
+row in the Inspector — its type, its text, ▲ ▼ to move it, ✕ to remove it — and the buttons under the
+list add one of each type:
+
+| Type | Looks like | Takes |
+|---|---|---|
+| `runway` | white on red | digits, space, `-` — `23-05` |
+| `destination` | black on yellow | capital letters, digits, space, `-`, and arrows |
+| `location` | yellow on black | capital letters |
+| `remainingrunway` | white on black | digits — `10` |
+| `linebreak` | — | nothing: what comes after it goes on the **back** face |
+
+Lowercase becomes capitals and anything a type does not take is left out as you type. A **destination**
+carries its arrows and hold marks inline: click in its text, then on one of the buttons under it — `↑ ↖ ← ↙ ↓`
+for the left-hand arrows, `↑ ↗ → ↘ ↓` for the right-hand ones, and `HOLD0`, `HOLD1`. They are written as
+`<LEFT45>`, `<RIGHT90>`, `<HOLD0>` and so on: `B<RIGHT90>` reads **B →**. A `<…>` that is not one of these
+is left out of the file, and the Inspector says so.
+
+Two examples: a runway sign with a hold mark on its back is `runway 23-05`, `linebreak`,
+`destination <HOLD0>`; a location sign with a direction beside it is `location B`, `destination B<RIGHT90>`.
+
+The rest of the Inspector:
+
+- **Lon**, **Lat**, **Facing — true** — the direction the front face looks toward.
+- **Size type** — `1` to `4`; `3` to start with.
+- **Brightness** — `0.0` to `1.0`; `0.5` to start with.
+- **Name** — the element's name in the file. Empty is written as `TAXISIGN`.
+
 ### Jetway
 
 *(v2.4)* A boarding bridge on a terminal. Only **Export TAP…** uses it. Any number per airport.
@@ -1049,7 +1089,8 @@ The first time, the dialog asks for that folder (**Choose…**). PCT remembers i
 folder** shows it and changes it.
 
 What goes in: the airport, its boundary, runways, helipads, parking positions, [tarmacs](#tarmac),
-[lines](#line), [ground texts](#ground-text), [jetways](#jetway) and [car lots](#car-lot), and every object
+[lines](#line), [ground texts](#ground-text), [taxi signs](#taxi-sign), [jetways](#jetway) and
+[car lots](#car-lot), and every object
 you placed. **Glider starts** go in a second file beside it, `<CODE>_addendum.tap`, which the converter adds
 in when it finds both files side by side. A project without glider starts writes no addendum.
 The code, the name and the country follow the same rules as for **Export /airports…**, and the airport

@@ -220,6 +220,7 @@ body {
   overflow: visible;
 }
 .pct-groundtext,
+.pct-taxisign,
 .pct-mark-label {
   position: absolute;
   left: 0;
@@ -228,6 +229,13 @@ body {
   font-weight: 700;
   font-family: system-ui, sans-serif;
   user-select: none;
+}
+.pct-taxisign {
+  display: flex;
+  outline: 1px solid #0f172a;
+}
+.pct-taxisign > span {
+  height: 100%;
 }
 .pct-mark-label {
   transform: translate(-50%, -50%);
@@ -1206,6 +1214,42 @@ body {
   background: #fff;
   cursor: pointer;
   font-variant-numeric: tabular-nums;
+}
+.pct-sign-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.pct-sign-row {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.pct-sign-row select {
+  flex: 0 0 auto;
+  max-width: 44%;
+}
+.pct-sign-row .pct-text,
+.pct-sign-row .pct-num-off {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.pct-sign-row button {
+  font: inherit;
+  font-size: 11px;
+  padding: 3px 5px;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  background: #fff;
+  cursor: pointer;
+}
+.pct-sign-row button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.pct-sign-tokens,
+.pct-sign-add {
+  flex-wrap: wrap;
 }
 .pct-shift-row {
   display: flex;

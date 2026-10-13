@@ -3,8 +3,8 @@
 //
 // These cards behave exactly like a light or a plant: click to arm, click the map to drop, Escape to
 // cancel — the same procedure as placing POI objects, so nothing new has to be learned. Order:
-// Airport · Boundary · Runway · Helipad · Parking · Tarmac · Line · Ground Text · Jetway · Car Lot · Aerotow ·
-// Winch Launch.
+// Airport · Boundary · Runway · Helipad · Parking · Tarmac · Line · Ground Text · Taxi Sign · Jetway ·
+// Car Lot · Aerotow · Winch Launch.
 //
 // ★ THE ORDER IS A PAIR, NOT A LIST: the catalog and the placed list must show the same sequence.
 // Neither column owns it, so changing one of them alone is the bug — PlacedList.tsx carries the same
@@ -36,6 +36,7 @@ import {
   ParkingIcon,
   RunwayIcon,
   TarmacIcon,
+  TaxisignIcon,
   WinchIcon,
 } from "./categoryIcon";
 
@@ -55,6 +56,7 @@ const RUNWAY_TERMS = "runway strip threshold papi reil approach lighting";
 const TARMAC_TERMS = "tarmac apron taxiway pavement asphalt concrete grass surface material flatten polygon";
 const LINE_TERMS = "line marking taxiway centre center centerline edge hold short paint";
 const GROUNDTEXT_TERMS = "ground text marking letter paint taxiway sign painted";
+const TAXISIGN_TERMS = "taxi sign taxiway signs signboard location destination runway hold arrow";
 const JETWAY_TERMS = "jetway jet bridge gate terminal boarding";
 const CARLOT_TERMS = "car lot park parking cars vehicles";
 const AEROTOW_TERMS = "aerotow glider tow towing sailplane dr400 start";
@@ -82,6 +84,7 @@ export function AirportSection(): React.ReactElement {
   const tarmacCount = useEditor((s) => s.project.airport?.tarmacs?.length ?? 0);
   const lineCount = useEditor((s) => s.project.airport?.lines?.length ?? 0);
   const groundTextCount = useEditor((s) => s.project.airport?.groundtexts?.length ?? 0);
+  const taxisignCount = useEditor((s) => s.project.airport?.taxisigns?.length ?? 0);
   const jetwayCount = useEditor((s) => s.project.airport?.jetways?.length ?? 0);
   const carlotCount = useEditor((s) => s.project.airport?.carlots?.length ?? 0);
   const draftPoints = useEditor((s) => s.shapeDraft.length);
@@ -112,6 +115,7 @@ export function AirportSection(): React.ReactElement {
   const tarmacMatches = q === "" || TARMAC_TERMS.includes(q);
   const lineMatches = q === "" || LINE_TERMS.includes(q);
   const groundTextMatches = q === "" || GROUNDTEXT_TERMS.includes(q);
+  const taxisignMatches = q === "" || TAXISIGN_TERMS.includes(q);
   const jetwayMatches = q === "" || JETWAY_TERMS.includes(q);
   const carlotMatches = q === "" || CARLOT_TERMS.includes(q);
   const count =
@@ -122,6 +126,7 @@ export function AirportSection(): React.ReactElement {
     (tarmacMatches ? 1 : 0) +
     (lineMatches ? 1 : 0) +
     (groundTextMatches ? 1 : 0) +
+    (taxisignMatches ? 1 : 0) +
     (jetwayMatches ? 1 : 0) +
     (carlotMatches ? 1 : 0) +
     (runwayMatches ? 1 : 0) +
@@ -180,7 +185,7 @@ export function AirportSection(): React.ReactElement {
     editorStore.getState().armPlacement(cur?.kind === "line" ? null : { kind: "line" });
   }, []);
 
-  // A ground text, a jetway or a car lot: drop, select, stay armed — a stand's card.
+  // A ground text, a taxi sign, a jetway or a car lot: drop, select, stay armed — a stand's card.
   const armMark = useCallback((kind: MarkKind) => {
     const cur = editorStore.getState().placing;
     editorStore.getState().armPlacement(cur?.kind === kind ? null : { kind });
@@ -378,6 +383,25 @@ export function AirportSection(): React.ReactElement {
                 {groundTextCount === 0
                   ? "letters painted on the ground"
                   : `${groundTextCount} placed · click the map to add another`}
+              </span>
+            </span>
+          </button>
+        )}
+        {taxisignMatches && (
+          <button
+            type="button"
+            className={placing?.kind === "taxisign" ? "pct-obj-card armed" : "pct-obj-card"}
+            aria-pressed={placing?.kind === "taxisign"}
+            title="A taxiway sign, for Export TAP. Click, then click the map where it stands"
+            onClick={() => armMark("taxisign")}
+          >
+            <TaxisignIcon />
+            <span className="pct-obj-text">
+              <span className="pct-obj-name">Taxi Sign</span>
+              <span className="pct-obj-cat">
+                {taxisignCount === 0
+                  ? "a taxiway sign: location, destination, runway…"
+                  : `${taxisignCount} placed · click the map to add another`}
               </span>
             </span>
           </button>

@@ -11,7 +11,7 @@
 import { z } from "zod";
 import type { LonLat, Project, Settings } from "./types";
 import { APPROACH_LIGHT_SYSTEMS, PAPI_SIDES, PARKING_TYPES, REIL_KINDS } from "./airport";
-import { GROUNDTEXT_BACKGROUNDS, GROUNDTEXT_COLORS, GROUNDTEXT_POINTING } from "./marks";
+import { GROUNDTEXT_BACKGROUNDS, GROUNDTEXT_COLORS, GROUNDTEXT_POINTING, TAXISIGN_ELEMENT_TYPES } from "./marks";
 import type { FootprintOverrides } from "../catalog/footprints";
 import { isValidPhotoKey } from "../catalog/photoKey";
 
@@ -220,6 +220,23 @@ const zGroundText = z.looseObject({
   pointing: z.enum(GROUNDTEXT_POINTING),
 });
 
+/** A taxi sign. The component `type` is an ENUM for the same reason as the colours above; the size type
+ *  is one of the four the converter takes. */
+const zTaxisign = z.looseObject({
+  id: z.string().min(1),
+  position: zLonLat,
+  heading: z.number().finite(),
+  name: z.string().max(IDENTITY_MAX),
+  sizeType: z.number().int().min(1).max(4),
+  brightness: z.number().finite().min(0).max(1),
+  elements: z.array(
+    z.looseObject({
+      type: z.enum(TAXISIGN_ELEMENT_TYPES),
+      value: z.string().max(IDENTITY_MAX),
+    }),
+  ),
+});
+
 const zJetway = z.looseObject({
   id: z.string().min(1),
   position: zLonLat,
@@ -293,6 +310,7 @@ export const zAirport = z.looseObject({
   tarmacs: z.array(zTarmac).optional(),
   lines: z.array(zLine).optional(),
   groundtexts: z.array(zGroundText).optional(),
+  taxisigns: z.array(zTaxisign).optional(),
   jetways: z.array(zJetway).optional(),
   carlots: z.array(zCarlot).optional(),
   parkings: z.array(zParking).optional(),

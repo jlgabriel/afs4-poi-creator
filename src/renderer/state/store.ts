@@ -48,6 +48,7 @@ import { DEFAULT_PAD_RADIUS_M } from "../../core/export/planExport";
 import {
   aerotowsOf,
   carlotsOf,
+  taxisignsOf,
   groundTextsOf,
   jetwaysOf,
   linesOf,
@@ -129,16 +130,31 @@ export type AirportSelection =
   | { kind: "boundary" }
   | { kind: "pad" | "runway" | "parking" | "aerotow" | "winch" | "tarmac" | "line" | MarkKind; id: string };
 
-/** The three one-point TAP elements, by the kind the selection and the placement use, and the airport
+/** The four one-point TAP elements, by the kind the selection and the placement use, and the airport
  *  list each lives in (mutate.ts MarkKey). */
-export type MarkKind = "groundtext" | "jetway" | "carlot";
+export type MarkKind = "groundtext" | "taxisign" | "jetway" | "carlot";
 export const MARK_KEY: Record<MarkKind, mutate.MarkKey> = {
   groundtext: "groundtexts",
+  taxisign: "taxisigns",
   jetway: "jetways",
   carlot: "carlots",
 };
 export const isMarkKind = (kind: string | undefined): kind is MarkKind =>
-  kind === "groundtext" || kind === "jetway" || kind === "carlot";
+  kind === "groundtext" || kind === "taxisign" || kind === "jetway" || kind === "carlot";
+
+/** Each kind's placement and its list. */
+const MARK_ADD: Record<MarkKind, (p: Project, at: LonLat, opts: { id?: string }) => Project> = {
+  groundtext: mutate.addAirportGroundText,
+  taxisign: mutate.addAirportTaxisign,
+  jetway: mutate.addAirportJetway,
+  carlot: mutate.addAirportCarlot,
+};
+const MARK_READ: Record<MarkKind, (a: ProjectAirport) => { id: string; position: LonLat }[]> = {
+  groundtext: groundTextsOf,
+  taxisign: taxisignsOf,
+  jetway: jetwaysOf,
+  carlot: carlotsOf,
+};
 
 /** The cards drawn point by point into `shapeDraft`, and how many points each needs to finish. */
 export const SHAPE_MIN_POINTS = { boundary: 3, tarmac: 3, line: 2 } as const;
@@ -175,6 +191,7 @@ function removeAirportPart(project: Project, sel: AirportSelection): Project {
     case "line":
       return mutate.removeAirportLine(project, sel.id);
     case "groundtext":
+    case "taxisign":
     case "jetway":
     case "carlot":
       return mutate.removeAirportMark(project, MARK_KEY[sel.kind], sel.id);
@@ -413,10 +430,14 @@ export interface EditorState {
   setAirportLinePoints: (id: string, points: LonLat[]) => void;
   setAirportLineName: (id: string, name: string) => void;
   setAirportRunwaySurface: (id: string, patch: { material?: string; brightness?: number }) => void;
-  //    GROUND TEXTs, JETWAYs and CAR LOTs: one move and one turn for the three, and each one's fields.
+  //    GROUND TEXTs, TAXI SIGNs, JETWAYs and CAR LOTs: one move and one turn for the four, and each one's
+  //    fields.
   moveAirportMark: (kind: MarkKind, id: string, position: LonLat) => void;
   rotateAirportMark: (kind: MarkKind, id: string, heading: number) => void;
   updateAirportGroundText: (id: string, patch: mutate.GroundTextPatch) => void;
+  /** `typing` names the component whose value is being typed: those keystrokes share one undo entry. Without
+   *  it, a change to the components (add, remove, reorder, a type) is an entry of its own. */
+  updateAirportTaxisign: (id: string, patch: mutate.TaxisignPatch, typing?: number) => void;
   updateAirportJetway: (id: string, patch: mutate.JetwayPatch) => void;
   updateAirportCarlot: (id: string, patch: mutate.CarlotPatch) => void;
   //    Parking positions. Every one takes an id: letting it default would only hide a caller that forgot which stand it meant (mutate.ts).
@@ -759,16 +780,11 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
             set({ placing: null, selection: [], airportSelection: { kind: "runway", id: rwyId } });
             return;
           }
-          // A ground text, jetway or car lot: a stand's gesture too.
+          // A ground text, taxi sign, jetway or car lot: a stand's gesture too.
           if (isMarkKind(spec.kind)) {
             const kind = spec.kind;
             const markId = deps.newId();
-            const add =
-              kind === "groundtext"
-                ? mutate.addAirportGroundText
-                : kind === "jetway"
-                  ? mutate.addAirportJetway
-                  : mutate.addAirportCarlot;
+            const add = MARK_ADD[kind];
             commit((proj) => add(proj, p, { id: markId }));
             set({ selection: [], airportSelection: { kind, id: markId } });
             return;
@@ -899,9 +915,7 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
             }
             if (isMarkKind(sel.kind)) {
               const kind = sel.kind;
-              const list =
-                kind === "groundtext" ? groundTextsOf(a) : kind === "jetway" ? jetwaysOf(a) : carlotsOf(a);
-              const mark = list.find((m) => m.id === sel.id);
+              const mark = MARK_READ[kind](a).find((m) => m.id === sel.id);
               if (mark !== undefined) self.moveAirportMark(kind, sel.id, to(mark.position));
               return;
             }
@@ -1156,6 +1170,12 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
           commitCoalesced(`airport:groundtext:${Object.keys(patch).join(",")}:${id}`, (proj) =>
             mutate.updateAirportGroundText(proj, id, patch),
           ),
+        // Typing one component's value coalesces; adding, removing or reordering components after it does not.
+        updateAirportTaxisign: (id, patch, typing) => {
+          const apply = (proj: Project): Project => mutate.updateAirportTaxisign(proj, id, patch);
+          if (patch.elements !== undefined && typing === undefined) commit(apply);
+          else commitCoalesced(`airport:taxisign:${Object.keys(patch).join(",")}:${typing ?? ""}:${id}`, apply);
+        },
         updateAirportJetway: (id, patch) =>
           commitCoalesced(`airport:jetway:${Object.keys(patch).join(",")}:${id}`, (proj) =>
             mutate.updateAirportJetway(proj, id, patch),
