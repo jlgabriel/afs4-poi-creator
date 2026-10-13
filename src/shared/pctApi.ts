@@ -159,6 +159,8 @@ export interface TapExportOptions {
 export interface TapExportResult {
   fileName: string;
   path: string;
+  /** `<ICAO>_addendum.tap` beside it, when the airport has glider starts. */
+  addendumPath?: string;
   warnings: string[];
 }
 
@@ -242,8 +244,9 @@ export interface PctApi {
   installHeliport(project: Project, opts: HeliportInstallOptions): Promise<PctResult<InstallResult>>;
   listInstalledHeliports(): Promise<InstalledHeliport[]>;
   uninstallHeliport(country: string, folderName: string): Promise<PctResult<void>>;
-  // "Export TAP": writes ONLY `<ICAO>.tap` into settings.tapDir — no install, no other file. Refuses with
-  // "no-tap-dir" before the folder is chosen and "file-exists" unless `overwrite`.
+  // "Export TAP": writes `<ICAO>.tap` (plus `<ICAO>_addendum.tap` when there are glider starts) into
+  // settings.tapDir — no install, no other file. Refuses with "no-tap-dir" before the folder is chosen and
+  // "file-exists" unless `overwrite`.
   exportTap(project: Project, opts: TapExportOptions): Promise<PctResult<TapExportResult>>;
   revealInFolder(folderName: string): Promise<void>; // main validates + resolves within known roots
 

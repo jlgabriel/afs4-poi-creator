@@ -84,6 +84,10 @@ export type PlacingSpec =
   // The AIRPORT's own point, settable by clicking the map (this) or by typing LON/LAT. It is the odd one of the set in that it MOVES the one airport rather than adding anything, so
   // it is armed only while the airport has no point of its own; once it has one, it is a thing you drag.
   | { kind: "airport" }
+  // The airport's BOUNDARY, the one card that takes MANY clicks: each map click adds a point to
+  // `boundaryDraft`, a double click puts down the last one and closes the ring (finishBoundary). Armed
+  // only while the airport has no boundary — there is one, and after that it is edited on the map.
+  | { kind: "boundary" }
   // `naturalHeight` rides along rather than being looked up at place time. The palette has the
   // CatalogPlant in hand when it arms, so carrying it removes the only path where a plant could be
   // created with height 0 — the one value that may mean "invisible" (see mutate.createPlant).
@@ -103,6 +107,8 @@ export type PlacingSpec =
  *  something only one of them needs. */
 export type AirportSelection =
   | { kind: "data" }
+  // One per airport, so no id.
+  | { kind: "boundary" }
   | { kind: "pad" | "runway" | "parking" | "aerotow" | "winch"; id: string };
 
 /** Drop whichever airport part the selection names. Exhaustive on purpose — no `default` branch — so
@@ -127,6 +133,8 @@ function removeAirportPart(project: Project, sel: AirportSelection): Project {
       return mutate.removeAirportAerotow(project, sel.id);
     case "winch":
       return mutate.removeAirportWinch(project, sel.id);
+    case "boundary":
+      return mutate.setAirportBoundary(project, null);
   }
 }
 
@@ -264,6 +272,10 @@ export interface EditorState {
    *  on something else. */
   pendingAirportDelete: boolean;
   placing: PlacingSpec | null; // what click-to-place is armed for (xref / airport_light / light / helipad)
+  /** The BOUNDARY being drawn: the points clicked so far, while `placing` is `boundary`. Ephemeral — the
+   *  ring reaches the document in ONE commit when it closes, so drawing it is one undo entry, and Escape
+   *  (or arming anything else) throws the draft away. */
+  boundaryDraft: LonLat[];
   filter: Filter;
   mapView: Camera; // the LIVE camera; stamped into the document only at save
   cameraEpoch: number; // bumps on document load (open/new) → MapView re-centers; pan never bumps it
@@ -346,6 +358,11 @@ export interface EditorState {
   moveAirportPosition: (position: LonLat) => void;
   //    The airport's elevation, metres ASL; `null` = the terrain under its point (looked up at export).
   setAirportElevation: (elevation: number | null) => void;
+  //    The BOUNDARY: the card's gesture (arm to draw, or open the one that exists), the double click
+  //    that closes a draft, and the one writer every map edit of the ring goes through.
+  startBoundaryCard: () => void;
+  finishBoundary: () => void;
+  setAirportBoundary: (points: LonLat[] | null) => void;
   //    Parking positions. Every one takes an id: letting it default would only hide a caller that forgot which stand it meant (mutate.ts).
   moveAirportParking: (id: string, position: LonLat) => void;
   rotateAirportParking: (id: string, heading: number) => void;
@@ -537,6 +554,7 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
           airportSelection: null,
           pendingAirportDelete: false,
           placing: null,
+          boundaryDraft: [],
           resolvedElev: new Map(),
           pendingRecovery: null, // a fresh document clears any recovery banner
           mapView: project.camera,
@@ -564,6 +582,7 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
         airportSelection: null,
         pendingAirportDelete: false,
         placing: null,
+        boundaryDraft: [],
         filter: { query: "", category: null },
         mapView: deps.initialProject.camera,
         cameraEpoch: 0,
@@ -624,7 +643,8 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
           set({ selection: [], airportSelection: null, pendingAirportDelete: false }),
         selectAirportPart: (sel) =>
           set({ airportSelection: sel, selection: [], pendingAirportDelete: false }),
-        armPlacement: (name) => set({ placing: name }),
+        // Any change of what is armed drops a boundary half drawn: it belonged to the old arming.
+        armPlacement: (name) => set({ placing: name, boundaryDraft: [] }),
         setFilter: (patch) => set((s) => ({ filter: { ...s.filter, ...patch } })),
 
         placeAt: (p) => {
@@ -638,6 +658,12 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
           // The airport's own point creates nothing: the block already exists by the time this
           // can be armed, and all the click does is put its coordinate somewhere. Disarms, because there
           // is one airport and a second click would only move what the first one placed.
+          // A boundary click adds a point to the DRAFT and commits nothing — the ring is written whole
+          // when the double click closes it (finishBoundary).
+          if (spec.kind === "boundary") {
+            set((s) => ({ boundaryDraft: [...s.boundaryDraft, p] }));
+            return;
+          }
           if (spec.kind === "airport") {
             commit((proj) => mutate.setAirportPosition(proj, p));
             set({ placing: null, selection: [], airportSelection: { kind: "data" } });
@@ -759,6 +785,14 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
               // Only when it HAS a point. An identity-only airport has nothing to nudge, and inventing
               // one from an arrow key would make the airport's point follow something other than itself.
               if (a.position !== undefined) self.moveAirportPosition(to(a.position));
+              return;
+            }
+            // The whole ring, like dragging inside it. Coalesced so a run of arrows is one undo entry.
+            if (sel.kind === "boundary") {
+              const ring = a.boundary;
+              if (ring !== undefined) {
+                commitCoalesced("airport:boundary", (proj) => mutate.setAirportBoundary(proj, ring.map(to)));
+              }
               return;
             }
             if (sel.kind === "pad") {
@@ -897,6 +931,50 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
           get().createAirport({ select: placed });
           if (!placed) set({ placing: { kind: "airport" } });
         },
+        // ★ THE BOUNDARY CARD mirrors the Airport card: there is one boundary per airport, so the card
+        // DRAWS it while there is none and OPENS it once there is. Re-arming on an existing ring would
+        // throw it away on the next click. Pressing the card while armed disarms, like every card.
+        startBoundaryCard: () => {
+          const st = get();
+          if (st.placing?.kind === "boundary") {
+            set({ placing: null, boundaryDraft: [] });
+            return;
+          }
+          if (st.project.airport?.boundary !== undefined) {
+            set({
+              placing: null,
+              boundaryDraft: [],
+              selection: [],
+              airportSelection: { kind: "boundary" },
+              pendingAirportDelete: false,
+            });
+            return;
+          }
+          set({ placing: { kind: "boundary" }, boundaryDraft: [] });
+        },
+        // The DOUBLE CLICK. The browser has already delivered it as two clicks, both of which placeAt
+        // added; the second is a copy of the first, so it is dropped and the first one is the last point.
+        // Fewer than three points left ⇒ not a ring yet: keep drawing.
+        finishBoundary: () => {
+          const st = get();
+          if (st.placing?.kind !== "boundary") return;
+          const points = st.boundaryDraft.slice(0, -1);
+          if (points.length < 3) {
+            set({ boundaryDraft: points });
+            return;
+          }
+          commit((proj) => mutate.setAirportBoundary(proj, points));
+          set({
+            placing: null,
+            boundaryDraft: [],
+            selection: [],
+            airportSelection: { kind: "boundary" },
+            pendingAirportDelete: false,
+          });
+        },
+        // Not coalesced: each map gesture on the ring (drag a point, add one, remove one, move the ring)
+        // arrives here ONCE, on release, so each is its own undo entry already.
+        setAirportBoundary: (points) => commit((proj) => mutate.setAirportBoundary(proj, points)),
         // Coalesced like every other drag, and id-less because there is exactly one airport point in a
         // project.
         moveAirportPosition: (position) =>

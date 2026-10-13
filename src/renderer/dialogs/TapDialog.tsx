@@ -7,17 +7,14 @@
 // what goes in. An existing `.tap` of the same name is replaced only after a confirmation: a user may have
 // edited it by hand since the last export.
 import { useEffect, useState } from "react";
-import type { PctError, TapExportOptions, TapExportResult } from "../../shared/pctApi";
+import type { TapExportOptions, TapExportResult } from "../../shared/pctApi";
 import { identityProblemText, validateIdentity } from "../../core/export/heliportTemplate";
 import { airportIdentity } from "../../core/export/planExport";
-import { tapFileName } from "../../core/export/tapWriter";
+import { tapAddendumFileName, tapFileName } from "../../core/export/tapWriter";
 import { firstProjectError } from "../../core/project/schemas";
 import { editorStore, useEditor } from "../state/editorStore";
 import { getPct } from "../app/pct";
 
-function messageFor(error: PctError): string {
-  return error.code === "file-exists" ? `"${error.fileName}" already exists in the TAP folder.` : error.message;
-}
 
 export function TapDialog({ onClose }: { onClose: () => void }): React.ReactElement {
   const pct = getPct();
@@ -93,18 +90,21 @@ export function TapDialog({ onClose }: { onClose: () => void }): React.ReactElem
       return;
     }
     if (res.error.code === "file-exists" && !overwrite) {
-      if (window.confirm(`"${res.error.fileName}" already exists in the TAP folder.\n\nReplace it?`)) {
+      // The message from main names every file the replace touches (the addendum too).
+      if (window.confirm(`${res.error.message}\n\nReplace?`)) {
         return write(true);
       }
       setError(`Kept the existing "${res.error.fileName}".`);
       return;
     }
-    setError(messageFor(res.error));
+    setError(res.error.message);
   };
 
   const runways = airport?.runways ?? [];
   const pads = airport?.pads ?? [];
   const parkings = airport?.parkings ?? [];
+  const gliderCount = (airport?.aerotows ?? []).length + (airport?.winches ?? []).length;
+  const boundaryPoints = airport?.boundary?.length ?? 0;
   const blocked =
     airport === undefined || airport.position === undefined || problem !== null || tapDir === null || busy || pct === null;
 
@@ -122,6 +122,7 @@ export function TapDialog({ onClose }: { onClose: () => void }): React.ReactElem
           <div className="pct-export-done">
             <p className="pct-ok">Written:</p>
             <code className="pct-path">{result.path}</code>
+            {result.addendumPath !== undefined && <code className="pct-path">{result.addendumPath}</code>}
             {result.warnings.length > 0 && (
               <ul className="pct-warnings">
                 {result.warnings.map((w) => (
@@ -139,9 +140,9 @@ export function TapDialog({ onClose }: { onClose: () => void }): React.ReactElem
         ) : (
           <>
             <p className="pct-field-meta">
-              Writes this project's airport as one <code>.tap</code> file for the TAP converter — the airport
-              data and every object you placed. Only the <code>.tap</code> is written: nothing is installed in
-              Aerofly.
+              Writes this project's airport as a <code>.tap</code> file for the TAP converter — the airport
+              data and every object you placed — and its glider starts, if any, in a second file beside it
+              (<code>_addendum.tap</code>). Nothing is installed in Aerofly.
             </p>
 
             {airport === undefined ? (
@@ -170,6 +171,17 @@ export function TapDialog({ onClose }: { onClose: () => void }): React.ReactElem
                       <span className="pct-field-meta">File</span>
                       <code className="pct-path">{identity && problem === null ? tapFileName(identity.icao) : "—"}</code>
                     </li>
+                    {gliderCount > 0 && (
+                      <li>
+                        <span className="pct-field-meta">Glider starts</span>
+                        <span>
+                          {gliderCount} in{" "}
+                          <code className="pct-path">
+                            {identity && problem === null ? tapAddendumFileName(identity.icao) : "—"}
+                          </code>
+                        </span>
+                      </li>
+                    )}
                     <li>
                       <span className="pct-field-meta">Name</span>
                       <span>{airport.name.trim() || "—"}</span>
@@ -181,6 +193,10 @@ export function TapDialog({ onClose }: { onClose: () => void }): React.ReactElem
                         {pads.length === 1 ? "" : "s"} · {parkings.length} parking position
                         {parkings.length === 1 ? "" : "s"}
                       </span>
+                    </li>
+                    <li>
+                      <span className="pct-field-meta">Boundary</span>
+                      <span>{boundaryPoints >= 3 ? `${boundaryPoints} points` : "— none —"}</span>
                     </li>
                     <li>
                       <span className="pct-field-meta">Elevation</span>

@@ -38,6 +38,7 @@ import {
   runwaysOf,
   winchesOf,
 } from "./airport";
+import { centroid } from "../geo/poiName";
 
 const nowIso = (): string => new Date().toISOString();
 
@@ -754,6 +755,32 @@ export function addAirportWinch(
       : { ...airport, winches: [...winchesOf(airport), w] };
   // The GLIDER end, not the winch: that is the one the click put down, and the start position.
   return { ...project, airport: seededPosition(next, position), modifiedAt: now };
+}
+
+// ── The BOUNDARY (types.ts ProjectAirport.boundary) ─────────────────────────────────────────────────
+
+/** Replace the airport's boundary with `points` (an OPEN ring), or drop it with `null`. Every edit the
+ *  map makes to the polygon — move, insert or delete a point, move the whole ring — is one call here
+ *  with the new list, so each is one undo entry.
+ *
+ *  A ring of fewer than three points is refused (unchanged): the editor never makes one, and a two-point
+ *  "polygon" is nothing the converter can use. Like every other placement, a boundary on a project
+ *  with no airport creates the block, and seeds the airport's own point — at the ring's centre. */
+export function setAirportBoundary(project: Project, points: LonLat[] | null, now = nowIso()): Project {
+  const airport = project.airport;
+  if (points === null) {
+    if (airport?.boundary === undefined) return project;
+    const next = { ...airport };
+    delete next.boundary;
+    return { ...project, airport: next, modifiedAt: now };
+  }
+  if (points.length < 3) return project;
+  const boundary = points.map((p) => ({ lon: p.lon, lat: p.lat }));
+  const next: ProjectAirport =
+    airport === undefined
+      ? { icao: "", name: "", country: "", pads: [], boundary }
+      : { ...airport, boundary };
+  return { ...project, airport: seededPosition(next, centroid(boundary)), modifiedAt: now };
 }
 
 export function removeAirportAerotow(project: Project, aerotowId: string, now = nowIso()): Project {

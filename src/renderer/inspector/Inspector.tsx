@@ -29,6 +29,7 @@ import { NumberInput } from "./NumberInput";
 import { ParkingFields } from "./ParkingFields";
 import { RunwayFields } from "./RunwayFields";
 import { AerotowFields, WinchFields } from "./GliderFields";
+import { BoundaryFields } from "./BoundaryFields";
 
 /** Object note — local draft committed on blur/Enter (one undo entry, not one per key; Escape reverts).
  *  Empty/whitespace clears the field (mutate.setLabel drops it). Mirrors TopBar's ProjectNameField. */
@@ -836,6 +837,9 @@ export function Inspector(): React.ReactElement {
     const sel = s.airportSelection;
     return sel?.kind === "winch" ? s.project.airport?.winches?.find((w) => w.id === sel.id) : undefined;
   });
+  const boundary = useEditor((s) =>
+    s.airportSelection?.kind === "boundary" ? s.project.airport?.boundary : undefined,
+  );
   const plantMeta = useEditor((s) => (obj?.kind === "plant" ? s.plantIndex.get(plantKey(obj)) : undefined));
   const resolvedAsl = useEditor((s) => (obj ? s.resolvedElev.get(obj.id) : undefined));
 
@@ -844,6 +848,8 @@ export function Inspector(): React.ReactElement {
       <h2 className="pct-panel-title">Inspector</h2>
       {airportData !== undefined ? (
         <AirportDataFields airport={airportData} />
+      ) : boundary !== undefined ? (
+        <BoundaryFields boundary={boundary} />
       ) : pad !== undefined ? (
         // Keyed by id like every other repeatable part's panel: the numeric drafts reset when the
         // selection moves to another pad, and editing THIS one keeps the panel alive.

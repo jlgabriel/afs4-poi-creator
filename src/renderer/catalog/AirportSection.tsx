@@ -3,7 +3,7 @@
 //
 // These cards behave exactly like a light or a plant: click to arm, click the map to drop, Escape to
 // cancel — the same procedure as placing POI objects, so nothing new has to be learned. Order:
-// Airport · Runway · Helipad · Parking · Aerotow · Winch Launch.
+// Airport · Boundary · Runway · Helipad · Parking · Aerotow · Winch Launch.
 //
 // ★ THE ORDER IS A PAIR, NOT A LIST: the catalog and the placed list must show the same sequence.
 // Neither column owns it, so changing one of them alone is the bug — PlacedList.tsx carries the same
@@ -22,7 +22,15 @@ import { useCallback } from "react";
 import type { ParkingType } from "../../core/project/types";
 import { PARKING_TYPES, PARKING_TYPE_LABELS } from "../../core/project/airport";
 import { editorStore, useEditor } from "../state/editorStore";
-import { AerotowIcon, DataIcon, HelipadIcon, ParkingIcon, RunwayIcon, WinchIcon } from "./categoryIcon";
+import {
+  AerotowIcon,
+  BoundaryIcon,
+  DataIcon,
+  HelipadIcon,
+  ParkingIcon,
+  RunwayIcon,
+  WinchIcon,
+} from "./categoryIcon";
 
 /** The stand type a fresh card arms. GA is the common case and the smallest footprint, so a user who
  *  never opens the type field gets the stand a light aircraft fits on rather than a 40 m jet apron. */
@@ -31,6 +39,7 @@ const DEFAULT_NEW_PARKING: ParkingType = "parked_ga";
 /** What each card answers the search box with. The words are what someone would actually type looking
  *  for the thing, not the label alone — "heliport" finds the pad, "stand"/"gate"/"apron" find parking. */
 const DATA_TERMS = "data airport icao code country name identity heliport";
+const BOUNDARY_TERMS = "boundary polygon outline perimeter fence area";
 const HELIPAD_TERMS = "start - helicopter helipad heliport pad";
 const PARKING_TERMS = `parking stand gate apron aircraft ${PARKING_TYPES.map(
   (t) => PARKING_TYPE_LABELS[t],
@@ -50,6 +59,8 @@ export function AirportSection(): React.ReactElement {
   const runwayCount = useEditor((s) => s.project.airport?.runways?.length ?? 0);
   const aerotowCount = useEditor((s) => s.project.airport?.aerotows?.length ?? 0);
   const winchCount = useEditor((s) => s.project.airport?.winches?.length ?? 0);
+  const boundaryPoints = useEditor((s) => s.project.airport?.boundary?.length ?? 0);
+  const draftPoints = useEditor((s) => s.boundaryDraft.length);
   const query = useEditor((s) => s.filter.query);
 
   const airportPlaced = useEditor((s) => s.project.airport?.position !== undefined);
@@ -60,11 +71,13 @@ export function AirportSection(): React.ReactElement {
   const runwayArmed = placing?.kind === "runway";
   const aerotowArmed = placing?.kind === "aerotow";
   const winchArmed = placing?.kind === "winch";
+  const boundaryArmed = placing?.kind === "boundary";
 
   // The search box filters every section (a query that hides the xrefs but leaves these cards sitting
   // there reads as a bug — see LightsSection's note on the same problem).
   const q = query.trim().toLowerCase();
   const dataMatches = q === "" || DATA_TERMS.includes(q);
+  const boundaryMatches = q === "" || BOUNDARY_TERMS.includes(q);
   const padMatches = q === "" || HELIPAD_TERMS.includes(q);
   const parkingMatches = q === "" || PARKING_TERMS.includes(q);
   const runwayMatches = q === "" || RUNWAY_TERMS.includes(q);
@@ -72,6 +85,7 @@ export function AirportSection(): React.ReactElement {
   const winchMatches = q === "" || WINCH_TERMS.includes(q);
   const count =
     (dataMatches ? 1 : 0) +
+    (boundaryMatches ? 1 : 0) +
     (padMatches ? 1 : 0) +
     (parkingMatches ? 1 : 0) +
     (runwayMatches ? 1 : 0) +
@@ -94,6 +108,10 @@ export function AirportSection(): React.ReactElement {
   //
   // The decision itself lives in the store (`startAirportCard`) rather than here, where a test can reach it.
   const startAirport = useCallback(() => editorStore.getState().startAirportCard(), []);
+
+  // One boundary per airport, so this card behaves like the Airport card: it draws while there is none
+  // and opens the one there is (store.startBoundaryCard).
+  const startBoundary = useCallback(() => editorStore.getState().startBoundaryCard(), []);
 
   const armPad = useCallback(() => {
     const cur = editorStore.getState().placing;
@@ -154,6 +172,35 @@ export function AirportSection(): React.ReactElement {
                   : airportIcao === ""
                     ? "no code yet · click to fill it in"
                     : `${airportIcao.toUpperCase()} · click to edit`}
+              </span>
+            </span>
+          </button>
+        )}
+        {boundaryMatches && (
+          <button
+            type="button"
+            className={boundaryArmed ? "pct-obj-card armed" : "pct-obj-card"}
+            aria-pressed={boundaryArmed}
+            title={
+              boundaryPoints > 0
+                ? "The polygon around the whole airport. Click to edit it"
+                : "The polygon around the whole airport. Click, then click the map point by point — double-click the last one"
+            }
+            onClick={startBoundary}
+          >
+            <BoundaryIcon />
+            <span className="pct-obj-text">
+              <span className="pct-obj-name">Boundary</span>
+              {/* Drawing takes many clicks, the only card that does — so while armed the subtitle says how
+                  to finish rather than what the card is. */}
+              <span className="pct-obj-cat">
+                {boundaryArmed
+                  ? draftPoints < 3
+                    ? `${draftPoints} point${draftPoints === 1 ? "" : "s"} · click to add, double-click the last`
+                    : `${draftPoints} points · double-click to close`
+                  : boundaryPoints > 0
+                    ? `${boundaryPoints} points · click to edit`
+                    : "click points around the airport"}
               </span>
             </span>
           </button>

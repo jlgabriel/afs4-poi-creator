@@ -134,6 +134,15 @@ body {
 .pct-helipad {
   cursor: grab;
 }
+/* The airport boundary (BoundaryLayer): its points are dragged like a grip; inside the selected ring the
+   whole polygon moves. */
+.pct-boundary-vertex,
+.pct-boundary-mid {
+  cursor: grab;
+}
+.pct-boundary.leaflet-interactive {
+  cursor: move;
+}
 /* The painted H at the pad's centre. It turns with the pad — a real helipad's H lies along the approach —
    so the rotation is written inline by the layer and this only has to make it legible over satellite
    imagery, which is what the dark shadow is for. pointer-events:none so the glyph never eats the drag on
@@ -184,6 +193,28 @@ body {
   height: 100%;
   border: 2px solid;
   cursor: grab;
+}
+
+/* A runway end's name ("05") just past its threshold — see RunwayLayer. A dark tag with white digits,
+   like the end labels in airport diagrams, so it reads on grass and on concrete. Never a click target. */
+.pct-runway-label {
+  background: none;
+  border: none;
+  pointer-events: none;
+}
+.pct-runway-label span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  border-radius: 3px;
+  background: #0f172a;
+  color: #ffffff;
+  font: 600 11px/1 system-ui, sans-serif;
+  white-space: nowrap;
+  user-select: none;
 }
 
 /* Side panels. */

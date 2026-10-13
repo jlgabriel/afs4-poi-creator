@@ -59,7 +59,7 @@ function makeStore(over: Partial<EditorDeps> = {}) {
  *  test that reaches for one after selecting Data has asked the wrong question and should say so. */
 function selectedPartId(store: ReturnType<typeof makeStore>["store"]): string {
   const sel = store.getState().airportSelection;
-  if (sel === null || sel.kind === "data") {
+  if (sel === null || sel.kind === "data" || sel.kind === "boundary") {
     throw new Error(`expected an airport part to be selected, got ${JSON.stringify(sel)}`);
   }
   return sel.id;
@@ -1457,3 +1457,86 @@ function placeWinchAt(store: ReturnType<typeof makeStore>["store"], lon: number,
   const sel = store.getState().airportSelection!;
   return "id" in sel ? sel.id : "";
 }
+
+describe("the airport BOUNDARY", () => {
+  const A = { lon: 10, lat: 48 };
+  const B = { lon: 10.01, lat: 48 };
+  const C = { lon: 10.01, lat: 48.01 };
+  const D = { lon: 10, lat: 48.01 };
+
+  /** Click A, B, C, then double-click D: the browser delivers D twice before the dblclick. */
+  function draw(store: ReturnType<typeof makeStore>["store"]): void {
+    store.getState().startBoundaryCard();
+    for (const p of [A, B, C, D, D]) store.getState().placeAt(p);
+    store.getState().finishBoundary();
+  }
+
+  it("draws point by point and closes on the double click, as ONE undo entry", () => {
+    const { store } = makeStore();
+    store.getState().startBoundaryCard();
+    expect(store.getState().placing).toEqual({ kind: "boundary" });
+    for (const p of [A, B, C, D, D]) store.getState().placeAt(p);
+    // Nothing reaches the document while drawing.
+    expect(store.getState().project.airport).toBeUndefined();
+    expect(store.getState().boundaryDraft).toHaveLength(5);
+    store.getState().finishBoundary();
+    const st = store.getState();
+    expect(st.project.airport?.boundary).toEqual([A, B, C, D]); // the double click's copy is gone
+    expect(st.placing).toBeNull();
+    expect(st.boundaryDraft).toEqual([]);
+    expect(st.airportSelection).toEqual({ kind: "boundary" });
+    expect(st.undoStack).toHaveLength(1);
+    // The airport block it created gets its own point at the ring's centre.
+    near(st.project.airport!.position!.lon, 10.005, 1e-9);
+  });
+
+  it("keeps drawing when the double click comes before three points", () => {
+    const { store } = makeStore();
+    store.getState().startBoundaryCard();
+    for (const p of [A, B, B]) store.getState().placeAt(p);
+    store.getState().finishBoundary();
+    expect(store.getState().placing).toEqual({ kind: "boundary" });
+    expect(store.getState().boundaryDraft).toEqual([A, B]);
+    expect(store.getState().project.airport).toBeUndefined();
+  });
+
+  it("Escape (disarming) throws the draft away", () => {
+    const { store } = makeStore();
+    store.getState().startBoundaryCard();
+    store.getState().placeAt(A);
+    store.getState().armPlacement(null);
+    expect(store.getState().boundaryDraft).toEqual([]);
+  });
+
+  it("the card opens an existing boundary instead of drawing over it", () => {
+    const { store } = makeStore();
+    draw(store);
+    store.getState().selectAirportPart(null);
+    store.getState().startBoundaryCard();
+    expect(store.getState().placing).toBeNull();
+    expect(store.getState().airportSelection).toEqual({ kind: "boundary" });
+  });
+
+  it("each map edit is one undo entry, a ring never drops below three points, and Del removes it", () => {
+    const { store } = makeStore();
+    draw(store);
+    store.getState().setAirportBoundary([A, B, C]);
+    expect(store.getState().project.airport?.boundary).toEqual([A, B, C]);
+    store.getState().setAirportBoundary([A, B]); // refused
+    expect(store.getState().project.airport?.boundary).toEqual([A, B, C]);
+    store.getState().undo();
+    expect(store.getState().project.airport?.boundary).toEqual([A, B, C, D]);
+    store.getState().selectAirportPart({ kind: "boundary" });
+    store.getState().deleteSelection();
+    expect(store.getState().project.airport?.boundary).toBeUndefined();
+    expect(store.getState().project.airport).toBeDefined(); // the airport stays
+  });
+
+  it("the arrow keys move the whole ring", () => {
+    const { store } = makeStore();
+    draw(store);
+    store.getState().nudgeSelection(100, 0);
+    const ring = store.getState().project.airport!.boundary!;
+    ring.forEach((p, i) => near(haversine(p, [A, B, C, D][i]!), 100, 0.5));
+  });
+});

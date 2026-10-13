@@ -177,8 +177,8 @@ see [A TAP file for a converter](#a-tap-file-for-a-converter).
   jetways, construction, furniture, people, churches, comm-towers…) and a search box.
 - **Lights** — the sim's 22 airport light fixtures plus a fully parametric point light.
 - **Plants** — 41 trees and shrubs.
-- **Airport** — six cards, and none of them is scenery: the airfield itself, a **Runway**, a
-  **Helipad**, a **Parking** stand, an **Aerotow** and a **Winch Launch**
+- **Airport** — seven cards, and none of them is scenery: the airfield itself, its **Boundary**, a
+  **Runway**, a **Helipad**, a **Parking** stand, an **Aerotow** and a **Winch Launch**
   ([section 9](#9-airports--somewhere-to-fly-from)).
 
 ![Shot 18 — the Catalog panel as it opens: four sections shut, and their counts](images/18_catalog_collapsed.jpg)
@@ -580,14 +580,15 @@ order to list a place: a code, a name, a country, and at least one spot to start
 **Install one or the other, not both.** The airport takes its own copy of everything you placed, so a
 project installed as a POI *and* as an airport puts every object into the world twice.
 
-This section is long because there are six pieces to describe. You do not need all six: an airport with
+This section is long because there are seven pieces to describe. You do not need all seven: an airport with
 one helipad on it is a complete, working airport, and that is where most people stop.
 
 | | |
 |---|---|
 | [What PCT writes, and what it doesn't](#what-pct-writes-and-what-it-doesnt) | Read this one first. |
-| [The six cards](#the-six-cards) | The rule they share, and the two ways they differ. |
+| [The seven cards](#the-seven-cards) | The rule they share, and the ways they differ. |
 | [Airport — the name and the code](#airport--the-name-and-the-code) | Identity, and the point the whole field is filed under. |
+| [Boundary](#boundary) | The polygon around the whole field, for Export TAP. |
 | [Runway](#runway) · [Helipad](#helipad) · [Parking](#parking) | The three you are most likely to place. |
 | [Aerotow](#aerotow) · [Winch Launch](#winch-launch) | The two glider starts. |
 | [Installing it](#installing-it) | The dialog, and the one rule Aerofly enforces. |
@@ -613,30 +614,32 @@ flight at.
 
 Painting markings on the ground is a different job, done with a different file, and PCT does not do it.
 
-### The six cards
+### The seven cards
 
-Open **Airport** in the catalog and there are six.
+Open **Airport** in the catalog and there are seven.
 
 ![Shot 27 — the Airport section: Airport, Runway, Helipad, Parking, Aerotow and Winch Launch, each with a line saying what it does](images/27_airport_section.jpg)
 
-All six behave the way the rest of PCT behaves: **click the card to arm it, click the map to drop it,
+All seven behave the way the rest of PCT behaves: **click the card to arm it, click the map to drop it,
 Esc to cancel.** Nothing here lives in a dialog, and nothing needs filling in before you can put it on
 the map.
 
-They differ in exactly two ways, and each card says which it is on its own second line:
+They differ in how many clicks they take, and each card says which it is on its own second line:
 
 - **Three are repeatable and stay armed** — Helipad, Parking, Aerotow. Drop one, drop another, keep
   going. Each click puts down one more.
 - **Two lay out a whole shape and then disarm** — Runway and Winch Launch. Both are made of *two*
   points, so the click cannot put the finished thing under the cursor. It drops a starter — a 200 m
   strip, 900 m of rope, both pointing north — and the next thing you do is drag an end.
+- **One takes as many clicks as it has corners** — Boundary. Click the map once per corner and
+  **double-click the last one**: that closes the polygon.
 
 **Airport** is the odd one, honestly so: it places no part. It is the airfield itself — its name, its
 code, and the single point the whole thing is filed under. Its card puts that point on the map the
 first time, and after that it is the way back to the identity fields.
 
-**The order is the same in both columns.** Airport · Runway · Helipad · Parking · Aerotow · Winch
-Launch, in the catalog on the left and in the placed list on the right. That is deliberate, and it is
+**The order is the same in both columns.** Airport · Boundary · Runway · Helipad · Parking · Aerotow ·
+Winch Launch, in the catalog on the left and in the placed list on the right. That is deliberate, and it is
 ApfelFlieger's rule: the sequences match so that finding a thing in one column tells you where it is in
 the other.
 
@@ -644,7 +647,9 @@ On the map each part is drawn at its real size, and each one looks like itself:
 
 ![Shot 28 — a whole small airfield on the map: the runway as a strip with a threshold handle at each end, the helipad's white circle, the stand's violet one, the pink dots of the two glider starts with the winch's rope running off down the extended centreline, and the airport's own crosshair in the middle](images/28_airfield_on_map.jpg)
 
-- the **runway** is a strip, with a white handle on each threshold;
+- the **boundary** is a dashed yellow line around the field;
+- the **runway** is a strip, with a white handle on each threshold and each end's identifier (`05`,
+  `23`) just past it — so you can see at a glance which end is which;
 - the **helipad** is a white circle with an **H** in it, the **stand** a violet one with a **P**;
 - the two **glider starts** are pink — the aerotow a dot with a short rope, the winch launch a dot, a
   long rope and a square at the winch end;
@@ -703,6 +708,33 @@ panel:
   field is the sensible place, since it is the coordinate Aerofly measures distances to.
 
 That point is the one field the install cannot do without. Everything else can wait.
+
+### Boundary
+
+The polygon around the whole airfield. Only **Export TAP…** uses it — the TAP converter needs it to
+convert everything — so an airport you install with **Export /airports…** can do without one.
+
+**Drawing it.** Click the **Boundary** card, then click the map once for each corner, going round the
+field. A dashed line follows the cursor to show how the polygon would close. **Double-click the last
+corner** and the polygon closes; it needs at least three. **Esc** throws away a polygon you have not
+closed yet.
+
+There is one boundary per airport. Once it exists, the card selects it instead of starting another;
+to draw it again from scratch, delete it and click the card.
+
+**Changing it.** Select it — on its row in the placed list, or by clicking its outline — and its
+corners appear:
+
+- **drag a white point** to move that corner;
+- **drag a grey point** (there is one halfway along each side) and it becomes a new corner;
+- **right-click a white point** to remove it — a boundary keeps at least three;
+- **drag inside the polygon** to move the whole boundary. The arrow keys move it too.
+
+The sides must not cross each other. If a dragged corner makes them cross, the Inspector says so, and
+so does Export TAP.
+
+While it is not selected, only its outline answers the mouse: inside it the map behaves as usual, so
+you can place and select everything else in the airport.
 
 ### Runway
 
@@ -896,7 +928,9 @@ folder you choose — usually the converter's input folder — and what happens 
 The first time, the dialog asks for that folder (**Choose…**). PCT remembers it, and **Settings → TAP
 folder** shows it and changes it.
 
-What goes in: the airport, its runways, helipads and parking positions, and every object you placed.
+What goes in: the airport, its boundary, runways, helipads and parking positions, and every object you
+placed. **Glider starts** go in a second file beside it, `<CODE>_addendum.tap`, which the converter adds
+in when it finds both files side by side. A project without glider starts writes no addendum.
 The code, the name and the country follow the same rules as for **Export /airports…**, and the airport
 needs its point on the map.
 
@@ -904,9 +938,11 @@ needs its point on the map.
 so an elevation of 0 puts them at sea level. On **Terrain**, PCT looks the height up when you export; if
 the lookup cannot be made (offline, say), the dialog takes a base elevation instead.
 
-Three things a `.tap` does not carry, and the dialog tells you when your project has them:
+Draw the airport's [boundary](#boundary) before you export: without one the dialog warns you, because
+the converter needs it.
 
-- **Glider starts** (aerotow and winch) are not written to it yet.
+Two things a `.tap` does not carry, and the dialog tells you when your project has them:
+
 - **An XREF's scale** — it comes out at its normal size.
 - **A height for XREFs and plants.** Point lights and airport lights keep theirs.
 
@@ -917,7 +953,9 @@ Runways are written as standard asphalt with the standard markings: PCT has no f
 or the paint yet.
 
 If a file with that name is already in the folder, PCT asks before replacing it — you may have edited it
-by hand since the last export. Nothing else in the folder is ever touched.
+by hand since the last export. The same goes for the addendum. If your project no longer has glider
+starts but an addendum from an earlier export is still there, replacing removes it, since the converter
+would otherwise add its glider starts back in. Nothing else in the folder is ever touched.
 
 ### The numbers underneath
 

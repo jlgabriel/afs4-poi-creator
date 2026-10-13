@@ -37,7 +37,8 @@ import {
   type HeliportWinchSpec,
   type IdentityProblem,
 } from "./heliportTemplate";
-import { buildTap, tapFileName, type TapSpec } from "./tapWriter";
+import { buildTap, buildTapAddendum, tapAddendumFileName, tapFileName, type TapSpec } from "./tapWriter";
+import { ringSelfIntersects } from "../geo/polygon";
 
 // A POI's two payload files are named `poi.tsl` / `poi.toc`, and the .tsl
 // references the .toc by this basename.
@@ -320,6 +321,9 @@ export function planHeliport(
 export interface TapPlan {
   fileName: string;
   content: string;
+  /** `<ICAO>_addendum.tap`, the glider starts. `content` is null when the airport has none — the name is
+   *  still carried, because an addendum left in the folder by an earlier export must then go. */
+  addendum: { fileName: string; content: string | null };
   warnings: string[];
 }
 
@@ -376,11 +380,15 @@ export function planTap(project: Project, resolvedLights: ResolvedObject[], terr
       "Aerofly rejects an airport with no helipad and no runway — the converter's airport will need at least one of the two.",
     );
   }
-  const gliders = (airport.aerotows ?? []).length + (airport.winches ?? []).length;
-  if (gliders > 0) {
+  const boundary = (airport.boundary ?? []).map((p) => shiftPoint(p, shift));
+  if (boundary.length < 3) {
     warnings.push(
-      `${gliders} glider start${gliders === 1 ? " is" : "s are"} not in the TAP — aerotow and winch starts are not written to it yet.`,
+      boundary.length === 0
+        ? "The airport has no boundary — the converter needs one to convert everything. Draw it with the Boundary card."
+        : "The boundary has fewer than three points, so it is left out — draw it again with the Boundary card.",
     );
+  } else if (ringSelfIntersects(boundary)) {
+    warnings.push("The boundary crosses itself — drag its points so that no two edges cross.");
   }
 
   const placedXrefs = project.objects.filter((o) => o.kind === "xref");
@@ -403,6 +411,7 @@ export function planTap(project: Project, resolvedLights: ResolvedObject[], terr
     identity,
     position: shiftPoint(airport.position, shift),
     elevation,
+    boundary: boundary.length >= 3 ? boundary : null,
     runways,
     pads,
     parkings: heliportParkings(airport.parkings, shift),
@@ -420,5 +429,15 @@ export function planTap(project: Project, resolvedLights: ResolvedObject[], terr
       direction: x.direction,
     })),
   };
-  return { fileName: tapFileName(identity.icao), content: buildTap(spec), warnings };
+  // Glider starts go in their own file beside the `.tap` (tapWriter.ts buildTapAddendum).
+  const addendum = buildTapAddendum(
+    heliportWinches(airport.winches, shift),
+    heliportAerotows(airport.aerotows, shift),
+  );
+  return {
+    fileName: tapFileName(identity.icao),
+    content: buildTap(spec),
+    addendum: { fileName: tapAddendumFileName(identity.icao), content: addendum },
+    warnings,
+  };
 }

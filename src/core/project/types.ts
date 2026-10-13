@@ -378,6 +378,11 @@ export interface ProjectAirport {
   /** Glider AEROTOW and WINCH LAUNCH starts, `.wad`-only. Same absent-means-none rule. */
   aerotows?: AirportAerotow[];
   winches?: AirportWinch[];
+  /** The airport's BOUNDARY: a closed polygon around the whole field, stored OPEN — at least 3 points,
+   *  the first NOT repeated at the end (the TAP writer closes it). Storing it open means the shared
+   *  first/last point is one point, so moving it can never pull the ring apart. One per airport.
+   *  Only Export TAP reads it; the `.tsc`/`.wad` writers do not. Absent ≡ none. */
+  boundary?: LonLat[];
   /** Every parking position, in document order. Absent ≡ none, which is what every project
    *  written before v1.4 has — and the writers emit no `parking_positions` block at all in that case, so
    *  those projects keep exporting the same bytes.

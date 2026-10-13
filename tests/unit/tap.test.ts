@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import type { Project, ResolvedAirportLight, ResolvedLight } from "../../src/core/project/types";
@@ -9,7 +9,7 @@ import {
   NoAirportError,
   planTap,
 } from "../../src/core/export/planExport";
-import { tapFileName } from "../../src/core/export/tapWriter";
+import { buildTapAddendum, tapAddendumFileName, tapFileName } from "../../src/core/export/tapWriter";
 import { NoTapDirError, TapFileExistsError, writeTap } from "../../src/main/tapExport";
 import { parseTm, type TmNode } from "../../src/core/tm/tmParser";
 
@@ -81,6 +81,12 @@ const TAP_PROJECT: Project = {
     country: "cl",
     position: { lon: -71.6153, lat: -33.6564 },
     elevation: 75,
+    boundary: [
+      { lon: -71.6248, lat: -33.6602 },
+      { lon: -71.6224, lat: -33.6628 },
+      { lon: -71.6093, lat: -33.6548 },
+      { lon: -71.6114, lat: -33.6523 },
+    ],
     pads: [{ id: "h1", name: "Helipad_W", position: { lon: -71.616, lat: -33.656 }, heading: 92, radius: 8 }],
     runways: [
       {
@@ -137,6 +143,13 @@ const GOLDEN_TAP = `<[file][][]
         <[vector2_float64][model_center][-71.6153000 -33.6564000]>
         <[bool][auto_height][true]>
         <[vector2_float64][offset][0 0]>
+        <[list_tm_airport_pd_boundary][boundaries][]
+            <[tm_airport_pd_boundary][element][0]
+                <[list_vector2_float64][points][ (-71.6248000 -33.6602000) (-71.6224000 -33.6628000) (-71.6093000 -33.6548000) (-71.6114000 -33.6523000) (-71.6248000 -33.6602000) ]>
+            >
+        >
+        <[list_tm_airport_pd_custom_model][custom_models][]
+        >
         <[list_tm_airport_pd_rwy_pair][runway_pairs][]
             <[tm_airport_pd_rwy_pair][element][0]
                 <[array_tm_airport_pd_rwy][runway_pair][]
@@ -231,7 +244,7 @@ const GOLDEN_TAP = `<[file][][]
                 <[string8u][name][helipad_large_flood_light]>
                 <[string8u][configuration][]>
                 <[vector3_float64][position][-71.6159000 -33.6558000 69.00]>
-                <[float64][orientation][30]>
+                <[float64][direction][30]>
                 <[uint32][group_index][0]>
             >
         >
@@ -240,6 +253,29 @@ const GOLDEN_TAP = `<[file][][]
                 <[string8][name][airport_windsock_large1]>
                 <[vector2_float64][position][-71.6183000 -33.6575000]>
                 <[float64][direction][53]>
+            >
+        >
+    >
+>
+`;
+
+// The converter's own addendum layout: `stringt8c` names, bare `tmvector2d` points, compass `direction`.
+const GOLDEN_ADDENDUM = `<[file][][]
+    <[tm_airport_pd][][]
+        <[list_tm_airport_pd_glider_winch][glider_winches][]
+            <[tm_airport_pd_glider_winch][element][0]
+                <[stringt8c][name][23]>
+                <[tmvector2d][position][-71.6112000 -33.6541000]>
+                <[tmvector2d][winch][-71.6226000 -33.6606000]>
+                <[float32][spacing][25]>
+            >
+        >
+        <[list_tm_airport_pd_glider_aerotow][glider_aerotows][]
+            <[tm_airport_pd_glider_aerotow][element][0]
+                <[stringt8c][name][23]>
+                <[tmvector2d][position][-71.6123000 -33.6547400]>
+                <[float64][direction][236]>
+                <[tmvector2d][waypoints][]>
             >
         >
     >
@@ -351,17 +387,58 @@ describe("Export TAP — the .tap file", () => {
     expect(() => planTap(terrainOnly, TAP_LIGHTS)).toThrow(NeedsAirportElevationError);
   });
 
-  it("omits empty lists and never writes a boundary", () => {
+  it("omits empty lists, except custom_models, which is always there and always empty", () => {
+    const { boundary: _b, ...noBoundary } = TAP_PROJECT.airport!;
     const bare: Project = {
       ...TAP_PROJECT,
       objects: [],
-      airport: { ...TAP_PROJECT.airport!, runways: [], parkings: [] },
+      airport: { ...noBoundary, runways: [], parkings: [] },
     };
-    const text = planTap(bare, []).content;
+    const plan = planTap(bare, []);
     for (const list of ["runway_pairs", "parking_positions", "plants", "lights", "airport_lights", "xrefs", "boundaries"]) {
-      expect(text).not.toContain(`[${list}]`);
+      expect(plan.content).not.toContain(`[${list}]`);
     }
-    expect(text).toContain("[helipads]");
+    expect(plan.content).toContain("[helipads]");
+    expect(plan.content).toContain("<[list_tm_airport_pd_custom_model][custom_models][]\n        >");
+    expect(plan.warnings.join(" ")).toContain("no boundary");
+  });
+
+  it("closes the boundary ring and warns when it crosses itself", () => {
+    const ring = valuesOf(planTap(TAP_PROJECT, TAP_LIGHTS).content, "points")[0]!;
+    const pairs = ring.trim().split(") (");
+    expect(pairs.length).toBe(5);
+    expect(pairs[0]!.replace("(", "")).toBe(pairs[4]!.replace(")", ""));
+    // Swap two points: the ring now crosses itself (a bow tie).
+    const [a, b, c, d] = TAP_PROJECT.airport!.boundary!;
+    const bowTie: Project = { ...TAP_PROJECT, airport: { ...TAP_PROJECT.airport!, boundary: [a!, c!, b!, d!] } };
+    expect(planTap(bowTie, TAP_LIGHTS).warnings.join(" ")).toContain("crosses itself");
+    // Two points are no ring: left out, with a warning.
+    const two: Project = { ...TAP_PROJECT, airport: { ...TAP_PROJECT.airport!, boundary: [a!, b!] } };
+    const plan = planTap(two, TAP_LIGHTS);
+    expect(plan.content).not.toContain("[boundaries]");
+    expect(plan.warnings.join(" ")).toContain("fewer than three points");
+  });
+
+  it("writes the glider starts to <ICAO>_addendum.tap, and none when there are none", () => {
+    expect(planTap(TAP_PROJECT, TAP_LIGHTS).addendum).toEqual({ fileName: "PCTT01_addendum.tap", content: null });
+    expect(tapAddendumFileName("scsn")).toBe("SCSN_addendum.tap");
+    const p: Project = {
+      ...TAP_PROJECT,
+      airport: {
+        ...TAP_PROJECT.airport!,
+        winches: [
+          { id: "w1", name: "23", position: { lon: -71.6112, lat: -33.6541 }, winch: { lon: -71.6226, lat: -33.6606 }, spacing: 25 },
+        ],
+        aerotows: [{ id: "a1", name: "23", position: { lon: -71.6123, lat: -33.65474 }, heading: 236 }],
+      },
+    };
+    const plan = planTap(p, TAP_LIGHTS);
+    expect(plan.addendum.content).toBe(GOLDEN_ADDENDUM);
+    // Not in the .tap itself, and no warning about them any more.
+    expect(plan.content).not.toContain("glider");
+    expect(plan.warnings.join(" ")).not.toContain("glider");
+    // Only one of the two kinds: the other list is left out.
+    expect(buildTapAddendum([], [{ name: "23", position: { lon: 0, lat: 0 }, headingDeg: 236 }])).not.toContain("winch");
   });
 
   it("moves every point with the export shift", () => {
@@ -385,13 +462,8 @@ describe("Export TAP — the .tap file", () => {
         { ...xref, id: "x2", scale: 2 },
         { ...xref, id: "x3", height: { mode: "terrain-offset", offset: 12 } },
       ] as Project["objects"],
-      airport: {
-        ...TAP_PROJECT.airport!,
-        aerotows: [{ id: "a1", name: "05", position: { lon: -71.62, lat: -33.66 }, heading: 56 }],
-      },
     };
     const w = planTap(p, TAP_LIGHTS).warnings.join(" ");
-    expect(w).toContain("1 glider start is not in the TAP");
     expect(w).toContain("1 XREF has a scale other than 1");
     expect(w).toContain("1 XREF or plant is set above the terrain");
   });
@@ -424,7 +496,9 @@ describe("Export TAP — writing the file", () => {
     const plan = planTap(TAP_PROJECT, TAP_LIGHTS);
     expect(() => writeTap(null, plan, { overwrite: false })).toThrow(NoTapDirError);
 
-    const file = writeTap(dir, plan, { overwrite: false });
+    const written = writeTap(dir, plan, { overwrite: false });
+    expect(written.addendum).toBeNull();
+    const file = written.file;
     expect(file).toBe(path.join(dir, "PCTT01.tap"));
     expect(readFileSync(file, "utf8")).toBe(GOLDEN_TAP);
 
@@ -433,5 +507,45 @@ describe("Export TAP — writing the file", () => {
     expect(readFileSync(file, "utf8")).toBe("edited by hand");
     writeTap(dir, plan, { overwrite: true });
     expect(readFileSync(file, "utf8")).toBe(GOLDEN_TAP);
+  });
+});
+
+describe("Export TAP — the addendum on disk", () => {
+  let dir: string | null = null;
+  afterEach(() => {
+    if (dir) rmSync(dir, { recursive: true, force: true });
+    dir = null;
+  });
+
+  const withGliders: Project = {
+    ...TAP_PROJECT,
+    airport: {
+      ...TAP_PROJECT.airport!,
+      aerotows: [{ id: "a1", name: "23", position: { lon: -71.6123, lat: -33.65474 }, heading: 236 }],
+    },
+  };
+
+  it("writes the addendum beside the .tap, and removes a stale one only on a confirmed replace", () => {
+    dir = mkdtempSync(path.join(tmpdir(), "pct-tap-"));
+    const both = writeTap(dir, planTap(withGliders, TAP_LIGHTS), { overwrite: false });
+    expect(both.addendum).toBe(path.join(dir, "PCTT01_addendum.tap"));
+    expect(readFileSync(both.addendum!, "utf8")).toContain("glider_aerotows");
+
+    // The same airport without glider starts: the old addendum would still be merged by the converter.
+    const plain = planTap(TAP_PROJECT, TAP_LIGHTS);
+    let err: unknown;
+    try {
+      writeTap(dir, plain, { overwrite: false });
+    } catch (e) {
+      err = e;
+    }
+    expect(err).toBeInstanceOf(TapFileExistsError);
+    expect((err as Error).message).toContain('"PCTT01.tap" and "PCTT01_addendum.tap" already exist');
+    expect((err as Error).message).toContain("removes");
+    expect(existsSync(both.addendum!)).toBe(true);
+
+    writeTap(dir, plain, { overwrite: true });
+    expect(existsSync(both.addendum!)).toBe(false);
+    expect(existsSync(both.file)).toBe(true);
   });
 });

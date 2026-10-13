@@ -181,6 +181,29 @@ export const DataIcon = memo(function DataIcon(): React.ReactElement {
   );
 });
 
+/** The airport BOUNDARY: a dashed polygon with its corner points — the shape it is on the map. */
+export const BoundaryIcon = memo(function BoundaryIcon(): React.ReactElement {
+  return (
+    <svg
+      className="pct-thumb"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M4 8 L11 3 L20 7 L18 19 L6 18 Z" strokeDasharray="3 2.5" />
+      <circle cx="4" cy="8" r="1.4" fill="currentColor" />
+      <circle cx="11" cy="3" r="1.4" fill="currentColor" />
+      <circle cx="20" cy="7" r="1.4" fill="currentColor" />
+      <circle cx="18" cy="19" r="1.4" fill="currentColor" />
+      <circle cx="6" cy="18" r="1.4" fill="currentColor" />
+    </svg>
+  );
+});
+
 /** The helipad. It gets its own export rather than an ICONS entry because it is keyed by nothing — there
  *  is no catalog category behind it; the pad is PCT's own idea of a start position, not an object from
  *  the install. Same 0 0 24 24 line style as every glyph above, deliberately NOT the map's solid disc:

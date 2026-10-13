@@ -230,6 +230,9 @@ export const zAirport = z.looseObject({
   runways: z.array(zRunway).optional(),
   aerotows: z.array(zAerotow).optional(),
   winches: z.array(zWinch).optional(),
+  // No minimum on LOAD: a hand-edited ring of two points still opens (the TAP export leaves it out and
+  // says so). The editor itself never goes below three.
+  boundary: z.array(zLonLat).optional(),
   parkings: z.array(zParking).optional(),
   // The compatibility mirror (types.ts ProjectAirport.pad). Validated so a malformed one is caught here
   // rather than silently shipped to an older PCT, and normalised by migrateAirport before it gets here.

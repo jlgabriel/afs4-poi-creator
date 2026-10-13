@@ -19,13 +19,17 @@
 // shape grabbable at all. With no handler on the strip, pressing it and pulling pans the map and the
 // runway looks inert. Both ends move together in ONE commit, so it is one undo entry.
 //
+// ★ EACH END CARRIES ITS NAME ("05", "23") just past its threshold, always, selected or not. Which
+// threshold is "05" is the one thing about a runway that is easy to get backwards and invisible in the
+// fields, and the TAP's runway headings follow the names.
+//
 // Colour: the palette had no saturated colour left that is not already spoken for — blue footprints,
 // white pad, green plants, amber selection, red missing, cyan grips, violet stands. So the strip is
 // asphalt: a dark fill under a pale stroke. It does not need a colour to be recognisable; nothing else on
 // this map is a kilometre-long rectangle.
 import * as L from "leaflet";
 import type { AirportRunway, LonLat } from "../../core/project/types";
-import { wrapLon } from "../../core/geo/geo";
+import { initialBearing, wrapLon } from "../../core/geo/geo";
 import { stripCorners } from "./runwayStrip";
 
 export interface RunwayCallbacks {
@@ -45,12 +49,36 @@ const HANDLE_CASING = "#0f172a";
 
 const toLatLng = (p: LonLat): L.LatLngExpression => [p.lat, p.lon];
 
+/** How far past its threshold an end's name sits, in PIXELS — a name is read on screen, so it keeps its
+ *  distance at every zoom. Mercator keeps angles, so a compass bearing is also the on-screen direction. */
+const LABEL_GAP_PX = 18;
+const LABEL_W = 34;
+const LABEL_H = 16;
+
+/** The divIcon for one end's name, anchored so its centre sits LABEL_GAP_PX beyond the threshold, on the
+ *  side away from the other end. */
+function labelIcon(text: string, own: LonLat, other: LonLat): L.DivIcon {
+  const out = (initialBearing(other, own) * Math.PI) / 180;
+  const dx = Math.sin(out) * LABEL_GAP_PX;
+  const dy = -Math.cos(out) * LABEL_GAP_PX;
+  const span = document.createElement("span");
+  span.textContent = text;
+  return L.divIcon({
+    className: "pct-runway-label",
+    html: span,
+    iconSize: [LABEL_W, LABEL_H],
+    iconAnchor: [LABEL_W / 2 - dx, LABEL_H / 2 - dy],
+  });
+}
+
 interface Entry {
   runway: AirportRunway;
   selected: boolean;
   strip: L.Polygon;
   /** One per threshold, index-aligned with `runway.ends`. Present only while selected. */
   handles: L.CircleMarker[];
+  /** Each end's name, index-aligned with `runway.ends`; null for an end without one. Always shown. */
+  labels: [L.Marker | null, L.Marker | null];
 }
 
 type Drag =
@@ -126,6 +154,7 @@ export class RunwayLayer {
     if (e === undefined) return;
     this.group.removeLayer(e.strip);
     for (const h of e.handles) this.group.removeLayer(h);
+    for (const l of e.labels) if (l !== null) this.group.removeLayer(l);
     this.entries.delete(id);
   }
 
@@ -140,7 +169,17 @@ export class RunwayLayer {
     strip.on("click", () => this.cb.onSelect(r.id));
     strip.on("mousedown", (e: L.LeafletMouseEvent) => this.onGrabBody(r.id, e));
 
-    const entry: Entry = { runway: r, selected, strip, handles: [] };
+    // Not interactive: a name must never take a click meant for the map or the strip.
+    const labels = ([0, 1] as const).map((end) => {
+      const text = r.ends[end].identifier.trim();
+      if (text === "") return null;
+      const own = r.ends[end].threshold;
+      const other = r.ends[1 - end]!.threshold;
+      return L.marker(toLatLng(own), { icon: labelIcon(text, own, other), interactive: false, keyboard: false }).addTo(
+        this.group,
+      );
+    }) as [L.Marker | null, L.Marker | null];
+    const entry: Entry = { runway: r, selected, strip, handles: [], labels };
     if (selected) this.addHandles(entry);
     return entry;
   }
@@ -210,6 +249,15 @@ export class RunwayLayer {
     e.strip.setLatLngs(stripCorners(a, b, e.runway.width).map(toLatLng));
     e.handles[0]?.setLatLng(toLatLng(a));
     e.handles[1]?.setLatLng(toLatLng(b));
+    const [la, lb] = e.labels;
+    if (la !== null) {
+      la.setLatLng(toLatLng(a));
+      la.setIcon(labelIcon(e.runway.ends[0].identifier.trim(), a, b));
+    }
+    if (lb !== null) {
+      lb.setLatLng(toLatLng(b));
+      lb.setIcon(labelIcon(e.runway.ends[1].identifier.trim(), b, a));
+    }
   }
 
   /** Where the two thresholds are RIGHT NOW: mid-drag that is the preview, otherwise the document. */

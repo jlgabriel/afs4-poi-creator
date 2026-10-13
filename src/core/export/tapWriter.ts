@@ -14,28 +14,37 @@
 //   • helipad / parking: compass `direction` (not heading), parking `radius` (not size) and `type`
 //     (not tags).
 //   • objects: plants and XREFs carry a 2-D `position` and no height; an XREF has no `scale_factor`; an
-//     airport light's fixture is `name` (not type_name); plant `group`/`species` are `string8`.
-//     Point and airport lights keep a 3-D position with the same height the `.toc` gets.
+//     airport light's fixture is `name` (not type_name) and its facing is `direction` (not
+//     orientation); plant `group`/`species` are `string8`. Point and airport lights keep a 3-D position
+//     with the same height the `.toc` gets.
 //   • an XREF's `direction` is the COMPASS HEADING, not the `.toc` rotation: the converter applies the
 //     heading → `.toc` direction conversion itself (orientation.ts), so writing the `.toc` value would
 //     convert it twice.
 //   • the place is always `auto_height` true, and its `elevation` is the reference height the converter
 //     places XREFs at — so it must be the airport's real elevation, not 0.
 //
+//   • `boundaries`: the airport's BOUNDARY polygon, closed (first point repeated as the last). PCT stores
+//     it open and closes it here. Followed by `custom_models`, which PCT always writes EMPTY — the list
+//     holds complete models, which are not added by third parties, but the converter expects the block.
+//   • glider starts are NOT in the `.tap`: they go in a second file, `<ICAO>_addendum.tap`, which the
+//     converter merges when both sit side by side in its input folder (see buildTapAddendum).
+//
 // Rows PCT has no data for are written with the converter's neutral defaults (see TAP_* below). The two
 // derived rows are a runway end's `direction` (see endDirection) and `marking_nonumbers` (an unnamed end
-// paints no numbers). Empty lists are OMITTED: the converter accepts a `.tap` without them. No boundary
-// polygon is written — PCT has none, and the converter does not need one for what PCT writes.
+// paints no numbers). Empty lists are OMITTED (the converter accepts a `.tap` without them), except
+// `custom_models`.
 
 import type { LonLat, ResolvedAirportLight, ResolvedLight } from "../project/types";
 import { tag, block, fmtLonLat, fmtMeters, fmtNum, sanitizeValue } from "../tm/tmEmit";
 import { initialBearing } from "../geo/geo";
 import { directionToHeading } from "../geo/orientation";
 import type {
+  HeliportAerotowSpec,
   HeliportIdentity,
   HeliportPadSpec,
   HeliportParkingSpec,
   HeliportRunwaySpec,
+  HeliportWinchSpec,
 } from "./heliportTemplate";
 
 /** A plant as the `.tap` wants it: no height (the converter resolves it). Position already shifted. */
@@ -60,6 +69,9 @@ export interface TapSpec {
   position: LonLat;
   /** Metres ASL → the place's `elevation` and every runway end's. */
   elevation: number;
+  /** The BOUNDARY polygon, OPEN (no repeated point; the writer closes it), at least 3 points, shifted.
+   *  Null = none: the `boundaries` block is left out. */
+  boundary: LonLat[] | null;
   runways: HeliportRunwaySpec[];
   pads: HeliportPadSpec[];
   parkings: HeliportParkingSpec[];
@@ -73,6 +85,11 @@ export interface TapSpec {
 /** The file name: the code in CAPITALS plus `.tap` — the converter names the airport after it. */
 export function tapFileName(icao: string): string {
   return `${icao.trim().toUpperCase()}.tap`;
+}
+
+/** The glider-start file beside it: `<ICAO>_addendum.tap`. */
+export function tapAddendumFileName(icao: string): string {
+  return `${icao.trim().toUpperCase()}_addendum.tap`;
 }
 
 /** Per-end rows PCT offers nothing for. The four flags match the `.wad` defaults (heliportTemplate.ts
@@ -240,7 +257,9 @@ function airportLights(lightList: ResolvedAirportLight[]): string[] {
         tag("string8u", "name", sanitizeValue(o.typeName)),
         tag("string8u", "configuration", sanitizeValue(o.configuration)),
         tag("vector3_float64", "position", deg3(o.position, o.heightAsl)),
-        tag("float64", "orientation", fmtNum(o.orientation, 3)),
+        // `direction`, compass degrees (0 = N, 90 = E) — the same bearing `orientation` holds in the
+        // project, written as is: the converter makes the `.toc` value itself.
+        tag("float64", "direction", fmtNum(o.orientation, 3)),
         tag("uint32", "group_index", String(o.groupIndex)),
       ]),
     ),
@@ -261,6 +280,17 @@ function xrefs(xrefList: TapXrefSpec[]): string[] {
   );
 }
 
+/** The `boundaries` list: one element, the polygon CLOSED by repeating its first point. The points row
+ *  is a list of `(lon lat)` pairs on one line, the spacing the converter's own files use. */
+function boundaries(boundary: LonLat[] | null): string[] {
+  if (boundary === null || boundary.length < 3) return [];
+  const ring = [...boundary, boundary[0]!];
+  const points = ` ${ring.map((p) => `(${deg(p)})`).join(" ")} `;
+  return list("list_tm_airport_pd_boundary", "boundaries", [
+    block("tm_airport_pd_boundary", "element", "0", [tag("list_vector2_float64", "points", points)]),
+  ]);
+}
+
 /** The whole `.tap` text. Pure; the caller has already validated the identity and shifted every point. */
 export function buildTap(spec: TapSpec): string {
   const name = text(spec.identity.name);
@@ -276,6 +306,9 @@ export function buildTap(spec: TapSpec): string {
     // Always true, whatever the project's height mode: the converter's airport sits on the terrain.
     tag("bool", "auto_height", "true"),
     tag("vector2_float64", "offset", "0 0"),
+    ...boundaries(spec.boundary),
+    // Always written, always empty (see the header).
+    ...block("list_tm_airport_pd_custom_model", "custom_models", "", []),
     ...runwayPairs(spec.runways, elevation),
     ...helipads(spec.pads),
     ...parkingPositions(spec.parkings),
@@ -283,6 +316,48 @@ export function buildTap(spec: TapSpec): string {
     ...lights(spec.lights),
     ...airportLights(spec.airportLights),
     ...xrefs(spec.xrefs),
+  ];
+  return block("file", "", "", block("tm_airport_pd", "", "", body)).join("\n") + "\n";
+}
+
+/** `<ICAO>_addendum.tap`: the airport's glider starts, which live in this second file and not in the
+ *  `.tap` itself. Null when the airport has none — then there is no addendum to write.
+ *
+ *  Its vocabulary is its own, like the `.tap`'s: `name` is `stringt8c`, points are `tmvector2d` written
+ *  bare (no parentheses), the winch `spacing` is `float32`, and an aerotow's `direction` is the COMPASS
+ *  heading (the converter makes the `.wad` radians). The aerotow's `waypoints` row is written empty, with
+ *  the `tmvector2d` type the converter's own addendum uses for it. Winches come first, then aerotows; an
+ *  empty one of the two lists is left out. */
+export function buildTapAddendum(
+  winches: readonly HeliportWinchSpec[],
+  aerotows: readonly HeliportAerotowSpec[],
+): string | null {
+  if (winches.length === 0 && aerotows.length === 0) return null;
+  const body = [
+    ...list(
+      "list_tm_airport_pd_glider_winch",
+      "glider_winches",
+      winches.map((w, i) =>
+        block("tm_airport_pd_glider_winch", "element", String(i), [
+          tag("stringt8c", "name", text(w.name)),
+          tag("tmvector2d", "position", deg(w.position)),
+          tag("tmvector2d", "winch", deg(w.winch)),
+          tag("float32", "spacing", fmtNum(w.spacingM)),
+        ]),
+      ),
+    ),
+    ...list(
+      "list_tm_airport_pd_glider_aerotow",
+      "glider_aerotows",
+      aerotows.map((a, i) =>
+        block("tm_airport_pd_glider_aerotow", "element", String(i), [
+          tag("stringt8c", "name", text(a.name)),
+          tag("tmvector2d", "position", deg(a.position)),
+          tag("float64", "direction", fmtNum(a.headingDeg, 3)),
+          tag("tmvector2d", "waypoints", ""),
+        ]),
+      ),
+    ),
   ];
   return block("file", "", "", block("tm_airport_pd", "", "", body)).join("\n") + "\n";
 }

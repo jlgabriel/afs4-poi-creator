@@ -18,6 +18,7 @@ import { ParkingLayer } from "./ParkingLayer";
 import { AirportLayer } from "./AirportLayer";
 import { RunwayLayer } from "./RunwayLayer";
 import { GliderLayer } from "./GliderLayer";
+import { BoundaryLayer } from "./BoundaryLayer";
 
 /** The tile layer for the current provider (Esri satellite / OSM streets / custom XYZ). Overzoom
  *  (maxNativeZoom < maxZoom) keeps metre-precise placement usable past the source's native resolution.
@@ -58,6 +59,13 @@ export function MapView(): React.ReactElement {
     // are added, so whatever is created last sits on top and takes the clicks. A runway is a strip
     // hundreds of metres wide that stands, pads and objects are placed ON — created last it would cover
     // all of them and swallow every click meant for something standing on it.
+    // ★★ AND THE BOUNDARY GOES BEFORE THEM: it surrounds the whole airport, so everything else on the
+    // map sits inside it and must stack above it.
+    const boundary = new BoundaryLayer(map, {
+      onChange: (points) => editorStore.getState().setAirportBoundary(points),
+      onSelect: () => editorStore.getState().selectAirportPart({ kind: "boundary" }),
+    });
+
     const runway = new RunwayLayer(map, {
       onMoveEnd: (id, end, p) => editorStore.getState().moveAirportRunwayEnd(id, end, p),
       onMove: (id, a, b) => editorStore.getState().moveAirportRunway(id, a, b),
@@ -137,6 +145,8 @@ export function MapView(): React.ReactElement {
           ? { kind: sel.kind, id: sel.id }
           : null,
       );
+      boundary.sync(s.project.airport?.boundary ?? null, sel?.kind === "boundary", s.placing === null);
+      boundary.syncDraft(s.placing?.kind === "boundary" ? s.boundaryDraft : null);
       // `position` and not airportPosition(): the airport's point must not follow pads[0], so
       // never draw a ⊕ on a point the airport does not actually own.
       airport.sync(s.project.airport?.position ?? null, sel?.kind === "data");
@@ -155,6 +165,8 @@ export function MapView(): React.ReactElement {
           s.selection,
           s.project.airport,
           s.airportSelection,
+          s.placing,
+          s.boundaryDraft,
         ] as const,
       paint,
       { equalityFn: shallow },
@@ -181,6 +193,20 @@ export function MapView(): React.ReactElement {
     };
     map.on("click", onClick);
 
+    // The double click that closes a boundary being drawn. While the Boundary card is armed a double
+    // click must not also zoom the map, so Leaflet's double-click zoom is off for exactly that long.
+    const onDblClick = (): void => {
+      if (editorStore.getState().placing?.kind === "boundary") editorStore.getState().finishBoundary();
+    };
+    map.on("dblclick", onDblClick);
+    const unsubDraw = editorStore.subscribe(
+      (s) => s.placing?.kind === "boundary",
+      (drawing) => {
+        if (drawing) map.doubleClickZoom.disable();
+        else map.doubleClickZoom.enable();
+      },
+    );
+
     // Camera is EPHEMERAL (P1-4): capture the live view on pan/zoom, never dirtying the document.
     const onMoveEnd = (): void => {
       const c = map.getCenter();
@@ -200,12 +226,14 @@ export function MapView(): React.ReactElement {
       unsub();
       unsubCamera();
       unsubTiles();
+      unsubDraw();
       airport.destroy();
       glider.destroy();
       parking.destroy();
       helipad.destroy();
       layer.destroy();
       runway.destroy();
+      boundary.destroy();
       map.remove(); // frees the container so StrictMode's second mount can re-init it
     };
   }, []);

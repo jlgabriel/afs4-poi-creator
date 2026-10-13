@@ -397,10 +397,12 @@ async function runTapExport(project: Project, opts: TapExportOptions): Promise<T
               version: app.getVersion(),
             });
   const plan = planTap(project, resolved, await tapAirportTerrain(project, opts));
-  const file = writeTap(settings.tapDir, plan, { overwrite: opts.overwrite });
-  log.info(`tap export ok — written to ${file}`);
+  const written = writeTap(settings.tapDir, plan, { overwrite: opts.overwrite });
+  log.info(`tap export ok — written to ${written.file}${written.addendum === null ? "" : ` and ${written.addendum}`}`);
   for (const w of plan.warnings) log.warn(`tap export warning: ${w}`);
-  return { fileName: plan.fileName, path: file, warnings: plan.warnings };
+  const result: TapExportResult = { fileName: plan.fileName, path: written.file, warnings: plan.warnings };
+  if (written.addendum !== null) result.addendumPath = written.addendum;
+  return result;
 }
 
 /** The terrain under the airport point, for a project whose airport has no elevation of its own;

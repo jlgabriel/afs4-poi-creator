@@ -11,6 +11,7 @@ import { editorStore, useEditor } from "../state/editorStore";
 import { Thumbnail } from "../catalog/Thumbnail";
 import {
   AerotowIcon,
+  BoundaryIcon,
   DataIcon,
   HelipadIcon,
   ParkingIcon,
@@ -40,7 +41,8 @@ function DataRow(): React.ReactElement | null {
     (airport.parkings?.length ?? 0) +
     (airport.runways?.length ?? 0) +
     (airport.aerotows?.length ?? 0) +
-    (airport.winches?.length ?? 0);
+    (airport.winches?.length ?? 0) +
+    (airport.boundary !== undefined ? 1 : 0);
   return (
     <button
       type="button"
@@ -65,6 +67,34 @@ function DataRow(): React.ReactElement | null {
               ? "no parts placed yet"
               : `${parts} ${parts === 1 ? "part" : "parts"}`}
         </span>
+      </span>
+    </button>
+  );
+}
+
+/** The airport's boundary — one per airport, so one row at most. Double-click flies to its first point. */
+function BoundaryRow(): React.ReactElement | null {
+  const boundary = useEditor((s) => s.project.airport?.boundary);
+  const selected = useEditor((s) => s.airportSelection?.kind === "boundary");
+  if (boundary === undefined) return null;
+  return (
+    <button
+      type="button"
+      className={selected ? "pct-placed-row pct-placed-pad sel" : "pct-placed-row pct-placed-pad"}
+      aria-pressed={selected}
+      title="The polygon around the whole airport"
+      onClick={() => editorStore.getState().selectAirportPart({ kind: "boundary" })}
+      onDoubleClick={() => {
+        const first = boundary[0];
+        if (first !== undefined) editorStore.getState().flyTo(first);
+      }}
+    >
+      <BoundaryIcon />
+      <span className="pct-placed-text">
+        <span className="pct-placed-name">
+          <span className="pct-placed-label">Boundary</span>
+        </span>
+        <span className="pct-placed-meta">{boundary.length} points</span>
       </span>
     </button>
   );
@@ -326,6 +356,7 @@ export function PlacedList(): React.ReactElement {
             so both columns show the same sequence. Changing it here without changing AirportSection.tsx
             puts the two columns out of step. */}
         <DataRow />
+        <BoundaryRow />
         <RunwayRows />
         <HelipadRows />
         <ParkingRows />

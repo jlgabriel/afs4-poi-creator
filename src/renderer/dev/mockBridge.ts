@@ -11,7 +11,7 @@ import type { Catalog, CatalogObject, PlacedXref, Project, Settings } from "../.
 import { categorize, displayName } from "../../core/catalog/categorize";
 import { photoKey } from "../../core/catalog/photoKey";
 import { EMPTY_FOOTPRINTS, setFootprint, type FootprintOverrides } from "../../core/catalog/footprints";
-import type { InstalledHeliport, InstalledPoi, PctApi } from "../../shared/pctApi";
+import type { InstalledHeliport, InstalledPoi, PctApi, TapExportResult } from "../../shared/pctApi";
 import { planTap } from "../../core/export/planExport";
 
 // A spread of real-ish name stems across the catalog's categories, expanded with numeric suffixes so
@@ -432,8 +432,16 @@ export function installMockBridge(): void {
           };
         }
         writtenTaps.add(plan.fileName);
-        (window as unknown as { __pctLastTap?: string }).__pctLastTap = plan.content;
-        return { ok: true, value: { fileName: plan.fileName, path: `${settings.tapDir}/${plan.fileName}`, warnings: plan.warnings } };
+        const w = window as unknown as { __pctLastTap?: string; __pctLastTapAddendum?: string | null };
+        w.__pctLastTap = plan.content;
+        w.__pctLastTapAddendum = plan.addendum.content;
+        const value: TapExportResult = {
+          fileName: plan.fileName,
+          path: `${settings.tapDir}/${plan.fileName}`,
+          warnings: plan.warnings,
+        };
+        if (plan.addendum.content !== null) value.addendumPath = `${settings.tapDir}/${plan.addendum.fileName}`;
+        return { ok: true, value };
       } catch (e) {
         return { ok: false, error: { code: "invalid-project", message: e instanceof Error ? e.message : String(e) } };
       }
