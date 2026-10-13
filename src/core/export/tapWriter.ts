@@ -26,6 +26,9 @@
 //   • `boundaries`: the airport's BOUNDARY polygon, closed (first point repeated as the last). PCT stores
 //     it open and closes it here. Followed by `custom_models`, which PCT always writes EMPTY — the list
 //     holds complete models, which are not added by third parties, but the converter expects the block.
+//   • `tarmacs` (closed polygons, like the boundary) and `lines` (open polylines) come right after
+//     `parking_positions`. Their material and line names, and the runway's material, are the converter's
+//     vocabulary (surfaces.ts). `brightness` is a `string8` here, and EMPTY for a material that takes none.
 //   • glider starts are NOT in the `.tap`: they go in a second file, `<ICAO>_addendum.tap`, which the
 //     converter merges when both sit side by side in its input folder (see buildTapAddendum).
 //
@@ -63,6 +66,28 @@ export interface TapXrefSpec {
   direction: number;
 }
 
+/** A runway as the `.tap` wants it: the shared spec plus its surface, already resolved to the strings
+ *  the file holds (defaults applied, brightness formatted). */
+export interface TapRunwaySpec extends HeliportRunwaySpec {
+  material: string;
+  brightness: string;
+}
+
+/** A tarmac polygon: an OPEN ring of at least 3 points, shifted (the writer closes it). `brightness` is
+ *  the string the file holds — empty for a material that takes none. */
+export interface TapTarmacSpec {
+  points: LonLat[];
+  level: number;
+  material: string;
+  brightness: string;
+}
+
+/** A painted line: at least 2 points, shifted. */
+export interface TapLineSpec {
+  points: LonLat[];
+  name: string;
+}
+
 export interface TapSpec {
   identity: HeliportIdentity;
   /** The airport's own point, degrees, shifted with the scene → `model_center`. */
@@ -72,9 +97,11 @@ export interface TapSpec {
   /** The BOUNDARY polygon, OPEN (no repeated point; the writer closes it), at least 3 points, shifted.
    *  Null = none: the `boundaries` block is left out. */
   boundary: LonLat[] | null;
-  runways: HeliportRunwaySpec[];
+  runways: TapRunwaySpec[];
   pads: HeliportPadSpec[];
   parkings: HeliportParkingSpec[];
+  tarmacs: TapTarmacSpec[];
+  lines: TapLineSpec[];
   plants: TapPlantSpec[];
   /** Height already resolved, exactly as the `.toc` writes it. */
   lights: ResolvedLight[];
@@ -105,10 +132,8 @@ const TAP_RUNWAY_END_DEFAULTS: ReadonlyArray<readonly [string, string, string]> 
   ["bool", "marking_aimingpoint", "false"],
 ];
 
-/** Per-pair rows PCT offers nothing for: the standard asphalt runway. */
+/** Per-pair rows PCT offers nothing for: the standard markings. */
 const TAP_RUNWAY_PAIR_DEFAULTS: ReadonlyArray<readonly [string, string, string]> = [
-  ["string8", "material", "asphalt_runway__typestd"],
-  ["string8", "brightness", "0.5"],
   ["bool", "marking_centreline", "true"],
   ["bool", "marking_sidelines", "true"],
 ];
@@ -150,7 +175,7 @@ function list(type: string, name: string, elements: string[][]): string[] {
   return elements.length === 0 ? [] : block(type, name, "", elements.flat());
 }
 
-function runwayPairs(runways: HeliportRunwaySpec[], elevation: string): string[] {
+function runwayPairs(runways: TapRunwaySpec[], elevation: string): string[] {
   return list(
     "list_tm_airport_pd_rwy_pair",
     "runway_pairs",
@@ -179,6 +204,8 @@ function runwayPairs(runways: HeliportRunwaySpec[], elevation: string): string[]
       return block("tm_airport_pd_rwy_pair", "element", String(i), [
         ...block("array_tm_airport_pd_rwy", "runway_pair", "", ends.flat()),
         tag("float64", "width", fmtNum(r.widthM)),
+        tag("string8", "material", sanitizeValue(r.material)),
+        tag("string8", "brightness", r.brightness),
         ...TAP_RUNWAY_PAIR_DEFAULTS.map(([t, f, v]) => tag(t, f, v)),
       ]);
     }),
@@ -280,15 +307,50 @@ function xrefs(xrefList: TapXrefSpec[]): string[] {
   );
 }
 
-/** The `boundaries` list: one element, the polygon CLOSED by repeating its first point. The points row
- *  is a list of `(lon lat)` pairs on one line, the spacing the converter's own files use. */
+/** A `points` row: `(lon lat)` pairs on one line, the spacing the converter's own files use. */
+const pointList = (points: readonly LonLat[]): string => ` ${points.map((p) => `(${deg(p)})`).join(" ")} `;
+
+/** A polygon CLOSED by repeating its first point, as `boundaries` and `tarmacs` hold it. */
+const closed = (ring: readonly LonLat[]): LonLat[] => [...ring, ring[0]!];
+
+/** The `boundaries` list: one element, the polygon closed. */
 function boundaries(boundary: LonLat[] | null): string[] {
   if (boundary === null || boundary.length < 3) return [];
-  const ring = [...boundary, boundary[0]!];
-  const points = ` ${ring.map((p) => `(${deg(p)})`).join(" ")} `;
   return list("list_tm_airport_pd_boundary", "boundaries", [
-    block("tm_airport_pd_boundary", "element", "0", [tag("list_vector2_float64", "points", points)]),
+    block("tm_airport_pd_boundary", "element", "0", [
+      tag("list_vector2_float64", "points", pointList(closed(boundary))),
+    ]),
   ]);
+}
+
+/** The `tarmacs` list: each polygon closed, then its level, material and brightness. */
+function tarmacs(tarmacList: TapTarmacSpec[]): string[] {
+  return list(
+    "list_tm_airport_pd_tarmac",
+    "tarmacs",
+    tarmacList.map((t, i) =>
+      block("tm_airport_pd_tarmac", "element", String(i), [
+        tag("list_vector2_float64", "points", pointList(closed(t.points))),
+        tag("int32", "level", String(t.level)),
+        tag("string8", "material", sanitizeValue(t.material)),
+        tag("string8", "brightness", t.brightness),
+      ]),
+    ),
+  );
+}
+
+/** The `lines` list: each polyline OPEN, as drawn, then its line name. */
+function lines(lineList: TapLineSpec[]): string[] {
+  return list(
+    "list_tm_airport_pd_line",
+    "lines",
+    lineList.map((l, i) =>
+      block("tm_airport_pd_line", "element", String(i), [
+        tag("list_vector2_float64", "points", pointList(l.points)),
+        tag("string8", "name", sanitizeValue(l.name)),
+      ]),
+    ),
+  );
 }
 
 /** The whole `.tap` text. Pure; the caller has already validated the identity and shifted every point. */
@@ -312,6 +374,8 @@ export function buildTap(spec: TapSpec): string {
     ...runwayPairs(spec.runways, elevation),
     ...helipads(spec.pads),
     ...parkingPositions(spec.parkings),
+    ...tarmacs(spec.tarmacs),
+    ...lines(spec.lines),
     ...plants(spec.plants),
     ...lights(spec.lights),
     ...airportLights(spec.airportLights),

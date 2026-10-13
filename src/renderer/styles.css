@@ -134,14 +134,28 @@ body {
 .pct-helipad {
   cursor: grab;
 }
-/* The airport boundary (BoundaryLayer): its points are dragged like a grip; inside the selected ring the
-   whole polygon moves. */
-.pct-boundary-vertex,
-.pct-boundary-mid {
+/* The airport's point-by-point shapes — boundary, tarmacs, lines (PolyShape): a click selects, the points
+   of the selected one are dragged like a grip, and its body moves the whole shape. */
+.pct-boundary-hit.leaflet-interactive,
+.pct-tarmac.leaflet-interactive,
+.pct-line-hit.leaflet-interactive {
+  cursor: pointer;
+}
+.pct-shape-vertex,
+.pct-shape-mid {
   cursor: grab;
 }
-.pct-boundary.leaflet-interactive {
+.pct-boundary.grab.leaflet-interactive,
+.pct-tarmac.grab.leaflet-interactive,
+.pct-boundary-hit.grab.leaflet-interactive,
+.pct-line-hit.grab.leaflet-interactive {
   cursor: move;
+}
+/* Those shapes live in panes BELOW the overlay pane (MapView). Each pane's <svg> covers the whole map, and
+   an empty <svg> still takes the mouse, so the overlay's would hide every shape under it. Let the SVG
+   itself pass clicks through; its interactive paths opt back in (Leaflet gives them pointer-events). */
+.leaflet-pane > svg {
+  pointer-events: none;
 }
 /* The painted H at the pad's centre. It turns with the pad — a real helipad's H lies along the approach —
    so the rotation is written inline by the layer and this only has to make it legible over satellite

@@ -118,7 +118,7 @@ The short version is below. For the whole thing walked through with pictures, se
    **light or a plant** a size too, by measuring it yourself: see
    [Footprints you measure yourself](#footprints-you-measure-yourself).
    Below the catalog, the **Lights** section holds the airport-light fixtures and the custom point light,
-   **Plants** holds the trees and shrubs, and **Airport** holds the seven pieces an airfield is made of.
+   **Plants** holds the trees and shrubs, and **Airport** holds the nine pieces an airfield is made of.
 4. **Export & install** — **Export /poi…** writes the folder into your `scenery/poi/`. Restart Aerofly
    and fly to the spot. The same dialog can **uninstall** POIs that PCT made, so nothing is permanent.
    If you'd rather **start** a flight there than fly to it, **Export /airports…** writes the same
@@ -226,10 +226,12 @@ by hand.
 [Section 9 of the guide](guide/GUIDE.md#9-airports--somewhere-to-fly-from) walks the whole thing through
 with pictures.
 
-**PCT writes the airfield's data, not its asphalt** — no markings, no centre line, no surface. Aerofly
-draws the ground; this tells it where the runway is and how to use it.
+**Export /airports… writes the airfield's data, not its asphalt** — no markings, no centre line, no
+surface. Aerofly draws the ground; this tells it where the runway is and how to use it. The surfaces —
+a runway's material, **Tarmac** areas and painted **Lines** — go only into **Export TAP…**, for the
+converter to bake into the ground.
 
-The catalog's **Airport** section holds seven cards, and every one of them behaves like a tree or a light:
+The catalog's **Airport** section holds nine cards, and every one of them behaves like a tree or a light:
 click the card, click the map, edit it in the inspector.
 
 | Card | What it is |
@@ -239,6 +241,8 @@ click the card, click the map, edit it in the inspector.
 | **Runway** | Two thresholds you drag; the length and the direction are whatever they say. Per end: identifier, approach lighting, PAPI, REIL, and whether you can land or take off there. |
 | **Helipad** | A helicopter start. Its own point, at its own radius, as many as you like. |
 | **Parking** | A stand — General Aviation, Jet or Pushback — that an aircraft starts a flight from. |
+| **Tarmac** | An apron, taxiway, ground or flattened area, for Export TAP. Drawn like the Boundary, as many as you like; each has a level, a material and a brightness. |
+| **Line** | A painted line — centre line, edge, hold position… — for Export TAP. Click its points, double-click the last; pick the marking in the inspector. |
 | **Aerotow** | A glider start, towed into the air along its heading by the DR400. |
 | **Winch Launch** | A glider start on a cable: two points, no heading, ~900 m of rope. |
 
@@ -274,8 +278,9 @@ stay out of the object count — they aren't scenery.
 Restart Aerofly after installing: airports are read once, at startup.
 
 **Export TAP…** *(v2.1)* saves the same airport, and every object around it, as a `<CODE>.tap` file —
-the format a TAP converter builds an airport folder from — with its **Boundary** *(v2.2)*, and its glider
-starts in `<CODE>_addendum.tap` beside it. It installs nothing: the files go into the folder you pick
+the format a TAP converter builds an airport folder from — with its **Boundary** *(v2.2)*, its
+**Tarmac** areas, painted **Lines** and each runway's material *(v2.3)*, and its glider starts in
+`<CODE>_addendum.tap` beside it. It installs nothing: the files go into the folder you pick
 (it's also under *Settings → TAP folder*), and PCT asks before replacing them. An XREF's scale and the
 heights of XREFs and plants are not in it, and the dialog says so when your project has them. The airport's **Elevation** (Airport panel, *v2.1.1*) goes
 in too: the converter places the XREFs at that height. Asked for by **@ApfelFlieger**.

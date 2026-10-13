@@ -105,6 +105,8 @@ export function TapDialog({ onClose }: { onClose: () => void }): React.ReactElem
   const parkings = airport?.parkings ?? [];
   const gliderCount = (airport?.aerotows ?? []).length + (airport?.winches ?? []).length;
   const boundaryPoints = airport?.boundary?.length ?? 0;
+  const tarmacCount = airport?.tarmacs?.length ?? 0;
+  const lineCount = airport?.lines?.length ?? 0;
   const blocked =
     airport === undefined || airport.position === undefined || problem !== null || tapDir === null || busy || pct === null;
 
@@ -197,6 +199,13 @@ export function TapDialog({ onClose }: { onClose: () => void }): React.ReactElem
                     <li>
                       <span className="pct-field-meta">Boundary</span>
                       <span>{boundaryPoints >= 3 ? `${boundaryPoints} points` : "— none —"}</span>
+                    </li>
+                    <li>
+                      <span className="pct-field-meta">Surfaces</span>
+                      <span>
+                        {tarmacCount} tarmac{tarmacCount === 1 ? "" : "s"} · {lineCount} line
+                        {lineCount === 1 ? "" : "s"}
+                      </span>
                     </li>
                     <li>
                       <span className="pct-field-meta">Elevation</span>

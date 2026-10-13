@@ -8,8 +8,10 @@
 
 import type {
   AirportAerotow,
+  AirportLine,
   AirportParking,
   AirportRunway,
+  AirportTarmac,
   AirportWinch,
   LonLat,
   ParkingType,
@@ -43,6 +45,14 @@ export function aerotowsOf(airport: ProjectAirport | undefined): AirportAerotow[
 }
 export function winchesOf(airport: ProjectAirport | undefined): AirportWinch[] {
   return airport?.winches ?? [];
+}
+
+/** The tarmac polygons and painted lines, absent and empty collapsed — same contract as parkingsOf. */
+export function tarmacsOf(airport: ProjectAirport | undefined): AirportTarmac[] {
+  return airport?.tarmacs ?? [];
+}
+export function linesOf(airport: ProjectAirport | undefined): AirportLine[] {
+  return airport?.lines ?? [];
 }
 
 // Deleting a part never drops the whole airport block: editing changes only the affected elements. The

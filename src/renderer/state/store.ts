@@ -45,7 +45,7 @@ import {
 import { destination } from "../../core/geo/geo";
 import { lineUp, spaceEvenly } from "../../core/geo/arrange";
 import { DEFAULT_PAD_RADIUS_M } from "../../core/export/planExport";
-import { aerotowsOf, parkingsOf, runwaysOf, winchesOf } from "../../core/project/airport";
+import { aerotowsOf, linesOf, parkingsOf, runwaysOf, tarmacsOf, winchesOf } from "../../core/project/airport";
 import * as mutate from "../../core/project/mutate";
 
 export type Camera = Project["camera"];
@@ -85,9 +85,14 @@ export type PlacingSpec =
   // it is armed only while the airport has no point of its own; once it has one, it is a thing you drag.
   | { kind: "airport" }
   // The airport's BOUNDARY, the one card that takes MANY clicks: each map click adds a point to
-  // `boundaryDraft`, a double click puts down the last one and closes the ring (finishBoundary). Armed
+  // `shapeDraft`, a double click puts down the last one and closes the ring (finishShape). Armed
   // only while the airport has no boundary — there is one, and after that it is edited on the map.
   | { kind: "boundary" }
+  // A TARMAC polygon and a painted LINE: drawn exactly like the boundary — click point by point, double
+  // click on the last — but any number can exist, so the card draws a new one every time. Finishing
+  // selects the new shape and disarms: the next thing you do is edit it.
+  | { kind: "tarmac" }
+  | { kind: "line" }
   // `naturalHeight` rides along rather than being looked up at place time. The palette has the
   // CatalogPlant in hand when it arms, so carrying it removes the only path where a plant could be
   // created with height 0 — the one value that may mean "invisible" (see mutate.createPlant).
@@ -109,7 +114,13 @@ export type AirportSelection =
   | { kind: "data" }
   // One per airport, so no id.
   | { kind: "boundary" }
-  | { kind: "pad" | "runway" | "parking" | "aerotow" | "winch"; id: string };
+  | { kind: "pad" | "runway" | "parking" | "aerotow" | "winch" | "tarmac" | "line"; id: string };
+
+/** The cards drawn point by point into `shapeDraft`, and how many points each needs to finish. */
+export const SHAPE_MIN_POINTS = { boundary: 3, tarmac: 3, line: 2 } as const;
+export type ShapeKind = keyof typeof SHAPE_MIN_POINTS;
+export const isShapeKind = (kind: string | undefined): kind is ShapeKind =>
+  kind === "boundary" || kind === "tarmac" || kind === "line";
 
 /** Drop whichever airport part the selection names. Exhaustive on purpose — no `default` branch — so
  *  adding a seventh kind to AirportSelection fails the typecheck here instead of silently deleting
@@ -135,6 +146,10 @@ function removeAirportPart(project: Project, sel: AirportSelection): Project {
       return mutate.removeAirportWinch(project, sel.id);
     case "boundary":
       return mutate.setAirportBoundary(project, null);
+    case "tarmac":
+      return mutate.removeAirportTarmac(project, sel.id);
+    case "line":
+      return mutate.removeAirportLine(project, sel.id);
   }
 }
 
@@ -272,10 +287,10 @@ export interface EditorState {
    *  on something else. */
   pendingAirportDelete: boolean;
   placing: PlacingSpec | null; // what click-to-place is armed for (xref / airport_light / light / helipad)
-  /** The BOUNDARY being drawn: the points clicked so far, while `placing` is `boundary`. Ephemeral — the
-   *  ring reaches the document in ONE commit when it closes, so drawing it is one undo entry, and Escape
-   *  (or arming anything else) throws the draft away. */
-  boundaryDraft: LonLat[];
+  /** The SHAPE being drawn (a boundary, tarmac or line): the points clicked so far, while `placing` is
+   *  one of those kinds. Ephemeral — the shape reaches the document in ONE commit when it is finished, so
+   *  drawing it is one undo entry, and Escape (or arming anything else) throws the draft away. */
+  shapeDraft: LonLat[];
   filter: Filter;
   mapView: Camera; // the LIVE camera; stamped into the document only at save
   cameraEpoch: number; // bumps on document load (open/new) → MapView re-centers; pan never bumps it
@@ -359,10 +374,17 @@ export interface EditorState {
   //    The airport's elevation, metres ASL; `null` = the terrain under its point (looked up at export).
   setAirportElevation: (elevation: number | null) => void;
   //    The BOUNDARY: the card's gesture (arm to draw, or open the one that exists), the double click
-  //    that closes a draft, and the one writer every map edit of the ring goes through.
+  //    that finishes any shape being drawn, and the one writer every map edit of the ring goes through.
   startBoundaryCard: () => void;
-  finishBoundary: () => void;
+  finishShape: () => void;
   setAirportBoundary: (points: LonLat[] | null) => void;
+  //    TARMAC polygons and painted LINEs: the map's one writer for their points, and the Inspector's
+  //    fields. A runway's surface (material, brightness) belongs with them: only Export TAP reads any of it.
+  setAirportTarmacPoints: (id: string, points: LonLat[]) => void;
+  updateAirportTarmac: (id: string, patch: { level?: number; material?: string; brightness?: number }) => void;
+  setAirportLinePoints: (id: string, points: LonLat[]) => void;
+  setAirportLineName: (id: string, name: string) => void;
+  setAirportRunwaySurface: (id: string, patch: { material?: string; brightness?: number }) => void;
   //    Parking positions. Every one takes an id: letting it default would only hide a caller that forgot which stand it meant (mutate.ts).
   moveAirportParking: (id: string, position: LonLat) => void;
   rotateAirportParking: (id: string, heading: number) => void;
@@ -554,7 +576,7 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
           airportSelection: null,
           pendingAirportDelete: false,
           placing: null,
-          boundaryDraft: [],
+          shapeDraft: [],
           resolvedElev: new Map(),
           pendingRecovery: null, // a fresh document clears any recovery banner
           mapView: project.camera,
@@ -582,7 +604,7 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
         airportSelection: null,
         pendingAirportDelete: false,
         placing: null,
-        boundaryDraft: [],
+        shapeDraft: [],
         filter: { query: "", category: null },
         mapView: deps.initialProject.camera,
         cameraEpoch: 0,
@@ -644,7 +666,7 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
         selectAirportPart: (sel) =>
           set({ airportSelection: sel, selection: [], pendingAirportDelete: false }),
         // Any change of what is armed drops a boundary half drawn: it belonged to the old arming.
-        armPlacement: (name) => set({ placing: name, boundaryDraft: [] }),
+        armPlacement: (name) => set({ placing: name, shapeDraft: [] }),
         setFilter: (patch) => set((s) => ({ filter: { ...s.filter, ...patch } })),
 
         placeAt: (p) => {
@@ -659,9 +681,9 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
           // can be armed, and all the click does is put its coordinate somewhere. Disarms, because there
           // is one airport and a second click would only move what the first one placed.
           // A boundary click adds a point to the DRAFT and commits nothing — the ring is written whole
-          // when the double click closes it (finishBoundary).
-          if (spec.kind === "boundary") {
-            set((s) => ({ boundaryDraft: [...s.boundaryDraft, p] }));
+          // when the double click closes it (finishShape). Same for a tarmac or a line.
+          if (isShapeKind(spec.kind)) {
+            set((s) => ({ shapeDraft: [...s.shapeDraft, p] }));
             return;
           }
           if (spec.kind === "airport") {
@@ -792,6 +814,21 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
               const ring = a.boundary;
               if (ring !== undefined) {
                 commitCoalesced("airport:boundary", (proj) => mutate.setAirportBoundary(proj, ring.map(to)));
+              }
+              return;
+            }
+            // A tarmac or a line moves whole, the same way. The key carries the id, like a stand's.
+            if (sel.kind === "tarmac") {
+              const t = tarmacsOf(a).find((x) => x.id === sel.id);
+              if (t !== undefined) {
+                commitCoalesced(`tarmac:${sel.id}`, (proj) => mutate.setAirportTarmacPoints(proj, sel.id, t.points.map(to)));
+              }
+              return;
+            }
+            if (sel.kind === "line") {
+              const l = linesOf(a).find((x) => x.id === sel.id);
+              if (l !== undefined) {
+                commitCoalesced(`line:${sel.id}`, (proj) => mutate.setAirportLinePoints(proj, sel.id, l.points.map(to)));
               }
               return;
             }
@@ -937,44 +974,62 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
         startBoundaryCard: () => {
           const st = get();
           if (st.placing?.kind === "boundary") {
-            set({ placing: null, boundaryDraft: [] });
+            set({ placing: null, shapeDraft: [] });
             return;
           }
           if (st.project.airport?.boundary !== undefined) {
             set({
               placing: null,
-              boundaryDraft: [],
+              shapeDraft: [],
               selection: [],
               airportSelection: { kind: "boundary" },
               pendingAirportDelete: false,
             });
             return;
           }
-          set({ placing: { kind: "boundary" }, boundaryDraft: [] });
+          set({ placing: { kind: "boundary" }, shapeDraft: [] });
         },
         // The DOUBLE CLICK. The browser has already delivered it as two clicks, both of which placeAt
         // added; the second is a copy of the first, so it is dropped and the first one is the last point.
-        // Fewer than three points left ⇒ not a ring yet: keep drawing.
-        finishBoundary: () => {
+        // Too few points left (3 for a ring, 2 for a line) ⇒ not a shape yet: keep drawing.
+        finishShape: () => {
           const st = get();
-          if (st.placing?.kind !== "boundary") return;
-          const points = st.boundaryDraft.slice(0, -1);
-          if (points.length < 3) {
-            set({ boundaryDraft: points });
+          const kind = st.placing?.kind;
+          if (!isShapeKind(kind)) return;
+          const points = st.shapeDraft.slice(0, -1);
+          if (points.length < SHAPE_MIN_POINTS[kind]) {
+            set({ shapeDraft: points });
             return;
           }
-          commit((proj) => mutate.setAirportBoundary(proj, points));
+          let selected: AirportSelection;
+          if (kind === "boundary") {
+            commit((proj) => mutate.setAirportBoundary(proj, points));
+            selected = { kind: "boundary" };
+          } else {
+            const id = deps.newId();
+            commit((proj) =>
+              kind === "tarmac" ? mutate.addAirportTarmac(proj, points, { id }) : mutate.addAirportLine(proj, points, { id }),
+            );
+            selected = { kind, id };
+          }
           set({
             placing: null,
-            boundaryDraft: [],
+            shapeDraft: [],
             selection: [],
-            airportSelection: { kind: "boundary" },
+            airportSelection: selected,
             pendingAirportDelete: false,
           });
         },
         // Not coalesced: each map gesture on the ring (drag a point, add one, remove one, move the ring)
         // arrives here ONCE, on release, so each is its own undo entry already.
         setAirportBoundary: (points) => commit((proj) => mutate.setAirportBoundary(proj, points)),
+        // Same for tarmacs and lines: one map gesture, one commit, one undo entry.
+        setAirportTarmacPoints: (id, points) => commit((proj) => mutate.setAirportTarmacPoints(proj, id, points)),
+        setAirportLinePoints: (id, points) => commit((proj) => mutate.setAirportLinePoints(proj, id, points)),
+        // The Inspector's fields: a select or a ± button is one discrete change, so each is its own entry.
+        updateAirportTarmac: (id, patch) => commit((proj) => mutate.updateAirportTarmac(proj, id, patch)),
+        setAirportLineName: (id, name) => commit((proj) => mutate.setAirportLineName(proj, id, name)),
+        setAirportRunwaySurface: (id, patch) => commit((proj) => mutate.setAirportRunwaySurface(proj, id, patch)),
         // Coalesced like every other drag, and id-less because there is exactly one airport point in a
         // project.
         moveAirportPosition: (position) =>

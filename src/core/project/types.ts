@@ -272,6 +272,35 @@ export interface AirportRunway {
   ends: [AirportRunwayEnd, AirportRunwayEnd];
   /** Metres, and here it really is the full width (not a radius). */
   width: number;
+  /** The surface, a name from surfaces.ts RUNWAY_MATERIALS. Only Export TAP reads it. Absent ≡
+   *  DEFAULT_RUNWAY_MATERIAL, so a runway saved before it existed exports the same `.tap`. */
+  material?: string;
+  /** 0.1–1.0 (surfaces.ts BRIGHTNESS_STEPS). Only Export TAP reads it. Absent ≡ DEFAULT_BRIGHTNESS. */
+  brightness?: number;
+}
+
+/** A TARMAC: a closed polygon of paved (or flattened, or grass) surface the TAP converter bakes into the
+ *  airport. Any number per airport; where two overlap, the higher `level` covers the lower. Only Export
+ *  TAP reads it. */
+export interface AirportTarmac {
+  id: string;
+  /** Stored OPEN, like the boundary: at least 3 points, the first NOT repeated (the writer closes it). */
+  points: LonLat[];
+  /** 1 or higher, integer. */
+  level: number;
+  /** A name from surfaces.ts TARMAC_MATERIALS. */
+  material: string;
+  /** 0.1–1.0. Written empty for a material that takes none (surfaces.ts materialHasBrightness), but kept
+   *  here so switching back to a paved material restores it. */
+  brightness: number;
+}
+
+/** A painted LINE: an open polyline of at least 2 points, with a line name from surfaces.ts LINE_NAMES.
+ *  Any number per airport. Only Export TAP reads it. */
+export interface AirportLine {
+  id: string;
+  points: LonLat[];
+  name: string;
 }
 
 /** A glider AEROTOW start: where the glider stands to be pulled into the air by the tow plane.
@@ -383,6 +412,9 @@ export interface ProjectAirport {
    *  first/last point is one point, so moving it can never pull the ring apart. One per airport.
    *  Only Export TAP reads it; the `.tsc`/`.wad` writers do not. Absent ≡ none. */
   boundary?: LonLat[];
+  /** TARMAC polygons and painted LINEs, in document order. Only Export TAP reads them. Absent ≡ none. */
+  tarmacs?: AirportTarmac[];
+  lines?: AirportLine[];
   /** Every parking position, in document order. Absent ≡ none, which is what every project
    *  written before v1.4 has — and the writers emit no `parking_positions` block at all in that case, so
    *  those projects keep exporting the same bytes.

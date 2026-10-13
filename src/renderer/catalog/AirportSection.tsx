@@ -3,7 +3,7 @@
 //
 // These cards behave exactly like a light or a plant: click to arm, click the map to drop, Escape to
 // cancel — the same procedure as placing POI objects, so nothing new has to be learned. Order:
-// Airport · Boundary · Runway · Helipad · Parking · Aerotow · Winch Launch.
+// Airport · Boundary · Runway · Helipad · Parking · Tarmac · Line · Aerotow · Winch Launch.
 //
 // ★ THE ORDER IS A PAIR, NOT A LIST: the catalog and the placed list must show the same sequence.
 // Neither column owns it, so changing one of them alone is the bug — PlacedList.tsx carries the same
@@ -27,8 +27,10 @@ import {
   BoundaryIcon,
   DataIcon,
   HelipadIcon,
+  LineIcon,
   ParkingIcon,
   RunwayIcon,
+  TarmacIcon,
   WinchIcon,
 } from "./categoryIcon";
 
@@ -45,8 +47,17 @@ const PARKING_TERMS = `parking stand gate apron aircraft ${PARKING_TYPES.map(
   (t) => PARKING_TYPE_LABELS[t],
 ).join(" ")}`.toLowerCase();
 const RUNWAY_TERMS = "runway strip threshold papi reil approach lighting";
-const AEROTOW_TERMS = "aerotow glider tow towing sailplane dr400 start";
+const TARMAC_TERMS = "tarmac apron taxiway pavement asphalt concrete grass surface material flatten polygon";
+const LINE_TERMS = "line marking taxiway centre center centerline edge hold short paint";
+const AEROTOW_TERMS ="aerotow glider tow towing sailplane dr400 start";
 const WINCH_TERMS = "winch launch glider cable rope sailplane start";
+
+/** A drawing card's subtitle while it is armed: how far along the shape is and how to finish it. */
+function shapeProgress(points: number, min: number): string {
+  return points < min
+    ? `${points} point${points === 1 ? "" : "s"} · click to add, double-click the last`
+    : `${points} points · double-click the last to finish`;
+}
 
 export function AirportSection(): React.ReactElement {
   const placing = useEditor((s) => s.placing);
@@ -60,7 +71,9 @@ export function AirportSection(): React.ReactElement {
   const aerotowCount = useEditor((s) => s.project.airport?.aerotows?.length ?? 0);
   const winchCount = useEditor((s) => s.project.airport?.winches?.length ?? 0);
   const boundaryPoints = useEditor((s) => s.project.airport?.boundary?.length ?? 0);
-  const draftPoints = useEditor((s) => s.boundaryDraft.length);
+  const tarmacCount = useEditor((s) => s.project.airport?.tarmacs?.length ?? 0);
+  const lineCount = useEditor((s) => s.project.airport?.lines?.length ?? 0);
+  const draftPoints = useEditor((s) => s.shapeDraft.length);
   const query = useEditor((s) => s.filter.query);
 
   const airportPlaced = useEditor((s) => s.project.airport?.position !== undefined);
@@ -72,6 +85,8 @@ export function AirportSection(): React.ReactElement {
   const aerotowArmed = placing?.kind === "aerotow";
   const winchArmed = placing?.kind === "winch";
   const boundaryArmed = placing?.kind === "boundary";
+  const tarmacArmed = placing?.kind === "tarmac";
+  const lineArmed = placing?.kind === "line";
 
   // The search box filters every section (a query that hides the xrefs but leaves these cards sitting
   // there reads as a bug — see LightsSection's note on the same problem).
@@ -83,11 +98,15 @@ export function AirportSection(): React.ReactElement {
   const runwayMatches = q === "" || RUNWAY_TERMS.includes(q);
   const aerotowMatches = q === "" || AEROTOW_TERMS.includes(q);
   const winchMatches = q === "" || WINCH_TERMS.includes(q);
+  const tarmacMatches = q === "" || TARMAC_TERMS.includes(q);
+  const lineMatches = q === "" || LINE_TERMS.includes(q);
   const count =
     (dataMatches ? 1 : 0) +
     (boundaryMatches ? 1 : 0) +
     (padMatches ? 1 : 0) +
     (parkingMatches ? 1 : 0) +
+    (tarmacMatches ? 1 : 0) +
+    (lineMatches ? 1 : 0) +
     (runwayMatches ? 1 : 0) +
     (aerotowMatches ? 1 : 0) +
     (winchMatches ? 1 : 0);
@@ -130,6 +149,18 @@ export function AirportSection(): React.ReactElement {
   const armRunway = useCallback(() => {
     const cur = editorStore.getState().placing;
     editorStore.getState().armPlacement(cur?.kind === "runway" ? null : { kind: "runway" });
+  }, []);
+
+  // A tarmac or a line is drawn point by point like the boundary, but any number can exist, so the card
+  // always starts a NEW one (and pressing it while drawing cancels, like every card).
+  const armTarmac = useCallback(() => {
+    const cur = editorStore.getState().placing;
+    editorStore.getState().armPlacement(cur?.kind === "tarmac" ? null : { kind: "tarmac" });
+  }, []);
+
+  const armLine = useCallback(() => {
+    const cur = editorStore.getState().placing;
+    editorStore.getState().armPlacement(cur?.kind === "line" ? null : { kind: "line" });
   }, []);
 
   const armAerotow = useCallback(() => {
@@ -263,6 +294,48 @@ export function AirportSection(): React.ReactElement {
                 {standCount === 0
                   ? "a stand to start a flight from"
                   : `${standCount} placed · click the map to add another`}
+              </span>
+            </span>
+          </button>
+        )}
+        {tarmacMatches && (
+          <button
+            type="button"
+            className={tarmacArmed ? "pct-obj-card armed" : "pct-obj-card"}
+            aria-pressed={tarmacArmed}
+            title="A paved, grass or flattened area for Export TAP. Click, then click the map point by point — double-click the last one"
+            onClick={armTarmac}
+          >
+            <TarmacIcon />
+            <span className="pct-obj-text">
+              <span className="pct-obj-name">Tarmac</span>
+              <span className="pct-obj-cat">
+                {tarmacArmed
+                  ? shapeProgress(draftPoints, 3)
+                  : tarmacCount === 0
+                    ? "an apron, taxiway or ground area"
+                    : `${tarmacCount} placed · click to draw another`}
+              </span>
+            </span>
+          </button>
+        )}
+        {lineMatches && (
+          <button
+            type="button"
+            className={lineArmed ? "pct-obj-card armed" : "pct-obj-card"}
+            aria-pressed={lineArmed}
+            title="A painted line for Export TAP. Click, then click the map point by point — double-click the last one"
+            onClick={armLine}
+          >
+            <LineIcon />
+            <span className="pct-obj-text">
+              <span className="pct-obj-name">Line</span>
+              <span className="pct-obj-cat">
+                {lineArmed
+                  ? shapeProgress(draftPoints, 2)
+                  : lineCount === 0
+                    ? "a painted marking: centre line, edge, hold…"
+                    : `${lineCount} placed · click to draw another`}
               </span>
             </span>
           </button>

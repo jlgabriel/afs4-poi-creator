@@ -27,6 +27,7 @@ import { haversine, initialBearing } from "../../core/geo/geo";
 import { editorStore } from "../state/editorStore";
 import { NumberInput } from "./NumberInput";
 import { WadPosition } from "./WadReadout";
+import { RunwaySurfaceFields } from "./SurfaceFields";
 
 const fmtDeg = (n: number): string => n.toFixed(6);
 /** Display only — see the header. The token on disk is always the lower-case one. */
@@ -199,7 +200,8 @@ export function RunwayFields({ runway }: { runway: AirportRunway }): React.React
     <div className="pct-inspector-body">
       <div className="pct-field-title">{titleFor(runway)}</div>
 
-      {/* PCT writes the runway's DATA, not its asphalt — explained in the manual, not here. */}
+      {/* The airport exports write the runway's DATA, not its asphalt; only Export TAP takes a surface
+          (Material and Brightness, below the length). */}
       <div className="pct-field pct-field-col">
         <span className="pct-field-label">Runway</span>
       </div>
@@ -221,6 +223,8 @@ export function RunwayFields({ runway }: { runway: AirportRunway }): React.React
         {bearing(initialBearing(a.threshold, b.threshold))}° /{" "}
         {bearing(initialBearing(b.threshold, a.threshold))}° true
       </span>
+
+      <RunwaySurfaceFields runway={runway} />
 
       <EndBlock runwayId={runway.id} end={a} index={0} />
       <EndBlock runwayId={runway.id} end={b} index={1} />

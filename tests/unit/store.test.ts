@@ -1468,7 +1468,7 @@ describe("the airport BOUNDARY", () => {
   function draw(store: ReturnType<typeof makeStore>["store"]): void {
     store.getState().startBoundaryCard();
     for (const p of [A, B, C, D, D]) store.getState().placeAt(p);
-    store.getState().finishBoundary();
+    store.getState().finishShape();
   }
 
   it("draws point by point and closes on the double click, as ONE undo entry", () => {
@@ -1478,12 +1478,12 @@ describe("the airport BOUNDARY", () => {
     for (const p of [A, B, C, D, D]) store.getState().placeAt(p);
     // Nothing reaches the document while drawing.
     expect(store.getState().project.airport).toBeUndefined();
-    expect(store.getState().boundaryDraft).toHaveLength(5);
-    store.getState().finishBoundary();
+    expect(store.getState().shapeDraft).toHaveLength(5);
+    store.getState().finishShape();
     const st = store.getState();
     expect(st.project.airport?.boundary).toEqual([A, B, C, D]); // the double click's copy is gone
     expect(st.placing).toBeNull();
-    expect(st.boundaryDraft).toEqual([]);
+    expect(st.shapeDraft).toEqual([]);
     expect(st.airportSelection).toEqual({ kind: "boundary" });
     expect(st.undoStack).toHaveLength(1);
     // The airport block it created gets its own point at the ring's centre.
@@ -1494,9 +1494,9 @@ describe("the airport BOUNDARY", () => {
     const { store } = makeStore();
     store.getState().startBoundaryCard();
     for (const p of [A, B, B]) store.getState().placeAt(p);
-    store.getState().finishBoundary();
+    store.getState().finishShape();
     expect(store.getState().placing).toEqual({ kind: "boundary" });
-    expect(store.getState().boundaryDraft).toEqual([A, B]);
+    expect(store.getState().shapeDraft).toEqual([A, B]);
     expect(store.getState().project.airport).toBeUndefined();
   });
 
@@ -1505,7 +1505,7 @@ describe("the airport BOUNDARY", () => {
     store.getState().startBoundaryCard();
     store.getState().placeAt(A);
     store.getState().armPlacement(null);
-    expect(store.getState().boundaryDraft).toEqual([]);
+    expect(store.getState().shapeDraft).toEqual([]);
   });
 
   it("the card opens an existing boundary instead of drawing over it", () => {
@@ -1538,5 +1538,67 @@ describe("the airport BOUNDARY", () => {
     store.getState().nudgeSelection(100, 0);
     const ring = store.getState().project.airport!.boundary!;
     ring.forEach((p, i) => near(haversine(p, [A, B, C, D][i]!), 100, 0.5));
+  });
+});
+
+describe("TARMAC polygons and painted LINEs", () => {
+  const A = { lon: 10, lat: 48 };
+  const B = { lon: 10.001, lat: 48 };
+  const C = { lon: 10.001, lat: 48.001 };
+
+  it("draws a tarmac like the boundary, selects it with the defaults, and draws a NEW one on the next arm", () => {
+    const { store } = makeStore();
+    store.getState().armPlacement({ kind: "tarmac" });
+    for (const p of [A, B, C, C]) store.getState().placeAt(p);
+    expect(store.getState().project.airport).toBeUndefined();
+    store.getState().finishShape();
+    const st = store.getState();
+    expect(st.project.airport?.tarmacs).toEqual([
+      { id: "id0", points: [A, B, C], level: 1, material: "asphalt_apron__typestd", brightness: 0.5 },
+    ]);
+    expect(st.airportSelection).toEqual({ kind: "tarmac", id: "id0" });
+    expect(st.placing).toBeNull();
+    expect(st.undoStack).toHaveLength(1);
+    store.getState().armPlacement({ kind: "tarmac" });
+    for (const p of [C, B, A, A]) store.getState().placeAt(p);
+    store.getState().finishShape();
+    expect(store.getState().project.airport?.tarmacs?.map((t) => t.id)).toEqual(["id0", "id1"]);
+  });
+
+  it("finishes a line at two points, and keeps a tarmac drawing below three", () => {
+    const { store } = makeStore();
+    store.getState().armPlacement({ kind: "line" });
+    for (const p of [A, B, B]) store.getState().placeAt(p);
+    store.getState().finishShape();
+    expect(store.getState().project.airport?.lines).toEqual([{ id: "id0", points: [A, B], name: "taxi_center" }]);
+    expect(store.getState().airportSelection).toEqual({ kind: "line", id: "id0" });
+    store.getState().armPlacement({ kind: "tarmac" });
+    for (const p of [A, B, B]) store.getState().placeAt(p);
+    store.getState().finishShape();
+    expect(store.getState().placing).toEqual({ kind: "tarmac" });
+    expect(store.getState().shapeDraft).toEqual([A, B]);
+  });
+
+  it("edits the fields, moves with the arrows as one undo entry, and Del removes only the selected one", () => {
+    const { store } = makeStore();
+    store.getState().armPlacement({ kind: "tarmac" });
+    for (const p of [A, B, C, C]) store.getState().placeAt(p);
+    store.getState().finishShape();
+    store.getState().updateAirportTarmac("id0", { level: 3, material: "grass00" });
+    expect(store.getState().project.airport?.tarmacs?.[0]).toMatchObject({ level: 3, material: "grass00" });
+    const before = store.getState().undoStack.length;
+    store.getState().nudgeSelection(10, 0);
+    store.getState().nudgeSelection(10, 0);
+    expect(store.getState().undoStack.length).toBe(before + 1);
+    near(haversine(store.getState().project.airport!.tarmacs![0]!.points[0]!, A), 20, 0.1);
+    store.getState().deleteSelection();
+    expect(store.getState().project.airport?.tarmacs).toEqual([]);
+  });
+
+  it("sets a runway's surface", () => {
+    const { store } = makeStore();
+    const id = placeRunwayAt(store, 10, 48);
+    store.getState().setAirportRunwaySurface(id, { material: "grass01", brightness: 0.3 });
+    expect(store.getState().project.airport?.runways?.[0]).toMatchObject({ material: "grass01", brightness: 0.3 });
   });
 });

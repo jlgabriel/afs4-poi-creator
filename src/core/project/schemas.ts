@@ -181,6 +181,25 @@ const zRunway = z.looseObject({
   id: z.string().min(1),
   ends: z.tuple([zRunwayEnd, zRunwayEnd]),
   width: z.number().finite().positive(),
+  material: z.string().max(IDENTITY_MAX).optional(),
+  brightness: z.number().finite().optional(),
+});
+
+/** A tarmac polygon and a painted line (types.ts AirportTarmac / AirportLine). The material and line
+ *  names are free strings on LOAD, not enums: an unlisted name is kept and written as is (surfaces.ts).
+ *  No minimum point count either, like the boundary — the TAP export leaves a short one out and says so. */
+const zTarmac = z.looseObject({
+  id: z.string().min(1),
+  points: z.array(zLonLat),
+  level: z.number().int(),
+  material: z.string().max(IDENTITY_MAX),
+  brightness: z.number().finite(),
+});
+
+const zLine = z.looseObject({
+  id: z.string().min(1),
+  points: z.array(zLonLat),
+  name: z.string().max(IDENTITY_MAX),
 });
 
 /** The two glider starts (types.ts AirportAerotow / AirportWinch). Both are `.wad`-only elements, so
@@ -233,6 +252,8 @@ export const zAirport = z.looseObject({
   // No minimum on LOAD: a hand-edited ring of two points still opens (the TAP export leaves it out and
   // says so). The editor itself never goes below three.
   boundary: z.array(zLonLat).optional(),
+  tarmacs: z.array(zTarmac).optional(),
+  lines: z.array(zLine).optional(),
   parkings: z.array(zParking).optional(),
   // The compatibility mirror (types.ts ProjectAirport.pad). Validated so a malformed one is caught here
   // rather than silently shipped to an older PCT, and normalised by migrateAirport before it gets here.

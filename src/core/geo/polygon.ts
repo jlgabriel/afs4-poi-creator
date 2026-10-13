@@ -1,4 +1,4 @@
-// polygon.ts — plane geometry for the airport polygons (the BOUNDARY), on raw lon/lat.
+// polygon.ts — plane geometry for the airport polygons and lines (boundary, tarmacs, lines), on raw lon/lat.
 //
 // Lon/lat is treated as a plane here. That is exact for what these answer — whether two segments cross,
 // where a segment's midpoint is — at airport scale, away from the antimeridian, which no airport spans.
@@ -35,4 +35,20 @@ export function ringSelfIntersects(points: readonly LonLat[]): boolean {
     }
   }
   return false;
+}
+
+/** The area of a CLOSED ring (given open), square metres. A local flat projection around the ring's
+ *  first point — exact enough for a readout at airport scale. */
+export function ringAreaM2(points: readonly LonLat[]): number {
+  if (points.length < 3) return 0;
+  const o = points[0]!;
+  const kx = 111320 * Math.cos((o.lat * Math.PI) / 180);
+  const ky = 110540;
+  let twice = 0;
+  for (let i = 0; i < points.length; i++) {
+    const a = points[i]!;
+    const b = points[(i + 1) % points.length]!;
+    twice += (a.lon - o.lon) * kx * ((b.lat - o.lat) * ky) - (b.lon - o.lon) * kx * ((a.lat - o.lat) * ky);
+  }
+  return Math.abs(twice) / 2;
 }

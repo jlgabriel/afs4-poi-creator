@@ -19,6 +19,9 @@ import { AirportLayer } from "./AirportLayer";
 import { RunwayLayer } from "./RunwayLayer";
 import { GliderLayer } from "./GliderLayer";
 import { BoundaryLayer } from "./BoundaryLayer";
+import { LineLayer, TarmacLayer } from "./SurfaceLayer";
+import { DraftLayer } from "./DraftLayer";
+import { isShapeKind } from "../state/store";
 
 /** The tile layer for the current provider (Esri satellite / OSM streets / custom XYZ). Overzoom
  *  (maxNativeZoom < maxZoom) keeps metre-precise placement usable past the source's native resolution.
@@ -59,12 +62,33 @@ export function MapView(): React.ReactElement {
     // are added, so whatever is created last sits on top and takes the clicks. A runway is a strip
     // hundreds of metres wide that stands, pads and objects are placed ON — created last it would cover
     // all of them and swallow every click meant for something standing on it.
-    // ★★ AND THE BOUNDARY GOES BEFORE THEM: it surrounds the whole airport, so everything else on the
-    // map sits inside it and must stack above it.
-    const boundary = new BoundaryLayer(map, {
+    // ★★ THE SURFACES GO UNDER EVERYTHING, in PANES of their own so the order survives a rebuild (a
+    // selected shape is redrawn, and inside one pane that would put it on top). From the bottom: the
+    // boundary (it surrounds the whole airport), the tarmacs, the lines — all under the overlay pane
+    // (400) where runways and footprints live — and above all of them the editing handles of whichever
+    // shape is selected, plus the shape being drawn. styles.css lets clicks through the panes' empty SVG.
+    const pane = (name: string, z: number): string => {
+      map.createPane(name).style.zIndex = String(z);
+      return name;
+    };
+    const boundaryPane = pane("pctBoundary", 370);
+    const tarmacPane = pane("pctTarmac", 380);
+    const linePane = pane("pctLines", 390);
+    const handlePane = pane("pctShapeHandles", 450);
+
+    const boundary = new BoundaryLayer(map, { shape: boundaryPane, handles: handlePane }, {
       onChange: (points) => editorStore.getState().setAirportBoundary(points),
       onSelect: () => editorStore.getState().selectAirportPart({ kind: "boundary" }),
     });
+    const tarmac = new TarmacLayer(map, { shape: tarmacPane, handles: handlePane }, {
+      onChange: (id, points) => editorStore.getState().setAirportTarmacPoints(id, points),
+      onSelect: (id) => editorStore.getState().selectAirportPart({ kind: "tarmac", id }),
+    });
+    const line = new LineLayer(map, { shape: linePane, handles: handlePane }, {
+      onChange: (id, points) => editorStore.getState().setAirportLinePoints(id, points),
+      onSelect: (id) => editorStore.getState().selectAirportPart({ kind: "line", id }),
+    });
+    const draft = new DraftLayer(map, handlePane);
 
     const runway = new RunwayLayer(map, {
       onMoveEnd: (id, end, p) => editorStore.getState().moveAirportRunwayEnd(id, end, p),
@@ -145,8 +169,12 @@ export function MapView(): React.ReactElement {
           ? { kind: sel.kind, id: sel.id }
           : null,
       );
-      boundary.sync(s.project.airport?.boundary ?? null, sel?.kind === "boundary", s.placing === null);
-      boundary.syncDraft(s.placing?.kind === "boundary" ? s.boundaryDraft : null);
+      const editable = s.placing === null;
+      boundary.sync(s.project.airport?.boundary ?? null, sel?.kind === "boundary", editable);
+      tarmac.sync(s.project.airport?.tarmacs ?? [], sel?.kind === "tarmac" ? sel.id : null, editable);
+      line.sync(s.project.airport?.lines ?? [], sel?.kind === "line" ? sel.id : null, editable);
+      const drawing = s.placing?.kind;
+      draft.sync(isShapeKind(drawing) ? s.shapeDraft : null, drawing !== "line");
       // `position` and not airportPosition(): the airport's point must not follow pads[0], so
       // never draw a ⊕ on a point the airport does not actually own.
       airport.sync(s.project.airport?.position ?? null, sel?.kind === "data");
@@ -166,7 +194,7 @@ export function MapView(): React.ReactElement {
           s.project.airport,
           s.airportSelection,
           s.placing,
-          s.boundaryDraft,
+          s.shapeDraft,
         ] as const,
       paint,
       { equalityFn: shallow },
@@ -193,14 +221,15 @@ export function MapView(): React.ReactElement {
     };
     map.on("click", onClick);
 
-    // The double click that closes a boundary being drawn. While the Boundary card is armed a double
-    // click must not also zoom the map, so Leaflet's double-click zoom is off for exactly that long.
+    // The double click that finishes a shape being drawn (boundary, tarmac, line). While one is being
+    // drawn a double click must not also zoom the map, so Leaflet's double-click zoom is off for exactly
+    // that long.
     const onDblClick = (): void => {
-      if (editorStore.getState().placing?.kind === "boundary") editorStore.getState().finishBoundary();
+      if (isShapeKind(editorStore.getState().placing?.kind)) editorStore.getState().finishShape();
     };
     map.on("dblclick", onDblClick);
     const unsubDraw = editorStore.subscribe(
-      (s) => s.placing?.kind === "boundary",
+      (s) => isShapeKind(s.placing?.kind),
       (drawing) => {
         if (drawing) map.doubleClickZoom.disable();
         else map.doubleClickZoom.enable();
@@ -233,6 +262,9 @@ export function MapView(): React.ReactElement {
       helipad.destroy();
       layer.destroy();
       runway.destroy();
+      draft.destroy();
+      line.destroy();
+      tarmac.destroy();
       boundary.destroy();
       map.remove(); // frees the container so StrictMode's second mount can re-init it
     };

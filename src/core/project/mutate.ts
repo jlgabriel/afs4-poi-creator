@@ -10,10 +10,12 @@
 
 import type {
   AirportAerotow,
+  AirportLine,
   AirportPad,
   AirportParking,
   AirportRunway,
   AirportRunwayEnd,
+  AirportTarmac,
   AirportWinch,
   HeightMode,
   HeightSpec,
@@ -34,11 +36,20 @@ import {
   DEFAULT_RUNWAY_WIDTH_M,
   DEFAULT_WINCH_SPACING_M,
   aerotowsOf,
+  linesOf,
   parkingsOf,
   runwaysOf,
+  tarmacsOf,
   winchesOf,
 } from "./airport";
 import { centroid } from "../geo/poiName";
+import {
+  DEFAULT_BRIGHTNESS,
+  DEFAULT_LINE_NAME,
+  DEFAULT_TARMAC_LEVEL,
+  DEFAULT_TARMAC_MATERIAL,
+  clampBrightness,
+} from "./surfaces";
 
 const nowIso = (): string => new Date().toISOString();
 
@@ -781,6 +792,180 @@ export function setAirportBoundary(project: Project, points: LonLat[] | null, no
       ? { icao: "", name: "", country: "", pads: [], boundary }
       : { ...airport, boundary };
   return { ...project, airport: seededPosition(next, centroid(boundary)), modifiedAt: now };
+}
+
+// ── Runway SURFACE, TARMAC polygons and painted LINEs (types.ts) — only Export TAP reads them ──────────
+
+/** A runway's material and brightness (types.ts AirportRunway.material / .brightness). A brightness is
+ *  snapped onto the converter's steps (surfaces.ts clampBrightness). */
+export function setAirportRunwaySurface(
+  project: Project,
+  runwayId: string,
+  patch: { material?: string; brightness?: number },
+  now = nowIso(),
+): Project {
+  return updateRunway(
+    project,
+    runwayId,
+    (r) => {
+      const material = patch.material ?? r.material;
+      const brightness = patch.brightness === undefined ? r.brightness : clampBrightness(patch.brightness);
+      if (material === r.material && brightness === r.brightness) return r;
+      const next: AirportRunway = { ...r };
+      if (material !== undefined) next.material = material;
+      if (brightness !== undefined) next.brightness = brightness;
+      return next;
+    },
+    now,
+  );
+}
+
+/** Copy points so the document never shares arrays with a caller (the map layers keep theirs). */
+const copyPoints = (points: readonly LonLat[]): LonLat[] => points.map((p) => ({ lon: p.lon, lat: p.lat }));
+
+/** Replace one element of the tarmac or line list by id. No airport, no element with that id, or a patch
+ *  that changes nothing → the same project reference. */
+function updateListItem<T extends { id: string }>(
+  project: Project,
+  key: "tarmacs" | "lines",
+  read: (a: ProjectAirport) => T[],
+  id: string,
+  patch: (item: T) => T,
+  now: string,
+): Project {
+  const airport = project.airport;
+  if (airport === undefined) return project;
+  const current = read(airport);
+  const i = current.findIndex((t) => t.id === id);
+  const found = i < 0 ? undefined : current[i];
+  if (found === undefined) return project;
+  const item = patch(found);
+  if (item === found) return project;
+  const list = [...current];
+  list[i] = item;
+  return { ...project, airport: { ...airport, [key]: list }, modifiedAt: now };
+}
+
+function removeListItem(
+  project: Project,
+  key: "tarmacs" | "lines",
+  read: (a: ProjectAirport) => { id: string }[],
+  id: string,
+  now: string,
+): Project {
+  const airport = project.airport;
+  if (airport === undefined) return project;
+  const current = read(airport);
+  const list = current.filter((t) => t.id !== id);
+  if (list.length === current.length) return project;
+  return { ...project, airport: { ...airport, [key]: list }, modifiedAt: now };
+}
+
+/** APPEND a tarmac polygon (an OPEN ring of at least 3 points) with the default level, material and
+ *  brightness. Fewer than 3 points is refused. Creates the airport block when there is none and seeds the
+ *  airport's point at the polygon's centre, like the boundary. */
+export function addAirportTarmac(
+  project: Project,
+  points: readonly LonLat[],
+  opts: { id?: string } = {},
+  now = nowIso(),
+): Project {
+  if (points.length < 3) return project;
+  const tarmac: AirportTarmac = {
+    id: opts.id ?? randomId(),
+    points: copyPoints(points),
+    level: DEFAULT_TARMAC_LEVEL,
+    material: DEFAULT_TARMAC_MATERIAL,
+    brightness: DEFAULT_BRIGHTNESS,
+  };
+  const airport = project.airport;
+  const next: ProjectAirport =
+    airport === undefined
+      ? { icao: "", name: "", country: "", pads: [], tarmacs: [tarmac] }
+      : { ...airport, tarmacs: [...tarmacsOf(airport), tarmac] };
+  return { ...project, airport: seededPosition(next, centroid(tarmac.points)), modifiedAt: now };
+}
+
+export function removeAirportTarmac(project: Project, tarmacId: string, now = nowIso()): Project {
+  return removeListItem(project, "tarmacs", tarmacsOf, tarmacId, now);
+}
+
+/** Every map edit of a tarmac's outline (move, insert or remove a point, move the whole polygon) is one
+ *  call here with the new open ring. Fewer than 3 points is refused. */
+export function setAirportTarmacPoints(
+  project: Project,
+  tarmacId: string,
+  points: readonly LonLat[],
+  now = nowIso(),
+): Project {
+  if (points.length < 3) return project;
+  return updateListItem(project, "tarmacs", tarmacsOf, tarmacId, (t) => ({ ...t, points: copyPoints(points) }), now);
+}
+
+/** Level, material and brightness. A level is rounded to an integer and refused below 1; a brightness is
+ *  snapped onto the converter's steps. */
+export function updateAirportTarmac(
+  project: Project,
+  tarmacId: string,
+  patch: { level?: number; material?: string; brightness?: number },
+  now = nowIso(),
+): Project {
+  if (patch.level !== undefined && !(Number.isFinite(patch.level) && Math.round(patch.level) >= 1)) return project;
+  return updateListItem(
+    project,
+    "tarmacs",
+    tarmacsOf,
+    tarmacId,
+    (t) => {
+      const level = patch.level === undefined ? t.level : Math.round(patch.level);
+      const material = patch.material ?? t.material;
+      const brightness = patch.brightness === undefined ? t.brightness : clampBrightness(patch.brightness);
+      if (level === t.level && material === t.material && brightness === t.brightness) return t;
+      return { ...t, level, material, brightness };
+    },
+    now,
+  );
+}
+
+/** APPEND a painted line (at least 2 points) with the default line name. Fewer is refused. Creates the
+ *  airport block when there is none, seeding its point at the line's first point. */
+export function addAirportLine(
+  project: Project,
+  points: readonly LonLat[],
+  opts: { id?: string; name?: string } = {},
+  now = nowIso(),
+): Project {
+  if (points.length < 2) return project;
+  const line: AirportLine = {
+    id: opts.id ?? randomId(),
+    points: copyPoints(points),
+    name: opts.name ?? DEFAULT_LINE_NAME,
+  };
+  const airport = project.airport;
+  const next: ProjectAirport =
+    airport === undefined
+      ? { icao: "", name: "", country: "", pads: [], lines: [line] }
+      : { ...airport, lines: [...linesOf(airport), line] };
+  return { ...project, airport: seededPosition(next, line.points[0]!), modifiedAt: now };
+}
+
+export function removeAirportLine(project: Project, lineId: string, now = nowIso()): Project {
+  return removeListItem(project, "lines", linesOf, lineId, now);
+}
+
+/** Every map edit of a line, like setAirportTarmacPoints. Fewer than 2 points is refused. */
+export function setAirportLinePoints(
+  project: Project,
+  lineId: string,
+  points: readonly LonLat[],
+  now = nowIso(),
+): Project {
+  if (points.length < 2) return project;
+  return updateListItem(project, "lines", linesOf, lineId, (l) => ({ ...l, points: copyPoints(points) }), now);
+}
+
+export function setAirportLineName(project: Project, lineId: string, name: string, now = nowIso()): Project {
+  return updateListItem(project, "lines", linesOf, lineId, (l) => (l.name === name ? l : { ...l, name }), now);
 }
 
 export function removeAirportAerotow(project: Project, aerotowId: string, now = nowIso()): Project {

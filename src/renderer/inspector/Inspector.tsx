@@ -30,6 +30,7 @@ import { ParkingFields } from "./ParkingFields";
 import { RunwayFields } from "./RunwayFields";
 import { AerotowFields, WinchFields } from "./GliderFields";
 import { BoundaryFields } from "./BoundaryFields";
+import { LineFields, TarmacFields } from "./SurfaceFields";
 
 /** Object note — local draft committed on blur/Enter (one undo entry, not one per key; Escape reverts).
  *  Empty/whitespace clears the field (mutate.setLabel drops it). Mirrors TopBar's ProjectNameField. */
@@ -840,6 +841,21 @@ export function Inspector(): React.ReactElement {
   const boundary = useEditor((s) =>
     s.airportSelection?.kind === "boundary" ? s.project.airport?.boundary : undefined,
   );
+  // A tarmac or a line, and its place in its list: the panel is titled by number, like the placed row.
+  const surfaceIndex = useEditor((s) => {
+    const sel = s.airportSelection;
+    if (sel?.kind === "tarmac") return s.project.airport?.tarmacs?.findIndex((t) => t.id === sel.id) ?? -1;
+    if (sel?.kind === "line") return s.project.airport?.lines?.findIndex((l) => l.id === sel.id) ?? -1;
+    return -1;
+  });
+  const tarmac = useEditor((s) => {
+    const sel = s.airportSelection;
+    return sel?.kind === "tarmac" ? s.project.airport?.tarmacs?.find((t) => t.id === sel.id) : undefined;
+  });
+  const surfaceLine = useEditor((s) => {
+    const sel = s.airportSelection;
+    return sel?.kind === "line" ? s.project.airport?.lines?.find((l) => l.id === sel.id) : undefined;
+  });
   const plantMeta = useEditor((s) => (obj?.kind === "plant" ? s.plantIndex.get(plantKey(obj)) : undefined));
   const resolvedAsl = useEditor((s) => (obj ? s.resolvedElev.get(obj.id) : undefined));
 
@@ -850,6 +866,10 @@ export function Inspector(): React.ReactElement {
         <AirportDataFields airport={airportData} />
       ) : boundary !== undefined ? (
         <BoundaryFields boundary={boundary} />
+      ) : tarmac !== undefined ? (
+        <TarmacFields key={tarmac.id} tarmac={tarmac} index={surfaceIndex} />
+      ) : surfaceLine !== undefined ? (
+        <LineFields key={surfaceLine.id} line={surfaceLine} index={surfaceIndex} />
       ) : pad !== undefined ? (
         // Keyed by id like every other repeatable part's panel: the numeric drafts reset when the
         // selection moves to another pad, and editing THIS one keeps the panel alive.

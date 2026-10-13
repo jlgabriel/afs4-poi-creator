@@ -580,16 +580,17 @@ order to list a place: a code, a name, a country, and at least one spot to start
 **Install one or the other, not both.** The airport takes its own copy of everything you placed, so a
 project installed as a POI *and* as an airport puts every object into the world twice.
 
-This section is long because there are seven pieces to describe. You do not need all seven: an airport with
+This section is long because there are nine pieces to describe. You do not need all nine: an airport with
 one helipad on it is a complete, working airport, and that is where most people stop.
 
 | | |
 |---|---|
 | [What PCT writes, and what it doesn't](#what-pct-writes-and-what-it-doesnt) | Read this one first. |
-| [The seven cards](#the-seven-cards) | The rule they share, and the ways they differ. |
+| [The nine cards](#the-nine-cards) | The rule they share, and the ways they differ. |
 | [Airport — the name and the code](#airport--the-name-and-the-code) | Identity, and the point the whole field is filed under. |
 | [Boundary](#boundary) | The polygon around the whole field, for Export TAP. |
 | [Runway](#runway) · [Helipad](#helipad) · [Parking](#parking) | The three you are most likely to place. |
+| [Tarmac](#tarmac) · [Line](#line) | Paved areas and painted lines, for Export TAP. |
 | [Aerotow](#aerotow) · [Winch Launch](#winch-launch) | The two glider starts. |
 | [Installing it](#installing-it) | The dialog, and the one rule Aerofly enforces. |
 | [Finding it in the sim](#finding-it-in-the-sim) | Why the row in LOCATION may come up blank. |
@@ -612,15 +613,17 @@ So the scene you are making is still made of objects: the hangar, the fuel tanks
 the parked aircraft. The airport is what turns that scene into a place the sim will let you *begin* a
 flight at.
 
-Painting markings on the ground is a different job, done with a different file, and PCT does not do it.
+Painting the ground — tarmac, markings — is a different job, done with a different file: a `.tap`, which
+a TAP converter turns into the airport's ground. PCT writes that file too, with **Export TAP…**, and
+the [Tarmac](#tarmac) and [Line](#line) cards are what go into it. **Export /airports…** leaves them out.
 
-### The seven cards
+### The nine cards
 
-Open **Airport** in the catalog and there are seven.
+Open **Airport** in the catalog and there are nine.
 
 ![Shot 27 — the Airport section: Airport, Runway, Helipad, Parking, Aerotow and Winch Launch, each with a line saying what it does](images/27_airport_section.jpg)
 
-All seven behave the way the rest of PCT behaves: **click the card to arm it, click the map to drop it,
+All nine behave the way the rest of PCT behaves: **click the card to arm it, click the map to drop it,
 Esc to cancel.** Nothing here lives in a dialog, and nothing needs filling in before you can put it on
 the map.
 
@@ -631,15 +634,16 @@ They differ in how many clicks they take, and each card says which it is on its 
 - **Two lay out a whole shape and then disarm** — Runway and Winch Launch. Both are made of *two*
   points, so the click cannot put the finished thing under the cursor. It drops a starter — a 200 m
   strip, 900 m of rope, both pointing north — and the next thing you do is drag an end.
-- **One takes as many clicks as it has corners** — Boundary. Click the map once per corner and
-  **double-click the last one**: that closes the polygon.
+- **Three take as many clicks as they have points** — Boundary, Tarmac and Line. Click the map once per
+  point and **double-click the last one**: that finishes the shape. There is one boundary per airport;
+  tarmacs and lines, as many as you like — the card draws a new one each time.
 
 **Airport** is the odd one, honestly so: it places no part. It is the airfield itself — its name, its
 code, and the single point the whole thing is filed under. Its card puts that point on the map the
 first time, and after that it is the way back to the identity fields.
 
-**The order is the same in both columns.** Airport · Boundary · Runway · Helipad · Parking · Aerotow ·
-Winch Launch, in the catalog on the left and in the placed list on the right. That is deliberate, and it is
+**The order is the same in both columns.** Airport · Boundary · Runway · Helipad · Parking · Tarmac ·
+Line · Aerotow · Winch Launch, in the catalog on the left and in the placed list on the right. That is deliberate, and it is
 ApfelFlieger's rule: the sequences match so that finding a thing in one column tells you where it is in
 the other.
 
@@ -650,6 +654,9 @@ On the map each part is drawn at its real size, and each one looks like itself:
 - the **boundary** is a dashed yellow line around the field;
 - the **runway** is a strip, with a white handle on each threshold and each end's identifier (`05`,
   `23`) just past it — so you can see at a glance which end is which;
+- a **tarmac** is a filled area tinted by its material — green for ground, grey for apron, dark for
+  runway, a faint dashed outline for flatten — and lies under everything else;
+- a **line** is drawn in its paint colour (yellow, white, blue, orange, red), dashed when the marking is;
 - the **helipad** is a white circle with an **H** in it, the **stand** a violet one with a **P**;
 - the two **glider starts** are pink — the aerotow a dot with a short rope, the winch launch a dot, a
   long rope and a square at the winch end;
@@ -751,6 +758,11 @@ length you fix by dragging, the width you type.
 **Width — m** is not cosmetic, even though PCT draws no pavement from it. Aerofly reads it when it flies
 an automatic landing onto your runway.
 
+**Material** and **Brightness** *(v2.3)* are the runway's surface, and only **Export TAP…** uses them:
+the converter paints the runway with them. The material is `asphalt_runway__typestd` (the default),
+`asphalt_runway__typeblue`, or `grass01` for a grass strip; brightness runs from `0.1` to `1.0`, default
+`0.5`. Grass takes no brightness, so the field turns itself off.
+
 The two ends are two blocks, **END 1** and **END 2**, either of which can be folded away.
 
 ![Shot 31.2 — the same panel scrolled down to END 2](images/31_inspector_runway_2.jpg)
@@ -824,6 +836,59 @@ regardless of size.
 
 **Name** — `Parking1`, `Parking_W`, `FuelStation`. Empty is legal; an unnamed stand is written as
 `Parking`.
+
+### Tarmac
+
+*(v2.3)* A paved, grass or flattened area — an apron, a taxiway, the ground around them. Only **Export
+TAP…** uses it: the converter turns each one into ground in the airport. An airport can have as many as
+you like.
+
+**Drawing one.** Exactly like the [boundary](#boundary): click the **Tarmac** card, click the map once
+for each corner, and **double-click the last corner** to close it (three at least). **Esc** throws away
+one you have not closed. The card draws a new tarmac every time you click it.
+
+**Changing it.** Click inside it on the map, or on its row in the placed list, to select it. Then the
+boundary's gestures apply: drag a white point to move it, drag a grey point to add one, right-click a
+white point to remove it, drag inside the area to move it all, or use the arrow keys. While it is not
+selected, a click inside selects it and a drag pans the map as usual.
+
+In the Inspector:
+
+- **Level** — where two areas overlap, the **higher level covers the lower one**. A new tarmac starts
+  on level 1.
+- **Material** — grouped in four:
+  - **Flatten** (`flatten`) is invisible: it levels the terrain under the airport. It belongs on
+    **level 1**.
+  - **Ground** — `grass00`, `hole` and six variations of `concrete_ground_green` — is the ground
+    *outside* aprons, taxiways and runways, and belongs on **level 2 or higher**, over the flattened
+    area.
+  - **Apron and taxiway** — asphalt, concrete and concrete plates, each as `typestd` or `typeblue`. A new
+    tarmac starts as `asphalt_apron__typestd`.
+  - **Runway** — the same three surfaces a runway offers.
+
+  The Inspector warns when the level does not suit the material, and so does Export TAP.
+- **Brightness** — `0.1` to `1.0`, default `0.5`. Flatten, hole and the two grasses take none, and the
+  field turns itself off for them.
+
+The sides must not cross each other; the Inspector and Export TAP say so if they do.
+
+### Line
+
+*(v2.3)* A painted line: a taxiway centre line, an edge line, a hold position, a stand lead-in. Only
+**Export TAP…** uses it. Any number per airport.
+
+**Drawing one.** Click the **Line** card, click the map once for each point along the line, and
+**double-click the last one** to finish (two at least). Unlike a tarmac it does not close: the last
+point stays the end of the line.
+
+**Changing it.** The same gestures as a tarmac — select it by clicking on the line; drag a white point,
+drag a grey point to add one, right-click a white point to remove it (a line keeps at least two); drag
+the line itself, or use the arrow keys, to move it all.
+
+**Marking** is the one field: which line it is, from the converter's list — `taxi_center` by default,
+`taxi_edge`, `hold_pos_b`, `stand_lead_in` and so on. A name ending in `_dashed` is the dashed version of
+the same line, and one with `_black` has a black border, for light pavement. The map draws the line in
+its paint colour, dashed when the marking is.
 
 ### Aerotow
 
@@ -928,8 +993,8 @@ folder you choose — usually the converter's input folder — and what happens 
 The first time, the dialog asks for that folder (**Choose…**). PCT remembers it, and **Settings → TAP
 folder** shows it and changes it.
 
-What goes in: the airport, its boundary, runways, helipads and parking positions, and every object you
-placed. **Glider starts** go in a second file beside it, `<CODE>_addendum.tap`, which the converter adds
+What goes in: the airport, its boundary, runways, helipads, parking positions, [tarmacs](#tarmac) and
+[lines](#line), and every object you placed. **Glider starts** go in a second file beside it, `<CODE>_addendum.tap`, which the converter adds
 in when it finds both files side by side. A project without glider starts writes no addendum.
 The code, the name and the country follow the same rules as for **Export /airports…**, and the airport
 needs its point on the map.
@@ -949,8 +1014,8 @@ Two things a `.tap` does not carry, and the dialog tells you when your project h
 Each runway end's direction follows its identifier: an end named `05` points about 050°, whichever
 threshold on the map it belongs to. An end without a runway number points toward the other end.
 
-Runways are written as standard asphalt with the standard markings: PCT has no fields for the surface
-or the paint yet.
+Each runway goes in with its **Material** and **Brightness** (standard asphalt at `0.5` until you change
+them) and the standard markings, which PCT has no fields for yet.
 
 If a file with that name is already in the folder, PCT asks before replacing it — you may have edited it
 by hand since the last export. The same goes for the addendum. If your project no longer has glider

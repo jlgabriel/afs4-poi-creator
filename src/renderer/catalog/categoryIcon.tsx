@@ -321,3 +321,49 @@ export const WinchIcon = memo(function WinchIcon(): React.ReactElement {
     </svg>
   );
 });
+
+/** A TARMAC: a filled patch of pavement with its corner points — a polygon, but solid where the
+ *  boundary's is dashed, because a tarmac is a surface and the boundary only an edge. */
+export const TarmacIcon = memo(function TarmacIcon(): React.ReactElement {
+  return (
+    <svg
+      className="pct-thumb"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M4 7 L15 4 L20 12 L13 20 L5 17 Z" fill="currentColor" fillOpacity="0.25" />
+      <circle cx="4" cy="7" r="1.4" fill="currentColor" />
+      <circle cx="15" cy="4" r="1.4" fill="currentColor" />
+      <circle cx="20" cy="12" r="1.4" fill="currentColor" />
+      <circle cx="13" cy="20" r="1.4" fill="currentColor" />
+      <circle cx="5" cy="17" r="1.4" fill="currentColor" />
+    </svg>
+  );
+});
+
+/** A painted LINE: an open polyline through its points, the way it is drawn on the map. */
+export const LineIcon = memo(function LineIcon(): React.ReactElement {
+  return (
+    <svg
+      className="pct-thumb"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M3 18 L9 9 L15 14 L21 5" strokeWidth="2.2" />
+      <circle cx="3" cy="18" r="1.4" fill="currentColor" />
+      <circle cx="9" cy="9" r="1.4" fill="currentColor" />
+      <circle cx="15" cy="14" r="1.4" fill="currentColor" />
+      <circle cx="21" cy="5" r="1.4" fill="currentColor" />
+    </svg>
+  );
+});

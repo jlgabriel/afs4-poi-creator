@@ -117,6 +117,30 @@ const TAP_PROJECT: Project = {
     parkings: [
       { id: "s1", name: "Parking_G", position: { lon: -71.6151, lat: -33.6554 }, heading: 143, size: 7.5, type: "parked_ga" },
     ],
+    tarmacs: [
+      {
+        id: "t1",
+        points: [
+          { lon: -71.6161, lat: -33.65595 },
+          { lon: -71.6161, lat: -33.65605 },
+          { lon: -71.616, lat: -33.65605 },
+          { lon: -71.616, lat: -33.65595 },
+        ],
+        level: 1,
+        material: "asphalt_apron__typestd",
+        brightness: 0.5,
+      },
+    ],
+    lines: [
+      {
+        id: "n1",
+        points: [
+          { lon: -71.6161, lat: -33.656 },
+          { lon: -71.616, lat: -33.656 },
+        ],
+        name: "taxi_center",
+      },
+    ],
   },
 };
 
@@ -220,6 +244,20 @@ const GOLDEN_TAP = `<[file][][]
                 <[float64][radius][7.5]>
                 <[string8][name][Parking_G]>
                 <[string8][type][parked_ga]>
+            >
+        >
+        <[list_tm_airport_pd_tarmac][tarmacs][]
+            <[tm_airport_pd_tarmac][element][0]
+                <[list_vector2_float64][points][ (-71.6161000 -33.6559500) (-71.6161000 -33.6560500) (-71.6160000 -33.6560500) (-71.6160000 -33.6559500) (-71.6161000 -33.6559500) ]>
+                <[int32][level][1]>
+                <[string8][material][asphalt_apron__typestd]>
+                <[string8][brightness][0.5]>
+            >
+        >
+        <[list_tm_airport_pd_line][lines][]
+            <[tm_airport_pd_line][element][0]
+                <[list_vector2_float64][points][ (-71.6161000 -33.6560000) (-71.6160000 -33.6560000) ]>
+                <[string8][name][taxi_center]>
             >
         >
         <[list_tm_airport_pd_plant][plants][]
@@ -392,10 +430,10 @@ describe("Export TAP — the .tap file", () => {
     const bare: Project = {
       ...TAP_PROJECT,
       objects: [],
-      airport: { ...noBoundary, runways: [], parkings: [] },
+      airport: { ...noBoundary, runways: [], parkings: [], tarmacs: [], lines: [] },
     };
     const plan = planTap(bare, []);
-    for (const list of ["runway_pairs", "parking_positions", "plants", "lights", "airport_lights", "xrefs", "boundaries"]) {
+    for (const list of ["runway_pairs", "parking_positions", "tarmacs", "lines", "plants", "lights", "airport_lights", "xrefs", "boundaries"]) {
       expect(plan.content).not.toContain(`[${list}]`);
     }
     expect(plan.content).toContain("[helipads]");
@@ -417,6 +455,55 @@ describe("Export TAP — the .tap file", () => {
     const plan = planTap(two, TAP_LIGHTS);
     expect(plan.content).not.toContain("[boundaries]");
     expect(plan.warnings.join(" ")).toContain("fewer than three points");
+  });
+
+  it("writes a runway's own material and brightness, and an empty brightness for a material that takes none", () => {
+    const a = TAP_PROJECT.airport!;
+    const blue: Project = {
+      ...TAP_PROJECT,
+      airport: { ...a, runways: [{ ...a.runways![0]!, material: "asphalt_runway__typeblue", brightness: 0.8 }] },
+    };
+    const content = planTap(blue, TAP_LIGHTS).content;
+    expect(content).toContain("<[string8][material][asphalt_runway__typeblue]>");
+    expect(content).toContain("<[string8][brightness][0.8]>");
+    const grass: Project = { ...TAP_PROJECT, airport: { ...a, runways: [{ ...a.runways![0]!, material: "grass01" }] } };
+    expect(planTap(grass, TAP_LIGHTS).content).toContain(
+      "<[string8][material][grass01]>\n                <[string8][brightness][]>",
+    );
+  });
+
+  it("writes each tarmac closed and each line open, and warns about what the converter cannot use", () => {
+    const a = TAP_PROJECT.airport!;
+    const t = a.tarmacs![0]!;
+    const full = planTap(TAP_PROJECT, TAP_LIGHTS).content;
+    expect(full.indexOf("[parking_positions]")).toBeLessThan(full.indexOf("[tarmacs]"));
+    expect(full.indexOf("[tarmacs]")).toBeLessThan(full.indexOf("[lines]"));
+    expect(full.indexOf("[lines]")).toBeLessThan(full.indexOf("[plants]"));
+    // Flatten takes no brightness and belongs on level 1; a ground material on level 1 is too low.
+    const flatten: Project = {
+      ...TAP_PROJECT,
+      airport: {
+        ...a,
+        tarmacs: [
+          { ...t, material: "flatten", level: 2 },
+          { ...t, id: "t2", material: "grass00", level: 1 },
+          { ...t, id: "t3", points: t.points.slice(0, 2) },
+          { ...t, id: "t4", points: [t.points[0]!, t.points[2]!, t.points[1]!, t.points[3]!] },
+        ],
+        lines: [{ ...a.lines![0]!, points: [a.lines![0]!.points[0]!] }],
+      },
+    };
+    const plan = planTap(flatten, TAP_LIGHTS);
+    const elements = nodesByName(parseTm(plan.content), "tarmacs")[0]!.children;
+    expect(elements.length).toBe(3);
+    expect(valuesOf(plan.content, "brightness").slice(1, 3)).toEqual(["", ""]);
+    expect(plan.content).not.toContain("[lines]");
+    const w = plan.warnings.join(" | ");
+    expect(w).toContain("Tarmac 1: Flatten is meant for level 1.");
+    expect(w).toContain("Tarmac 2: Ground materials are meant for level 2 or higher.");
+    expect(w).toContain("Tarmac 3 has fewer than three points");
+    expect(w).toContain("Tarmac 4 crosses itself");
+    expect(w).toContain("Line 1 has fewer than two points");
   });
 
   it("writes the glider starts to <ICAO>_addendum.tap, and none when there are none", () => {

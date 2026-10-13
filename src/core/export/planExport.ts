@@ -37,8 +37,23 @@ import {
   type HeliportWinchSpec,
   type IdentityProblem,
 } from "./heliportTemplate";
-import { buildTap, buildTapAddendum, tapAddendumFileName, tapFileName, type TapSpec } from "./tapWriter";
+import {
+  buildTap,
+  buildTapAddendum,
+  tapAddendumFileName,
+  tapFileName,
+  type TapLineSpec,
+  type TapSpec,
+  type TapTarmacSpec,
+} from "./tapWriter";
 import { ringSelfIntersects } from "../geo/polygon";
+import {
+  DEFAULT_BRIGHTNESS,
+  DEFAULT_RUNWAY_MATERIAL,
+  fmtBrightness,
+  materialHasBrightness,
+  tarmacLevelProblem,
+} from "../project/surfaces";
 
 // A POI's two payload files are named `poi.tsl` / `poi.toc`, and the .tsl
 // references the .toc by this basename.
@@ -391,6 +406,35 @@ export function planTap(project: Project, resolvedLights: ResolvedObject[], terr
     warnings.push("The boundary crosses itself — drag its points so that no two edges cross.");
   }
 
+  // Tarmacs and lines: a short one is left out (the editor never makes one; a hand-edited file can),
+  // and each warning names the element by its number in the list, as the Inspector shows it.
+  const tarmacs: TapTarmacSpec[] = [];
+  (airport.tarmacs ?? []).forEach((t, i) => {
+    const label = `Tarmac ${i + 1}`;
+    if (t.points.length < 3) {
+      warnings.push(`${label} has fewer than three points, so it is left out.`);
+      return;
+    }
+    const points = t.points.map((p) => shiftPoint(p, shift));
+    if (ringSelfIntersects(points)) warnings.push(`${label} crosses itself — drag its points so that no two edges cross.`);
+    const levelProblem = tarmacLevelProblem(t.material, t.level);
+    if (levelProblem !== null) warnings.push(`${label}: ${levelProblem}`);
+    tarmacs.push({
+      points,
+      level: t.level,
+      material: t.material,
+      brightness: materialHasBrightness(t.material) ? fmtBrightness(t.brightness) : "",
+    });
+  });
+  const lines: TapLineSpec[] = [];
+  (airport.lines ?? []).forEach((l, i) => {
+    if (l.points.length < 2) {
+      warnings.push(`Line ${i + 1} has fewer than two points, so it is left out.`);
+      return;
+    }
+    lines.push({ points: l.points.map((p) => shiftPoint(p, shift)), name: l.name });
+  });
+
   const placedXrefs = project.objects.filter((o) => o.kind === "xref");
   const placedPlants = project.objects.filter((o) => o.kind === "plant");
   const scaled = placedXrefs.filter((o) => o.scale !== 1).length;
@@ -412,9 +456,16 @@ export function planTap(project: Project, resolvedLights: ResolvedObject[], terr
     position: shiftPoint(airport.position, shift),
     elevation,
     boundary: boundary.length >= 3 ? boundary : null,
-    runways,
+    // heliportRunways keeps the document's order, so index i is runway i.
+    runways: runways.map((r, i) => {
+      const material = airport.runways?.[i]?.material ?? DEFAULT_RUNWAY_MATERIAL;
+      const brightness = airport.runways?.[i]?.brightness ?? DEFAULT_BRIGHTNESS;
+      return { ...r, material, brightness: materialHasBrightness(material) ? fmtBrightness(brightness) : "" };
+    }),
     pads,
     parkings: heliportParkings(airport.parkings, shift),
+    tarmacs,
+    lines,
     plants: placedPlants.map((p) => ({
       position: shiftPoint(p.position, shift),
       heightRange: p.heightRange,

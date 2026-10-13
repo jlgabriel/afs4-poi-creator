@@ -14,13 +14,16 @@ import {
   BoundaryIcon,
   DataIcon,
   HelipadIcon,
+  LineIcon,
   ParkingIcon,
   RunwayIcon,
+  TarmacIcon,
   WinchIcon,
 } from "../catalog/categoryIcon";
 import { photoKeyForPlaced as placedPhotoKey } from "../../core/catalog/photoKey";
 import { PARKING_TYPE_LABELS } from "../../core/project/airport";
 import { haversine, initialBearing } from "../../core/geo/geo";
+import type { LonLat } from "../../core/project/types";
 import { rowInfo } from "./rowInfo";
 
 /** The airport's own row (DATA) — pinned above every airport part, because the parts belong to it.
@@ -42,7 +45,9 @@ function DataRow(): React.ReactElement | null {
     (airport.runways?.length ?? 0) +
     (airport.aerotows?.length ?? 0) +
     (airport.winches?.length ?? 0) +
-    (airport.boundary !== undefined ? 1 : 0);
+    (airport.boundary !== undefined ? 1 : 0) +
+    (airport.tarmacs?.length ?? 0) +
+    (airport.lines?.length ?? 0);
   return (
     <button
       type="button"
@@ -186,6 +191,57 @@ function ParkingRows(): React.ReactElement | null {
           </button>
         );
       })}
+    </>
+  );
+}
+
+/** One row per tarmac, then one per line — numbered as the Inspector and the TAP warnings number them,
+ *  with the material or line name as the code. Double-click flies to the first point. */
+function SurfaceRows(): React.ReactElement | null {
+  const tarmacs = useEditor((s) => s.project.airport?.tarmacs);
+  const lines = useEditor((s) => s.project.airport?.lines);
+  const sel = useEditor((s) => s.airportSelection);
+  const row = (
+    kind: "tarmac" | "line",
+    id: string,
+    label: string,
+    code: string,
+    meta: string,
+    first: LonLat | undefined,
+  ): React.ReactElement => {
+    const selected = sel !== null && sel.kind === kind && sel.id === id;
+    return (
+      <button
+        key={id}
+        type="button"
+        className={selected ? "pct-placed-row pct-placed-pad sel" : "pct-placed-row pct-placed-pad"}
+        aria-pressed={selected}
+        title={kind === "tarmac" ? "A tarmac area" : "A painted line"}
+        onClick={() => editorStore.getState().selectAirportPart({ kind, id })}
+        onDoubleClick={() => {
+          if (first !== undefined) editorStore.getState().flyTo(first);
+        }}
+      >
+        {kind === "tarmac" ? <TarmacIcon /> : <LineIcon />}
+        <span className="pct-placed-text">
+          <span className="pct-placed-name">
+            <span className="pct-placed-label">{label}</span>
+            <span className="pct-placed-code">{code}</span>
+          </span>
+          <span className="pct-placed-meta">{meta}</span>
+        </span>
+      </button>
+    );
+  };
+  if ((tarmacs?.length ?? 0) + (lines?.length ?? 0) === 0) return null;
+  return (
+    <>
+      {(tarmacs ?? []).map((t, i) =>
+        row("tarmac", t.id, `Tarmac ${i + 1}`, t.material, `${t.points.length} points · level ${t.level}`, t.points[0]),
+      )}
+      {(lines ?? []).map((l, i) =>
+        row("line", l.id, `Line ${i + 1}`, l.name, `${l.points.length} points`, l.points[0]),
+      )}
     </>
   );
 }
@@ -360,6 +416,7 @@ export function PlacedList(): React.ReactElement {
         <RunwayRows />
         <HelipadRows />
         <ParkingRows />
+        <SurfaceRows />
         <GliderRows />
         {objects.length === 0 ? (
           <p className="pct-empty">No objects yet — click the map to place one.</p>
