@@ -76,6 +76,7 @@ import {
   openProject,
   saveProject,
   saveProjectAs,
+  setCurrentProjectPath,
   writeProjectSidecar,
 } from "./projectFile";
 import { NoXrefError, readCatalogCache, scanXref, writeCatalogCache } from "./scan";
@@ -93,6 +94,7 @@ import { defaultXrefTableCandidates, loadXrefTable } from "./xrefTableSource";
 import { normalizeUserDir, readSettings, writeSettings } from "./settings";
 import { writeFileAtomic } from "./fsAtomic";
 import { NoTapDirError, TapFileExistsError, writeTap } from "./tapExport";
+import { TapImportError, readTap } from "../core/import/tapReader";
 
 const PROJECT_FILTER = [{ name: "PCT project", extensions: ["json"] }];
 const FOOTPRINTS_FILTER = [{ name: "PCT footprints", extensions: ["json"] }];
@@ -162,6 +164,7 @@ function toPctError(e: unknown): PctError {
   if (e instanceof NoAirportError) return { code: "invalid-project", message: e.message };
   if (e instanceof NeedsAirportElevationError) return { code: "needs-elevation", message: e.message, points: [] };
   if (e instanceof NoTapDirError) return { code: "no-tap-dir", message: e.message };
+  if (e instanceof TapImportError) return { code: "invalid-tap", message: e.message };
   if (e instanceof TapFileExistsError) {
     return { code: "file-exists", message: e.message, fileName: e.fileName };
   }
@@ -206,6 +209,29 @@ async function showSaveFile(opts: SaveDialogOptions): Promise<string | null> {
   win?.webContents.focus();
   return r.canceled || !r.filePath ? null : r.filePath;
 }
+/** Import TAP: pick a `.tap`, read it with the `_addendum.tap` beside it, and hand back a new project.
+ *  Choosing the addendum itself opens the pair from the main file's side. The imported project has no
+ *  file yet, so main forgets the current path: its first Save asks where to write it. */
+async function runTapImport(): Promise<{ project: Project; warnings: string[]; fileName: string } | null> {
+  const tapDir = currentSettings().tapDir;
+  const picked = await showOpenFile({
+    title: "Import TAP",
+    properties: ["openFile"],
+    filters: [{ name: "TAP airport", extensions: ["tap"] }],
+    defaultPath: tapDir !== null && existsSync(tapDir) ? tapDir : undefined,
+  });
+  if (picked === null) return null;
+  const dir = path.dirname(picked);
+  const base = path.basename(picked).replace(/\.tap$/i, "").replace(/_addendum$/i, "");
+  const main = path.join(dir, `${base}.tap`);
+  const addendum = path.join(dir, `${base}_addendum.tap`);
+  if (!existsSync(main)) throw new TapImportError(`${base}.tap is not in that folder, only its addendum.`);
+  const result = readTap(readFileSync(main, "utf8"), existsSync(addendum) ? readFileSync(addendum, "utf8") : null);
+  setCurrentProjectPath(null);
+  log.info(`importTap: ${path.basename(main)}${existsSync(addendum) ? " + addendum" : ""}, ${result.warnings.length} warnings`);
+  return { ...result, fileName: path.basename(main) };
+}
+
 /** Default the Open dialog to the AFS4 `scenery/poi/` folder — where most users keep
  *  their POIs. Best-effort: returns undefined (→ OS default / last-used dir) when the user folder isn't
  *  set/detected or scenery/poi doesn't exist yet. */
@@ -728,6 +754,8 @@ export function registerIpc(): void {
   );
   ipcMain.handle("pct:exportTap", (_e, project: Project, opts: TapExportOptions) =>
     guarded("exportTap", () => runTapExport(project, opts)),
+  );
+  ipcMain.handle("pct:importTap", () => guarded("importTap", runTapImport),
   );
   // ── The session log ──
   // The renderer can WRITE to it (its own uncaught errors — otherwise they die in a DevTools console

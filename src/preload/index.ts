@@ -39,6 +39,7 @@ const pct: PctApi = {
   uninstallHeliport: (country, folderName) =>
     ipcRenderer.invoke("pct:uninstallHeliport", country, folderName),
   exportTap: (project, opts) => ipcRenderer.invoke("pct:exportTap", project, opts),
+  importTap: () => ipcRenderer.invoke("pct:importTap"),
   revealInFolder: (folderName) => ipcRenderer.invoke("pct:revealInFolder", folderName),
   log: (level, message) => ipcRenderer.invoke("pct:log", level, message),
   openLog: () => ipcRenderer.invoke("pct:openLog"),

@@ -1142,12 +1142,34 @@ Each runway end's direction follows its identifier: an end named `05` points abo
 threshold on the map it belongs to. An end without a runway number points toward the other end.
 
 Each runway goes in with its **Material** and **Brightness** (standard asphalt at `0.5` until you change
-them) and the standard markings, which PCT has no fields for yet.
+them), its side and centre lines, and each end's markings — see [Runway](#runway).
 
 If a file with that name is already in the folder, PCT asks before replacing it — you may have edited it
 by hand since the last export. The same goes for the addendum. If your project no longer has glider
 starts but an addendum from an earlier export is still there, replacing removes it, since the converter
 would otherwise add its glider starts back in. Nothing else in the folder is ever touched.
+
+### Importing a TAP file
+
+*(v2.8)* **Import TAP…**, beside Export TAP…, goes the other way: it opens a `<CODE>.tap` as a **new
+project**, with the airport and everything in it on the map. When `<CODE>_addendum.tap` sits beside it,
+its glider starts come in too; picking the addendum itself opens the pair. Like **Open**, it asks first
+when the project you have open has unsaved changes.
+
+The import is forgiving, because a `.tap` may come from another tool or have been edited by hand:
+
+- the elements can be in any order, and their numbering can be missing or wrong;
+- the rows inside an element can be in any order;
+- a missing list is simply empty, and a missing or unreadable value takes PCT's default;
+- an element that cannot be placed — no position, a polygon with too few points — is left out;
+- a file that ends before its last blocks are closed is read up to its end.
+
+When anything was filled in or left out, a note says what, element by element, once the project is open.
+
+What a `.tap` does not hold comes back as PCT's defaults: XREFs and plants on the terrain, every XREF
+at its normal size. Lights and airport lights keep the height their position carries.
+
+The new project has no file yet: **Save** asks where to put it.
 
 ### The numbers underneath
 

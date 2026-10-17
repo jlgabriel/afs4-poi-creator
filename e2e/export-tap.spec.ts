@@ -120,3 +120,47 @@ test("Export TAP writes <ICAO>.tap into the TAP folder, and replaces it only whe
     await app.close();
   }
 });
+
+test("Import TAP reads the pair back through main, from either file of the two", async () => {
+  const { userData, tapDir } = seed();
+  const app = await electron.launch({ args: [MAIN, `--user-data-dir=${userData}`], cwd: ROOT });
+  try {
+    const page = await app.firstWindow();
+    await expect(page.getByRole("button", { name: "Import TAP…" })).toBeEnabled();
+    // Export first (the real writer), then add an addendum by hand.
+    await page.evaluate(
+      (p) => (window as unknown as { pct: { exportTap: (p: Project, o: object) => Promise<unknown> } }).pct.exportTap(p, { overwrite: false }),
+      PROJECT,
+    );
+    writeFileSync(
+      path.join(tapDir, "PCTE2E_addendum.tap"),
+      "<[file][][] <[tm_airport_pd][][] <[list_tm_airport_pd_glider_aerotow][glider_aerotows][] " +
+        "<[tm_airport_pd_glider_aerotow][element][0] <[stringt8c][name][23]> <[tmvector2d][position][6.987 46.255]> " +
+        "<[float64][direction][231]> > > > >",
+    );
+    type Imported = { ok: boolean; value: { project: Project; warnings: string[]; fileName: string } | null };
+    const importFrom = async (file: string): Promise<Imported> => {
+      await app.evaluate(({ dialog }, f) => {
+        dialog.showOpenDialog = (async () => ({ canceled: false, filePaths: [f] })) as typeof dialog.showOpenDialog;
+      }, file);
+      return (await page.evaluate(() =>
+        (window as unknown as { pct: { importTap: () => Promise<unknown> } }).pct.importTap(),
+      )) as Imported;
+    };
+    for (const picked of ["PCTE2E.tap", "PCTE2E_addendum.tap"]) {
+      const r = await importFrom(path.join(tapDir, picked));
+      expect(r.ok).toBe(true);
+      expect(r.value!.fileName).toBe("PCTE2E.tap");
+      expect(r.value!.warnings).toEqual([]);
+      const a = r.value!.project.airport!;
+      expect(a).toMatchObject({ icao: "pcte2e", name: "TAP E2E Field", country: "ch", elevation: 512 });
+      expect(a.aerotows).toHaveLength(1);
+      expect(r.value!.project.objects.map((o) => (o.kind === "xref" ? o.name : o.kind))).toEqual(["tower_e2e"]);
+    }
+    writeFileSync(path.join(tapDir, "NOTAP.tap"), "not a tap");
+    const bad = await importFrom(path.join(tapDir, "NOTAP.tap"));
+    expect(bad.ok).toBe(false);
+  } finally {
+    await app.close();
+  }
+});

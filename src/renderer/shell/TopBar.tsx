@@ -1,5 +1,5 @@
 // TopBar.tsx — the spanning top bar (design §5): brand · editable project name · dirty dot ·
-// [New][Open][Save] │ [Undo][Redo] │ [Export /poi…][Export /airports…][Export TAP…] │ [Rescan][Settings].
+// [New][Open][Save] │ [Undo][Redo] │ [Export /poi…][Export /airports…][Export TAP…][Import TAP…] │ [Rescan][Settings].
 // Undo/redo are visible buttons (a shortcut nobody can see is a feature only its author has); the other
 // edit verbs are keyboard chords. New/Open/Save delegate to app/commands.ts; Export/Rescan are handed
 // down as callbacks by AppShell, and a button without its callback is disabled. IPC-backed buttons
@@ -8,7 +8,7 @@ import { useState } from "react";
 import { editorStore, useEditor } from "../state/editorStore";
 import type { HeightMode } from "../../core/project/types";
 import { hasPct } from "../app/pct";
-import { doNew, doOpen, doSave, doSaveAs, setTileProvider } from "../app/commands";
+import { doImportTap, doNew, doOpen, doSave, doSaveAs, setTileProvider } from "../app/commands";
 import { PROVIDER_LABEL, type TileProvider } from "../map/tileProviders";
 import { AirportSearch } from "./AirportSearch";
 import { ShowMenu } from "./ShowMenu";
@@ -218,6 +218,16 @@ export function TopBar({ onExport, onHeliport, onTap, onRescan, onSettings }: To
         title={pct ? "Write the airport as an <ICAO>.tap file for the TAP converter" : NO_PCT}
       >
         Export TAP…
+      </button>
+      {/* Its inverse, and a way IN rather than out: a `.tap` (with its addendum) opened as a NEW project. It
+          replaces the open document like Open does, so it asks first when there are unsaved changes. */}
+      <button
+        type="button"
+        onClick={() => void doImportTap()}
+        disabled={!pct}
+        title={pct ? "Open an <ICAO>.tap file as a new project" : NO_PCT}
+      >
+        Import TAP…
       </button>
 
       <span className="pct-divider" />

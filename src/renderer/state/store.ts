@@ -363,6 +363,7 @@ export interface EditorState {
   openProject: (path: string | null, project: Project) => void;
   newProject: (project: Project) => void;
   recoverProject: (project: Project) => void; // load a crash-recovery shadow as UNSAVED (dirty) work
+  importProject: (project: Project) => void; // load an imported TAP: no file yet, unsaved (dirty)
   markSaved: (path: string | null) => void;
 
   // ── selection / placement / filter (ephemeral) ──
@@ -718,6 +719,7 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
         openProject: (path, project) => load(project, path),
         newProject: (project) => load(project, null),
         recoverProject: (project) => load(project, null, true), // no path yet; unsaved → dirty
+        importProject: (project) => load(project, null, true),
         markSaved: (path) => {
           cancelAutosave(); // we just saved — a pending autosave would only rewrite a now-stale shadow
           set((s) => ({ project: serializeProject(s), projectPath: path, dirty: false }));

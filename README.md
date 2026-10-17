@@ -124,7 +124,8 @@ The short version is below. For the whole thing walked through with pictures, se
    If you'd rather **start** a flight there than fly to it, **Export /airports…** writes the same
    project as a small airfield — see [Airports you can fly from](#airports-you-can-fly-from).
    The two buttons are named for the folder under the sim's own `scenery` that each one writes into.
-   A third, **Export TAP…**, installs nothing: it saves the airport as a `.tap` file for a TAP converter.
+   A third, **Export TAP…**, installs nothing: it saves the airport as a `.tap` file for a TAP converter,
+   and **Import TAP…** opens such a file as a new project.
 5. **Optional: photograph what you placed** — once you're out there looking at your objects,
    screenshot one to the clipboard and right-click its card in PCT to paste it in. From then on the
    catalog shows the real thing instead of a drawn icon. See

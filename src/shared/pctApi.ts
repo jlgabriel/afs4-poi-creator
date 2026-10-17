@@ -51,6 +51,8 @@ export type PctError =
   // re-sends with overwrite).
   | { code: "no-tap-dir"; message: string }
   | { code: "file-exists"; message: string; fileName: string }
+  // "Import TAP": the chosen file has no airport in it.
+  | { code: "invalid-tap"; message: string }
   | { code: "io"; message: string };
 
 export type PctResult<T> = { ok: true; value: T } | { ok: false; error: PctError };
@@ -248,6 +250,10 @@ export interface PctApi {
   // settings.tapDir — no install, no other file. Refuses with "no-tap-dir" before the folder is chosen and
   // "file-exists" unless `overwrite`.
   exportTap(project: Project, opts: TapExportOptions): Promise<PctResult<TapExportResult>>;
+  // "Import TAP…": main runs the Open dialog, reads `<ICAO>.tap` and the `<ICAO>_addendum.tap` beside it
+  // (choosing the addendum opens the pair too) and turns them into a NEW, unsaved project
+  // (core/import/tapReader.ts). `warnings` say what was filled in or left out. Null when cancelled.
+  importTap(): Promise<PctResult<{ project: Project; warnings: string[]; fileName: string } | null>>;
   revealInFolder(folderName: string): Promise<void>; // main validates + resolves within known roots
 
   // The session log (main/log.ts): one plain-text file in userData, rewritten from scratch at every

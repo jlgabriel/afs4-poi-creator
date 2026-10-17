@@ -13,6 +13,7 @@ import { photoKey } from "../../core/catalog/photoKey";
 import { EMPTY_FOOTPRINTS, setFootprint, type FootprintOverrides } from "../../core/catalog/footprints";
 import type { InstalledHeliport, InstalledPoi, PctApi, TapExportResult } from "../../shared/pctApi";
 import { planTap } from "../../core/export/planExport";
+import { readTap } from "../../core/import/tapReader";
 
 // A spread of real-ish name stems across the catalog's categories, expanded with numeric suffixes so
 // the list is production-scale.
@@ -444,6 +445,23 @@ export function installMockBridge(): void {
         return { ok: true, value };
       } catch (e) {
         return { ok: false, error: { code: "invalid-project", message: e instanceof Error ? e.message : String(e) } };
+      }
+    },
+    // No file dialog in the browser: the preview imports the last `.tap` this session exported (or one
+    // put on `window.__pctImportTap` by hand), through the REAL reader. Nothing to import = cancelled.
+    importTap: async () => {
+      const w = window as unknown as {
+        __pctLastTap?: string;
+        __pctLastTapAddendum?: string | null;
+        __pctImportTap?: { tap: string; addendum?: string | null };
+      };
+      const src = w.__pctImportTap ?? (w.__pctLastTap !== undefined ? { tap: w.__pctLastTap, addendum: w.__pctLastTapAddendum } : null);
+      if (src === null) return { ok: true, value: null };
+      try {
+        const r = readTap(src.tap, src.addendum ?? null);
+        return { ok: true, value: { ...r, fileName: "PREVIEW.tap" } };
+      } catch (e) {
+        return { ok: false, error: { code: "invalid-tap", message: e instanceof Error ? e.message : String(e) } };
       }
     },
     revealInFolder: noop,

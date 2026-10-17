@@ -51,10 +51,36 @@ export async function doOpen(): Promise<void> {
   void pct.clearShadow(); // the opened file IS the saved state → drop the previous doc's shadow
 }
 
-/** Save the current project (main saves to the known path, or prompts Save-As the first time). */
+/** Import TAP: a `.tap` (and its addendum) opened as a NEW, unsaved project. Confirms first if there are
+ *  unsaved changes, like Open. What the import filled in or left out is listed after it loads. */
+export async function doImportTap(): Promise<void> {
+  const pct = getPct();
+  if (!pct) return;
+  if (editorStore.getState().dirty && !window.confirm("Discard unsaved changes and import a TAP file?")) return;
+  const res = await pct.importTap();
+  if (!res.ok) return reportError(res.error);
+  if (res.value === null) return; // cancelled
+  editorStore.getState().importProject(res.value.project);
+  void pct.clearShadow();
+  const { warnings, fileName } = res.value;
+  if (warnings.length > 0) {
+    const shown = warnings.slice(0, 15);
+    const more = warnings.length - shown.length;
+    window.alert(
+      `${fileName} imported, with ${warnings.length} note${warnings.length === 1 ? "" : "s"}:\n\n` +
+        shown.map((w) => `• ${w}`).join("\n") +
+        (more > 0 ? `\n… and ${more} more.` : ""),
+    );
+  }
+}
+
+/** Save the current project (main saves to the known path, or prompts Save-As the first time). A
+ *  document with no file of its own — new, imported or recovered — always goes through Save As: main's
+ *  remembered path may still belong to the project open before it, and must not be written over. */
 export async function doSave(): Promise<void> {
   const pct = getPct();
   if (!pct) return;
+  if (editorStore.getState().projectPath === null) return doSaveAs();
   const project = validatedProjectToSave();
   if (project === null) return;
   const res = await pct.saveProject(project);
