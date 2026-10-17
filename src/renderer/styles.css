@@ -1029,6 +1029,12 @@ body {
   font-size: 13px;
   color: #334155;
 }
+/* Checkboxes two per row, in pairs that belong together (Landing / Takeoff, Sidelines / Centerlines…). */
+.pct-check-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 8px;
+}
 
 /* One RUNWAY END, fold-out: the two ends are fold-out blocks below each other, not side by side. Same collapsed-details idiom as
    .pct-wad, with a frame because unlike that read-out these blocks are EDITABLE and there are two of

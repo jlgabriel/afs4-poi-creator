@@ -369,6 +369,46 @@ describe("Export TAP — the .tap file", () => {
     expect(valuesOf(planTap(unnamed(ns), []).content, "direction").slice(0, 2)).toEqual(["0", "180"]);
   });
 
+  it("writes each end's markings and the pair's side and centre lines; numbers is the negated row", () => {
+    const runway = TAP_PROJECT.airport!.runways![0]!;
+    const marked: Project = {
+      ...TAP_PROJECT,
+      airport: {
+        ...TAP_PROJECT.airport!,
+        runways: [
+          {
+            ...runway,
+            sidelines: false,
+            centerline: true,
+            ends: [
+              {
+                ...runway.ends[0],
+                markings: {
+                  numbers: false,
+                  threshold: false,
+                  piano: false,
+                  skidmarks: true,
+                  touchdown: true,
+                  aimingPoint: true,
+                },
+              },
+              { ...runway.ends[1], identifier: "23" },
+            ],
+          },
+        ],
+      },
+    };
+    const c = planTap(marked, []).content;
+    expect(valuesOf(c, "marking_nonumbers").slice(0, 2)).toEqual(["true", "false"]);
+    expect(valuesOf(c, "marking_threshold").slice(0, 2)).toEqual(["false", "true"]);
+    expect(valuesOf(c, "marking_piano").slice(0, 2)).toEqual(["false", "true"]);
+    expect(valuesOf(c, "marking_skidmark").slice(0, 2)).toEqual(["true", "false"]);
+    expect(valuesOf(c, "marking_touchdown").slice(0, 2)).toEqual(["true", "false"]);
+    expect(valuesOf(c, "marking_aimingpoint").slice(0, 2)).toEqual(["true", "false"]);
+    expect(valuesOf(c, "marking_sidelines")[0]).toBe("false");
+    expect(valuesOf(c, "marking_centreline")[0]).toBe("true");
+  });
+
   it("gives a numbered end the axis direction that matches its number, whichever threshold it sits at", () => {
     // "05" at the NORTH-EAST threshold and "23" at the south-west one: 05 still gets ~056, 23 ~236.
     const runway = TAP_PROJECT.airport!.runways![0]!;
@@ -479,14 +519,15 @@ describe("Export TAP — the .tap file", () => {
     expect(full.indexOf("[parking_positions]")).toBeLessThan(full.indexOf("[tarmacs]"));
     expect(full.indexOf("[tarmacs]")).toBeLessThan(full.indexOf("[lines]"));
     expect(full.indexOf("[lines]")).toBeLessThan(full.indexOf("[plants]"));
-    // Flatten takes no brightness and belongs on level 1; a ground material on level 1 is too low.
+    // Flatten takes no brightness and is written on level 0 whatever the project says; any other
+    // material is written on level 1 or higher.
     const flatten: Project = {
       ...TAP_PROJECT,
       airport: {
         ...a,
         tarmacs: [
           { ...t, material: "flatten", level: 2 },
-          { ...t, id: "t2", material: "grass00", level: 1 },
+          { ...t, id: "t2", material: "grass00", level: 0 },
           { ...t, id: "t3", points: t.points.slice(0, 2) },
           { ...t, id: "t4", points: [t.points[0]!, t.points[2]!, t.points[1]!, t.points[3]!] },
         ],
@@ -499,8 +540,8 @@ describe("Export TAP — the .tap file", () => {
     expect(valuesOf(plan.content, "brightness").slice(1, 3)).toEqual(["", ""]);
     expect(plan.content).not.toContain("[lines]");
     const w = plan.warnings.join(" | ");
-    expect(w).toContain("Tarmac 1: Flatten is meant for level 1.");
-    expect(w).toContain("Tarmac 2: Ground materials are meant for level 2 or higher.");
+    expect(valuesOf(plan.content, "level").slice(0, 2)).toEqual(["0", "1"]);
+    expect(w).not.toContain("level");
     expect(w).toContain("Tarmac 3 has fewer than three points");
     expect(w).toContain("Tarmac 4 crosses itself");
     expect(w).toContain("Line 1 has fewer than two points");

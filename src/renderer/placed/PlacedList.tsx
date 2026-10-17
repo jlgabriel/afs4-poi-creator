@@ -28,6 +28,7 @@ import {
 import { photoKeyForPlaced as placedPhotoKey } from "../../core/catalog/photoKey";
 import { PARKING_TYPE_LABELS } from "../../core/project/airport";
 import { cleanTaxisignValue, taxisignFaces } from "../../core/project/marks";
+import { tarmacLevel } from "../../core/project/surfaces";
 import { haversine, initialBearing } from "../../core/geo/geo";
 import type { LonLat } from "../../core/project/types";
 import { rowInfo } from "./rowInfo";
@@ -247,7 +248,7 @@ function SurfaceRows(): React.ReactElement | null {
   return (
     <>
       {(tarmacs ?? []).map((t, i) =>
-        row("tarmac", t.id, `Tarmac ${i + 1}`, t.material, `${t.points.length} points · level ${t.level}`, t.points[0]),
+        row("tarmac", t.id, `Tarmac ${i + 1}`, t.material, `${t.points.length} points · level ${tarmacLevel(t.material, t.level)}`, t.points[0]),
       )}
       {(lines ?? []).map((l, i) =>
         row("line", l.id, `Line ${i + 1}`, l.name, `${l.points.length} points`, l.points[0]),

@@ -71,10 +71,10 @@ describe("ground text, jetway and car lot — the model", () => {
         position: Q,
         heading: 0,
         mountingElevation: 5,
-        extensionDirection: 45,
+        extensionDirection: 0,
         extensionPitch: -1,
-        extensionAmount: 10,
-        exitDirection: 20,
+        extensionAmount: 0,
+        exitDirection: 0,
         docked: false,
       },
     ]);
@@ -106,11 +106,18 @@ describe("ground text, jetway and car lot — the model", () => {
 
   it("clamps a jetway's ranged numbers and refuses a non-finite one", () => {
     const p = withMarks();
-    const q = updateAirportJetway(p, "j1", { mountingElevation: 9, extensionAmount: 30, exitDirection: -5, docked: true });
+    const q = updateAirportJetway(p, "j1", {
+      mountingElevation: 9,
+      extensionAmount: 30,
+      extensionDirection: 95,
+      exitDirection: -85,
+      docked: true,
+    });
     expect(jetwaysOf(q.airport)[0]).toMatchObject({
       mountingElevation: 6,
       extensionAmount: 24.5,
-      exitDirection: 0,
+      extensionDirection: 80,
+      exitDirection: -80,
       docked: true,
     });
     expect(updateAirportJetway(p, "j1", { extensionPitch: Number.NaN })).toBe(p);
@@ -183,10 +190,10 @@ describe("ground text, jetway and car lot — Export TAP", () => {
         "                <[vector2_float64][position][-71.6158000 -33.6559000]>",
         "                <[float64][mounting_elevation][5]>",
         "                <[float64][direction][180]>",
-        "                <[float64][extension_direction][45]>",
+        "                <[float64][extension_direction][0]>",
         "                <[float64][extension_pitch][-1]>",
-        "                <[float64][extension_amount][10]>",
-        "                <[float64][exit_direction][20]>",
+        "                <[float64][extension_amount][0]>",
+        "                <[float64][exit_direction][0]>",
         "                <[bool][docked][false]>",
       ].join("\n"),
     );

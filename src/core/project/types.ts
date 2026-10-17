@@ -261,6 +261,21 @@ export interface AirportRunwayEnd {
    *  is the half the navigation menu reads. */
   approach: boolean;
   takeoff: boolean;
+  /** The paint at this end. Only Export TAP reads it. Absent ≡ surfaces.ts DEFAULT_RUNWAY_END_MARKINGS,
+   *  so a runway saved before it existed exports the same `.tap`. */
+  markings?: RunwayEndMarkings;
+}
+
+/** The markings the TAP converter paints at one runway end, each on or off. */
+export interface RunwayEndMarkings {
+  /** The runway number. The `.tap` row is the NEGATION, `marking_nonumbers`; an end without an
+   *  identifier paints none whatever this says. */
+  numbers: boolean;
+  threshold: boolean;
+  piano: boolean;
+  skidmarks: boolean;
+  touchdown: boolean;
+  aimingPoint: boolean;
 }
 
 /** A runway, i.e. the PAIR of ends.
@@ -279,6 +294,10 @@ export interface AirportRunway {
   material?: string;
   /** 0.1–1.0 (surfaces.ts BRIGHTNESS_STEPS). Only Export TAP reads it. Absent ≡ DEFAULT_BRIGHTNESS. */
   brightness?: number;
+  /** The side lines and the centre line, painted along the whole runway. Only Export TAP reads them.
+   *  Absent ≡ true. */
+  sidelines?: boolean;
+  centerline?: boolean;
 }
 
 /** A TARMAC: a closed polygon of paved (or flattened, or grass) surface the TAP converter bakes into the
@@ -357,13 +376,13 @@ export interface AirportJetway {
   heading: number;
   /** Metres, 3.6–6: the height of the mounting point. */
   mountingElevation: number;
-  /** Degrees relative to `heading`, counter-clockwise, 0–45. */
+  /** Degrees relative to `heading`, counter-clockwise, −80 to +80. */
   extensionDirection: number;
   /** Degrees. */
   extensionPitch: number;
   /** Metres, 0–24.5. */
   extensionAmount: number;
-  /** Degrees relative to `heading`, 0–45. */
+  /** Degrees relative to `heading`, −80 to +80. */
   exitDirection: number;
   docked: boolean;
 }

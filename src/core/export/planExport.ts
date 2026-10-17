@@ -54,7 +54,8 @@ import {
   DEFAULT_RUNWAY_MATERIAL,
   fmtBrightness,
   materialHasBrightness,
-  tarmacLevelProblem,
+  runwayEndMarkings,
+  tarmacLevel,
 } from "../project/surfaces";
 
 // A POI's two payload files are named `poi.tsl` / `poi.toc`, and the .tsl
@@ -419,11 +420,9 @@ export function planTap(project: Project, resolvedLights: ResolvedObject[], terr
     }
     const points = t.points.map((p) => shiftPoint(p, shift));
     if (ringSelfIntersects(points)) warnings.push(`${label} crosses itself — drag its points so that no two edges cross.`);
-    const levelProblem = tarmacLevelProblem(t.material, t.level);
-    if (levelProblem !== null) warnings.push(`${label}: ${levelProblem}`);
     tarmacs.push({
       points,
-      level: t.level,
+      level: tarmacLevel(t.material, t.level),
       material: t.material,
       brightness: materialHasBrightness(t.material) ? fmtBrightness(t.brightness) : "",
     });
@@ -480,9 +479,17 @@ export function planTap(project: Project, resolvedLights: ResolvedObject[], terr
     boundary: boundary.length >= 3 ? boundary : null,
     // heliportRunways keeps the document's order, so index i is runway i.
     runways: runways.map((r, i) => {
-      const material = airport.runways?.[i]?.material ?? DEFAULT_RUNWAY_MATERIAL;
-      const brightness = airport.runways?.[i]?.brightness ?? DEFAULT_BRIGHTNESS;
-      return { ...r, material, brightness: materialHasBrightness(material) ? fmtBrightness(brightness) : "" };
+      const doc = airport.runways?.[i];
+      const material = doc?.material ?? DEFAULT_RUNWAY_MATERIAL;
+      const brightness = doc?.brightness ?? DEFAULT_BRIGHTNESS;
+      return {
+        ...r,
+        material,
+        brightness: materialHasBrightness(material) ? fmtBrightness(brightness) : "",
+        sidelines: doc?.sidelines ?? true,
+        centerline: doc?.centerline ?? true,
+        markings: [runwayEndMarkings(doc?.ends[0] ?? {}), runwayEndMarkings(doc?.ends[1] ?? {})],
+      };
     }),
     pads,
     parkings: heliportParkings(airport.parkings, shift),

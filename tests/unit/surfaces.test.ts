@@ -8,6 +8,7 @@ import {
   removeAirportTarmac,
   setAirportLineName,
   setAirportLinePoints,
+  setAirportRunwayEndMarkings,
   setAirportRunwaySurface,
   setAirportTarmacPoints,
   updateAirportTarmac,
@@ -18,8 +19,10 @@ import {
   TARMAC_MATERIALS,
   clampBrightness,
   fmtBrightness,
+  RUNWAY_MATERIALS,
   materialHasBrightness,
-  tarmacLevelProblem,
+  runwayEndMarkings,
+  tarmacLevel,
 } from "../../src/core/project/surfaces";
 import { zProject } from "../../src/core/project/schemas";
 import type { LonLat, Project } from "../../src/core/project/types";
@@ -59,12 +62,52 @@ describe("surface vocabulary", () => {
     expect(clampBrightness(3)).toBe(1);
   });
 
-  it("says when a level does not suit the material", () => {
-    expect(tarmacLevelProblem("flatten", 1)).toBeNull();
-    expect(tarmacLevelProblem("flatten", 2)).not.toBeNull();
-    expect(tarmacLevelProblem("grass00", 1)).not.toBeNull();
-    expect(tarmacLevelProblem("grass00", 3)).toBeNull();
-    expect(tarmacLevelProblem("asphalt_apron__typestd", 1)).toBeNull();
+  it("pins flatten to level 0 and every other material to 1 or higher", () => {
+    expect(tarmacLevel("flatten", 1)).toBe(0);
+    expect(tarmacLevel("flatten", 5)).toBe(0);
+    expect(tarmacLevel("grass00", 0)).toBe(1);
+    expect(tarmacLevel("grass00", 3)).toBe(3);
+    expect(tarmacLevel("asphalt_apron__typestd", 1)).toBe(1);
+  });
+
+  it("offers a runway every material except flatten and hole", () => {
+    const names = RUNWAY_MATERIALS.map((m) => m.name);
+    expect(names).not.toContain("flatten");
+    expect(names).not.toContain("hole");
+    expect(names).toContain("concrete_apron__typestd");
+    expect(names).toContain("asphalt_runway__typestd");
+    expect(names).toHaveLength(TARMAC_MATERIALS.length - 2);
+  });
+});
+
+describe("runway markings", () => {
+  it("default to numbers, threshold and piano", () => {
+    expect(runwayEndMarkings({})).toEqual({
+      numbers: true,
+      threshold: true,
+      piano: true,
+      skidmarks: false,
+      touchdown: false,
+      aimingPoint: false,
+    });
+  });
+
+  it("are written whole on the first edit, and an edit that changes nothing is a no-op", () => {
+    const p = addAirportRunway(base(), SQUARE[0]!, SQUARE[2]!, { id: "r1" }, NOW);
+    const q = setAirportRunwayEndMarkings(p, "r1", 1, { touchdown: true }, LATER);
+    expect(q.airport!.runways![0]!.ends[0].markings).toBeUndefined();
+    expect(q.airport!.runways![0]!.ends[1].markings).toEqual({ ...runwayEndMarkings({}), touchdown: true });
+    expect(setAirportRunwayEndMarkings(q, "r1", 1, { touchdown: true }, LATER)).toBe(q);
+    expect(zProject.safeParse(q).success).toBe(true);
+  });
+
+  it("sidelines and centerline are absent until set", () => {
+    const p = addAirportRunway(base(), SQUARE[0]!, SQUARE[2]!, { id: "r1" }, NOW);
+    expect(p.airport!.runways![0]!.sidelines).toBeUndefined();
+    const q = setAirportRunwaySurface(p, "r1", { centerline: false }, LATER);
+    expect(q.airport!.runways![0]!.centerline).toBe(false);
+    expect(q.airport!.runways![0]!.sidelines).toBeUndefined();
+    expect(setAirportRunwaySurface(q, "r1", { centerline: false }, LATER)).toBe(q);
   });
 });
 
@@ -105,6 +148,11 @@ describe("tarmac polygons", () => {
     expect(tarmacsOf(q.airport)[0]).toMatchObject({ level: 2, material: "grass00", brightness: 1 });
     expect(updateAirportTarmac(q, "t1", { level: 0 })).toBe(q);
     expect(updateAirportTarmac(q, "t1", { level: 2 })).toBe(q);
+    // Flatten pins the level to 0 and ignores a level patch; another material lifts it back to 1.
+    const f = updateAirportTarmac(q, "t1", { material: "flatten" }, LATER);
+    expect(tarmacsOf(f.airport)[0]!.level).toBe(0);
+    expect(updateAirportTarmac(f, "t1", { level: 4 })).toBe(f);
+    expect(tarmacsOf(updateAirportTarmac(f, "t1", { material: "grass00" }, LATER).airport)[0]!.level).toBe(1);
   });
 
   it("removes by id", () => {

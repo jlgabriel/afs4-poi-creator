@@ -20,7 +20,9 @@ import type {
   ApproachLightSystem,
   PapiSide,
   ReilKind,
+  RunwayEndMarkings,
 } from "../../core/project/types";
+import { runwayEndMarkings } from "../../core/project/surfaces";
 import { APPROACH_LIGHT_SYSTEMS, PAPI_SIDES, REIL_KINDS } from "../../core/project/airport";
 import { clampLonLat } from "../../core/project/schemas";
 import { haversine, initialBearing } from "../../core/geo/geo";
@@ -28,8 +30,19 @@ import { editorStore } from "../state/editorStore";
 import { NumberInput } from "./NumberInput";
 import { WadPosition } from "./WadReadout";
 import { RunwaySurfaceFields } from "./SurfaceFields";
+import { Help } from "./HelpNote";
 
 const fmtDeg = (n: number): string => n.toFixed(6);
+
+/** An end's markings, in pairs: each row of the grid is one pair. */
+const END_MARKINGS: readonly (readonly [keyof RunwayEndMarkings, string])[] = [
+  ["numbers", "RWY NUMBER"],
+  ["threshold", "THRESHOLD LINE"],
+  ["piano", "PIANO LINE"],
+  ["skidmarks", "SKIDMARKS"],
+  ["touchdown", "TOUCHDOWN ZONE"],
+  ["aimingPoint", "AIMING POINT"],
+];
 /** Display only — see the header. The token on disk is always the lower-case one. */
 const shout = (v: string): string => v.toUpperCase();
 const bearing = (deg: number): string => String(Math.round(deg) % 360).padStart(3, "0");
@@ -54,8 +67,9 @@ function EndBlock({
   index: 0 | 1;
 }): React.ReactElement {
   const store = editorStore.getState;
-  const patch = (p: Partial<Omit<AirportRunwayEnd, "threshold">>): void =>
+  const patch = (p: Partial<Omit<AirportRunwayEnd, "threshold" | "markings">>): void =>
     store().updateAirportRunwayEnd(runwayId, index, p);
+  const markings = runwayEndMarkings(end);
 
   return (
     <details className="pct-runway-end" open>
@@ -165,27 +179,50 @@ function EndBlock({
         </label>
       </div>
 
-      {/* `approach` and `takeoff` in the file. Those are the format's words, not English UI words, and
-          this is the same call the parking `tags` got: say what it means to the person choosing. */}
-      <div className="pct-field pct-field-col">
+      {/* `approach` (`landing` in the `.tap`) and `takeoff`: whether this end may be landed on and taken
+          off from. Then the paint at this end, which only Export TAP writes. */}
+      <div className="pct-field pct-check-grid">
         <label className="pct-check">
           <input
             type="checkbox"
             checked={end.approach}
-            aria-label={`Runway end ${index + 1} can be landed on`}
+            aria-label={`Runway end ${index + 1} landing`}
             onChange={(e) => patch({ approach: e.target.checked })}
           />
-          Can land here
+          LANDING
         </label>
         <label className="pct-check">
           <input
             type="checkbox"
             checked={end.takeoff}
-            aria-label={`Runway end ${index + 1} can be taken off from`}
+            aria-label={`Runway end ${index + 1} takeoff`}
             onChange={(e) => patch({ takeoff: e.target.checked })}
           />
-          Can take off here
+          TAKEOFF
         </label>
+      </div>
+
+      <div className="pct-field pct-field-col">
+        <span className="pct-field-label">
+          Markings
+          <Help>
+            The paint at this end, for Export TAP. The other exports do not use it. An end without an identifier
+            gets no number.
+          </Help>
+        </span>
+        <div className="pct-check-grid">
+          {END_MARKINGS.map(([key, label]) => (
+            <label key={key} className="pct-check">
+              <input
+                type="checkbox"
+                checked={markings[key]}
+                aria-label={`Runway end ${index + 1} ${label.toLowerCase()}`}
+                onChange={(e) => store().setAirportRunwayEndMarkings(runwayId, index, { [key]: e.target.checked })}
+              />
+              {label}
+            </label>
+          ))}
+        </div>
       </div>
     </details>
   );

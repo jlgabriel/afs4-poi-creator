@@ -767,9 +767,13 @@ length you fix by dragging, the width you type.
 an automatic landing onto your runway.
 
 **Material** and **Brightness** *(v2.3)* are the runway's surface, and only **Export TAP…** uses them:
-the converter paints the runway with them. The material is `asphalt_runway__typestd` (the default),
-`asphalt_runway__typeblue`, or `grass01` for a grass strip; brightness runs from `0.1` to `1.0`, default
-`0.5`. Grass takes no brightness, so the field turns itself off.
+the converter paints the runway with them. The material is `asphalt_runway__typestd` by default; the menu
+offers the runway surfaces first (`asphalt_runway__typeblue`, `grass01` for a grass strip), then every
+apron and ground material *(v2.6)* — all the tarmac materials except `flatten` and `hole`. Brightness runs
+from `0.1` to `1.0`, default `0.5`. The grasses take no brightness, so the field turns itself off.
+
+**SIDELINES** and **CENTERLINES** *(v2.6)* paint the side lines and the centre line along the whole
+runway. Both are on by default, and only **Export TAP…** uses them.
 
 The two ends are two blocks, **END 1** and **END 2**, either of which can be folded away.
 
@@ -785,8 +789,11 @@ Per end:
   `CALVERT` and `ODALS`.
 - **PAPI** — none, left, right or both.
 - **REIL** — the runway end identifier lights: none, unidirectional or omnidirectional.
-- **Can land here** / **Can take off here** — both on by default. Turning one off tells Aerofly not to
-  use that end for that.
+- **LANDING** / **TAKEOFF** — both on by default. Turning one off tells Aerofly not to use that end for
+  that.
+- **Markings** *(v2.6)* — the paint at that end, for **Export TAP…** only: **RWY NUMBER**, **THRESHOLD
+  LINE** and **PIANO LINE** (on by default), **SKIDMARKS**, **TOUCHDOWN ZONE** and **AIMING POINT** (off).
+  An end without an identifier gets no number, whatever the box says.
 
 ### Helipad
 
@@ -863,18 +870,15 @@ selected, a click inside selects it and a drag pans the map as usual.
 In the Inspector:
 
 - **Level** — where two areas overlap, the **higher level covers the lower one**. A new tarmac starts
-  on level 1.
+  on level 1. *(v2.6)* Flatten is always **level 0**, below everything, and its level cannot be changed;
+  every other material is level 1 or higher.
 - **Material** — grouped in four:
-  - **Flatten** (`flatten`) is invisible: it levels the terrain under the airport. It belongs on
-    **level 1**.
+  - **Flatten** (`flatten`) is invisible: it levels the terrain under the airport.
   - **Ground** — `grass00`, `hole` and six variations of `concrete_ground_green` — is the ground
-    *outside* aprons, taxiways and runways, and belongs on **level 2 or higher**, over the flattened
-    area.
+    *outside* aprons, taxiways and runways.
   - **Apron and taxiway** — asphalt, concrete and concrete plates, each as `typestd` or `typeblue`. A new
     tarmac starts as `asphalt_apron__typestd`.
-  - **Runway** — the same three surfaces a runway offers.
-
-  The Inspector warns when the level does not suit the material, and so does Export TAP.
+  - **Runway** — `asphalt_runway__typestd`, `asphalt_runway__typeblue` and `grass01`.
 - **Brightness** — `0.1` to `1.0`, default `0.5`. Flatten, hole and the two grasses take none, and the
   field turns itself off for them.
 
@@ -935,7 +939,7 @@ list add one of each type:
 
 | Type | Looks like | Takes |
 |---|---|---|
-| `runway` | white on red | digits, space, `-` — `23-05` |
+| `runway` | white on red | digits, capital letters, space, `-` — `23L-05R` |
 | `destination` | black on yellow | capital letters, digits, space, `-`, and arrows |
 | `location` | yellow on black | capital letters |
 | `remainingrunway` | white on black | digits — `10` |
@@ -944,8 +948,10 @@ list add one of each type:
 Lowercase becomes capitals and anything a type does not take is left out as you type. A **destination**
 carries its arrows and hold marks inline: click in its text, then on one of the buttons under it — `↑ ↖ ← ↙ ↓`
 for the left-hand arrows, `↑ ↗ → ↘ ↓` for the right-hand ones, and `HOLD0`, `HOLD1`. They are written as
-`<LEFT45>`, `<RIGHT90>`, `<HOLD0>` and so on: `B<RIGHT90>` reads **B →**. A `<…>` that is not one of these
-is left out of the file, and the Inspector says so.
+`<LEFT45>`, `<RIGHT90>`, `<HOLD0>` and so on: `B<RIGHT90>` reads **B →**. *(v2.6)* An arrow takes any
+angle from `0` to `180`, not only the ones on the buttons: change the number in the text, as in
+`<RIGHT30>`. There are only the two hold marks. A `<…>` that is none of these is left out of the file,
+and the Inspector says so.
 
 Two examples: a runway sign with a hold mark on its back is `runway 23-05`, `linebreak`,
 `destination <HOLD0>`; a location sign with a direction beside it is `location B`, `destination B<RIGHT90>`.
@@ -968,10 +974,11 @@ point along the heading, as long as its extension.
 In the Inspector, besides **Lon**, **Lat** and **Heading — true**:
 
 - **Mounting elevation** — the height of the mounting point, `3.6` to `6` m.
-- **Extension direction** — `0` to `45`°, counter-clockwise from the jetway's heading.
+- **Extension direction** — `-80` to `+80`°, counter-clockwise from the jetway's heading; `0` to start
+  with.
 - **Extension pitch** — degrees; `-1` by default.
-- **Extension amount** — how far it reaches, up to `24.5` m.
-- **Exit direction** — `0` to `45`°.
+- **Extension amount** — how far it reaches, up to `24.5` m; `0` to start with.
+- **Exit direction** — `-80` to `+80`°; `0` to start with.
 - **Docked** — whether it starts docked.
 
 A value outside its range is brought back to the nearest end of it.

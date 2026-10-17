@@ -48,18 +48,19 @@ export function groundTextTapDirection(heading: number): number {
 }
 
 /** The jetway's ranges and defaults. Directions are degrees RELATIVE to the jetway's own direction,
- *  counter-clockwise; the mounting elevation and the extension are metres. */
+ *  counter-clockwise, −80 to +80; the mounting elevation and the extension are metres. A fresh jetway
+ *  is straight and retracted. */
 export const JETWAY_MOUNTING_RANGE: readonly [number, number] = [3.6, 6];
-export const JETWAY_EXTENSION_DIRECTION_RANGE: readonly [number, number] = [0, 45];
+export const JETWAY_EXTENSION_DIRECTION_RANGE: readonly [number, number] = [-80, 80];
 export const JETWAY_EXTENSION_AMOUNT_RANGE: readonly [number, number] = [0, 24.5];
-export const JETWAY_EXIT_DIRECTION_RANGE: readonly [number, number] = [0, 45];
+export const JETWAY_EXIT_DIRECTION_RANGE: readonly [number, number] = [-80, 80];
 
 export const DEFAULT_JETWAY = {
   mountingElevation: 5,
-  extensionDirection: 45,
+  extensionDirection: 0,
   extensionPitch: -1,
-  extensionAmount: 10,
-  exitDirection: 20,
+  extensionAmount: 0,
+  exitDirection: 0,
   docked: false,
 } as const;
 
@@ -97,7 +98,9 @@ export function clampTaxisignBrightness(b: number): number | null {
 }
 
 /** The arrows and hold marks a DESTINATION value can carry, written inline: `B<RIGHT90>` reads "B →".
- *  The number is the arrow's angle from straight up, in steps of 45°, turned right or left. */
+ *  The number is the arrow's angle from straight up, turned right or left: any whole number 0–180
+ *  (isTaxisignToken). These are the PRESETS the Inspector offers as buttons; any other angle is typed.
+ *  The hold marks are exactly these two. */
 export const TAXISIGN_TOKENS: readonly string[] = [
   ...[0, 45, 90, 135, 180].map((a) => `<LEFT${a}>`),
   ...[0, 45, 90, 135, 180].map((a) => `<RIGHT${a}>`),
@@ -105,9 +108,17 @@ export const TAXISIGN_TOKENS: readonly string[] = [
   "<HOLD1>",
 ];
 
-/** The characters each component type takes. The destination also takes TAXISIGN_TOKENS. */
+/** Whether `<…>` is a token the converter knows: `<LEFTn>` / `<RIGHTn>` with n a whole number 0–180
+ *  (no leading zero), or one of the two hold marks. */
+export function isTaxisignToken(t: string): boolean {
+  if (t === "<HOLD0>" || t === "<HOLD1>") return true;
+  const m = /^<(?:LEFT|RIGHT)(0|[1-9]\d{0,2})>$/.exec(t);
+  return m !== null && Number(m[1]) <= 180;
+}
+
+/** The characters each component type takes. The destination also takes tokens (isTaxisignToken). */
 const TAXISIGN_CHARS: Record<TaxisignElementType, RegExp> = {
-  runway: /[0-9 -]/,
+  runway: /[0-9A-Z -]/,
   destination: /[A-Z0-9 -]/,
   location: /[A-Z]/,
   remainingrunway: /[0-9]/,
@@ -129,13 +140,13 @@ export function taxisignValueParts(value: string): { kind: "text" | "token" | "b
   const out: { kind: "text" | "token" | "bad"; text: string }[] = [];
   for (const m of value.matchAll(/<[^<>]*>?|[^<]+/g)) {
     const t = m[0];
-    out.push({ kind: !t.startsWith("<") ? "text" : TAXISIGN_TOKENS.includes(t) ? "token" : "bad", text: t });
+    out.push({ kind: !t.startsWith("<") ? "text" : isTaxisignToken(t) ? "token" : "bad", text: t });
   }
   return out;
 }
 
 /** A component's value as the `.tap` gets it: editTaxisignValue, and for a destination every `<…>` that
- *  is not one of TAXISIGN_TOKENS dropped. */
+ *  is not a token (isTaxisignToken) dropped. */
 export function cleanTaxisignValue(type: TaxisignElementType, value: string): string {
   const v = editTaxisignValue(type, value);
   if (type !== "destination") return v;
@@ -150,7 +161,7 @@ export function taxisignValueProblem(type: TaxisignElementType, value: string): 
   if (type === "linebreak") return null;
   const clean = cleanTaxisignValue(type, value);
   if (clean.trim() === "") return "Empty: this component shows nothing.";
-  if (clean !== editTaxisignValue(type, value)) return "A <…> that is not one of the arrows or holds is left out.";
+  if (clean !== editTaxisignValue(type, value)) return "A <…> that is not an arrow (<LEFT0>–<LEFT180>, <RIGHT0>–<RIGHT180>) or a hold (<HOLD0>, <HOLD1>) is left out.";
   return null;
 }
 

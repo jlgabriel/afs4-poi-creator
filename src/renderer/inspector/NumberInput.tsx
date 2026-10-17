@@ -10,9 +10,10 @@ interface NumberInputProps {
   format?: (n: number) => string; // how the committed value is displayed when not being edited
   id?: string;
   ariaLabel?: string;
+  disabled?: boolean;
 }
 
-export function NumberInput({ value, onCommit, format, id, ariaLabel }: NumberInputProps): React.ReactElement {
+export function NumberInput({ value, onCommit, format, id, ariaLabel, disabled }: NumberInputProps): React.ReactElement {
   const [draft, setDraft] = useState<string | null>(null);
   const shown = draft ?? (format ? format(value) : String(value));
 
@@ -32,6 +33,7 @@ export function NumberInput({ value, onCommit, format, id, ariaLabel }: NumberIn
       inputMode="decimal"
       id={id}
       aria-label={ariaLabel}
+      disabled={disabled}
       value={shown}
       onChange={(e) => setDraft(e.target.value)}
       onBlur={commit}

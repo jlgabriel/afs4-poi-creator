@@ -34,6 +34,7 @@ import type {
   PoiShift,
   Project,
   ProjectAirport,
+  RunwayEndMarkings,
   Vec3,
 } from "./types";
 import {
@@ -58,6 +59,8 @@ import {
   DEFAULT_TARMAC_LEVEL,
   DEFAULT_TARMAC_MATERIAL,
   clampBrightness,
+  runwayEndMarkings,
+  tarmacLevel,
 } from "./surfaces";
 import {
   DEFAULT_CARLOT_COLUMNS,
@@ -734,12 +737,13 @@ export function moveAirportRunwayEnd(
 }
 
 /** Everything else about one end, in one patch: identifier, the three lighting rows, approach/takeoff.
- *  `threshold` is deliberately not patchable here — dragging it is `moveAirportRunwayEnd`. */
+ *  `threshold` is deliberately not patchable here — dragging it is `moveAirportRunwayEnd` — and neither
+ *  are the markings (`setAirportRunwayEndMarkings`). */
 export function updateAirportRunwayEnd(
   project: Project,
   runwayId: string,
   end: 0 | 1,
-  patch: Partial<Omit<AirportRunwayEnd, "threshold">>,
+  patch: Partial<Omit<AirportRunwayEnd, "threshold" | "markings">>,
   now = nowIso(),
 ): Project {
   return updateRunway(
@@ -749,6 +753,29 @@ export function updateAirportRunwayEnd(
       patchEnd(r, end, (e) => {
         const next = { ...e, ...patch };
         return (Object.keys(patch) as (keyof typeof patch)[]).every((k) => e[k] === patch[k]) ? e : next;
+      }),
+    now,
+  );
+}
+
+/** Turn some of one end's markings on or off. The first edit writes the whole set, defaults included
+ *  (surfaces.ts runwayEndMarkings), so the stored value never depends on a default that may change. */
+export function setAirportRunwayEndMarkings(
+  project: Project,
+  runwayId: string,
+  end: 0 | 1,
+  patch: Partial<RunwayEndMarkings>,
+  now = nowIso(),
+): Project {
+  return updateRunway(
+    project,
+    runwayId,
+    (r) =>
+      patchEnd(r, end, (e) => {
+        const current = runwayEndMarkings(e);
+        const next = { ...current, ...patch };
+        const same = (Object.keys(next) as (keyof RunwayEndMarkings)[]).every((k) => current[k] === next[k]);
+        return same && e.markings !== undefined ? e : { ...e, markings: next };
       }),
     now,
   );
@@ -831,12 +858,14 @@ export function setAirportBoundary(project: Project, points: LonLat[] | null, no
 
 // ── Runway SURFACE, TARMAC polygons and painted LINEs (types.ts) — only Export TAP reads them ──────────
 
-/** A runway's material and brightness (types.ts AirportRunway.material / .brightness). A brightness is
+export type RunwaySurfacePatch = Partial<Pick<AirportRunway, "material" | "brightness" | "sidelines" | "centerline">>;
+
+/** A runway's material, brightness, side lines and centre line (types.ts AirportRunway). A brightness is
  *  snapped onto the converter's steps (surfaces.ts clampBrightness). */
 export function setAirportRunwaySurface(
   project: Project,
   runwayId: string,
-  patch: { material?: string; brightness?: number },
+  patch: RunwaySurfacePatch,
   now = nowIso(),
 ): Project {
   return updateRunway(
@@ -845,10 +874,21 @@ export function setAirportRunwaySurface(
     (r) => {
       const material = patch.material ?? r.material;
       const brightness = patch.brightness === undefined ? r.brightness : clampBrightness(patch.brightness);
-      if (material === r.material && brightness === r.brightness) return r;
+      const sidelines = patch.sidelines ?? r.sidelines;
+      const centerline = patch.centerline ?? r.centerline;
+      if (
+        material === r.material &&
+        brightness === r.brightness &&
+        sidelines === r.sidelines &&
+        centerline === r.centerline
+      ) {
+        return r;
+      }
       const next: AirportRunway = { ...r };
       if (material !== undefined) next.material = material;
       if (brightness !== undefined) next.brightness = brightness;
+      if (sidelines !== undefined) next.sidelines = sidelines;
+      if (centerline !== undefined) next.centerline = centerline;
       return next;
     },
     now,
@@ -941,7 +981,8 @@ export function setAirportTarmacPoints(
 }
 
 /** Level, material and brightness. A level is rounded to an integer and refused below 1; a brightness is
- *  snapped onto the converter's steps. */
+ *  snapped onto the converter's steps. FLATTEN is pinned to level 0 (surfaces.ts tarmacLevel): choosing it
+ *  sets the level to 0, a level patch leaves it there, and choosing another material lifts it to 1. */
 export function updateAirportTarmac(
   project: Project,
   tarmacId: string,
@@ -955,8 +996,8 @@ export function updateAirportTarmac(
     tarmacsOf,
     tarmacId,
     (t) => {
-      const level = patch.level === undefined ? t.level : Math.round(patch.level);
       const material = patch.material ?? t.material;
+      const level = tarmacLevel(material, patch.level === undefined ? t.level : patch.level);
       const brightness = patch.brightness === undefined ? t.brightness : clampBrightness(patch.brightness);
       if (level === t.level && material === t.material && brightness === t.brightness) return t;
       return { ...t, level, material, brightness };

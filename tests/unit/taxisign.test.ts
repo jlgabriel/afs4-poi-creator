@@ -50,7 +50,7 @@ const el = (type: AirportTaxisignElement["type"], value = ""): AirportTaxisignEl
 
 describe("taxi sign — the vocabulary", () => {
   it("takes per type only the characters the converter lists", () => {
-    expect(editTaxisignValue("runway", "23-05l")).toBe("23-05");
+    expect(editTaxisignValue("runway", "23l-05r_")).toBe("23L-05R");
     expect(editTaxisignValue("location", "b2 ")).toBe("B");
     expect(editTaxisignValue("remainingrunway", "1 0")).toBe("10");
     expect(editTaxisignValue("destination", "b<right90>]")).toBe("B<RIGHT90>");
@@ -60,7 +60,9 @@ describe("taxi sign — the vocabulary", () => {
   it("keeps a half-typed token while editing, and writes only whole known tokens", () => {
     expect(editTaxisignValue("destination", "B<RIG")).toBe("B<RIG");
     expect(cleanTaxisignValue("destination", "B<RIG")).toBe("B");
-    expect(cleanTaxisignValue("destination", "<HOLD0>A<LEFT30>")).toBe("<HOLD0>A");
+    // Any whole angle 0–180 is an arrow; past 180, a leading zero or a third hold mark is not.
+    expect(cleanTaxisignValue("destination", "<HOLD0>A<LEFT30>")).toBe("<HOLD0>A<LEFT30>");
+    expect(cleanTaxisignValue("destination", "A<RIGHT181><LEFT045><HOLD2><RIGHT180>")).toBe("A<RIGHT180>");
     expect(taxisignValueProblem("destination", "B<RIG")).not.toBeNull();
     expect(taxisignValueProblem("destination", "B<RIGHT90>")).toBeNull();
     expect(taxisignValueProblem("location", "")).not.toBeNull();
@@ -112,7 +114,7 @@ describe("taxi sign — the model", () => {
   it("cleans components, refuses a size type outside 1–4, snaps the brightness, keeps 0.0", () => {
     const p = withSign();
     const q = updateAirportTaxisign(p, "t1", {
-      elements: [el("runway", "23-05x"), el("linebreak", "junk"), el("destination", "b<right90>")],
+      elements: [el("runway", "23-05_"), el("linebreak", "junk"), el("destination", "b<right90>")],
       brightness: 0.04,
     });
     expect(taxisignsOf(q.airport)[0]).toMatchObject({

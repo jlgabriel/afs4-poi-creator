@@ -43,7 +43,8 @@ import { Help } from "./HelpNote";
 import { NumberInput } from "./NumberInput";
 
 const fmtDeg = (n: number): string => n.toFixed(6);
-const range = ([lo, hi]: readonly [number, number], unit: string): string => `${lo}–${hi}${unit}`;
+const range = ([lo, hi]: readonly [number, number], unit: string): string =>
+  lo < 0 ? `−${-lo} to +${hi}${unit}` : `${lo}–${hi}${unit}`;
 
 /** Lon, lat and the heading: what every one of the three has. */
 function PlaceFields({
@@ -240,7 +241,7 @@ export function GroundTextFields({ text, index }: { text: AirportGroundText; ind
 
 /** What each component type looks like and takes, for its menu entry and its placeholder. */
 const TAXISIGN_TYPE_HINTS: Record<TaxisignElementType, { look: string; takes: string }> = {
-  runway: { look: "white on red", takes: "0–9, space, -" },
+  runway: { look: "white on red", takes: "0–9, A–Z, space, -" },
   destination: { look: "black on yellow", takes: "A–Z, 0–9, space, -, arrows" },
   location: { look: "yellow on black", takes: "A–Z" },
   remainingrunway: { look: "white on black", takes: "0–9" },
@@ -298,7 +299,8 @@ export function TaxisignFields({ sign, index }: { sign: AirportTaxisign; index: 
           Components
           <Help>
             Shown left to right on the front face. After a linebreak the rest goes on the back face, again left to
-            right. Arrows and hold marks go inside a destination: click in its text, then on an arrow.
+            right. Arrows and hold marks go inside a destination: click in its text, then on an arrow. An arrow
+            can take any angle from 0 to 180: change the number in its text, for example <code>&lt;RIGHT30&gt;</code>.
           </Help>
         </span>
         {elements.length === 0 && <span className="pct-warn">No components: the sign is blank.</span>}

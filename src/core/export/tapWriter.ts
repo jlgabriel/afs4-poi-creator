@@ -38,8 +38,8 @@
 //     converter merges when both sit side by side in its input folder (see buildTapAddendum).
 //
 // Rows PCT has no data for are written with the converter's neutral defaults (see TAP_* below). The two
-// derived rows are a runway end's `direction` (see endDirection) and `marking_nonumbers` (an unnamed end
-// paints no numbers). Empty lists are OMITTED (the converter accepts a `.tap` without them), except
+// derived rows are a runway end's `direction` (see endDirection) and `marking_nonumbers` (the negation of
+// the end's `numbers` marking, and true for an unnamed end). Empty lists are OMITTED (the converter accepts a `.tap` without them), except
 // `custom_models`.
 
 import type {
@@ -50,6 +50,7 @@ import type {
   LonLat,
   ResolvedAirportLight,
   ResolvedLight,
+  RunwayEndMarkings,
 } from "../project/types";
 import {
   TAXISIGN_LEVEL,
@@ -91,6 +92,10 @@ export interface TapXrefSpec {
 export interface TapRunwaySpec extends HeliportRunwaySpec {
   material: string;
   brightness: string;
+  sidelines: boolean;
+  centerline: boolean;
+  /** Per end, in the order of `ends`, defaults already applied. */
+  markings: [RunwayEndMarkings, RunwayEndMarkings];
 }
 
 /** A tarmac polygon: an OPEN ring of at least 3 points, shifted (the writer closes it). `brightness` is
@@ -151,27 +156,18 @@ export function tapAddendumFileName(icao: string): string {
 }
 
 /** Per-end rows PCT offers nothing for. The four flags match the `.wad` defaults (heliportTemplate.ts
- *  RUNWAY_END_WAD_DEFAULTS); the markings are the converter's standard set. */
+ *  RUNWAY_END_WAD_DEFAULTS). */
 const TAP_RUNWAY_END_DEFAULTS: ReadonlyArray<readonly [string, string, string]> = [
   ["bool", "navigation", "true"],
   ["bool", "departures", "true"],
   ["bool", "non_precision", "false"],
   ["bool", "precision", "false"],
-  ["bool", "marking_piano", "true"],
-  ["bool", "marking_touchdown", "false"],
-  ["bool", "marking_threshold", "true"],
-  ["bool", "marking_aimingpoint", "false"],
-];
-
-/** Per-pair rows PCT offers nothing for: the standard markings. */
-const TAP_RUNWAY_PAIR_DEFAULTS: ReadonlyArray<readonly [string, string, string]> = [
-  ["bool", "marking_centreline", "true"],
-  ["bool", "marking_sidelines", "true"],
 ];
 
 const deg = (p: LonLat): string => `${fmtLonLat(p.lon)} ${fmtLonLat(p.lat)}`;
 const deg3 = (p: LonLat, h: number): string => `${deg(p)} ${fmtMeters(h)}`;
 const text = (s: string): string => sanitizeValue(s).trim();
+const bool = (b: boolean): string => (b ? "true" : "false");
 
 /** The runway number an identifier starts with ("05", "23L", "9"), 1–36; null for anything else
  *  (empty, "ALSF2"…). */
@@ -214,6 +210,7 @@ function runwayPairs(runways: TapRunwaySpec[], elevation: string): string[] {
       const ends = r.ends.map((e, n) => {
         const other = r.ends[1 - n]!;
         const identifier = text(e.identifier);
+        const m = r.markings[n]!;
         return block("tm_airport_pd_rwy", "element", String(n), [
           tag("vector2_float64", "threshold", deg(e.threshold)),
           tag("float64", "xtension", "0"),
@@ -227,9 +224,13 @@ function runwayPairs(runways: TapRunwaySpec[], elevation: string): string[] {
           tag("bool", "landing", e.approach ? "true" : "false"),
           tag("bool", "takeoff", e.takeoff ? "true" : "false"),
           ...TAP_RUNWAY_END_DEFAULTS.map(([t, f, v]) => tag(t, f, v)),
-          // An end without a name gets no painted numbers.
-          tag("bool", "marking_nonumbers", identifier === "" ? "true" : "false"),
-          tag("bool", "marking_skidmark", "false"),
+          tag("bool", "marking_piano", bool(m.piano)),
+          tag("bool", "marking_touchdown", bool(m.touchdown)),
+          tag("bool", "marking_threshold", bool(m.threshold)),
+          tag("bool", "marking_aimingpoint", bool(m.aimingPoint)),
+          // The row is the NEGATION of the checkbox, and an end without a name gets no numbers.
+          tag("bool", "marking_nonumbers", bool(!m.numbers || identifier === "")),
+          tag("bool", "marking_skidmark", bool(m.skidmarks)),
         ]);
       });
       return block("tm_airport_pd_rwy_pair", "element", String(i), [
@@ -237,7 +238,8 @@ function runwayPairs(runways: TapRunwaySpec[], elevation: string): string[] {
         tag("float64", "width", fmtNum(r.widthM)),
         tag("string8", "material", sanitizeValue(r.material)),
         tag("string8", "brightness", r.brightness),
-        ...TAP_RUNWAY_PAIR_DEFAULTS.map(([t, f, v]) => tag(t, f, v)),
+        tag("bool", "marking_centreline", bool(r.centerline)),
+        tag("bool", "marking_sidelines", bool(r.sidelines)),
       ]);
     }),
   );

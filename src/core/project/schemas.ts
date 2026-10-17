@@ -174,6 +174,16 @@ const zRunwayEnd = z.looseObject({
   reil: z.enum(REIL_KINDS),
   approach: z.boolean(),
   takeoff: z.boolean(),
+  markings: z
+    .looseObject({
+      numbers: z.boolean(),
+      threshold: z.boolean(),
+      piano: z.boolean(),
+      skidmarks: z.boolean(),
+      touchdown: z.boolean(),
+      aimingPoint: z.boolean(),
+    })
+    .optional(),
 });
 
 /** A runway (types.ts AirportRunway). `ends` is a TUPLE of exactly two — the format has no other shape,
@@ -184,6 +194,8 @@ const zRunway = z.looseObject({
   width: z.number().finite().positive(),
   material: z.string().max(IDENTITY_MAX).optional(),
   brightness: z.number().finite().optional(),
+  sidelines: z.boolean().optional(),
+  centerline: z.boolean().optional(),
 });
 
 /** A tarmac polygon and a painted line (types.ts AirportTarmac / AirportLine). The material and line

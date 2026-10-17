@@ -1,5 +1,5 @@
 // SurfaceFields.tsx — the Inspector's panels for a TARMAC polygon and a painted LINE, and the SURFACE
-// block of a runway (material + brightness). Everything here is for Export TAP only.
+// block of a runway (material, brightness, side and centre lines). Everything here is for Export TAP only.
 //
 // The menus offer exactly the converter's vocabulary (surfaces.ts) and show the names VERBATIM: the name
 // is what the converter matches, and a friendlier label would hide which of two near-identical names
@@ -14,13 +14,16 @@ import {
   DEFAULT_BRIGHTNESS,
   DEFAULT_RUNWAY_MATERIAL,
   LINE_NAMES,
+  MIN_TARMAC_LEVEL,
   RUNWAY_MATERIALS,
+  RUNWAY_MATERIAL_GROUPS,
   TARMAC_GROUPS,
   TARMAC_GROUP_LABELS,
   TARMAC_MATERIALS,
   fmtBrightness,
+  isFlatten,
   materialHasBrightness,
-  tarmacLevelProblem,
+  tarmacLevel,
 } from "../../core/project/surfaces";
 import { haversine } from "../../core/geo/geo";
 import { ringAreaM2, ringSelfIntersects } from "../../core/geo/polygon";
@@ -93,10 +96,14 @@ export function RunwaySurfaceFields({ runway }: { runway: AirportRunway }): Reac
           aria-label="Runway material"
           onChange={(e) => store().setAirportRunwaySurface(runway.id, { material: e.target.value })}
         >
-          {RUNWAY_MATERIALS.map((m) => (
-            <option key={m.name} value={m.name}>
-              {m.name}
-            </option>
+          {RUNWAY_MATERIAL_GROUPS.map((g) => (
+            <optgroup key={g} label={TARMAC_GROUP_LABELS[g]}>
+              {RUNWAY_MATERIALS.filter((m) => m.group === g).map((m) => (
+                <option key={m.name} value={m.name}>
+                  {m.name}
+                </option>
+              ))}
+            </optgroup>
           ))}
           <UnlistedOption value={material} listed={RUNWAY_MATERIALS.some((m) => m.name === material)} />
         </select>
@@ -107,6 +114,26 @@ export function RunwaySurfaceFields({ runway }: { runway: AirportRunway }): Reac
         ariaLabel="Runway brightness"
         onChange={(b) => store().setAirportRunwaySurface(runway.id, { brightness: b })}
       />
+      <div className="pct-field pct-check-grid">
+        <label className="pct-check">
+          <input
+            type="checkbox"
+            checked={runway.sidelines ?? true}
+            aria-label="Runway sidelines"
+            onChange={(e) => store().setAirportRunwaySurface(runway.id, { sidelines: e.target.checked })}
+          />
+          SIDELINES
+        </label>
+        <label className="pct-check">
+          <input
+            type="checkbox"
+            checked={runway.centerline ?? true}
+            aria-label="Runway centerlines"
+            onChange={(e) => store().setAirportRunwaySurface(runway.id, { centerline: e.target.checked })}
+          />
+          CENTERLINES
+        </label>
+      </div>
     </>
   );
 }
@@ -116,7 +143,8 @@ export function TarmacFields({ tarmac, index }: { tarmac: AirportTarmac; index: 
   const patch = (p: { level?: number; material?: string; brightness?: number }): void =>
     store().updateAirportTarmac(tarmac.id, p);
   const crosses = ringSelfIntersects(tarmac.points);
-  const levelProblem = tarmacLevelProblem(tarmac.material, tarmac.level);
+  const flatten = isFlatten(tarmac.material);
+  const level = tarmacLevel(tarmac.material, tarmac.level);
   const listed = TARMAC_MATERIALS.some((m) => m.name === tarmac.material);
   return (
     <div className="pct-inspector-body">
@@ -142,24 +170,38 @@ export function TarmacFields({ tarmac, index }: { tarmac: AirportTarmac; index: 
       <div className="pct-field pct-field-col">
         <span className="pct-field-label">
           Level
-          <Help>Where two areas overlap, the higher level covers the lower one.</Help>
+          <Help>
+            Where two areas overlap, the higher level covers the lower one. Flatten is always level 0, below
+            everything; every other material is level 1 or higher.
+          </Help>
         </span>
         <div className="pct-nudge-row">
           <button
             type="button"
-            onClick={() => patch({ level: tarmac.level - 1 })}
-            disabled={tarmac.level <= 1}
+            onClick={() => patch({ level: level - 1 })}
+            disabled={flatten || level <= MIN_TARMAC_LEVEL}
             title="One level down"
             aria-label="Level down"
           >
             −
           </button>
-          <NumberInput value={tarmac.level} onCommit={(n) => patch({ level: n })} ariaLabel="Tarmac level" />
-          <button type="button" onClick={() => patch({ level: tarmac.level + 1 })} title="One level up" aria-label="Level up">
+          <NumberInput
+            value={level}
+            onCommit={(n) => patch({ level: n })}
+            ariaLabel="Tarmac level"
+            disabled={flatten}
+          />
+          <button
+            type="button"
+            onClick={() => patch({ level: level + 1 })}
+            disabled={flatten}
+            title="One level up"
+            aria-label="Level up"
+          >
             +
           </button>
         </div>
-        {levelProblem !== null && <span className="pct-warn">{levelProblem}</span>}
+        {flatten && <span className="pct-field-meta">Flatten is always level 0.</span>}
       </div>
 
       <label className="pct-field pct-field-col">

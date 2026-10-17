@@ -32,6 +32,7 @@ import type {
   PoiShift,
   Project,
   ProjectAirport,
+  RunwayEndMarkings,
   Settings,
   Vec3,
 } from "../../core/project/types";
@@ -429,7 +430,8 @@ export interface EditorState {
   updateAirportTarmac: (id: string, patch: { level?: number; material?: string; brightness?: number }) => void;
   setAirportLinePoints: (id: string, points: LonLat[]) => void;
   setAirportLineName: (id: string, name: string) => void;
-  setAirportRunwaySurface: (id: string, patch: { material?: string; brightness?: number }) => void;
+  setAirportRunwaySurface: (id: string, patch: mutate.RunwaySurfacePatch) => void;
+  setAirportRunwayEndMarkings: (id: string, end: 0 | 1, patch: Partial<RunwayEndMarkings>) => void;
   //    GROUND TEXTs, TAXI SIGNs, JETWAYs and CAR LOTs: one move and one turn for the four, and each one's
   //    fields.
   moveAirportMark: (kind: MarkKind, id: string, position: LonLat) => void;
@@ -1100,6 +1102,8 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
         updateAirportTarmac: (id, patch) => commit((proj) => mutate.updateAirportTarmac(proj, id, patch)),
         setAirportLineName: (id, name) => commit((proj) => mutate.setAirportLineName(proj, id, name)),
         setAirportRunwaySurface: (id, patch) => commit((proj) => mutate.setAirportRunwaySurface(proj, id, patch)),
+        setAirportRunwayEndMarkings: (id, end, patch) =>
+          commit((proj) => mutate.setAirportRunwayEndMarkings(proj, id, end, patch)),
         // Coalesced like every other drag, and id-less because there is exactly one airport point in a
         // project.
         moveAirportPosition: (position) =>

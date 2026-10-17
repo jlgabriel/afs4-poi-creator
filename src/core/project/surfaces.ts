@@ -9,7 +9,9 @@
 // A project may still carry a name that is not listed (a hand-edited project.json): it is kept and written
 // as is, and the menus show it as an extra entry rather than replacing it.
 
-/** The four groups of tarmac materials. The group decides the level a material is meant for. */
+import type { RunwayEndMarkings } from "./types";
+
+/** The four groups of tarmac materials. FLATTEN always sits on level 0, below everything else. */
 export type TarmacGroup = "flatten" | "ground" | "apron" | "runway";
 
 export interface TarmacMaterial {
@@ -54,14 +56,39 @@ export const TARMAC_GROUP_LABELS: Record<TarmacGroup, string> = {
   runway: "Runway",
 };
 
-/** The materials a RUNWAY offers: the runway group. */
-export const RUNWAY_MATERIALS: readonly TarmacMaterial[] = TARMAC_MATERIALS.filter((m) => m.group === "runway");
+/** The materials a RUNWAY offers: every tarmac material except `flatten` and `hole`, which are not a
+ *  surface. The menu shows the runway group first. */
+export const RUNWAY_MATERIALS: readonly TarmacMaterial[] = TARMAC_MATERIALS.filter(
+  (m) => m.name !== "flatten" && m.name !== "hole",
+);
+
+/** The runway menu's groups, in menu order. */
+export const RUNWAY_MATERIAL_GROUPS: readonly TarmacGroup[] = ["runway", "apron", "ground"];
 
 export const DEFAULT_RUNWAY_MATERIAL = "asphalt_runway__typestd";
 export const DEFAULT_TARMAC_MATERIAL = "asphalt_apron__typestd";
 export const DEFAULT_BRIGHTNESS = 0.5;
 export const DEFAULT_TARMAC_LEVEL = 1;
+/** FLATTEN's level: always 0, the bottom, so every other tarmac covers it. */
+export const FLATTEN_LEVEL = 0;
+/** The lowest level of every material other than flatten. */
+export const MIN_TARMAC_LEVEL = 1;
 export const DEFAULT_LINE_NAME = "taxi_center";
+
+/** A runway end's markings when the project says nothing: numbers, threshold and piano keys. */
+export const DEFAULT_RUNWAY_END_MARKINGS: Readonly<RunwayEndMarkings> = {
+  numbers: true,
+  threshold: true,
+  piano: true,
+  skidmarks: false,
+  touchdown: false,
+  aimingPoint: false,
+};
+
+/** An end's markings with the defaults filled in. */
+export function runwayEndMarkings(end: { markings?: RunwayEndMarkings }): RunwayEndMarkings {
+  return { ...DEFAULT_RUNWAY_END_MARKINGS, ...end.markings };
+}
 
 /** The brightness values the converter takes: 0.1 to 1.0 in steps of 0.1. */
 export const BRIGHTNESS_STEPS: readonly number[] = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0];
@@ -87,14 +114,16 @@ export function clampBrightness(b: number): number {
   return Math.min(1, Math.max(0.1, Math.round(b * 10) / 10));
 }
 
-/** Why a tarmac's level does not suit its material, or null. A higher level covers a lower one; the
- *  FLATTEN material belongs on level 1 and the GROUND materials on level 2 or higher, so the ground
- *  outside the paved area is drawn over the flattened area. */
-export function tarmacLevelProblem(material: string, level: number): string | null {
-  const group = tarmacMaterial(material)?.group;
-  if (group === "flatten" && level !== 1) return "Flatten is meant for level 1.";
-  if (group === "ground" && level < 2) return "Ground materials are meant for level 2 or higher.";
-  return null;
+/** Whether a material is FLATTEN, the one that is pinned to level 0. */
+export function isFlatten(material: string): boolean {
+  return material === "flatten";
+}
+
+/** The level a tarmac really has: FLATTEN_LEVEL for flatten whatever is stored, and at least
+ *  MIN_TARMAC_LEVEL for any other material. Flatten dominates any tarmac that shares its level, so it
+ *  is kept below all of them. */
+export function tarmacLevel(material: string, level: number): number {
+  return isFlatten(material) ? FLATTEN_LEVEL : Math.max(MIN_TARMAC_LEVEL, Math.round(level));
 }
 
 /** Every line name, in menu order. A plain name is a solid line; `_dashed` is its dashed variant and
