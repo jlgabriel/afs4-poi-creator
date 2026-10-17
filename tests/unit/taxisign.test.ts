@@ -8,7 +8,7 @@ import {
   rotateAirportMark,
   updateAirportTaxisign,
 } from "../../src/core/project/mutate";
-import { taxisignsOf } from "../../src/core/project/airport";
+import { airportPartCount, taxisignsOf } from "../../src/core/project/airport";
 import {
   TAXISIGN_TOKENS,
   cleanTaxisignValue,
@@ -213,5 +213,12 @@ describe("taxi sign — Export TAP", () => {
       Number(tap.split("[taxisigns]")[1]!.split("[position][")[1]!.split("]")[0]!.split(" ")[1]);
     const shifted: Project = { ...p, shift: { east: 0, north: 100 } };
     expect(lat(planTap(shifted, []).content)).toBeGreaterThan(lat(planTap(p, []).content));
+  });
+});
+
+describe("airportPartCount", () => {
+  it("counts the marks too — deleting the airport takes them with it", () => {
+    // One helipad, one ground text, one taxi sign, one jetway.
+    expect(airportPartCount(withSign().airport!)).toBe(4);
   });
 });

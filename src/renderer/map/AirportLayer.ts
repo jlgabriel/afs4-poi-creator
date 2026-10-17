@@ -19,6 +19,7 @@
 // cannot be mistaken for the pad's H-in-a-ring at any size ("distinguish by shape, never by colour").
 // Selected turns amber, because that is what selected looks like everywhere in PCT.
 import * as L from "leaflet";
+import { onPick } from "./pick";
 import type { LonLat } from "../../core/project/types";
 import { wrapLon } from "../../core/geo/geo";
 
@@ -113,7 +114,7 @@ export class AirportLayer {
       zIndexOffset: 1000,
       keyboard: false,
     }).addTo(this.group);
-    marker.on("click", () => this.cb.onSelect());
+    onPick(marker, () => this.cb.onSelect());
     marker.on("dragstart", () => {
       this.dragging = true;
     });

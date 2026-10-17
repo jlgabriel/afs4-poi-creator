@@ -6,6 +6,7 @@
 //   • the cyan rotate grip exists only on the SELECTED element;
 //   • reference-diff sync: an untouched element is skipped, a selection-only change restyles.
 import * as L from "leaflet";
+import { onPick } from "./pick";
 import type { LonLat } from "../../core/project/types";
 import { destination, initialBearing, wrapLon } from "../../core/geo/geo";
 import { snapAngle } from "./rotate";
@@ -144,7 +145,7 @@ export class MarkLayer<T extends Mark> {
       className: "pct-mark",
       bubblingMouseEvents: false,
     }).addTo(this.group);
-    shape.on("click", () => this.cb.onSelect(item.id));
+    onPick(shape, () => this.cb.onSelect(item.id));
     shape.on("mousedown", (e: L.LeafletMouseEvent) => this.onGrab(item.id, e));
     const tick = L.polyline([toLatLng(item.position), toLatLng(this.tipAt(item, item.position, item.heading))], {
       color: selected ? SELECTED : this.look.color,
@@ -296,21 +297,4 @@ export class MarkLayer<T extends Mark> {
     if (d.mode === "move") this.cb.onMove(d.id, { lon: wrapLon(d.at.lon), lat: d.at.lat });
     else if (d.heading !== d.startHeading) this.cb.onRotate(d.id, d.heading);
   };
-}
-
-/** A rectangle `along` metres in the heading's direction and `across` metres across it, centred on `at`. */
-export function rectAround(at: LonLat, heading: number, along: number, across: number): LonLat[] {
-  const front = destination(at, along / 2, heading);
-  const back = destination(at, along / 2, heading + 180);
-  return [
-    destination(front, across / 2, heading - 90),
-    destination(front, across / 2, heading + 90),
-    destination(back, across / 2, heading + 90),
-    destination(back, across / 2, heading - 90),
-  ];
-}
-
-/** A circle of `radius` metres as a 24-point ring. */
-export function circleAround(at: LonLat, radius: number): LonLat[] {
-  return Array.from({ length: 24 }, (_, i) => destination(at, radius, i * 15));
 }

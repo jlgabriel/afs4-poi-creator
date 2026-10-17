@@ -40,6 +40,7 @@ import { clampLonLat } from "../../core/project/schemas";
 import { editorStore } from "../state/editorStore";
 import type { MarkKind } from "../state/store";
 import { Help } from "./HelpNote";
+import { holdSvg, isHoldToken } from "../map/holdMark";
 import { NumberInput } from "./NumberInput";
 
 const fmtDeg = (n: number): string => n.toFixed(6);
@@ -248,8 +249,12 @@ const TAXISIGN_TYPE_HINTS: Record<TaxisignElementType, { look: string; takes: st
   linebreak: { look: "turns to the back face", takes: "" },
 };
 
-/** A token's button face: an arrow turned like the sign turns it, or the hold mark's name. */
+/** A token's button face: an arrow turned like the sign turns it, or the hold mark drawn as the sign
+ *  shows it, black on a yellow plate. */
 function TokenFace({ token }: { token: string }): React.ReactElement {
+  if (isHoldToken(token)) {
+    return <span className="pct-hold-face" dangerouslySetInnerHTML={{ __html: holdSvg(token, 12) }} />;
+  }
   const m = /^<(LEFT|RIGHT)(\d+)>$/.exec(token);
   if (m === null) return <>{token.slice(1, -1)}</>;
   const deg = (m[1] === "RIGHT" ? 1 : -1) * Number(m[2]);
@@ -508,7 +513,7 @@ export function JetwayFields({ jetway, index }: { jetway: AirportJetway; index: 
         "Exit direction — °",
         jetway.exitDirection,
         (n) => patch({ exitDirection: n }),
-        range(JETWAY_EXIT_DIRECTION_RANGE, "°"),
+        `${range(JETWAY_EXIT_DIRECTION_RANGE, "°")}, counter-clockwise from the extension`,
       )}
 
       <label className="pct-field pct-check">

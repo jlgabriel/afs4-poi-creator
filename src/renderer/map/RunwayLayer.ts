@@ -28,6 +28,7 @@
 // asphalt: a dark fill under a pale stroke. It does not need a colour to be recognisable; nothing else on
 // this map is a kilometre-long rectangle.
 import * as L from "leaflet";
+import { onPick } from "./pick";
 import type { AirportRunway, LonLat } from "../../core/project/types";
 import { initialBearing, wrapLon } from "../../core/geo/geo";
 import { stripCorners } from "./runwayStrip";
@@ -166,7 +167,7 @@ export class RunwayLayer {
     // Select on CLICK, drag on MOUSEDOWN — the split FootprintLayer uses. Firing onSelect from the
     // document mouseup when the drag never `moved` loses the click to any stray mousemove, because
     // `moved` is set unconditionally on the first one. Leaflet already decides what a click is.
-    strip.on("click", () => this.cb.onSelect(r.id));
+    onPick(strip, () => this.cb.onSelect(r.id));
     strip.on("mousedown", (e: L.LeafletMouseEvent) => this.onGrabBody(r.id, e));
 
     // Not interactive: a name must never take a click meant for the map or the strip.
@@ -198,7 +199,7 @@ export class RunwayLayer {
       }).addTo(this.group);
       h.on("mousedown", (ev: L.LeafletMouseEvent) => this.onGrab(r.id, end, ev));
       // Clicking a threshold selects its runway too, so a handle never swallows a select.
-      h.on("click", () => this.cb.onSelect(r.id));
+      onPick(h, () => this.cb.onSelect(r.id));
       return h;
     });
   }

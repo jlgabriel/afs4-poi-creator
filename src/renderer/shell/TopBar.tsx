@@ -12,6 +12,7 @@ import { doImportTap, doNew, doOpen, doSave, doSaveAs, setTileProvider } from ".
 import { PROVIDER_LABEL, type TileProvider } from "../map/tileProviders";
 import { AirportSearch } from "./AirportSearch";
 import { ShowMenu } from "./ShowMenu";
+import { showImportNotes, useImportNotes } from "../state/importNotes";
 
 const NO_PCT = "Not available in browser preview";
 
@@ -130,6 +131,7 @@ export function TopBar({ onExport, onHeliport, onTap, onRescan, onSettings }: To
   const canUndo = useEditor((s) => s.undoStack.length > 0);
   const canRedo = useEditor((s) => s.redoStack.length > 0);
   const pct = hasPct();
+  const lastImport = useImportNotes((s) => s.last);
 
   return (
     <header className="pct-topbar">
@@ -229,6 +231,17 @@ export function TopBar({ onExport, onHeliport, onTap, onRescan, onSettings }: To
       >
         Import TAP…
       </button>
+      {/* Only after an import that left notes: reopens them (state/importNotes.ts) while the .tap is being
+          corrected. They belong to the last imported FILE, so New/Open keep the button. */}
+      {lastImport !== null && (
+        <button
+          type="button"
+          onClick={() => showImportNotes(true)}
+          title={`Show the notes of the last import (${lastImport.fileName}) again`}
+        >
+          Import notes ({lastImport.notes.length})
+        </button>
+      )}
 
       <span className="pct-divider" />
       <button

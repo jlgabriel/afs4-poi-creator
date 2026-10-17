@@ -8,6 +8,7 @@ import type { LonLat, PlacedObject, Project } from "../../core/project/types";
 import type { PctError } from "../../shared/pctApi";
 import { editorStore } from "../state/editorStore";
 import { DEFAULT_CAMERA } from "../state/store";
+import { setImportNotes } from "../state/importNotes";
 import { getPct } from "./pct";
 
 /** Minimal error surfacing: a native alert. */
@@ -62,16 +63,9 @@ export async function doImportTap(): Promise<void> {
   if (res.value === null) return; // cancelled
   editorStore.getState().importProject(res.value.project);
   void pct.clearShadow();
-  const { warnings, fileName } = res.value;
-  if (warnings.length > 0) {
-    const shown = warnings.slice(0, 15);
-    const more = warnings.length - shown.length;
-    window.alert(
-      `${fileName} imported, with ${warnings.length} note${warnings.length === 1 ? "" : "s"}:\n\n` +
-        shown.map((w) => `• ${w}`).join("\n") +
-        (more > 0 ? `\n… and ${more} more.` : ""),
-    );
-  }
+  // The notes open in their own scrolling panel and stay for the session (state/importNotes.ts), so they
+  // can be read again from the top bar while the .tap is being corrected.
+  setImportNotes(res.value.fileName, res.value.warnings);
 }
 
 /** Save the current project (main saves to the known path, or prompts Save-As the first time). A

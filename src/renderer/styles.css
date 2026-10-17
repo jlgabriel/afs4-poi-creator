@@ -1420,15 +1420,6 @@ body {
   opacity: 0.45;
   cursor: default;
 }
-/* The armed second press of a delete that asks first (#253c) — only the airport's. It has to look
-   different from the button it was a moment ago, or "Really delete?" reads as the same control and the
-   user clicks straight through the question they were asked. */
-.pct-placed-actions button.pct-danger {
-  border-color: #b45309;
-  background: #fffbeb;
-  color: #b45309;
-  font-weight: 600;
-}
 .pct-placed-list {
   flex: 1 1 auto;
   overflow: auto;
@@ -1966,4 +1957,28 @@ body {
 }
 .pct-footprint-row .pct-text {
   width: 100%;
+}
+
+/* Import notes: wider than the default card, and the list takes the room the card has instead of
+   .pct-reg-list's 180px cap — this list is the whole point of the dialog. */
+.pct-modal-card.pct-import-notes {
+  width: min(640px, 100%);
+}
+.pct-import-notes-list {
+  flex: 1 1 auto;
+  max-height: 60vh;
+  min-height: 80px;
+}
+/* The airport's second, final Delete in the element menu (placed/ElementContextMenu.tsx). */
+.pct-context-menu button[role="menuitem"].pct-context-menu-danger {
+  color: #b91c1c;
+  font-weight: 600;
+}
+/* A hold-mark token button: the mark as the sign shows it, black on a yellow plate (map/holdMark.ts). */
+.pct-hold-face {
+  display: inline-flex;
+  padding: 1px 3px;
+  background: #facc15;
+  color: #111111;
+  border-radius: 2px;
 }

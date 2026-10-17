@@ -214,8 +214,9 @@ hand-build those files. Double-click a `.wad` read-out to copy it.
 
 Below the Inspector, **the placed list** is everything in the project. Click a row to select it,
 shift-click to add to the selection, **double-click to send the map to it** — handy once a project has
-grown past what fits on screen — and **Duplicate** / **Delete** at the top of the list act on whatever
-is selected. Airport parts get rows of their own pinned above the objects — the airport first, then
+grown past what fits on screen — and **Duplicate** / **Hide** at the top of the list act on whatever
+is selected. To delete, press **Delete**, or **right-click** a row (or the element on the map) and pick
+**Delete** — there is no Delete button, so nothing is deleted by a stray click. Airport parts get rows of their own pinned above the objects — the airport first, then
 its parts in the same order the catalog lists them — and they stay out of the object count.
 
 ![Shot 17 — the placed list: every object in the project, one row selected, with Duplicate and Delete above](images/17_placed_list.jpg)
@@ -259,7 +260,8 @@ header changes to "N objects selected", and the editing gestures start working o
   map is the one gesture that stays single: it moves the object you grabbed and leaves the rest.
 - **Ctrl+D** duplicates everything selected — 5 m east — and leaves *the copies* selected, so a
   second **Ctrl+D** gives you a third set rather than a second one.
-- **Delete** removes them all.
+- **Delete** removes them all — the key, or **Delete N objects** from the right-click menu of any of
+  them.
 
 Each gesture is a single undo step, however many objects it moved. Holding an arrow key down counts
 as one gesture too, so **Ctrl+Z** takes back the whole slide rather than the last half-metre of it.
@@ -683,9 +685,9 @@ turning into labels floating over the ocean.
 
 Airport parts get their own rows above the objects, and they **stay out of the object count** — they
 are not scenery. Click a row to select it, **double-click to send the map to it**, and the **arrow
-keys** nudge a selected part the same 0.5 m and 5 m they nudge an object. **Delete** removes the
-selected part; on the airport's own row it asks first, because deleting the airport takes every part
-with it.
+keys** nudge a selected part the same 0.5 m and 5 m they nudge an object. **Delete** — the key, or
+the right-click menu of the row or the part on the map — removes the selected part; on the airport's
+own row it asks first, because deleting the airport takes every part with it.
 
 **A small `?` beside a field opens a note about it.** The panels below are described here in full, so
 you should not need them — but they are there, on the field, at the moment you are looking at it.
@@ -1164,7 +1166,9 @@ The import is forgiving, because a `.tap` may come from another tool or have bee
 - an element that cannot be placed — no position, a polygon with too few points — is left out;
 - a file that ends before its last blocks are closed is read up to its end.
 
-When anything was filled in or left out, a note says what, element by element, once the project is open.
+When anything was filled in or left out, a list of notes says what, element by element, once the
+project is open. The list scrolls and has **Copy list**, and until the next import **Import notes (N)**
+in the top bar opens it again — handy while you correct the `.tap`.
 
 What a `.tap` does not hold comes back as PCT's defaults: XREFs and plants on the terrain, every XREF
 at its normal size. Lights and airport lights keep the height their position carries.

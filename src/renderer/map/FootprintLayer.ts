@@ -31,6 +31,7 @@
 //     fires the map's click-to-place, and grabbing a shape or handle never starts a map pan.
 
 import * as L from "leaflet";
+import { onMenu } from "./pick";
 import type {
   CatalogAirportLight,
   CatalogObject,
@@ -297,6 +298,7 @@ export class FootprintLayer {
     });
 
     poly.on("click", (e) => this.cb.onSelect(obj.id, e.originalEvent.shiftKey));
+    onMenu(poly, () => this.selectForMenu(obj.id));
     poly.on("mousedown", (e) => this.onGrab(obj.id, e));
 
     this.group.addLayer(poly);
@@ -331,6 +333,7 @@ export class FootprintLayer {
       bubblingMouseEvents: false,
     });
     body.on("click", (e) => this.cb.onSelect(obj.id, e.originalEvent.shiftKey));
+    onMenu(body, () => this.selectForMenu(obj.id));
     body.on("mousedown", (e) => this.onGrab(obj.id, e));
 
     this.group.addLayer(body);
@@ -456,6 +459,12 @@ export class FootprintLayer {
   // context menu) or a middle-click started a real drag that no matching mouseup ever ended cleanly.
   private static isPrimary(e: L.LeafletMouseEvent): boolean {
     return e.originalEvent.button === 0;
+  }
+
+  /** Right-click on an object: one that is already selected keeps the selection, so the menu acts on all
+   *  of it; any other becomes the selection alone. */
+  private selectForMenu(id: string): void {
+    if (this.entries.get(id)?.selected !== true) this.cb.onSelect(id, false);
   }
 
   private onGrab = (id: string, e: L.LeafletMouseEvent): void => {

@@ -21,7 +21,7 @@ interface Outcome {
 
 /** Lifts a list out of the app and into the user's editor — the point of the skipped list is that each
  *  line is a job to do by hand, and re-typing 35 filenames off a screen is not a plan. */
-function CopyList({ lines }: { lines: string[] }): React.ReactElement | null {
+export function CopyList({ lines }: { lines: string[] }): React.ReactElement | null {
   const [copied, setCopied] = useState(false);
   useEffect(() => {
     if (!copied) return undefined;

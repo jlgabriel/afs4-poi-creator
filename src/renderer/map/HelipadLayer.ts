@@ -26,6 +26,7 @@
 //     FootprintLayer and ParkingLayer already make.
 
 import * as L from "leaflet";
+import { onPick } from "./pick";
 import type { AirportPad, LonLat } from "../../core/project/types";
 import { destination, initialBearing, wrapLon } from "../../core/geo/geo";
 import { glyphPx } from "./glyph";
@@ -164,7 +165,7 @@ export class HelipadLayer {
       bubblingMouseEvents: false, // grabbing a pad never starts a map pan or a place-click
     }).addTo(this.group);
     // Select on CLICK, drag on MOUSEDOWN — see the header. This split is the whole fix.
-    ring.on("click", () => this.cb.onSelect(p.id));
+    onPick(ring, () => this.cb.onSelect(p.id));
     ring.on("mousedown", (e: L.LeafletMouseEvent) => this.onGrab(p.id, e));
 
     const tick = L.polyline([toLatLng(position), toLatLng(tipAt(p, position, p.heading))], {

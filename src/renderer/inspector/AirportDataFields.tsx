@@ -11,6 +11,7 @@
 // the .wad. The user is not shown three boxes for it.
 import { useEffect, useState } from "react";
 import type { ProjectAirport } from "../../core/project/types";
+import { airportPartCount } from "../../core/project/airport";
 import type { IcaoStatus } from "../../shared/pctApi";
 import { clampLonLat } from "../../core/project/schemas";
 import { identityProblemText, validateIdentity, SNAME_MAX } from "../../core/export/heliportTemplate";
@@ -105,12 +106,7 @@ export function AirportDataFields({ airport }: { airport: ProjectAirport }): Rea
   const point = airport.position;
   const armed = useEditor((s) => s.placing?.kind === "airport");
   const pendingDelete = useEditor((s) => s.pendingAirportDelete);
-  const parts =
-    airport.pads.length +
-    (airport.parkings?.length ?? 0) +
-    (airport.runways?.length ?? 0) +
-    (airport.aerotows?.length ?? 0) +
-    (airport.winches?.length ?? 0);
+  const parts = airportPartCount(airport);
 
   return (
     <div className="pct-inspector-body">

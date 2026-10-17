@@ -58,8 +58,7 @@ export function useKeyboardShortcuts(): void {
         // ★ ASK ABOUT BOTH SELECTIONS, or the key is dead on every airport element. Selecting an airport
         // part EMPTIES `selection` and fills `airportSelection` — the two are mutually exclusive by
         // design (store.ts, selectAirportPart) — so a guard that counts only `selection` returns before
-        // ever reaching deleteSelection, which handles both. The Delete BUTTON asks the same question
-        // (`!hasSelection && !airportSelected`); `hasSelection` asks it once and testably.
+        // ever reaching deleteSelection, which handles both. `hasSelection` asks it once and testably.
         if (!hasSelection(store.selection, store.airportSelection)) return;
         e.preventDefault();
         store.deleteSelection();

@@ -15,6 +15,7 @@
 // one commit on release, and select on the shape's own `click` while `mousedown` starts the drag — never
 // onSelect from the mouseup, which any stray mousemove eats.
 import * as L from "leaflet";
+import { onPick } from "./pick";
 import type { AirportAerotow, AirportWinch, LonLat } from "../../core/project/types";
 import { destination, initialBearing, wrapLon } from "../../core/geo/geo";
 import { snapAngle } from "./rotate";
@@ -219,8 +220,8 @@ export class GliderLayer {
     const tip = destination(a.position, AEROTOW_ROPE_M, a.heading);
     const rope = this.ropeLine(a.position, tip, selected).addTo(this.group);
     const mark = this.markerAt(a.position, selected).addTo(this.group);
-    rope.on("click", () => this.cb.onSelect("aerotow", a.id));
-    mark.on("click", () => this.cb.onSelect("aerotow", a.id));
+    onPick(rope, () => this.cb.onSelect("aerotow", a.id));
+    onPick(mark, () => this.cb.onSelect("aerotow", a.id));
     mark.on("mousedown", (e: L.LeafletMouseEvent) => this.grabAerotow(a.id, e));
     rope.on("mousedown", (e: L.LeafletMouseEvent) => this.grabAerotow(a.id, e));
     const entry: AerotowEntry = { kind: "aerotow", model: a, selected, mark, rope };
@@ -248,7 +249,7 @@ export class GliderLayer {
     const rope = this.ropeLine(w.position, w.winch, selected).addTo(this.group);
     const mark = this.markerAt(w.position, selected).addTo(this.group);
     const far = this.winchBoxAt(w.winch, selected).addTo(this.group);
-    for (const shape of [rope, mark, far]) shape.on("click", () => this.cb.onSelect("winch", w.id));
+    for (const shape of [rope, mark, far]) onPick(shape, () => this.cb.onSelect("winch", w.id));
     mark.on("mousedown", (e: L.LeafletMouseEvent) => this.grabWinch(w.id, "glider", e));
     far.on("mousedown", (e: L.LeafletMouseEvent) => this.grabWinch(w.id, "winch", e));
     // The rope moves the WHOLE launch. Without this it would have no mousedown at all, and pressing the

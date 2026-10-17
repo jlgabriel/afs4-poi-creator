@@ -74,6 +74,25 @@ export function carlotsOf(airport: ProjectAirport | undefined): AirportCarlot[] 
   return airport?.carlots ?? [];
 }
 
+/** Every part an airport holds — what deleting the airport takes with it. Counted in one place so the
+ *  placed list's Airport row and the Inspector's delete question always give the same number. */
+export function airportPartCount(airport: ProjectAirport): number {
+  return (
+    airport.pads.length +
+    parkingsOf(airport).length +
+    runwaysOf(airport).length +
+    aerotowsOf(airport).length +
+    winchesOf(airport).length +
+    (airport.boundary !== undefined ? 1 : 0) +
+    tarmacsOf(airport).length +
+    linesOf(airport).length +
+    groundTextsOf(airport).length +
+    taxisignsOf(airport).length +
+    jetwaysOf(airport).length +
+    carlotsOf(airport).length
+  );
+}
+
 // Deleting a part never drops the whole airport block: editing changes only the affected elements. The
 // check the app needs is FS4's own floor — at least one helipad or one runway — and the install asks it
 // (renderer/dialogs/HeliportDialog).

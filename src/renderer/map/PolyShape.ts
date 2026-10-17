@@ -17,6 +17,7 @@
 // and `mousedown` + `map.dragging.disable()` on anything grabbable — without it Leaflet's pan wins and the
 // shape looks inert. Drag listeners exist only while a drag does.
 import * as L from "leaflet";
+import { onPick } from "./pick";
 import type { LonLat } from "../../core/project/types";
 import { wrapLon } from "../../core/geo/geo";
 import { midpoint } from "../../core/geo/polygon";
@@ -134,7 +135,7 @@ export class PolyShape {
       bubblingMouseEvents: false,
     }).addTo(this.group);
     if (bodyIsShape) {
-      this.shape.on("click", () => this.cb.onSelect());
+      onPick(this.shape, () => this.cb.onSelect());
       if (grab) this.shape.on("mousedown", this.onGrabBody);
     } else if (this.editable) {
       // The outline (a ring) or the line answers through a wide stroke nobody sees, fill off.
@@ -147,7 +148,7 @@ export class PolyShape {
         className: grab ? `${this.opts.className}-hit grab` : `${this.opts.className}-hit`,
         bubblingMouseEvents: false,
       }).addTo(this.group);
-      this.hit.on("click", () => this.cb.onSelect());
+      onPick(this.hit, () => this.cb.onSelect());
       if (grab) this.hit.on("mousedown", this.onGrabBody);
     }
     if (grab) this.addHandles(points);

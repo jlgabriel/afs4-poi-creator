@@ -16,6 +16,7 @@
 //   • The rotate grip exists only on the SELECTED stand. N grips on N stands is clutter, and it is the
 //     same call FootprintLayer already makes ("present only while selected").
 import * as L from "leaflet";
+import { onPick } from "./pick";
 import type { AirportParking, LonLat } from "../../core/project/types";
 import { destination, initialBearing, wrapLon } from "../../core/geo/geo";
 import { glyphPx } from "./glyph";
@@ -150,7 +151,7 @@ export class ParkingLayer {
     // other spelling (fire onSelect from the document mouseup when the drag never `moved`) loses the
     // selection to any stray mousemove that lands between the press and the release, because `moved` is
     // set unconditionally on the first move. Leaflet already decides what counts as a click; let it.
-    ring.on("click", () => this.cb.onSelect(p.id));
+    onPick(ring, () => this.cb.onSelect(p.id));
     ring.on("mousedown", (e: L.LeafletMouseEvent) => this.onGrab(p.id, e));
 
     const tick = L.polyline([toLatLng(position), toLatLng(tipAt(p, position, p.heading))], {

@@ -12,6 +12,8 @@ import { ExportDialog } from "../dialogs/ExportDialog";
 import { HeliportDialog } from "../dialogs/HeliportDialog";
 import { TapDialog } from "../dialogs/TapDialog";
 import { SettingsDialog } from "../dialogs/SettingsDialog";
+import { ImportNotesDialog } from "../dialogs/ImportNotesDialog";
+import { ElementContextMenu } from "../placed/ElementContextMenu";
 import { useKeyboardShortcuts } from "../app/useKeyboardShortcuts";
 
 export function AppShell({ onRescan }: { onRescan: () => void }): React.ReactElement {
@@ -53,6 +55,8 @@ export function AppShell({ onRescan }: { onRescan: () => void }): React.ReactEle
       {exportOpen && <ExportDialog onClose={() => setExportOpen(false)} />}
       {heliportOpen && <HeliportDialog onClose={() => setHeliportOpen(false)} />}
       {tapOpen && <TapDialog onClose={() => setTapOpen(false)} />}
+      <ImportNotesDialog />
+      <ElementContextMenu />
       {settingsOpen && (
         <SettingsDialog onClose={() => setSettingsOpen(false)} onRescan={onRescan} />
       )}

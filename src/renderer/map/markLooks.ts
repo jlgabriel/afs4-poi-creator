@@ -13,7 +13,8 @@
 //   • JETWAY: three parts from the mounting point out. The BASE, a square on the heading; the EXTENSION,
 //     a 3 m wide tunnel from the base, turned by its extension direction (counter-clockwise) and as long as
 //     its extension amount (2 m at least, so a retracted one still shows); and the EXIT, a square at the
-//     end of the tunnel, turned by its exit direction from the heading. Sizes approximate.
+//     end of the tunnel, turned by its exit direction from the EXTENSION (exit 0 = in line with the
+//     tunnel), so turning the extension carries the exit with it. Sizes approximate.
 //   • CAR LOT: an approximate footprint — rows along the heading, spaces across it, each space 2.5 m wide
 //     and 5 m deep.
 //
@@ -30,7 +31,9 @@ import type {
 import type { GroundTextColor, TaxisignElementType } from "../../core/project/marks";
 import { cleanTaxisignValue, taxisignFaces, taxisignValueParts } from "../../core/project/marks";
 import { destination } from "../../core/geo/geo";
-import { circleAround, rectAround, type MarkLook } from "./MarkLayer";
+import type { MarkLook } from "./MarkLayer";
+import { holdSvg, isHoldToken } from "./holdMark";
+import { JETWAY_BASE_M, JETWAY_EXIT_M, circleAround, jetwayExtensionLength, jetwayParts, rectAround } from "./markShapes";
 
 const PAINT: Record<GroundTextColor, string> = {
   none: "transparent",
@@ -128,8 +131,11 @@ const signDepth = (t: AirportTaxisign): number => Math.max(1.5, SIGN_FACE_K * si
 const spaced = (s: string): string => escapeHtml(s).replace(/ /g, "&nbsp;");
 
 /** An arrow token as an arrow turned from straight up: right is clockwise, left counter-clockwise. A hold
- *  mark is shown by its name. */
+ *  mark is drawn as the mark (holdMark.ts). */
 function tokenHtml(token: string, letterPx: number): string {
+  if (isHoldToken(token)) {
+    return `<span style="padding:0 0.15em">${holdSvg(token, letterPx * 0.75)}</span>`;
+  }
   const m = /^<(LEFT|RIGHT)(\d+)>$/.exec(token);
   if (m === null) {
     return `<span style="font-size:${letterPx * 0.55}px;padding:0 0.2em">${escapeHtml(token.slice(1, -1))}</span>`;
@@ -187,29 +193,10 @@ export const TAXISIGN_LOOK: MarkLook<AirportTaxisign> = {
   },
 };
 
-const JETWAY_WIDTH_M = 3;
-const JETWAY_BASE_M = 4;
-const JETWAY_EXIT_M = 3.5;
-const extensionLength = (j: AirportJetway): number => Math.max(2, j.extensionAmount);
-
-/** The three parts' rings: base, extension, exit. Directions are relative to the heading and
- *  counter-clockwise, so a compass bearing is the heading MINUS them. */
-export function jetwayParts(j: AirportJetway, at: LonLat, heading: number): [LonLat[], LonLat[], LonLat[]] {
-  const base = rectAround(destination(at, JETWAY_BASE_M / 2, heading), heading, JETWAY_BASE_M, JETWAY_BASE_M);
-  const start = destination(at, JETWAY_BASE_M, heading);
-  const along = heading - j.extensionDirection;
-  const length = extensionLength(j);
-  const extension = rectAround(destination(start, length / 2, along), along, length, JETWAY_WIDTH_M);
-  const end = destination(start, length, along);
-  const exitHeading = heading - j.exitDirection;
-  const exit = rectAround(destination(end, JETWAY_EXIT_M / 2, exitHeading), exitHeading, JETWAY_EXIT_M, JETWAY_EXIT_M);
-  return [base, extension, exit];
-}
-
 export const JETWAY_LOOK: MarkLook<AirportJetway> = {
   color: "#6366f1",
   outline: (j, at, heading) => jetwayParts(j, at, heading),
-  reach: (j) => JETWAY_BASE_M + extensionLength(j) + JETWAY_EXIT_M,
+  reach: (j) => JETWAY_BASE_M + jetwayExtensionLength(j) + JETWAY_EXIT_M,
   glyph: () => null,
 };
 

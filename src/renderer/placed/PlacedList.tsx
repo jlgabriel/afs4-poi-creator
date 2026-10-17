@@ -1,13 +1,14 @@
 // PlacedList.tsx — the right panel's lower half: every placed object as a selectable row (design §5
 // "PLACED LIST: all objects, click=select, dblclick=fly"). It's the map's twin — both are just views
 // of the same store selection, so selecting here highlights the footprint and vice-versa, and the
-// Inspector above follows selection[0]. Duplicate / Delete act on the current selection (the same
-// store actions Ctrl+D / Del already call from the keyboard).
+// Inspector above follows selection[0]. Duplicate and Hide act on the current selection; deleting is
+// the Del key or a row's right-click menu (ElementContextMenu), never a button.
 //
 // Not virtualized: a POI is tens-to-low-hundreds of objects, not the catalog's hundreds; if dense scenes
 // ever make this janky, it takes the same react-window treatment the catalog got.
 import { useMemo } from "react";
 import { editorStore, useEditor } from "../state/editorStore";
+import { openElementMenu } from "../state/elementMenu";
 import type { MarkKind } from "../state/store";
 import { Thumbnail } from "../catalog/Thumbnail";
 import {
@@ -25,7 +26,7 @@ import {
   WinchIcon,
 } from "../catalog/categoryIcon";
 import { photoKeyForPlaced as placedPhotoKey } from "../../core/catalog/photoKey";
-import { PARKING_TYPE_LABELS } from "../../core/project/airport";
+import { PARKING_TYPE_LABELS, airportPartCount } from "../../core/project/airport";
 import { cleanTaxisignValue, taxisignFaces } from "../../core/project/marks";
 import { tarmacLevel } from "../../core/project/surfaces";
 import { haversine, initialBearing } from "../../core/geo/geo";
@@ -57,25 +58,21 @@ function rowClass(airportPart: boolean, selected: boolean, group: VisGroup, id?:
  *  row is what keeps such an airport visible and reachable instead of a block nobody can see.
  *
  *  Double-click flies to the airport's own point, like every other row here. */
+/** A row's right-click: `select` it (a selected object keeps the whole selection), then open the element
+ *  menu at the cursor. */
+function rowMenu(e: React.MouseEvent, select: () => void): void {
+  e.preventDefault();
+  select();
+  openElementMenu(e.clientX, e.clientY);
+}
+
 function DataRow(): React.ReactElement | null {
   const airport = useEditor((s) => s.project.airport);
   const selected = useEditor((s) => s.airportSelection?.kind === "data");
   if (airport === undefined) return null;
   const { icao, name } = airport;
   const point = airport.position;
-  const parts =
-    airport.pads.length +
-    (airport.parkings?.length ?? 0) +
-    (airport.runways?.length ?? 0) +
-    (airport.aerotows?.length ?? 0) +
-    (airport.winches?.length ?? 0) +
-    (airport.boundary !== undefined ? 1 : 0) +
-    (airport.tarmacs?.length ?? 0) +
-    (airport.lines?.length ?? 0) +
-    (airport.groundtexts?.length ?? 0) +
-    (airport.taxisigns?.length ?? 0) +
-    (airport.jetways?.length ?? 0) +
-    (airport.carlots?.length ?? 0);
+  const parts = airportPartCount(airport);
   return (
     <button
       type="button"
@@ -83,6 +80,7 @@ function DataRow(): React.ReactElement | null {
       aria-pressed={selected}
       title="The airport itself — its name and code"
       onClick={() => editorStore.getState().selectAirportPart({ kind: "data" })}
+      onContextMenu={(e) => rowMenu(e, () => editorStore.getState().selectAirportPart({ kind: "data" }))}
       onDoubleClick={() => {
         if (point !== undefined) editorStore.getState().flyTo(point);
       }}
@@ -128,6 +126,7 @@ function HelipadRows(): React.ReactElement | null {
             aria-pressed={selected}
             title="A helicopter start pad"
             onClick={() => editorStore.getState().selectAirportPart({ kind: "pad", id: pad.id })}
+            onContextMenu={(e) => rowMenu(e, () => editorStore.getState().selectAirportPart({ kind: "pad", id: pad.id }))}
             onDoubleClick={() => editorStore.getState().flyTo(pad.position)}
           >
             <HelipadIcon />
@@ -171,6 +170,7 @@ function ParkingRows(): React.ReactElement | null {
             aria-pressed={selected}
             title="A parking position"
             onClick={() => editorStore.getState().selectAirportPart({ kind: "parking", id: p.id })}
+            onContextMenu={(e) => rowMenu(e, () => editorStore.getState().selectAirportPart({ kind: "parking", id: p.id }))}
             onDoubleClick={() => editorStore.getState().flyTo(p.position)}
           >
             <ParkingIcon />
@@ -218,6 +218,7 @@ function SurfaceRows(): React.ReactElement | null {
         aria-pressed={selected}
         title={kind === "tarmac" ? "A tarmac area" : "A painted line"}
         onClick={() => editorStore.getState().selectAirportPart({ kind, id })}
+        onContextMenu={(e) => rowMenu(e, () => editorStore.getState().selectAirportPart({ kind, id }))}
         onDoubleClick={() => {
           if (first !== undefined) editorStore.getState().flyTo(first);
         }}
@@ -271,6 +272,7 @@ function MarkRows(): React.ReactElement | null {
         aria-pressed={selected}
         title={MARK_TITLES[kind]}
         onClick={() => editorStore.getState().selectAirportPart({ kind, id })}
+        onContextMenu={(e) => rowMenu(e, () => editorStore.getState().selectAirportPart({ kind, id }))}
         onDoubleClick={() => editorStore.getState().flyTo(at)}
       >
         {MARK_ICONS[kind]}
@@ -363,6 +365,7 @@ function RunwayRows(): React.ReactElement | null {
             aria-pressed={selected}
             title="A runway"
             onClick={() => editorStore.getState().selectAirportPart({ kind: "runway", id: r.id })}
+            onContextMenu={(e) => rowMenu(e, () => editorStore.getState().selectAirportPart({ kind: "runway", id: r.id }))}
             onDoubleClick={() => editorStore.getState().flyTo(r.ends[0].threshold)}
           >
             <RunwayIcon />
@@ -402,6 +405,7 @@ function GliderRows(): React.ReactElement | null {
         aria-pressed={selected}
         title="A glider aerotow start"
         onClick={() => editorStore.getState().selectAirportPart({ kind: "aerotow", id: a.id })}
+        onContextMenu={(e) => rowMenu(e, () => editorStore.getState().selectAirportPart({ kind: "aerotow", id: a.id }))}
         onDoubleClick={() => editorStore.getState().flyTo(a.position)}
       >
         <AerotowIcon />
@@ -429,6 +433,7 @@ function GliderRows(): React.ReactElement | null {
         aria-pressed={selected}
         title="A glider winch launch"
         onClick={() => editorStore.getState().selectAirportPart({ kind: "winch", id: w.id })}
+        onContextMenu={(e) => rowMenu(e, () => editorStore.getState().selectAirportPart({ kind: "winch", id: w.id }))}
         onDoubleClick={() => editorStore.getState().flyTo(w.position)}
       >
         <WinchIcon />
@@ -455,7 +460,6 @@ export function PlacedList(): React.ReactElement {
   const objects = useEditor((s) => s.project.objects);
   const selection = useEditor((s) => s.selection);
   const airportSelected = useEditor((s) => s.airportSelection !== null);
-  const pendingAirportDelete = useEditor((s) => s.pendingAirportDelete);
   const catalogIndex = useEditor((s) => s.catalogIndex);
   const airportLightIndex = useEditor((s) => s.airportLightIndex);
   const plantIndex = useEditor((s) => s.plantIndex);
@@ -498,28 +502,8 @@ export function PlacedList(): React.ReactElement {
           >
             {selectionHidden ? "Show" : "Hide"}
           </button>
-          {/* Delete also reaches the airport parts — deleteSelection drops whichever one is selected, so
-              the button follows whatever the panel above is showing. On the Airport row it deletes the
-              whole airport, geometry and all, which is the only deliberate way to do that. Duplicate does
-              not reach any of them.
-
-              ★ AND ON THAT ROW IT ASKS FIRST. The label is the question, so the second press is
-              answering something rather than repeating something. The note beside it lives in the
-              Airport panel, which is what the
-              Inspector is showing whenever this state can be reached. */}
-          <button
-            type="button"
-            disabled={!hasSelection && !airportSelected}
-            className={pendingAirportDelete ? "pct-danger" : undefined}
-            title={
-              pendingAirportDelete
-                ? "Press again to delete the airport and everything in it"
-                : "Delete selection (Del)"
-            }
-            onClick={() => editorStore.getState().deleteSelection()}
-          >
-            {pendingAirportDelete ? "Really delete?" : "Delete"}
-          </button>
+          {/* No Delete button: beside Hide it was one slip from a deletion nobody meant. The mouse deletes
+              from the right-click menu (ElementContextMenu), the keyboard with Del. */}
         </div>
       </div>
 
@@ -549,6 +533,11 @@ export function PlacedList(): React.ReactElement {
                 aria-pressed={selected}
                 title={info.name}
                 onClick={(e) => editorStore.getState().select([o.id], e.shiftKey)}
+                onContextMenu={(e) =>
+                  rowMenu(e, () => {
+                    if (!selected) editorStore.getState().select([o.id], false);
+                  })
+                }
                 onDoubleClick={() => editorStore.getState().flyTo(o.position)}
               >
                 {/* Every kind resolves a photo, not just xref: photoKey gives each kind a usable name, so
