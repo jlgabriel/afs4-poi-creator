@@ -3,8 +3,12 @@
 //
 // These cards behave exactly like a light or a plant: click to arm, click the map to drop, Escape to
 // cancel — the same procedure as placing POI objects, so nothing new has to be learned. Order:
-// Airport · Boundary · Runway · Helipad · Parking · Tarmac · Line · Ground Text · Taxi Sign · Jetway ·
-// Car Lot · Aerotow · Winch Launch.
+// Airport · Runway · Aerotow · Winch Launch · Helipad · Parking · Tarmac · Line · Ground Text · Taxi Sign ·
+// Jetway · Car Lot. The glider starts follow the runway they belong to.
+//
+// ★ NO BOUNDARY CARD: the boundary is one polygon per airport, part of the airport the way its point is,
+// so it is drawn and opened from the Airport panel (AirportDataFields BoundaryButton). The Airport card
+// answers a search for it.
 //
 // ★ THE ORDER IS A PAIR, NOT A LIST: the catalog and the placed list must show the same sequence.
 // Neither column owns it, so changing one of them alone is the bug — PlacedList.tsx carries the same
@@ -26,7 +30,6 @@ import { PARKING_TYPES, PARKING_TYPE_LABELS } from "../../core/project/airport";
 import { editorStore, useEditor } from "../state/editorStore";
 import {
   AerotowIcon,
-  BoundaryIcon,
   CarlotIcon,
   DataIcon,
   GroundTextIcon,
@@ -46,8 +49,7 @@ const DEFAULT_NEW_PARKING: ParkingType = "parked_ga";
 
 /** What each card answers the search box with. The words are what someone would actually type looking
  *  for the thing, not the label alone — "heliport" finds the pad, "stand"/"gate"/"apron" find parking. */
-const DATA_TERMS = "data airport icao code country name identity heliport";
-const BOUNDARY_TERMS = "boundary polygon outline perimeter fence area";
+const DATA_TERMS = "data airport icao code country name identity heliport boundary bounds polygon outline perimeter";
 const HELIPAD_TERMS = "start - helicopter helipad heliport pad";
 const PARKING_TERMS = `parking stand gate apron aircraft ${PARKING_TYPES.map(
   (t) => PARKING_TYPE_LABELS[t],
@@ -80,7 +82,6 @@ export function AirportSection(): React.ReactElement {
   const runwayCount = useEditor((s) => s.project.airport?.runways?.length ?? 0);
   const aerotowCount = useEditor((s) => s.project.airport?.aerotows?.length ?? 0);
   const winchCount = useEditor((s) => s.project.airport?.winches?.length ?? 0);
-  const boundaryPoints = useEditor((s) => s.project.airport?.boundary?.length ?? 0);
   const tarmacCount = useEditor((s) => s.project.airport?.tarmacs?.length ?? 0);
   const lineCount = useEditor((s) => s.project.airport?.lines?.length ?? 0);
   const groundTextCount = useEditor((s) => s.project.airport?.groundtexts?.length ?? 0);
@@ -98,7 +99,6 @@ export function AirportSection(): React.ReactElement {
   const runwayArmed = placing?.kind === "runway";
   const aerotowArmed = placing?.kind === "aerotow";
   const winchArmed = placing?.kind === "winch";
-  const boundaryArmed = placing?.kind === "boundary";
   const tarmacArmed = placing?.kind === "tarmac";
   const lineArmed = placing?.kind === "line";
 
@@ -106,7 +106,6 @@ export function AirportSection(): React.ReactElement {
   // there reads as a bug — see LightsSection's note on the same problem).
   const q = query.trim().toLowerCase();
   const dataMatches = q === "" || DATA_TERMS.includes(q);
-  const boundaryMatches = q === "" || BOUNDARY_TERMS.includes(q);
   const padMatches = q === "" || HELIPAD_TERMS.includes(q);
   const parkingMatches = q === "" || PARKING_TERMS.includes(q);
   const runwayMatches = q === "" || RUNWAY_TERMS.includes(q);
@@ -120,7 +119,6 @@ export function AirportSection(): React.ReactElement {
   const carlotMatches = q === "" || CARLOT_TERMS.includes(q);
   const count =
     (dataMatches ? 1 : 0) +
-    (boundaryMatches ? 1 : 0) +
     (padMatches ? 1 : 0) +
     (parkingMatches ? 1 : 0) +
     (tarmacMatches ? 1 : 0) +
@@ -149,10 +147,6 @@ export function AirportSection(): React.ReactElement {
   //
   // The decision itself lives in the store (`startAirportCard`) rather than here, where a test can reach it.
   const startAirport = useCallback(() => editorStore.getState().startAirportCard(), []);
-
-  // One boundary per airport, so this card behaves like the Airport card: it draws while there is none
-  // and opens the one there is (store.startBoundaryCard).
-  const startBoundary = useCallback(() => editorStore.getState().startBoundaryCard(), []);
 
   const armPad = useCallback(() => {
     const cur = editorStore.getState().placing;
@@ -235,35 +229,6 @@ export function AirportSection(): React.ReactElement {
             </span>
           </button>
         )}
-        {boundaryMatches && (
-          <button
-            type="button"
-            className={boundaryArmed ? "pct-obj-card armed" : "pct-obj-card"}
-            aria-pressed={boundaryArmed}
-            title={
-              boundaryPoints > 0
-                ? "The polygon around the whole airport. Click to edit it"
-                : "The polygon around the whole airport. Click, then click the map point by point — double-click the last one"
-            }
-            onClick={startBoundary}
-          >
-            <BoundaryIcon />
-            <span className="pct-obj-text">
-              <span className="pct-obj-name">Boundary</span>
-              {/* Drawing takes many clicks, the only card that does — so while armed the subtitle says how
-                  to finish rather than what the card is. */}
-              <span className="pct-obj-cat">
-                {boundaryArmed
-                  ? draftPoints < 3
-                    ? `${draftPoints} point${draftPoints === 1 ? "" : "s"} · click to add, double-click the last`
-                    : `${draftPoints} points · double-click to close`
-                  : boundaryPoints > 0
-                    ? `${boundaryPoints} points · click to edit`
-                    : "click points around the airport"}
-              </span>
-            </span>
-          </button>
-        )}
         {runwayMatches && (
           <button
             type="button"
@@ -282,6 +247,44 @@ export function AirportSection(): React.ReactElement {
                 {runwayCount === 0
                   ? "drops a strip · drag its two ends"
                   : `${runwayCount} placed · drops a strip you then drag`}
+              </span>
+            </span>
+          </button>
+        )}
+        {aerotowMatches && (
+          <button
+            type="button"
+            className={aerotowArmed ? "pct-obj-card armed" : "pct-obj-card"}
+            aria-pressed={aerotowArmed}
+            title="Where a glider waits to be towed into the air. Click, then click the map"
+            onClick={armAerotow}
+          >
+            <AerotowIcon />
+            <span className="pct-obj-text">
+              <span className="pct-obj-name">Aerotow</span>
+              <span className="pct-obj-cat">
+                {aerotowCount === 0
+                  ? "a glider start, towed by the DR400"
+                  : `${aerotowCount} placed · click the map to add another`}
+              </span>
+            </span>
+          </button>
+        )}
+        {winchMatches && (
+          <button
+            type="button"
+            className={winchArmed ? "pct-obj-card armed" : "pct-obj-card"}
+            aria-pressed={winchArmed}
+            title="A glider launched by a winch. Click, then click the map — then drag either end"
+            onClick={armWinch}
+          >
+            <WinchIcon />
+            <span className="pct-obj-text">
+              <span className="pct-obj-name">Winch Launch</span>
+              <span className="pct-obj-cat">
+                {winchCount === 0
+                  ? "lays out a rope · drag its two ends"
+                  : `${winchCount} placed · lays out a rope you then drag`}
               </span>
             </span>
           </button>
@@ -440,44 +443,6 @@ export function AirportSection(): React.ReactElement {
                 {carlotCount === 0
                   ? "rows of parked cars"
                   : `${carlotCount} placed · click the map to add another`}
-              </span>
-            </span>
-          </button>
-        )}
-        {aerotowMatches && (
-          <button
-            type="button"
-            className={aerotowArmed ? "pct-obj-card armed" : "pct-obj-card"}
-            aria-pressed={aerotowArmed}
-            title="Where a glider waits to be towed into the air. Click, then click the map"
-            onClick={armAerotow}
-          >
-            <AerotowIcon />
-            <span className="pct-obj-text">
-              <span className="pct-obj-name">Aerotow</span>
-              <span className="pct-obj-cat">
-                {aerotowCount === 0
-                  ? "a glider start, towed by the DR400"
-                  : `${aerotowCount} placed · click the map to add another`}
-              </span>
-            </span>
-          </button>
-        )}
-        {winchMatches && (
-          <button
-            type="button"
-            className={winchArmed ? "pct-obj-card armed" : "pct-obj-card"}
-            aria-pressed={winchArmed}
-            title="A glider launched by a winch. Click, then click the map — then drag either end"
-            onClick={armWinch}
-          >
-            <WinchIcon />
-            <span className="pct-obj-text">
-              <span className="pct-obj-name">Winch Launch</span>
-              <span className="pct-obj-cat">
-                {winchCount === 0
-                  ? "lays out a rope · drag its two ends"
-                  : `${winchCount} placed · lays out a rope you then drag`}
               </span>
             </span>
           </button>

@@ -11,6 +11,7 @@ import { hasPct } from "../app/pct";
 import { doNew, doOpen, doSave, doSaveAs, setTileProvider } from "../app/commands";
 import { PROVIDER_LABEL, type TileProvider } from "../map/tileProviders";
 import { AirportSearch } from "./AirportSearch";
+import { ShowMenu } from "./ShowMenu";
 
 const NO_PCT = "Not available in browser preview";
 
@@ -246,6 +247,7 @@ export function TopBar({ onExport, onHeliport, onTap, onRescan, onSettings }: To
       <AirportSearch />
       <HeightModeSwitch />
       <MapStyleSwitch />
+      <ShowMenu />
       <span className="pct-readout">
         {objCount} {objCount === 1 ? "object" : "objects"}
       </span>

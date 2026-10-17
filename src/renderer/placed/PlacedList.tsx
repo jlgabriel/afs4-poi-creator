@@ -12,7 +12,6 @@ import type { MarkKind } from "../state/store";
 import { Thumbnail } from "../catalog/Thumbnail";
 import {
   AerotowIcon,
-  BoundaryIcon,
   CarlotIcon,
   DataIcon,
   GroundTextIcon,
@@ -32,6 +31,24 @@ import { tarmacLevel } from "../../core/project/surfaces";
 import { haversine, initialBearing } from "../../core/geo/geo";
 import type { LonLat } from "../../core/project/types";
 import { rowInfo } from "./rowInfo";
+import { objectGroup, type VisGroup } from "../state/visibility";
+
+/** The group each mark kind is shown and hidden by (state/visibility.ts). */
+const MARK_GROUP: Record<MarkKind, VisGroup> = {
+  groundtext: "groundtexts",
+  taxisign: "taxisigns",
+  jetway: "jetways",
+  carlot: "carlots",
+};
+
+/** A row's class: an airport part's or an object's, selected, and dimmed when the map does not draw it.
+ *  Read from the store at render time: PlacedList subscribes to the two hidden sets, and every row is
+ *  rendered inside it, so a change of them re-renders all the rows. */
+function rowClass(airportPart: boolean, selected: boolean, group: VisGroup, id?: string): string {
+  const s = editorStore.getState();
+  const hidden = s.hiddenGroups.has(group) || (id !== undefined && s.hiddenIds.has(id));
+  return `pct-placed-row${airportPart ? " pct-placed-pad" : ""}${selected ? " sel" : ""}${hidden ? " hidden" : ""}`;
+}
 
 /** The airport's own row (DATA) — pinned above every airport part, because the parts belong to it.
  *  Present whenever the block is, INCLUDING an airport with no geometry at all: PCT will not INSTALL that
@@ -62,7 +79,7 @@ function DataRow(): React.ReactElement | null {
   return (
     <button
       type="button"
-      className={selected ? "pct-placed-row pct-placed-pad sel" : "pct-placed-row pct-placed-pad"}
+      className={rowClass(true, selected, "airport")}
       aria-pressed={selected}
       title="The airport itself — its name and code"
       onClick={() => editorStore.getState().selectAirportPart({ kind: "data" })}
@@ -88,34 +105,6 @@ function DataRow(): React.ReactElement | null {
   );
 }
 
-/** The airport's boundary — one per airport, so one row at most. Double-click flies to its first point. */
-function BoundaryRow(): React.ReactElement | null {
-  const boundary = useEditor((s) => s.project.airport?.boundary);
-  const selected = useEditor((s) => s.airportSelection?.kind === "boundary");
-  if (boundary === undefined) return null;
-  return (
-    <button
-      type="button"
-      className={selected ? "pct-placed-row pct-placed-pad sel" : "pct-placed-row pct-placed-pad"}
-      aria-pressed={selected}
-      title="The polygon around the whole airport"
-      onClick={() => editorStore.getState().selectAirportPart({ kind: "boundary" })}
-      onDoubleClick={() => {
-        const first = boundary[0];
-        if (first !== undefined) editorStore.getState().flyTo(first);
-      }}
-    >
-      <BoundaryIcon />
-      <span className="pct-placed-text">
-        <span className="pct-placed-name">
-          <span className="pct-placed-label">Boundary</span>
-        </span>
-        <span className="pct-placed-meta">{boundary.length} points</span>
-      </span>
-    </button>
-  );
-}
-
 /** One row per helicopter start pad. They are NOT objects and do not join their count — none of them goes into the
  *  cultivation and Duplicate means nothing for them — so they sit above the list rather than in it.
  *
@@ -135,7 +124,7 @@ function HelipadRows(): React.ReactElement | null {
           <button
             key={pad.id}
             type="button"
-            className={selected ? "pct-placed-row pct-placed-pad sel" : "pct-placed-row pct-placed-pad"}
+            className={rowClass(true, selected, "helipads", pad.id)}
             aria-pressed={selected}
             title="A helicopter start pad"
             onClick={() => editorStore.getState().selectAirportPart({ kind: "pad", id: pad.id })}
@@ -178,7 +167,7 @@ function ParkingRows(): React.ReactElement | null {
           <button
             key={p.id}
             type="button"
-            className={selected ? "pct-placed-row pct-placed-pad sel" : "pct-placed-row pct-placed-pad"}
+            className={rowClass(true, selected, "parkings", p.id)}
             aria-pressed={selected}
             title="A parking position"
             onClick={() => editorStore.getState().selectAirportPart({ kind: "parking", id: p.id })}
@@ -225,7 +214,7 @@ function SurfaceRows(): React.ReactElement | null {
       <button
         key={id}
         type="button"
-        className={selected ? "pct-placed-row pct-placed-pad sel" : "pct-placed-row pct-placed-pad"}
+        className={rowClass(true, selected, kind === "tarmac" ? "tarmacs" : "lines", id)}
         aria-pressed={selected}
         title={kind === "tarmac" ? "A tarmac area" : "A painted line"}
         onClick={() => editorStore.getState().selectAirportPart({ kind, id })}
@@ -278,7 +267,7 @@ function MarkRows(): React.ReactElement | null {
       <button
         key={id}
         type="button"
-        className={selected ? "pct-placed-row pct-placed-pad sel" : "pct-placed-row pct-placed-pad"}
+        className={rowClass(true, selected, MARK_GROUP[kind], id)}
         aria-pressed={selected}
         title={MARK_TITLES[kind]}
         onClick={() => editorStore.getState().selectAirportPart({ kind, id })}
@@ -370,7 +359,7 @@ function RunwayRows(): React.ReactElement | null {
           <button
             key={r.id}
             type="button"
-            className={selected ? "pct-placed-row pct-placed-pad sel" : "pct-placed-row pct-placed-pad"}
+            className={rowClass(true, selected, "runways", r.id)}
             aria-pressed={selected}
             title="A runway"
             onClick={() => editorStore.getState().selectAirportPart({ kind: "runway", id: r.id })}
@@ -409,7 +398,7 @@ function GliderRows(): React.ReactElement | null {
       <button
         key={a.id}
         type="button"
-        className={selected ? "pct-placed-row pct-placed-pad sel" : "pct-placed-row pct-placed-pad"}
+        className={rowClass(true, selected, "gliders", a.id)}
         aria-pressed={selected}
         title="A glider aerotow start"
         onClick={() => editorStore.getState().selectAirportPart({ kind: "aerotow", id: a.id })}
@@ -436,7 +425,7 @@ function GliderRows(): React.ReactElement | null {
       <button
         key={w.id}
         type="button"
-        className={selected ? "pct-placed-row pct-placed-pad sel" : "pct-placed-row pct-placed-pad"}
+        className={rowClass(true, selected, "gliders", w.id)}
         aria-pressed={selected}
         title="A glider winch launch"
         onClick={() => editorStore.getState().selectAirportPart({ kind: "winch", id: w.id })}
@@ -472,6 +461,19 @@ export function PlacedList(): React.ReactElement {
   const plantIndex = useEditor((s) => s.plantIndex);
   const selSet = useMemo(() => new Set(selection), [selection]);
   const hasSelection = selection.length > 0;
+  // Subscribed here so every row re-renders when they change (rowClass reads them).
+  const hiddenGroups = useEditor((s) => s.hiddenGroups);
+  const hiddenIds = useEditor((s) => s.hiddenIds);
+  const airportSel = useEditor((s) => s.airportSelection);
+  // What the Hide button would do: show again when everything selected is already hidden.
+  const selectionHidden =
+    airportSel?.kind === "data"
+      ? hiddenGroups.has("airport")
+      : airportSel?.kind === "boundary"
+        ? hiddenGroups.has("boundary")
+        : airportSel !== null
+          ? hiddenIds.has(airportSel.id)
+          : hasSelection && selection.every((id) => hiddenIds.has(id));
 
   return (
     <section className="pct-placed">
@@ -485,6 +487,16 @@ export function PlacedList(): React.ReactElement {
             onClick={() => editorStore.getState().duplicateSelection()}
           >
             Duplicate
+          </button>
+          {/* Hide takes the selection off the MAP only (state/visibility.ts); the row stays here, dimmed,
+              so it can be selected and shown again. The Show menu above the map brings back all. */}
+          <button
+            type="button"
+            disabled={!hasSelection && !airportSelected}
+            title={selectionHidden ? "Show it on the map again" : "Hide it on the map. The project and the exports keep it"}
+            onClick={() => editorStore.getState().toggleHideSelection()}
+          >
+            {selectionHidden ? "Show" : "Hide"}
           </button>
           {/* Delete also reaches the airport parts — deleteSelection drops whichever one is selected, so
               the button follows whatever the panel above is showing. On the Airport row it deletes the
@@ -514,15 +526,15 @@ export function PlacedList(): React.ReactElement {
       <div className="pct-placed-list">
         {/* ★ THIS ORDER IS HALF OF A PAIR. It must match the catalog's Airport section card for card,
             so both columns show the same sequence. Changing it here without changing AirportSection.tsx
-            puts the two columns out of step. */}
+            puts the two columns out of step. The boundary has no row: it belongs to the airport and is
+            reached from its panel. */}
         <DataRow />
-        <BoundaryRow />
         <RunwayRows />
+        <GliderRows />
         <HelipadRows />
         <ParkingRows />
         <SurfaceRows />
         <MarkRows />
-        <GliderRows />
         {objects.length === 0 ? (
           <p className="pct-empty">No objects yet — click the map to place one.</p>
         ) : (
@@ -533,7 +545,7 @@ export function PlacedList(): React.ReactElement {
               <button
                 key={o.id}
                 type="button"
-                className={selected ? "pct-placed-row sel" : "pct-placed-row"}
+                className={rowClass(false, selected, objectGroup(o), o.id)}
                 aria-pressed={selected}
                 title={info.name}
                 onClick={(e) => editorStore.getState().select([o.id], e.shiftKey)}

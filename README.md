@@ -118,7 +118,7 @@ The short version is below. For the whole thing walked through with pictures, se
    **light or a plant** a size too, by measuring it yourself: see
    [Footprints you measure yourself](#footprints-you-measure-yourself).
    Below the catalog, the **Lights** section holds the airport-light fixtures and the custom point light,
-   **Plants** holds the trees and shrubs, and **Airport** holds the thirteen pieces an airfield is made of.
+   **Plants** holds the trees and shrubs, and **Airport** holds the pieces an airfield is made of.
 4. **Export & install** — **Export /poi…** writes the folder into your `scenery/poi/`. Restart Aerofly
    and fly to the spot. The same dialog can **uninstall** POIs that PCT made, so nothing is permanent.
    If you'd rather **start** a flight there than fly to it, **Export /airports…** writes the same
@@ -231,27 +231,28 @@ surface. Aerofly draws the ground; this tells it where the runway is and how to 
 a runway's material, **Tarmac** areas and painted **Lines** — go only into **Export TAP…**, for the
 converter to bake into the ground. So do the **Ground Texts**, **Taxi Signs**, **Jetways** and **Car Lots**.
 
-The catalog's **Airport** section holds thirteen cards, and every one of them behaves like a tree or a light:
+The catalog's **Airport** section holds twelve cards, and every one of them behaves like a tree or a light:
 click the card, click the map, edit it in the inspector.
 
 | Card | What it is |
 |---|---|
-| **Airport** | The airfield itself: its **name**, its **ICAO code**, its two-letter **country code**, and the one point the whole thing is filed under. |
-| **Boundary** | The polygon around the whole field, for Export TAP. Click its corners, double-click the last; then drag, add or right-click away points. |
-| **Runway** | Two thresholds you drag; the length and the direction are whatever they say. Per end: identifier, approach lighting, PAPI, REIL, and whether you can land or take off there. |
+| **Airport** | The airfield itself: its **name**, its **ICAO code**, its two-letter **country code**, and the one point the whole thing is filed under. Its panel also draws the **boundary**, the polygon around the whole field, for Export TAP. |
+| **Runway** | Two thresholds you drag; the length and the direction are whatever they say. Per end: identifier, approach lighting, PAPI, REIL, whether you can land or take off there, and the markings Export TAP paints. |
+| **Aerotow** | A glider start, towed into the air along its heading by the DR400. |
+| **Winch Launch** | A glider start on a cable: two points, no heading, ~900 m of rope. |
 | **Helipad** | A helicopter start. Its own point, at its own radius, as many as you like. |
 | **Parking** | A stand — General Aviation, Jet or Pushback — that an aircraft starts a flight from. |
-| **Tarmac** | An apron, taxiway, ground or flattened area, for Export TAP. Drawn like the Boundary, as many as you like; each has a level, a material and a brightness. |
+| **Tarmac** | An apron, taxiway, ground or flattened area, for Export TAP. Click its corners, double-click the last, as many as you like; each has a level, a material and a brightness. |
 | **Line** | A painted line — centre line, edge, hold position… — for Export TAP. Click its points, double-click the last; pick the marking in the inspector. |
 | **Ground Text** | Letters painted on the pavement — `A`, `B2`, `TAXI B` — for Export TAP: letter size, colours, a box or circle behind them, an arrow. |
 | **Taxi Sign** | A taxiway sign, for Export TAP, built from components left to right — location, destination with arrows, runway, distance remaining — with a back face after a line break. |
 | **Jetway** | A boarding bridge, for Export TAP, placed where it is mounted on the terminal and turned to face out. |
 | **Car Lot** | Rows of parking spaces filled with cars at random, for Export TAP. |
-| **Aerotow** | A glider start, towed into the air along its heading by the DR400. |
-| **Winch Launch** | A glider start on a cable: two points, no heading, ~900 m of rope. |
 
 The order is the same in the catalog on the left and in the placed list on the right, and airport parts
-stay out of the object count — they aren't scenery.
+stay out of the object count — they aren't scenery. **Show ▾** in the top bar takes whole kinds of
+elements off the map while you work, and **Hide** above the placed list takes the selected one; neither
+changes the project or the exports.
 
 - **Aerofly's own floor: one helipad or one runway.** An airport with neither is rejected outright by
   the simulator, so PCT refuses to write one. Stands and

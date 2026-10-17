@@ -59,6 +59,7 @@ import {
   winchesOf,
 } from "../../core/project/airport";
 import * as mutate from "../../core/project/mutate";
+import type { VisGroup } from "./visibility";
 
 export type Camera = Project["camera"];
 /** The map tile config the renderer needs (a view of Settings.tiles). Held in the store so MapView can
@@ -338,6 +339,10 @@ export interface EditorState {
    *  drawing it is one undo entry, and Escape (or arming anything else) throws the draft away. */
   shapeDraft: LonLat[];
   filter: Filter;
+  /** What the map leaves out (visibility.ts). Not the document: no undo, no dirty, no export. A new
+   *  document keeps the hidden groups and forgets the hidden elements. */
+  hiddenGroups: ReadonlySet<VisGroup>;
+  hiddenIds: ReadonlySet<string>;
   mapView: Camera; // the LIVE camera; stamped into the document only at save
   cameraEpoch: number; // bumps on document load (open/new) → MapView re-centers; pan never bumps it
   resolvedElev: Map<string, number>; // id → terrain ASL under it, for the inspector; drop on move
@@ -368,6 +373,11 @@ export interface EditorState {
   selectAirportPart: (sel: AirportSelection | null) => void;
   armPlacement: (spec: PlacingSpec | null) => void;
   setFilter: (patch: Partial<Filter>) => void;
+  setGroupHidden: (group: VisGroup, hidden: boolean) => void;
+  /** Hide the selected element(s), or show them again when every one of them is hidden. For the
+   *  airport's point and its boundary, which have no id, that is their group. */
+  toggleHideSelection: () => void;
+  showAll: () => void;
   placeAt: (p: LonLat) => void;
 
   // ── document mutations (gesture-end / explicit — drag PREVIEW never hits the store) ──
@@ -635,6 +645,7 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
           placing: null,
           shapeDraft: [],
           resolvedElev: new Map(),
+          hiddenIds: new Set(),
           pendingRecovery: null, // a fresh document clears any recovery banner
           mapView: project.camera,
           cameraEpoch: s.cameraEpoch + 1, // re-center the map on the incoming document (P1-4 / A#4)
@@ -663,6 +674,8 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
         placing: null,
         shapeDraft: [],
         filter: { query: "", category: null },
+        hiddenGroups: new Set(),
+        hiddenIds: new Set(),
         mapView: deps.initialProject.camera,
         cameraEpoch: 0,
         resolvedElev: new Map(),
@@ -725,6 +738,33 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
         // Any change of what is armed drops a boundary half drawn: it belonged to the old arming.
         armPlacement: (name) => set({ placing: name, shapeDraft: [] }),
         setFilter: (patch) => set((s) => ({ filter: { ...s.filter, ...patch } })),
+        setGroupHidden: (group, hidden) =>
+          set((s) => {
+            if (s.hiddenGroups.has(group) === hidden) return {};
+            const next = new Set(s.hiddenGroups);
+            if (hidden) next.add(group);
+            else next.delete(group);
+            return { hiddenGroups: next };
+          }),
+        toggleHideSelection: () => {
+          const s = get();
+          const sel = s.airportSelection;
+          if (sel?.kind === "data" || sel?.kind === "boundary") {
+            const group: VisGroup = sel.kind === "data" ? "airport" : "boundary";
+            s.setGroupHidden(group, !s.hiddenGroups.has(group));
+            return;
+          }
+          const ids = sel !== null ? [sel.id] : s.selection;
+          if (ids.length === 0) return;
+          const next = new Set(s.hiddenIds);
+          const allHidden = ids.every((id) => next.has(id));
+          for (const id of ids) {
+            if (allHidden) next.delete(id);
+            else next.add(id);
+          }
+          set({ hiddenIds: next });
+        },
+        showAll: () => set({ hiddenGroups: new Set(), hiddenIds: new Set() }),
 
         placeAt: (p) => {
           const spec = get().placing;

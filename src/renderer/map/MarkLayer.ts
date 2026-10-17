@@ -21,8 +21,8 @@ export interface Mark {
 export interface MarkLook<T extends Mark> {
   /** Stroke and fill colour while not selected. */
   color: string;
-  /** The outline, around `at`, turned to `heading`. */
-  outline(item: T, at: LonLat, heading: number): LonLat[];
+  /** The outline, around `at`, turned to `heading`: one ring, or several separate ones drawn as one shape. */
+  outline(item: T, at: LonLat, heading: number): LonLat[] | LonLat[][];
   /** How far from the centre the heading tick ends; the rotate grip sits a little past it. */
   reach(item: T): number;
   /** The marking painted inside, as the HTML of a divIcon centred on the point, or null to paint none.
@@ -43,6 +43,13 @@ const SNAP_DEG = 5;
 const HANDLE_MARGIN_M = 6;
 
 const toLatLng = (p: LonLat): L.LatLngExpression => [p.lat, p.lon];
+
+/** An outline as Leaflet takes it: one ring, or several as a multi-polygon (one ring each, no holes). */
+function outlineLatLngs(o: LonLat[] | LonLat[][]): L.LatLngExpression[] | L.LatLngExpression[][][] {
+  const first = o[0];
+  if (first === undefined || !Array.isArray(first)) return (o as LonLat[]).map(toLatLng);
+  return (o as LonLat[][]).map((ring) => [ring.map(toLatLng)]);
+}
 
 interface Entry<T extends Mark> {
   item: T;
@@ -124,7 +131,7 @@ export class MarkLayer<T extends Mark> {
   }
 
   private build(item: T, selected: boolean): Entry<T> {
-    const ring = this.look.outline(item, item.position, item.heading).map(toLatLng);
+    const ring = outlineLatLngs(this.look.outline(item, item.position, item.heading));
     const casing = L.polygon(ring, {
       color: CASING,
       weight: 5,
@@ -246,7 +253,7 @@ export class MarkLayer<T extends Mark> {
   };
 
   private preview(e: Entry<T>, at: LonLat, heading: number): void {
-    const ring = this.look.outline(e.item, at, heading).map(toLatLng);
+    const ring = outlineLatLngs(this.look.outline(e.item, at, heading));
     e.casing.setLatLngs(ring);
     e.shape.setLatLngs(ring);
     e.tick.setLatLngs([toLatLng(at), toLatLng(this.tipAt(e.item, at, heading))]);

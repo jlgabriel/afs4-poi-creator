@@ -19,8 +19,48 @@ import { NumberInput } from "./NumberInput";
 import { WadPosition } from "./WadReadout";
 import { AirportElevationField } from "./AirportElevationField";
 import { getPct } from "../app/pct";
+import { BoundaryIcon } from "../catalog/categoryIcon";
+import { Help } from "./HelpNote";
 
 const fmtDeg = (n: number): string => n.toFixed(6);
+
+/** The airport's BOUNDARY, reached from here rather than from a card of its own: it is one polygon per
+ *  airport, part of the airport the way its point is. The button draws it while there is none and opens
+ *  it once there is (store.startBoundaryCard); pressed while drawing, it cancels. */
+function BoundaryButton({ points }: { points: number }): React.ReactElement {
+  const armed = useEditor((s) => s.placing?.kind === "boundary");
+  const draft = useEditor((s) => s.shapeDraft.length);
+  return (
+    <div className="pct-field pct-field-col">
+      <span className="pct-field-label">
+        Boundary
+        {/* ★ THIS TEXT IS A TEST: every gesture it names is one the boundary drawing must answer. */}
+        <Help>
+          The polygon around the whole airport, for Export TAP. Click Draw Boundary, click the map once for each
+          corner, and double-click the last one to close it. Esc cancels.
+        </Help>
+      </span>
+      <button
+        type="button"
+        className={armed ? "pct-boundary-btn armed" : "pct-boundary-btn"}
+        aria-pressed={armed}
+        onClick={() => editorStore.getState().startBoundaryCard()}
+      >
+        <BoundaryIcon />
+        {armed ? "Cancel drawing" : points > 0 ? "Edit Boundary" : "Draw Boundary"}
+      </button>
+      <span className="pct-field-meta">
+        {armed
+          ? draft < 3
+            ? `${draft} point${draft === 1 ? "" : "s"} · click to add, double-click the last`
+            : `${draft} points · double-click to close`
+          : points > 0
+            ? `${points} points`
+            : "None yet."}
+      </span>
+    </div>
+  );
+}
 
 /** Ask the dialog to open. Same channel the photo menu uses for Settings (`pct:open-settings`): the
  *  dialog's open flag is AppShell's local state and this panel is not its child, so a window event is
@@ -199,6 +239,8 @@ export function AirportDataFields({ airport }: { airport: ProjectAirport }): Rea
           <span className="pct-warn">{identityProblemText("country-format")}</span>
         )}
       </label>
+
+      <BoundaryButton points={airport.boundary?.length ?? 0} />
 
       <AirportElevationField elevation={airport.elevation} position={point} />
 

@@ -25,6 +25,7 @@ import { BoundaryLayer } from "./BoundaryLayer";
 import { LineLayer, TarmacLayer } from "./SurfaceLayer";
 import { DraftLayer } from "./DraftLayer";
 import { isShapeKind } from "../state/store";
+import { objectGroup, visibleOf, type VisGroup } from "../state/visibility";
 
 /** The tile layer for the current provider (Esri satellite / OSM streets / custom XYZ). Overzoom
  *  (maxNativeZoom < maxZoom) keeps metre-precise placement usable past the source's native resolution.
@@ -154,49 +155,59 @@ export function MapView(): React.ReactElement {
     // React so drag and undo never wait on a render.
     const paint = (): void => {
       const s = editorStore.getState();
+      // What the map leaves out (visibility.ts): the layers only ever see what is shown.
+      const a = s.project.airport;
+      const shown = <T extends { id: string }>(group: VisGroup, items: readonly T[] | undefined): T[] =>
+        visibleOf(s, group, items);
       layer.sync(
-        s.project.objects,
+        s.hiddenGroups.size === 0 && s.hiddenIds.size === 0
+          ? s.project.objects
+          : s.project.objects.filter((o) => !s.hiddenGroups.has(objectGroup(o)) && !s.hiddenIds.has(o.id)),
         s.catalogIndex,
         s.airportLightIndex,
         s.plantIndex,
         new Set(s.selection),
       );
       helipad.sync(
-        s.project.airport?.pads ?? [],
+        shown("helipads", a?.pads),
         s.airportSelection?.kind === "pad" ? s.airportSelection.id : null,
       );
       parking.sync(
-        s.project.airport?.parkings ?? [],
+        shown("parkings", a?.parkings),
         s.airportSelection?.kind === "parking" ? s.airportSelection.id : null,
       );
       runway.sync(
-        s.project.airport?.runways ?? [],
+        shown("runways", a?.runways),
         s.airportSelection?.kind === "runway" ? s.airportSelection.id : null,
       );
       // Rebuilt rather than passed through: narrowing `kind` inside a ternary condition does not narrow
       // the OBJECT, and this layer only ever wants the two glider kinds.
       const sel = s.airportSelection;
       glider.sync(
-        s.project.airport?.aerotows ?? [],
-        s.project.airport?.winches ?? [],
+        shown("gliders", a?.aerotows),
+        shown("gliders", a?.winches),
         sel !== null && (sel.kind === "aerotow" || sel.kind === "winch")
           ? { kind: sel.kind, id: sel.id }
           : null,
       );
       const markSel = (kind: MarkKind): string | null => (sel?.kind === kind ? sel.id : null);
-      groundText.sync(s.project.airport?.groundtexts ?? [], markSel("groundtext"));
-      taxisign.sync(s.project.airport?.taxisigns ?? [], markSel("taxisign"));
-      jetway.sync(s.project.airport?.jetways ?? [], markSel("jetway"));
-      carlot.sync(s.project.airport?.carlots ?? [], markSel("carlot"));
+      groundText.sync(shown("groundtexts", a?.groundtexts), markSel("groundtext"));
+      taxisign.sync(shown("taxisigns", a?.taxisigns), markSel("taxisign"));
+      jetway.sync(shown("jetways", a?.jetways), markSel("jetway"));
+      carlot.sync(shown("carlots", a?.carlots), markSel("carlot"));
       const editable = s.placing === null;
-      boundary.sync(s.project.airport?.boundary ?? null, sel?.kind === "boundary", editable);
-      tarmac.sync(s.project.airport?.tarmacs ?? [], sel?.kind === "tarmac" ? sel.id : null, editable);
-      line.sync(s.project.airport?.lines ?? [], sel?.kind === "line" ? sel.id : null, editable);
+      boundary.sync(
+        s.hiddenGroups.has("boundary") ? null : (a?.boundary ?? null),
+        sel?.kind === "boundary",
+        editable,
+      );
+      tarmac.sync(shown("tarmacs", a?.tarmacs), sel?.kind === "tarmac" ? sel.id : null, editable);
+      line.sync(shown("lines", a?.lines), sel?.kind === "line" ? sel.id : null, editable);
       const drawing = s.placing?.kind;
       draft.sync(isShapeKind(drawing) ? s.shapeDraft : null, drawing !== "line");
       // `position` and not airportPosition(): the airport's point must not follow pads[0], so
       // never draw a ⊕ on a point the airport does not actually own.
-      airport.sync(s.project.airport?.position ?? null, sel?.kind === "data");
+      airport.sync(s.hiddenGroups.has("airport") ? null : (a?.position ?? null), sel?.kind === "data");
     };
     paint();
     const unsub = editorStore.subscribe(
@@ -214,6 +225,8 @@ export function MapView(): React.ReactElement {
           s.airportSelection,
           s.placing,
           s.shapeDraft,
+          s.hiddenGroups,
+          s.hiddenIds,
         ] as const,
       paint,
       { equalityFn: shallow },

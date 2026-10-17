@@ -580,15 +580,16 @@ order to list a place: a code, a name, a country, and at least one spot to start
 **Install one or the other, not both.** The airport takes its own copy of everything you placed, so a
 project installed as a POI *and* as an airport puts every object into the world twice.
 
-This section is long because there are thirteen pieces to describe. You do not need all thirteen: an airport with
+This section is long because there are thirteen pieces to describe. You do not need all of them: an airport with
 one helipad on it is a complete, working airport, and that is where most people stop.
 
 | | |
 |---|---|
 | [What PCT writes, and what it doesn't](#what-pct-writes-and-what-it-doesnt) | Read this one first. |
-| [The thirteen cards](#the-thirteen-cards) | The rule they share, and the ways they differ. |
+| [The twelve cards](#the-twelve-cards) | The rule they share, and the ways they differ. |
+| [Showing and hiding](#showing-and-hiding) | Taking parts off the map while you work, without deleting them. |
 | [Airport — the name and the code](#airport--the-name-and-the-code) | Identity, and the point the whole field is filed under. |
-| [Boundary](#boundary) | The polygon around the whole field, for Export TAP. |
+| [Boundary](#boundary) | The polygon around the whole field, for Export TAP — drawn from the Airport panel. |
 | [Runway](#runway) · [Helipad](#helipad) · [Parking](#parking) | The three you are most likely to place. |
 | [Tarmac](#tarmac) · [Line](#line) | Paved areas and painted lines, for Export TAP. |
 | [Ground Text](#ground-text) · [Taxi Sign](#taxi-sign) · [Jetway](#jetway) · [Car Lot](#car-lot) | Painted letters, taxiway signs, boarding bridges and car parks, for Export TAP. |
@@ -619,13 +620,14 @@ a TAP converter turns into the airport's ground. PCT writes that file too, with 
 the [Tarmac](#tarmac), [Line](#line), [Ground Text](#ground-text), [Taxi Sign](#taxi-sign), [Jetway](#jetway)
 and [Car Lot](#car-lot) cards are what go into it. **Export /airports…** leaves them out.
 
-### The thirteen cards
+### The twelve cards
 
-Open **Airport** in the catalog and there are thirteen.
+Open **Airport** in the catalog and there are twelve. *(v2.7)* The boundary is the thirteenth piece but has
+no card: it belongs to the airport, so it is drawn from the [Airport panel](#boundary).
 
 ![Shot 27 — the Airport section: Airport, Runway, Helipad, Parking, Aerotow and Winch Launch, each with a line saying what it does](images/27_airport_section.jpg)
 
-All thirteen behave the way the rest of PCT behaves: **click the card to arm it, click the map to drop it,
+All twelve behave the way the rest of PCT behaves: **click the card to arm it, click the map to drop it,
 Esc to cancel.** Nothing here lives in a dialog, and nothing needs filling in before you can put it on
 the map.
 
@@ -637,17 +639,17 @@ They differ in how many clicks they take, and each card says which it is on its 
 - **Two lay out a whole shape and then disarm** — Runway and Winch Launch. Both are made of *two*
   points, so the click cannot put the finished thing under the cursor. It drops a starter — a 200 m
   strip, 900 m of rope, both pointing north — and the next thing you do is drag an end.
-- **Three take as many clicks as they have points** — Boundary, Tarmac and Line. Click the map once per
-  point and **double-click the last one**: that finishes the shape. There is one boundary per airport;
-  tarmacs and lines, as many as you like — the card draws a new one each time.
+- **Two take as many clicks as they have points** — Tarmac and Line. Click the map once per point and
+  **double-click the last one**: that finishes the shape. As many as you like — the card draws a new
+  one each time. The boundary is drawn the same way, from the Airport panel.
 
 **Airport** is the odd one, honestly so: it places no part. It is the airfield itself — its name, its
 code, and the single point the whole thing is filed under. Its card puts that point on the map the
 first time, and after that it is the way back to the identity fields.
 
-**The order is the same in both columns.** Airport · Boundary · Runway · Helipad · Parking · Tarmac ·
-Line · Ground Text · Taxi Sign · Jetway · Car Lot · Aerotow · Winch Launch, in the catalog on the left and in the
-placed list on the right. That is deliberate, and it is
+**The order is the same in both columns.** Airport · Runway · Aerotow · Winch Launch · Helipad · Parking ·
+Tarmac · Line · Ground Text · Taxi Sign · Jetway · Car Lot, in the catalog on the left and in the placed list
+on the right — the two glider starts right after the runway they belong to *(v2.7)*. That is deliberate, and it is
 ApfelFlieger's rule: the sequences match so that finding a thing in one column tells you where it is in
 the other.
 
@@ -662,10 +664,13 @@ On the map each part is drawn at its real size, and each one looks like itself:
   runway, a faint dashed outline for flatten — and lies under everything else;
 - a **line** is drawn in its paint colour (yellow, white, blue, orange, red), dashed when the marking is;
 - the **helipad** is a white circle with an **H** in it, the **stand** a violet one with a **P**;
-- a **ground text** is its letters, painted in its own colours and turned with it; a **taxi sign** its
-  front face laid flat, in the sign's own colours, readable from the side it faces; a **jetway** an indigo
-  tunnel from its mounting point, as long as its extension; a **car lot** a green rectangle about the
-  size of its spaces, with its rows × spaces written inside;
+- a **ground text** is its letters, painted in its own colours and turned with it; a **taxi sign** both
+  its faces laid flat *(v2.7)*, one each side of its point — the front on the side it faces, the back on
+  the other, each readable from its own side, and an empty face as a blank grey plate; a **jetway** three
+  indigo parts *(v2.7)*: its base, a square at the mounting point, the extension, a tunnel turned by its
+  extension direction and as long as its extension, and the exit, a square at the end turned by its exit
+  direction; a **car lot** a green rectangle about the size of its spaces, with its rows × spaces written
+  inside;
 - the two **glider starts** are pink — the aerotow a dot with a short rope, the winch launch a dot, a
   long rope and a square at the winch end;
 - the **airport** itself is a crosshair, ⊕, and nothing else on the map looks like it.
@@ -685,6 +690,20 @@ with it.
 **A small `?` beside a field opens a note about it.** The panels below are described here in full, so
 you should not need them — but they are there, on the field, at the moment you are looking at it.
 Warnings, live read-outs and anything explaining why a field is missing never fold away.
+
+### Showing and hiding
+
+*(v2.7)* A busy airfield puts a lot of shapes in a small space. Two things take them off the map while
+you work, and neither changes the project or any export:
+
+- **Show ▾**, in the top bar beside the map style, has one box per kind of element — objects, lights,
+  plants, and every airport part. Untick one and all of that kind leave the map.
+- **Hide**, above the placed list, hides whatever is selected. Its row stays in the list, faded and struck
+  through, so you can select it again and press **Show**.
+
+While anything is hidden the **Show** button turns amber and says how many. **Show all** in its menu brings
+everything back. A new or opened project starts with nothing hidden one by one; the kinds you unticked
+stay unticked.
 
 ### Airport — the name and the code
 
@@ -729,16 +748,17 @@ That point is the one field the install cannot do without. Everything else can w
 The polygon around the whole airfield. Only **Export TAP…** uses it — the TAP converter needs it to
 convert everything — so an airport you install with **Export /airports…** can do without one.
 
-**Drawing it.** Click the **Boundary** card, then click the map once for each corner, going round the
-field. A dashed line follows the cursor to show how the polygon would close. **Double-click the last
+**Drawing it.** *(v2.7)* Open the Airport panel — its card or its row — and click **Draw Boundary**, then
+click the map once for each corner, going round the field. A dashed line follows the cursor to show how the polygon would close. **Double-click the last
 corner** and the polygon closes; it needs at least three. **Esc** throws away a polygon you have not
 closed yet.
 
-There is one boundary per airport. Once it exists, the card selects it instead of starting another;
-to draw it again from scratch, delete it and click the card.
+There is one boundary per airport. Once it exists, the button reads **Edit Boundary** and selects it
+instead of starting another; to draw it again from scratch, delete it and click **Draw Boundary**. The
+boundary has no row of its own in the placed list: it is part of the airport.
 
-**Changing it.** Select it — on its row in the placed list, or by clicking its outline — and its
-corners appear:
+**Changing it.** Select it — with **Edit Boundary**, or by clicking its outline — and its corners
+appear:
 
 - **drag a white point** to move that corner;
 - **drag a grey point** (there is one halfway along each side) and it becomes a new corner;
@@ -930,8 +950,10 @@ In the Inspector:
 
 **Placing one.** Click the **Taxi Sign** card and click the map where the middle of the sign stands. It
 starts as a location sign reading `A`, facing south. Drag the sign to move it, and the cyan grip to turn
-it: **the front face looks toward the grip**. On the map the front face is drawn laid flat, so it reads
-the right way up from the grip's side.
+it: **the front face looks toward the grip**. On the map both faces are drawn laid flat *(v2.7)*, one each
+side of the sign's point: the front on the grip's side, reading the right way up from there, and the back
+on the other side, reading the right way up from behind. A face with nothing on it shows as a blank grey
+plate.
 
 **Components.** A sign is built from components, shown left to right on its front face. Each one is a
 row in the Inspector — its type, its text, ▲ ▼ to move it, ✕ to remove it — and the buttons under the
@@ -968,8 +990,9 @@ The rest of the Inspector:
 *(v2.4)* A boarding bridge on a terminal. Only **Export TAP…** uses it. Any number per airport.
 
 **Placing one.** Click the **Jetway** card and click the map **where the jetway is mounted on the
-terminal wall**, then set its heading with the cyan grip. On the map it is drawn as a tunnel from that
-point along the heading, as long as its extension.
+terminal wall**, then set its heading with the cyan grip. On the map it is drawn in three parts *(v2.7)*:
+the base, a square at the mounting point; the extension, a tunnel turned by the extension direction and as
+long as the extension amount; and the exit, a square at its end, turned by the exit direction.
 
 In the Inspector, besides **Lon**, **Lat** and **Heading — true**:
 

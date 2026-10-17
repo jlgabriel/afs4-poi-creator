@@ -42,7 +42,7 @@ export function BoundaryFields({ boundary }: { boundary: LonLat[] }): React.Reac
       </div>
 
       <p className="pct-field-meta">
-        To draw it again, delete it and click the <strong>Boundary</strong> card.
+        To draw it again, delete it and click <strong>Draw Boundary</strong> in the Airport panel.
       </p>
     </div>
   );
