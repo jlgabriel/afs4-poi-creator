@@ -1192,9 +1192,14 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
           commitCoalesced(`airport:runway:move:${id}`, (proj) =>
             mutate.moveAirportRunwayEnd(mutate.moveAirportRunwayEnd(proj, id, 0, a), id, 1, b),
           ),
-        // NOT coalesced: these are discrete choices from menus and checkboxes, not a dragged value.
+        // NOT coalesced: these are discrete choices from menus and checkboxes, not a dragged value. The
+        // extended runway is the exception — typed digit by digit, so "1200" is one undo entry, not four.
         updateAirportRunwayEnd: (id, end, patch) =>
-          commit((proj) => mutate.updateAirportRunwayEnd(proj, id, end, patch)),
+          patch.extension !== undefined
+            ? commitCoalesced(`airport:runway:extension:${id}:${end}`, (proj) =>
+                mutate.updateAirportRunwayEnd(proj, id, end, patch),
+              )
+            : commit((proj) => mutate.updateAirportRunwayEnd(proj, id, end, patch)),
         setAirportRunwayWidth: (id, width) =>
           commitCoalesced(`airport:runway:width:${id}`, (proj) =>
             mutate.setAirportRunwayWidth(proj, id, width),

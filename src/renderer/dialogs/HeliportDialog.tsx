@@ -173,7 +173,10 @@ export function HeliportDialog({ onClose }: { onClose: () => void }): React.Reac
       return;
     }
     if (res.error.code === "folder-exists" && !overwrite) {
-      if (window.confirm(`An airport folder "${res.error.folderName}" already exists.\n\nReplace it?`)) {
+      const ask =
+        `An airport folder "${res.error.folderName}" already exists.\n\nReplace it? ` +
+        "PCT replaces only its own files; files you added to the folder yourself are kept.";
+      if (window.confirm(ask)) {
         return install(true);
       }
       setError(`Kept the existing "${res.error.folderName}".`);

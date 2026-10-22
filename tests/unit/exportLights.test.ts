@@ -40,7 +40,7 @@ const WITNESS: ResolvedXref = {
   scale: 1,
 };
 
-// GOLDEN — byte-exact poi.toc for a mixed POI. Sibling order is ALWAYS light → airport_light → xref
+// GOLDEN — byte-exact pct.toc for a mixed POI. Sibling order is ALWAYS light → airport_light → xref
 // regardless of the input order. Field order/types are the canonical layout: airport_light leads with
 // type_name and uses float64 orientation; light leads with position. Regenerate deliberately only if
 // the format changes — never let it drift silently.

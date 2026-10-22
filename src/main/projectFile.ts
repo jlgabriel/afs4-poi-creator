@@ -11,6 +11,7 @@ import { existsSync, readFileSync, rmSync } from "node:fs";
 import path from "node:path";
 import type { Project } from "../core/project/types";
 import { parseProject, safeParseProject } from "../core/project/schemas";
+import { projectSidecarName } from "../core/export/planExport";
 import { writeFileAtomic } from "./fsAtomic";
 
 /** Returns a chosen absolute path, or null if the user cancelled the dialog. */
@@ -71,11 +72,11 @@ export async function saveProjectAs(
 }
 
 /** Drop a copy of the project JSON INTO an exported POI folder, beside its
- *  poi.toc/poi.tsl/README, so a shared POI can be re-opened and revised in PCT. Same serialization as
- *  Save; named by the POI slug (already filesystem-safe), falling back to "project". Does NOT touch
- *  currentPath — the sidecar is a companion copy, not "the open file". */
+ *  pct.toc/pct.tsl/README, so a shared POI can be re-opened and revised in PCT. Same serialization as
+ *  Save; named by planExport.ts projectSidecarName, which the installer also uses to know the file is
+ *  PCT's. Does NOT touch currentPath — the sidecar is a companion copy, not "the open file". */
 export function writeProjectSidecar(destDir: string, project: Project): string {
-  const name = `${project.poiName || "project"}.json`;
+  const name = projectSidecarName(project);
   writeFileAtomic(path.join(destDir, name), JSON.stringify(project, null, 2));
   return name;
 }

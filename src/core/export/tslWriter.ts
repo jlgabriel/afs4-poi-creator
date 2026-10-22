@@ -1,7 +1,7 @@
-// tslWriter.ts — Project → `poi.tsl`, the AFS4 `tmsimulator_scenery_place_simple` that
+// tslWriter.ts — Project → `pct.tsl`, the AFS4 `tmsimulator_scenery_place_simple` that
 // AFS4 loads for a POI (design §3.4).
 //
-// For PCT the .tsl is a thin wrapper around the `poi.toc` cultivation file (referenced via the
+// For PCT the .tsl is a thin wrapper around the `pct.toc` cultivation file (referenced via the
 // `cultivation` field), where the whole payload lives. The ONE exception is the plant anchor: a POI
 // with plants also carries a single reference-POI object here at terrain height, so the plants stop
 // blinking (see plantAnchor.ts). PCT places no other objects inline here. No place-level `geometry`
@@ -19,7 +19,7 @@ import { ANCHOR_GEOMETRY, type Anchor } from "./plantAnchor";
  *  anchoring, autoheight breaks for every POI. Verify in-sim before releasing a change to this value. */
 const ANCHOR_AGL_Z = "-1.0";
 
-/** Build the `poi.tsl` text.
+/** Build the `pct.tsl` text.
  *  @param opts.tocFileName  cultivation reference (the .toc basename), or null for no toc.
  *  @param opts.anchor       the reference-POI anchor (plantAnchor.ts), or null/absent for no anchor object
  *                           — then the .tsl carries no objects.

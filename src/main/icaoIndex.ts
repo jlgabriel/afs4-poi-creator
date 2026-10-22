@@ -14,7 +14,7 @@
 //
 // ZERO IPACS BYTES. The index is built from FILENAMES — `readdir`, never `readFile`. A `.wad` on disk is
 // one airport, and its basename IS the code (`kdag.wad` → KDAG). (The marker file that identifies our
-// own folders is READ, but it is a README.txt PCT itself wrote.)
+// own folders is READ, but it is a README PCT itself wrote.)
 //
 // WHAT IT CANNOT DO, stated plainly: it describes the machine PCT is running on, at this moment. It says
 // nothing about a machine that later receives a copy of the folder, and nothing about an add-on installed

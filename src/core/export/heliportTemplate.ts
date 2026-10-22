@@ -182,10 +182,10 @@ export interface HeliportSpec {
    *  writes carries the full row set, defaults included. */
   parkings?: HeliportParkingSpec[];
   // No `iata`: the `.wad` row it would fill is not a member of `tmworld_airport_detailed`.
-  /** The POI's cultivation basename ("poi"), or null for an empty POI — then no cultivation is referenced. */
+  /** The POI's cultivation basename ("pct"), or null for an empty POI — then no cultivation is referenced. */
   cultivationFileName: string | null;
   /** The plant anchor, when the POI carries one — it must be repeated here, because the `.tsc` REPLACES
-   *  the `poi.tsl` as the entry point and the anchor lives in the .tsl. Null → no objects block. */
+   *  the `pct.tsl` as the entry point and the anchor lives in the .tsl. Null → no objects block. */
   anchor: Anchor | null;
   /** The project's height mode, mirrored onto the cultivation reference. */
   autoheight: boolean;
@@ -222,7 +222,7 @@ function informationsBanner(): string[] {
     "//              REPLACES that airport. The file and folder names stay lowercase",
     "//  [country]:  two letters, lowercase (the 2-digit internet country code is recommended)",
     "//  [position]: lon lat in degrees - written by PCT",
-    "//  [filename]: the POI's own poi.toc, right beside this file",
+    "//  [filename]: the POI's own pct.toc, right beside this file",
     "//  [radius]:   maximum rotor radius in metres - the sim shows the DIAMETER as \"Size\"",
     "//  [heading]:  TRUE heading in degrees, the sim displays magnetic, so expect this minus",
     "//              the local variation",
@@ -413,7 +413,7 @@ function parkingBlock(parkings: HeliportParkingSpec[], wad: boolean): string[] {
   return block(listType, "parking_positions", "", elements);
 }
 
-/** `<icao>.tsc` — the place: identity, the functional pads, and the pointer to the POI's own `poi.toc`. */
+/** `<icao>.tsc` — the place: identity, the functional pads, and the pointer to the POI's own `pct.toc`. */
 export function buildHeliportTsc(spec: HeliportSpec): string {
   const pos = `${fmtLonLat(spec.position.lon)} ${fmtLonLat(spec.position.lat)}`;
   const v = identityValues(spec);
@@ -560,15 +560,15 @@ function anchorObject(anchor: Anchor): string[] {
  *  file, and the airport half-appears (its `.wad` loaded, but there is no place) and cannot be flown.
  *  Comments INSIDE the root, and trailing `//` comments on a tag line, are fine.
  *
- *  So the human instructions live in README.txt and these files start on `<[file][][]`. (PCT's own
+ *  So the human instructions live in the README and these files start on `<[file][][]`. (PCT's own
  *  tmParser tolerates a leading banner — that is not permission: the sim's parser does not.) */
 const NO_HEADER: string[] = [];
 
-/** Marker in an installed heliport's README.txt. Same trick as POI_README_MARKER: it is what makes a
+/** Marker in an installed heliport's README (planExport.ts README_FILE). Same trick as POI_README_MARKER: it is what makes a
  *  folder under scenery/airports/ safe to offer for Uninstall — PCT removes only what PCT wrote. */
 export const HELIPORT_README_MARKER = "Installed by PCT (POI Creation Tool) - heliport";
 
-/** README.txt for an INSTALLED heliport. */
+/** The README for an INSTALLED heliport. */
 export function heliportInstalledReadme(id: HeliportIdentity, projectName: string): string {
   return [
     `${sanitizeValue(projectName).trim()} - heliport ${id.icao.toUpperCase()}`,
@@ -580,7 +580,7 @@ export function heliportInstalledReadme(id: HeliportIdentity, projectName: strin
     "not match the airport code, and for a code you invented the row it finds may render blank. The",
     "airport is real all the same - it shows correctly on the map, where you built it, and it flies.",
     "",
-    "This folder holds the airport itself; the objects come from the poi.toc beside it, which is",
+    "This folder holds the airport itself; the objects come from the pct.toc beside it, which is",
     "the same cultivation the POI export writes.",
     "",
     "About the airport code: if two airports on one machine share a code, ONE of them wins and the",

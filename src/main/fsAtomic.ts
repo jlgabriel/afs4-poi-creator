@@ -12,7 +12,7 @@ import { mkdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 /** Suffix of the scratch file written next to the destination. Nothing reads it: every loader in PCT
- *  opens an exact filename (shadow.json, poi.toc, …), so a leftover from a crash is inert litter. */
+ *  opens an exact filename (shadow.json, pct.toc, …), so a leftover from a crash is inert litter. */
 const TMP_SUFFIX = ".pct-tmp";
 
 /** Write `data` to `file` atomically. If anything fails, `file` keeps whatever it held before. A string

@@ -743,11 +743,11 @@ const fileOf = (p: { files: { relPath: string; content: string }[] }, rel: strin
 describe("planExport — a POI carries no airport files", () => {
   it("writes the three POI files and nothing else", () => {
     const plan = planExport(PROJECT, [HANGAR]);
-    expect(relPaths(plan)).toEqual(["poi.tsl", "poi.toc", "README.txt"]);
+    expect(relPaths(plan)).toEqual(["pct.tsl", "pct.toc", "__README.txt"]);
   });
 
   it("says nothing about heliports in the README either", () => {
-    const readme = fileOf(planExport(PROJECT, [HANGAR]), "README.txt");
+    const readme = fileOf(planExport(PROJECT, [HANGAR]), "__README.txt");
     expect(readme).not.toContain("HELIPORT TEMPLATE");
     expect(readme).not.toContain(".tsc");
   });
@@ -814,7 +814,7 @@ describe("planHeliport — pads, stands and the export shift", () => {
     const plan = planHeliport(shifted, [HANGAR], { identity: ID, heliport: { pads: [at] } });
     const [lon] = valuesOf(fileOf(plan, TSC), "position")[0].split(" ").map(Number);
     expect(lon).toBeGreaterThan(HANGAR.position.lon); // 50 m east
-    const [objLon] = valuesOf(fileOf(plan, "poi.toc"), "position")[0].split(" ").map(Number);
+    const [objLon] = valuesOf(fileOf(plan, "pct.toc"), "position")[0].split(" ").map(Number);
     expect(lon).toBeCloseTo(objLon, 7); // …and by exactly as much as the object beside it
   });
 
@@ -839,7 +839,7 @@ describe("planHeliport — pads, stands and the export shift", () => {
     });
     const tsc = fileOf(plan, TSC);
     const [standLon] = valuesOf(tsc, "position").slice(-1)[0]!.split(" ").map(Number);
-    const [objLon] = valuesOf(fileOf(plan, "poi.toc"), "position")[0].split(" ").map(Number);
+    const [objLon] = valuesOf(fileOf(plan, "pct.toc"), "position")[0].split(" ").map(Number);
     expect(standLon).toBeCloseTo(objLon, 7);
     expect(valuesOf(tsc, "tags")).toEqual(["parked_ga"]);
 

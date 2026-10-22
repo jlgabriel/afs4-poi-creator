@@ -22,7 +22,8 @@ import type {
   ReilKind,
   RunwayEndMarkings,
 } from "../../core/project/types";
-import { runwayEndMarkings } from "../../core/project/surfaces";
+import { useState } from "react";
+import { runwayEndMarkings, runwayExtensionDigits } from "../../core/project/surfaces";
 import { APPROACH_LIGHT_SYSTEMS, PAPI_SIDES, REIL_KINDS } from "../../core/project/airport";
 import { clampLonLat } from "../../core/project/schemas";
 import { haversine, initialBearing } from "../../core/geo/geo";
@@ -57,6 +58,37 @@ function titleFor(r: AirportRunway): string {
   return `Runway ${a} / ${b}`;
 }
 
+/** The extended runway: digits only, at most five. While the field has focus it shows what was typed —
+ *  an emptied field stays empty instead of jumping to "0" under the cursor — and the stored number is
+ *  updated on every keystroke (empty ≡ 0). */
+function ExtensionInput({
+  value,
+  ariaLabel,
+  onChange,
+}: {
+  value: number;
+  ariaLabel: string;
+  onChange: (metres: number) => void;
+}): React.ReactElement {
+  const [draft, setDraft] = useState<string | null>(null);
+  return (
+    <input
+      className="pct-num"
+      inputMode="numeric"
+      // No maxLength: it would cut pasted text BEFORE the filter, so "12a3456" would keep only "1234".
+      value={draft ?? String(value)}
+      aria-label={ariaLabel}
+      onChange={(e) => {
+        const digits = runwayExtensionDigits(e.target.value);
+        setDraft(digits);
+        const metres = digits === "" ? 0 : Number(digits);
+        if (metres !== value) onChange(metres);
+      }}
+      onBlur={() => setDraft(null)}
+    />
+  );
+}
+
 function EndBlock({
   runwayId,
   end,
@@ -80,16 +112,36 @@ function EndBlock({
         {end.identifier.trim() !== "" && <span className="pct-end-code">{end.identifier.trim()}</span>}
       </summary>
 
-      <label className="pct-field pct-field-col">
-        <span className="pct-field-label">Identifier</span>
-        <input
-          className="pct-num"
-          value={end.identifier}
-          placeholder="1-3 digits (0…9,A…Z)"
-          aria-label={`Runway end ${index + 1} identifier`}
-          onChange={(e) => patch({ identifier: e.target.value })}
-        />
-      </label>
+      <div className="pct-field pct-field-row pct-field-row-end">
+        <label className="pct-field-col">
+          {/* The full hint lives in the help note: at half width the placeholder shows only its start. */}
+          <span className="pct-field-label">
+            Identifier
+            <Help>1-3 digits (0…9,A…Z)</Help>
+          </span>
+          <input
+            className="pct-num"
+            value={end.identifier}
+            placeholder="0…9, A…Z"
+            aria-label={`Runway end ${index + 1} identifier`}
+            onChange={(e) => patch({ identifier: e.target.value })}
+          />
+        </label>
+        <label className="pct-field-col">
+          <span className="pct-field-label">
+            Extended runway
+            <Help>
+              Pavement added beyond this end, in metres: up to 5 digits, 0 = none. For Export TAP; the other
+              exports do not use it.
+            </Help>
+          </span>
+          <ExtensionInput
+            value={end.extension ?? 0}
+            ariaLabel={`Runway end ${index + 1} extended runway, metres`}
+            onChange={(extension) => patch({ extension })}
+          />
+        </label>
+      </div>
 
       <div className="pct-field pct-field-row">
         <label className="pct-field-col">

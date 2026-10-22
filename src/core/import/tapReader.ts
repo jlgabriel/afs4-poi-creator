@@ -57,6 +57,7 @@ import {
   DEFAULT_RUNWAY_MATERIAL,
   DEFAULT_TARMAC_MATERIAL,
   clampBrightness,
+  cleanRunwayExtension,
   tarmacLevel,
 } from "../project/surfaces";
 import {
@@ -354,6 +355,11 @@ export function readTap(
         touchdown: e.bool("marking_touchdown", d.touchdown),
         aimingPoint: e.bool("marking_aimingpoint", d.aimingPoint),
       };
+      const xtension = e.num("xtension", 0);
+      const extension = cleanRunwayExtension(xtension);
+      if (extension !== xtension) {
+        warnings.push(`${e.label}: extended runway ${xtension} m is not 0–99999 whole metres; ${extension} m is used.`);
+      }
       ends.push({
         threshold,
         identifier: e.str("identifier", "").toUpperCase(),
@@ -363,6 +369,8 @@ export function readTap(
         approach: e.bool("landing", true),
         takeoff: e.bool("takeoff", true),
         markings,
+        // Absent ≡ 0 (types.ts), so a runway without one imports exactly as before.
+        ...(extension > 0 ? { extension } : {}),
       });
       e.report(warnings);
     }

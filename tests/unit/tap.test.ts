@@ -369,6 +369,21 @@ describe("Export TAP — the .tap file", () => {
     expect(valuesOf(planTap(unnamed(ns), []).content, "direction").slice(0, 2)).toEqual(["0", "180"]);
   });
 
+  it("writes each end's extended runway into its `xtension` row, whole metres in range", () => {
+    const runway = TAP_PROJECT.airport!.runways![0]!;
+    const extended = (a: number | undefined, b: number | undefined): Project => ({
+      ...TAP_PROJECT,
+      airport: {
+        ...TAP_PROJECT.airport!,
+        runways: [{ ...runway, ends: [{ ...runway.ends[0], extension: a }, { ...runway.ends[1], extension: b }] }],
+      },
+    });
+    expect(valuesOf(planTap(extended(450, undefined), []).content, "xtension")).toEqual(["450", "0"]);
+    // A hand-edited project file is cleaned at the writer, not refused.
+    expect(valuesOf(planTap(extended(12.6, 123456), []).content, "xtension")).toEqual(["13", "99999"]);
+    expect(valuesOf(planTap(extended(-3, Number.NaN), []).content, "xtension")).toEqual(["0", "0"]);
+  });
+
   it("writes each end's markings and the pair's side and centre lines; numbers is the negated row", () => {
     const runway = TAP_PROJECT.airport!.runways![0]!;
     const marked: Project = {

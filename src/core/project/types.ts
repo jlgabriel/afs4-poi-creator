@@ -264,6 +264,10 @@ export interface AirportRunwayEnd {
   /** The paint at this end. Only Export TAP reads it. Absent ≡ surfaces.ts DEFAULT_RUNWAY_END_MARKINGS,
    *  so a runway saved before it existed exports the same `.tap`. */
   markings?: RunwayEndMarkings;
+  /** Extended runway: metres of pavement the converter adds beyond this threshold, whole metres,
+   *  0…surfaces.ts RUNWAY_EXTENSION_MAX. The `.tap` row is `xtension`. Only Export TAP reads it — the
+   *  `.tsc`/`.wad` keep the threshold as the end. Absent ≡ 0. */
+  extension?: number;
 }
 
 /** The markings the TAP converter paints at one runway end, each on or off. */
@@ -573,14 +577,17 @@ export type ResolvedObject = ResolvedXref | ResolvedAirportLight | ResolvedLight
 
 /** One file to write into the POI folder. */
 export interface PoiFile {
-  relPath: string; // e.g. "poi.tsl"
+  relPath: string; // e.g. "pct.tsl"
   content: string;
 }
 
 /** A pure, testable description of the POI package to write — no I/O. */
 export interface ExportPlan {
   folderName: string; // "e01187n4838_munich_test"
-  files: PoiFile[]; // poi.tsl, poi.toc, README.txt
+  files: PoiFile[]; // pct.tsl, pct.toc, __README.txt
+  /** planExport.ts projectSidecarName: the project copy main drops beside the files. Absent when nothing
+   *  writes one (the CLI). */
+  sidecar?: string;
   assets: string[]; // bundled binary asset basenames to copy verbatim into the folder (v0.4 plant anchor mesh+texture); [] for xref/light-only POIs — the installer resolves each name in the app's assets dir
   warnings: string[];
 }

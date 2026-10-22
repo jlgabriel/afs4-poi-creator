@@ -539,6 +539,14 @@ else — for sharing, or for a manual install — and the button becomes **Expor
 
 Then: **restart Aerofly FS 4**. The dialog says so for a reason.
 
+**Installing again, and files of your own.** Install the same POI again and PCT replaces only the files
+it writes itself: `pct.tsl`, `pct.toc`, `pct_anchor.*`, and the two information files whose names
+start with two underscores (`__README.txt` and the `__….json` copy of the project — Aerofly skips any
+file named that way). Anything else in the folder is left where it is. So if you add objects of your
+own by hand, put them in a file of your own — `user.tsl`, say — beside your own TMB, TMA and TTX
+files, and every new install from PCT keeps them. **Uninstall** still removes the whole folder, your
+files included.
+
 **Uninstalling.** The bottom of the dialog lists the POIs currently installed. Anything PCT made
 gets an **Uninstall** button. Anything else is listed as "not by PCT" and left alone — PCT will not
 delete a folder it didn't create.
@@ -806,6 +814,8 @@ Per end:
 - **Identifier** — `08`, `26`, `18L`. One to three characters. Both may be left empty; PCT will not
   guess them from the heading, because naming a runway is a claim about the real world and a default
   bearing cannot make it.
+- **Extended runway** *(v2.8.2)* — beside the identifier: metres of pavement added beyond that end, up
+  to five digits, `0` for none. For **Export TAP…** only.
 - **Lon / Lat** — that end's threshold, if you would rather type it than drag it.
 - **Approach lighting** — eleven systems, from `NONE` through `MALSF` and `ALSF-2` to the older
   `CALVERT` and `ODALS`.
@@ -1099,8 +1109,9 @@ Airports go into your **Documents** folder rather than the sim's install directo
 
 ### Changing it, and taking it out
 
-Change anything, install again, and PCT **replaces** what it wrote — the button reads **Replace in
-/airports** as soon as it recognises the code as one of yours. There is no need to burn a fresh code on
+Change anything, install again, and PCT **replaces** what it wrote, and only that: a file you added to
+the folder yourself stays — the button reads **Replace in /airports** as soon as it recognises the code
+as one of yours. There is no need to burn a fresh code on
 every attempt: build, fly, come back, adjust, install again.
 
 ![Shot 38 — the airports PCT has installed, each with its own Uninstall](images/38_installed_airports.jpg)

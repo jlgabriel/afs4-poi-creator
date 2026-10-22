@@ -96,6 +96,8 @@ export interface TapRunwaySpec extends HeliportRunwaySpec {
   centerline: boolean;
   /** Per end, in the order of `ends`, defaults already applied. */
   markings: [RunwayEndMarkings, RunwayEndMarkings];
+  /** Per end: the extended runway in whole metres (types.ts AirportRunwayEnd.extension), already cleaned. */
+  extensions: [number, number];
 }
 
 /** A tarmac polygon: an OPEN ring of at least 3 points, shifted (the writer closes it). `brightness` is
@@ -213,7 +215,7 @@ function runwayPairs(runways: TapRunwaySpec[], elevation: string): string[] {
         const m = r.markings[n]!;
         return block("tm_airport_pd_rwy", "element", String(n), [
           tag("vector2_float64", "threshold", deg(e.threshold)),
-          tag("float64", "xtension", "0"),
+          tag("float64", "xtension", String(r.extensions[n]!)),
           tag("string8", "identifier", identifier),
           tag("string8", "appltsys", e.appltsys),
           tag("string8", "reil", e.reil),

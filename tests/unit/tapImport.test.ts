@@ -14,6 +14,7 @@ import {
   setAirportRunwaySurface,
   updateAirportGroundText,
   updateAirportJetway,
+  updateAirportRunwayEnd,
   updateAirportTaxisign,
 } from "../../src/core/project/mutate";
 
@@ -152,6 +153,7 @@ function fixture(): Project {
   let p = BASE;
   p = setAirportRunwaySurface(p, "r1", { material: "concrete_apron__typestd", brightness: 0.8, sidelines: false });
   p = setAirportRunwayEndMarkings(p, "r1", 1, { numbers: false, touchdown: true, aimingPoint: true });
+  p = updateAirportRunwayEnd(p, "r1", 0, { extension: 450 });
   p = addAirportGroundText(p, { lon: -71.6157, lat: -33.6562 }, { id: "g1" });
   p = updateAirportGroundText(p, "g1", { value: "TAXI B", pointing: "right", textColor: "white" });
   p = rotateAirportMark(p, "groundtexts", "g1", 47);
@@ -202,6 +204,8 @@ describe("Import TAP — round trip", () => {
     expect(a.pads[0]!.name).toBe("Helipad_W");
     expect(a.runways![0]!.ends[1].markings).toMatchObject({ numbers: false, touchdown: true, aimingPoint: true });
     expect(a.runways![0]!.sidelines).toBe(false);
+    expect(a.runways![0]!.ends[0].extension).toBe(450);
+    expect(a.runways![0]!.ends[1].extension).toBeUndefined(); // 0 imports as absent, the model's default
     expect(a.tarmacs!.map((t) => t.level)).toEqual([0, 2]);
     expect(a.taxisigns![0]!.heading).toBeCloseTo(211, 6);
     expect(a.jetways![0]).toMatchObject({ extensionDirection: -35, extensionAmount: 12.5, exitDirection: 20, docked: true });
@@ -234,6 +238,14 @@ describe("Import TAP — tolerance", () => {
     expect(shuffled).not.toBe(first.tap);
     const imported = readTap(shuffled, first.addendum);
     expect(exportTap(imported.project).tap).toBe(first.tap);
+  });
+
+  it("cleans an extended runway that is not whole metres in range, and says so", () => {
+    const odd = first.tap.replace("<[float64][xtension][450]>", "<[float64][xtension][12.7]>");
+    expect(odd).not.toBe(first.tap);
+    const imported = readTap(odd, first.addendum);
+    expect(imported.project.airport!.runways![0]!.ends[0].extension).toBe(13);
+    expect(imported.warnings.some((w) => /extended runway 12\.7 m/.test(w))).toBe(true);
   });
 
   it("fills a missing row with the default and says so, and keeps the element", () => {

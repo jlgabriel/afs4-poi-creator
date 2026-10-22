@@ -36,9 +36,9 @@ const SAFE = "e01185n4838_munich_test";
 const plan = (folderName: string, tocContent = "TOC\n"): ExportPlan => ({
   folderName,
   files: [
-    { relPath: "poi.tsl", content: "TSL\n" },
-    { relPath: "poi.toc", content: tocContent },
-    { relPath: "README.txt", content: `Munich test\n${POI_README_MARKER}\n` },
+    { relPath: "pct.tsl", content: "TSL\n" },
+    { relPath: "pct.toc", content: tocContent },
+    { relPath: "__README.txt", content: `Munich test\n${POI_README_MARKER}\n` },
   ],
   assets: [],
   warnings: [],
@@ -50,8 +50,8 @@ describe("writePoi", () => {
     const r = writePoi(plan(SAFE), root, { overwrite: false });
     expect(r.overwrote).toBe(false);
     expect(r.path).toBe(path.join(root, SAFE));
-    expect(readFileSync(path.join(root, SAFE, "poi.toc"), "utf8")).toBe("TOC\n");
-    expect(existsSync(path.join(root, SAFE, "README.txt"))).toBe(true);
+    expect(readFileSync(path.join(root, SAFE, "pct.toc"), "utf8")).toBe("TOC\n");
+    expect(existsSync(path.join(root, SAFE, "__README.txt"))).toBe(true);
   });
 
   it("refuses to clobber an existing folder unless overwrite is set", () => {
@@ -60,15 +60,51 @@ describe("writePoi", () => {
     expect(() => writePoi(plan(SAFE), root, { overwrite: false })).toThrow(FolderExistsError);
   });
 
-  it("replaces the folder contents when overwrite is true", () => {
+  it("replaces PCT's own files when overwrite is true", () => {
     const root = poiRoot(tmp);
     writePoi(plan(SAFE, "OLD\n"), root, { overwrite: false });
-    // Drop a stray file the fresh plan doesn't include — overwrite must clear it.
-    writeFileSync(path.join(root, SAFE, "stray.txt"), "x", "utf8");
     const r = writePoi(plan(SAFE, "NEW\n"), root, { overwrite: true });
     expect(r.overwrote).toBe(true);
-    expect(readFileSync(path.join(root, SAFE, "poi.toc"), "utf8")).toBe("NEW\n");
-    expect(existsSync(path.join(root, SAFE, "stray.txt"))).toBe(false);
+    expect(readFileSync(path.join(root, SAFE, "pct.toc"), "utf8")).toBe("NEW\n");
+  });
+
+  it("keeps the user's own files across a reinstall — user.tsl, their TMB, a subfolder", () => {
+    const root = poiRoot(tmp);
+    writePoi(plan(SAFE, "OLD\n"), root, { overwrite: false });
+    const dir = path.join(root, SAFE);
+    writeFileSync(path.join(dir, "user.tsl"), "MINE\n", "utf8");
+    writeFileSync(path.join(dir, "__user.tsl"), "DISABLED\n", "utf8"); // a user file switched off by name
+    writeFileSync(path.join(dir, "hangar.tmb"), "MESH", "utf8");
+    mkdirSync(path.join(dir, "textures"));
+    writeFileSync(path.join(dir, "textures", "hangar.ttx"), "TEX", "utf8");
+
+    writePoi(plan(SAFE, "NEW\n"), root, { overwrite: true });
+    expect(readFileSync(path.join(dir, "pct.toc"), "utf8")).toBe("NEW\n");
+    expect(readFileSync(path.join(dir, "user.tsl"), "utf8")).toBe("MINE\n");
+    expect(readFileSync(path.join(dir, "__user.tsl"), "utf8")).toBe("DISABLED\n");
+    expect(readFileSync(path.join(dir, "hangar.tmb"), "utf8")).toBe("MESH");
+    expect(readFileSync(path.join(dir, "textures", "hangar.ttx"), "utf8")).toBe("TEX");
+  });
+
+  it("drops the names earlier versions wrote, so the old poi.tsl cannot load the objects twice", () => {
+    const root = poiRoot(tmp);
+    const dir = path.join(root, SAFE);
+    mkdirSync(dir, { recursive: true });
+    for (const name of ["poi.tsl", "poi.toc", "README.txt", "munich_test.json", "pct_anchor.tmb", "pct_anchor.ttx"]) {
+      writeFileSync(path.join(dir, name), "OLD", "utf8");
+    }
+    writeFileSync(path.join(dir, "user.tsl"), "MINE\n", "utf8");
+
+    writePoi({ ...plan(SAFE), sidecar: "__munich_test.json" }, root, { overwrite: true });
+    expect(readdirSync(dir).sort()).toEqual(["__README.txt", "pct.toc", "pct.tsl", "user.tsl"]);
+  });
+
+  it("still lists a folder installed before the rename (README.txt) as PCT's", () => {
+    const root = poiRoot(tmp);
+    const dir = path.join(root, SAFE);
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(path.join(dir, "README.txt"), `Munich test\n${POI_README_MARKER}\n`, "utf8");
+    expect(listInstalledPois(tmp)).toEqual([{ folderName: SAFE, byPct: true }]);
   });
 
   it("rejects an unsafe folder name at the write boundary", () => {
@@ -88,8 +124,8 @@ describe("writePoi", () => {
   const brokenPlan = (folderName: string): ExportPlan => ({
     folderName,
     files: [
-      { relPath: "poi.tsl", content: "TSL\n" },
-      { relPath: "poi.tsl/nope.txt", content: "boom" }, // parent is a file → mkdir throws
+      { relPath: "pct.tsl", content: "TSL\n" },
+      { relPath: "pct.tsl/nope.txt", content: "boom" }, // parent is a file → mkdir throws
     ],
     assets: [],
     warnings: [],
@@ -100,8 +136,8 @@ describe("writePoi", () => {
     writePoi(plan(SAFE, "GOOD\n"), root, { overwrite: false });
     expect(() => writePoi(brokenPlan(SAFE), root, { overwrite: true })).toThrow();
     // the old POI is still there, complete and unharmed — not deleted, not half-replaced
-    expect(readFileSync(path.join(root, SAFE, "poi.toc"), "utf8")).toBe("GOOD\n");
-    expect(existsSync(path.join(root, SAFE, "README.txt"))).toBe(true);
+    expect(readFileSync(path.join(root, SAFE, "pct.toc"), "utf8")).toBe("GOOD\n");
+    expect(existsSync(path.join(root, SAFE, "__README.txt"))).toBe(true);
   });
 
   it("leaves NO partial POI behind when a fresh write fails part-way through", () => {
@@ -179,7 +215,7 @@ describe("listInstalledPois", () => {
     writePoi(plan(SAFE), root, { overwrite: false }); // has marker → byPct
     const other = "e01185n4838_handmade";
     mkdirSync(path.join(root, other), { recursive: true });
-    writeFileSync(path.join(root, other, "README.txt"), "no marker here", "utf8"); // byPct false
+    writeFileSync(path.join(root, other, "__README.txt"), "no marker here", "utf8"); // byPct false
     mkdirSync(path.join(root, "loose_folder"), { recursive: true }); // unsafe name → byPct false
     writeFileSync(path.join(root, "afile.txt"), "x", "utf8"); // a file, ignored
 

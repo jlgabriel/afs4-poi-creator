@@ -1,4 +1,4 @@
-// tocWriter.ts — Project objects → `poi.toc`, the AFS4 `cultivation` file that places
+// tocWriter.ts — Project objects → `pct.toc`, the AFS4 `cultivation` file that places
 // built-in xref objects BY NAME (design §3.4).
 //
 // PCT ships no model bytes: it references the sim's built-in objects through a cultivation
@@ -90,7 +90,7 @@ function plantElement(o: ResolvedPlant, index: number): string[] {
   ]);
 }
 
-/** Build the `poi.toc` text for a set of height-resolved objects.
+/** Build the `pct.toc` text for a set of height-resolved objects.
  *  A POI's `cultivation` carries sibling lists in the order `list_plant` → `list_light` →
  *  `list_airport_light` → `list_xref`. Every optional list is OMITTED when empty (never emitted
  *  empty), so an xref-only POI's bytes do not depend on the other kinds; `list_xref` is always

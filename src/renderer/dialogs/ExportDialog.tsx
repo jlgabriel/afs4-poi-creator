@@ -167,7 +167,8 @@ export function ExportDialog({ onClose }: { onClose: () => void }): React.ReactE
     if (res.error.code === "folder-exists" && !opts.overwrite) {
       const where = opts.target === "install" ? "installed POI" : "folder";
       const replace = window.confirm(
-        `A POI folder "${res.error.folderName}" already exists.\n\nReplace the existing ${where}?`,
+        `A POI folder "${res.error.folderName}" already exists.\n\nReplace the existing ${where}? ` +
+          "PCT replaces only its own files; files you added to the folder yourself are kept.",
       );
       if (replace) return install({ ...opts, overwrite: true });
       setError(`Kept the existing "${res.error.folderName}". Rename the POI to write a separate copy.`);

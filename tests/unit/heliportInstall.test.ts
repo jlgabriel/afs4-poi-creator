@@ -111,13 +111,13 @@ describe("validateIdentity", () => {
 });
 
 describe("planHeliport", () => {
-  it("writes the airport files and NO poi.tsl — the .tsc replaces it", () => {
+  it("writes the airport files and NO pct.tsl — the .tsc replaces it", () => {
     const plan = planHeliport(PROJECT, [HANGAR], OPTS);
     expect(plan.files.map((f) => f.relPath)).toEqual([
       "pct001.tsc",
       "pct001.wad",
-      "poi.toc",
-      "README.txt",
+      "pct.toc",
+      "__README.txt",
     ]);
   });
 
@@ -251,7 +251,7 @@ describe("planHeliport", () => {
 
   it("drops the cultivation reference entirely for an empty project", () => {
     const plan = planHeliport(PROJECT, [], OPTS);
-    expect(plan.files.map((f) => f.relPath)).toEqual(["pct001.tsc", "pct001.wad", "README.txt"]);
+    expect(plan.files.map((f) => f.relPath)).toEqual(["pct001.tsc", "pct001.wad", "__README.txt"]);
     expect(plan.warnings.some((w) => w.includes("no objects"))).toBe(true);
   });
 
@@ -259,7 +259,7 @@ describe("planHeliport", () => {
     const plan = planHeliport(PROJECT, [HANGAR], OPTS);
     expect(plan.files.map((f) => f.relPath)).toContain("pct001.tsc");
     expect(plan.files.map((f) => f.relPath)).toContain("pct001.wad");
-    expect(plan.files.map((f) => f.relPath)).not.toContain("poi.tsl");
+    expect(plan.files.map((f) => f.relPath)).not.toContain("pct.tsl");
     const tsc = plan.files.find((f) => f.relPath === "pct001.tsc")!.content;
     expect(tsc).toContain("[icao][PCT001]");
     expect(tsc).toContain("[sname][PCT Test Heliport]");
@@ -290,7 +290,7 @@ describe("planHeliport", () => {
   });
 
   it("marks its README so only PCT's own folders are ever offered for Uninstall", () => {
-    const readme = planHeliport(PROJECT, [HANGAR], OPTS).files.find((f) => f.relPath === "README.txt")!;
+    const readme = planHeliport(PROJECT, [HANGAR], OPTS).files.find((f) => f.relPath === "__README.txt")!;
     expect(readme.content).toContain(HELIPORT_README_MARKER);
   });
 
@@ -438,7 +438,7 @@ describe("installing under scenery/airports", () => {
     const w = write(plan);
     expect(w.path).toBe(path.join(tmp, "scenery", "airports", "us", "pct001_pct_test_heliport"));
     expect(existsSync(path.join(w.path, "pct001.tsc"))).toBe(true);
-    expect(existsSync(path.join(w.path, "poi.tsl"))).toBe(false);
+    expect(existsSync(path.join(w.path, "pct.tsl"))).toBe(false);
   });
 
   it("refuses a country code that is not two letters, at the PATH boundary", () => {
@@ -454,7 +454,7 @@ describe("installing under scenery/airports", () => {
     // Somebody else's airport, in the same tree, with a valid-looking name.
     const other = path.join(tmp, "scenery", "airports", "de", "e01185n4838_someone_else");
     mkdirSync(other, { recursive: true });
-    writeFileSync(path.join(other, "README.txt"), "not ours\n");
+    writeFileSync(path.join(other, "__README.txt"), "not ours\n");
 
     const rows = listInstalledHeliports(tmp);
     expect(rows).toEqual([{ folderName: plan.folderName, country: "us", icao: "pct001" }]);
@@ -505,7 +505,7 @@ describe("★ nothing may precede the root <[file] tag", () => {
 
 describe("the installed heliport's README", () => {
   it("carries the instructions the files may not — including how to undo it", () => {
-    const readme = planHeliport(PROJECT, [HANGAR], OPTS).files.find((f) => f.relPath === "README.txt")!;
+    const readme = planHeliport(PROJECT, [HANGAR], OPTS).files.find((f) => f.relPath === "__README.txt")!;
     expect(readme.content).toContain("To remove it");
     expect(readme.content).toContain("cannot speak for"); // the honest limit of the check
   });

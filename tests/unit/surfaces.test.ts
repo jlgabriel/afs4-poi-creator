@@ -11,6 +11,7 @@ import {
   setAirportRunwayEndMarkings,
   setAirportRunwaySurface,
   setAirportTarmacPoints,
+  updateAirportRunwayEnd,
   updateAirportTarmac,
 } from "../../src/core/project/mutate";
 import { linesOf, tarmacsOf } from "../../src/core/project/airport";
@@ -23,6 +24,9 @@ import {
   materialHasBrightness,
   runwayEndMarkings,
   tarmacLevel,
+  RUNWAY_EXTENSION_MAX,
+  cleanRunwayExtension,
+  runwayExtensionDigits,
 } from "../../src/core/project/surfaces";
 import { zProject } from "../../src/core/project/schemas";
 import type { LonLat, Project } from "../../src/core/project/types";
@@ -186,5 +190,29 @@ describe("project.json", () => {
     expect(back.airport?.tarmacs).toEqual(p.airport!.tarmacs);
     expect(back.airport?.lines).toEqual(p.airport!.lines);
     expect(back.airport?.runways?.[0]).toMatchObject({ material: "asphalt_runway__typeblue", brightness: 0.3 });
+  });
+});
+
+describe("extended runway", () => {
+  it("keeps digits only, at most five, as the field types them", () => {
+    expect(runwayExtensionDigits("12a3")).toBe("123");
+    expect(runwayExtensionDigits("1234567")).toBe("12345");
+    expect(runwayExtensionDigits("-5.5")).toBe("55");
+    expect(runwayExtensionDigits("")).toBe("");
+  });
+
+  it("cleans any number to whole metres in 0…99999, and nothing to 0", () => {
+    expect(cleanRunwayExtension(undefined)).toBe(0);
+    expect(cleanRunwayExtension(Number.POSITIVE_INFINITY)).toBe(0);
+    expect(cleanRunwayExtension(-1)).toBe(0);
+    expect(cleanRunwayExtension(300.4)).toBe(300);
+    expect(cleanRunwayExtension(RUNWAY_EXTENSION_MAX + 1)).toBe(RUNWAY_EXTENSION_MAX);
+  });
+
+  it("is cleaned by the edit too, and an unchanged value is no edit", () => {
+    let p = addAirportRunway(base(), SQUARE[0]!, SQUARE[2]!, { id: "r1" }, NOW);
+    p = updateAirportRunwayEnd(p, "r1", 1, { extension: 250.6 });
+    expect(p.airport!.runways![0]!.ends[1].extension).toBe(251);
+    expect(updateAirportRunwayEnd(p, "r1", 1, { extension: 251 })).toBe(p);
   });
 });

@@ -25,7 +25,7 @@ export const POI_SLUG_RE = /^[a-z0-9_]+$/;
 /** A placed object's `name` is a catalog object id. Built-in names are `[A-Za-z0-9_]`, so we allow that
  *  plus `.`/`-` as headroom and reject the rest. This stops an untrusted, shared project.json from
  *  smuggling a `]` (or a newline) into the value — the TM grammar has NO escape, so that would truncate
- *  and corrupt the emitted `poi.toc` written into the user's scenery/poi/. tocWriter runs the name
+ *  and corrupt the emitted `pct.toc` written into the user's scenery/poi/. tocWriter runs the name
  *  through `sanitizeValue` as well, as defence in depth. */
 export const XREF_NAME_RE = /^[A-Za-z0-9_.-]+$/;
 
@@ -174,6 +174,9 @@ const zRunwayEnd = z.looseObject({
   reil: z.enum(REIL_KINDS),
   approach: z.boolean(),
   takeoff: z.boolean(),
+  // Not range-checked here: the writer cleans it (surfaces.ts cleanRunwayExtension), so one odd number in
+  // a hand-edited file does not refuse the whole project.
+  extension: z.number().finite().optional(),
   markings: z
     .looseObject({
       numbers: z.boolean(),

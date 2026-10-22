@@ -59,6 +59,7 @@ import {
   DEFAULT_TARMAC_LEVEL,
   DEFAULT_TARMAC_MATERIAL,
   clampBrightness,
+  cleanRunwayExtension,
   runwayEndMarkings,
   tarmacLevel,
 } from "./surfaces";
@@ -736,16 +737,18 @@ export function moveAirportRunwayEnd(
   return updateRunway(project, runwayId, (r) => patchEnd(r, end, (e) => ({ ...e, threshold })), now);
 }
 
-/** Everything else about one end, in one patch: identifier, the three lighting rows, approach/takeoff.
- *  `threshold` is deliberately not patchable here — dragging it is `moveAirportRunwayEnd` — and neither
- *  are the markings (`setAirportRunwayEndMarkings`). */
+/** Everything else about one end, in one patch: identifier, the three lighting rows, approach/takeoff,
+ *  the extended runway (cleaned to whole metres in range). `threshold` is deliberately not patchable
+ *  here — dragging it is `moveAirportRunwayEnd` — and neither are the markings
+ *  (`setAirportRunwayEndMarkings`). */
 export function updateAirportRunwayEnd(
   project: Project,
   runwayId: string,
   end: 0 | 1,
-  patch: Partial<Omit<AirportRunwayEnd, "threshold" | "markings">>,
+  raw: Partial<Omit<AirportRunwayEnd, "threshold" | "markings">>,
   now = nowIso(),
 ): Project {
+  const patch = raw.extension === undefined ? raw : { ...raw, extension: cleanRunwayExtension(raw.extension) };
   return updateRunway(
     project,
     runwayId,

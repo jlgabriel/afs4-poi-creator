@@ -22,7 +22,7 @@ import {
 import path from "node:path";
 import type { ExportPlan } from "../core/project/types";
 import type { InstalledHeliport, InstalledPoi } from "../shared/pctApi";
-import { POI_README_MARKER } from "../core/export/planExport";
+import { POI_README_MARKER, README_FILE, pctOwnedFiles } from "../core/export/planExport";
 import { HELIPORT_README_MARKER, isSafeAirportFolderName } from "../core/export/heliportTemplate";
 import { isSafePoiFolderName } from "../core/geo/poiName";
 
@@ -96,7 +96,10 @@ export function resolvePoiPath(
 }
 
 /** Write a planned POI into `<root>/<plan.folderName>/`. `root` is poiRoot(userDir) for an install
- *  or a user-chosen dir for export-to-folder. Refuses to clobber unless `overwrite`. `opts.assetsDir` is
+ *  or a user-chosen dir for export-to-folder. Refuses to clobber unless `overwrite`; an overwrite
+ *  replaces only PCT's own files (planExport.ts pctOwnedFiles) and carries every other top-level entry
+ *  of the old folder over — the user's `user.tsl` and their own TMB/TMA/TTX survive a reinstall.
+ *  `opts.assetsDir` is
  *  the directory holding PCT's bundled binary assets (anchorAsset.ts) — required only when the plan ships
  *  any (a POI with plants); an xref/light-only plan has `assets: []` and never reads it. */
 export function writePoi(
@@ -130,7 +133,18 @@ export function writePoi(
       if (opts.assetsDir === undefined) throw new MissingAssetsDirError(name);
       copyFileSync(path.join(opts.assetsDir, name), path.join(staging, name));
     }
-    if (overwrote) rmSync(dest, { recursive: true, force: true });
+    // COPIED, not moved, into the staging folder: until the swap below the old folder stays whole, so a
+    // failure here still loses nothing.
+    if (overwrote) {
+      const owned = pctOwnedFiles(plan);
+      for (const e of readdirSync(dest, { withFileTypes: true })) {
+        if (owned.has(e.name.toLowerCase())) continue;
+        const target = path.join(staging, e.name);
+        if (existsSync(target)) continue;
+        cpSync(path.join(dest, e.name), target, { recursive: true });
+      }
+      rmSync(dest, { recursive: true, force: true });
+    }
     renameSync(staging, dest);
   } catch (e) {
     rmSync(staging, { recursive: true, force: true }); // leave no half-built POI behind
@@ -194,12 +208,18 @@ export function listInstalledPois(afs4UserDir: string): InstalledPoi[] {
   return out;
 }
 
+/** Where the marker is looked for: the current README, then the name earlier versions used, so a folder
+ *  installed before the rename is still PCT's to list and uninstall. */
+const README_NAMES = [README_FILE, "README.txt"];
+
 function hasMarker(dir: string, marker: string): boolean {
-  try {
-    return readFileSync(path.join(dir, "README.txt"), "utf8").includes(marker);
-  } catch {
-    return false;
-  }
+  return README_NAMES.some((name) => {
+    try {
+      return readFileSync(path.join(dir, name), "utf8").includes(marker);
+    } catch {
+      return false;
+    }
+  });
 }
 
 function hasPctMarker(dir: string): boolean {

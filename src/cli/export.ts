@@ -1,5 +1,5 @@
 // cli/export.ts — M1b headless exporter. Reads a project.json, resolves object heights, builds
-// the POI package (poi.tsl + poi.toc + README) via the pure core, writes it, and optionally
+// the POI package (pct.tsl + pct.toc + README) via the pure core, writes it, and optionally
 // installs it into the AFS4 user folder's scenery/poi/. Useful for building test POIs headlessly.
 //
 //   npm run export -- <project.json> [--install] [--afs4-dir <dir>]

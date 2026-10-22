@@ -133,16 +133,16 @@ describe("autosaveShadow / loadShadow", () => {
 });
 
 describe("writeProjectSidecar", () => {
-  it("writes <poiName>.json into the folder and round-trips through openProject", async () => {
+  it("writes __<poiName>.json into the folder and round-trips through openProject", async () => {
     const name = writeProjectSidecar(tmp, proj({ name: "Shared", poiName: "obbi_rw30r" }));
-    expect(name).toBe("obbi_rw30r.json");
+    expect(name).toBe("__obbi_rw30r.json");
     const res = await openProject(pick(path.join(tmp, name)));
     expect(res?.project.poiName).toBe("obbi_rw30r");
     expect(res?.project.name).toBe("Shared");
   });
 
-  it("falls back to project.json when poiName is empty", () => {
-    expect(writeProjectSidecar(tmp, proj({ poiName: "" }))).toBe("project.json");
+  it("falls back to __project.json when poiName is empty", () => {
+    expect(writeProjectSidecar(tmp, proj({ poiName: "" }))).toBe("__project.json");
   });
 
   it("is a companion copy — never touches the current project path", () => {

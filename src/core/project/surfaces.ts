@@ -90,6 +90,20 @@ export function runwayEndMarkings(end: { markings?: RunwayEndMarkings }): Runway
   return { ...DEFAULT_RUNWAY_END_MARKINGS, ...end.markings };
 }
 
+/** A runway end's extension: whole metres, at most five digits. */
+export const RUNWAY_EXTENSION_MAX = 99999;
+
+/** Any number → a valid extension: rounded to whole metres and clamped into 0…RUNWAY_EXTENSION_MAX. */
+export function cleanRunwayExtension(n: number | undefined): number {
+  if (n === undefined || !Number.isFinite(n)) return 0;
+  return Math.min(RUNWAY_EXTENSION_MAX, Math.max(0, Math.round(n)));
+}
+
+/** What the field keeps of a keystroke: digits only, the first five. */
+export function runwayExtensionDigits(text: string): string {
+  return text.replace(/\D/g, "").slice(0, String(RUNWAY_EXTENSION_MAX).length);
+}
+
 /** The brightness values the converter takes: 0.1 to 1.0 in steps of 0.1. */
 export const BRIGHTNESS_STEPS: readonly number[] = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0];
 

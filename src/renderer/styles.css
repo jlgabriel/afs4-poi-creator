@@ -985,6 +985,11 @@ body {
 .pct-field.pct-field-col {
   flex: none;
 }
+/* A row whose labels can wrap to different heights (a long label beside a short one): the inputs line up
+   along the bottom instead of following their labels down. */
+.pct-field-row-end > .pct-field-col {
+  justify-content: flex-end;
+}
 .pct-field-title {
   font-weight: 600;
   font-size: 14px;

@@ -37,7 +37,7 @@ const PLANT: ResolvedPlant = {
   heightRange: [17, 17],
 };
 
-// GOLDEN — byte-exact `poi.toc`. Regenerate deliberately if the cultivation format changes; never let
+// GOLDEN — byte-exact `pct.toc`. Regenerate deliberately if the cultivation format changes; never let
 // it drift silently.
 const GOLDEN_TOC = `<[file][][]
     <[cultivation][][]
@@ -66,7 +66,7 @@ const GOLDEN_TSL = `<[file][][]
     <[tmsimulator_scenery_place_simple][][]
         <[string8u][coordinate_system][lonlat]>
         <[bool][autoheight][false]>
-        <[string8u][cultivation][poi]>
+        <[string8u][cultivation][pct]>
     >
 >
 `;
@@ -79,7 +79,7 @@ const GOLDEN_TSL_ANCHORED = `<[file][][]
     <[tmsimulator_scenery_place_simple][][]
         <[string8u][coordinate_system][lonlat]>
         <[bool][autoheight][false]>
-        <[string8u][cultivation][poi]>
+        <[string8u][cultivation][pct]>
         <[list_tmsimulator_scenery_object][objects][]
             <[tmsimulator_scenery_object][element][0]
                 <[string8u][type][object]>
@@ -98,7 +98,7 @@ const GOLDEN_TSL_AUTOHEIGHT = `<[file][][]
     <[tmsimulator_scenery_place_simple][][]
         <[string8u][coordinate_system][lonlat]>
         <[bool][autoheight][true]>
-        <[string8u][cultivation][poi]>
+        <[string8u][cultivation][pct]>
         <[list_tmsimulator_scenery_object][objects][]
             <[tmsimulator_scenery_object][element][0]
                 <[string8u][type][object]>
@@ -112,7 +112,7 @@ const GOLDEN_TSL_AUTOHEIGHT = `<[file][][]
 `;
 
 describe("buildToc — cultivation list_xref", () => {
-  it("emits a byte-exact poi.toc for placed xrefs", () => {
+  it("emits a byte-exact pct.toc for placed xrefs", () => {
     expect(buildToc([TOWER, BARREL])).toBe(GOLDEN_TOC);
   });
   it("an empty POI still produces a valid (empty) xref list", () => {
@@ -136,7 +136,7 @@ describe("buildToc — cultivation list_xref", () => {
 
 describe("buildTsl — place_simple wrapper", () => {
   it("references the toc via cultivation", () => {
-    expect(buildTsl({ tocFileName: "poi" })).toBe(GOLDEN_TSL);
+    expect(buildTsl({ tocFileName: "pct" })).toBe(GOLDEN_TSL);
   });
   it("omits the cultivation line when there is no toc", () => {
     const tsl = buildTsl({ tocFileName: null });
@@ -147,34 +147,34 @@ describe("buildTsl — place_simple wrapper", () => {
     // because nothing is wrong with the file.
     // Safe for the other kinds: PCT writes explicit absolute ASL for every object, and autoheight does
     // not reach xref cultivation at all.
-    expect(buildTsl({ tocFileName: "poi" })).toContain("<[bool][autoheight][false]>");
+    expect(buildTsl({ tocFileName: "pct" })).toContain("<[bool][autoheight][false]>");
     expect(buildTsl({ tocFileName: null })).toContain("<[bool][autoheight][false]>");
   });
   it("carries no `name` tag — so the export has no user-typed value at all (no free text)", () => {
     // The tag has no effect. Dropping it removes the only free-text value the .tsl ever had, which is
     // what the `]`-truncation guard existed for. The .toc's own sanitizeValue still covers object names.
-    const tsl = buildTsl({ tocFileName: "poi" });
+    const tsl = buildTsl({ tocFileName: "pct" });
     expect(tsl).not.toContain("[name]");
     const place = parseTm(tsl).children[0]; // <file> → <tmsimulator_scenery_place_simple>
     expect(child(place, "name")).toBeUndefined();
-    expect(child(place, "cultivation")?.value).toBe("poi"); // and the file still parses
+    expect(child(place, "cultivation")?.value).toBe("pct"); // and the file still parses
   });
 
   it("emits the plant anchor object at terrain height when given an anchor", () => {
     const anchor = { position: { lon: 11.85, lat: 48.376 }, heightAsl: 520 };
-    expect(buildTsl({ tocFileName: "poi", anchor })).toBe(GOLDEN_TSL_ANCHORED);
+    expect(buildTsl({ tocFileName: "pct", anchor })).toBe(GOLDEN_TSL_ANCHORED);
   });
 
   it("carries no objects when there is no anchor — absent and null are byte-identical", () => {
-    expect(buildTsl({ tocFileName: "poi", anchor: null })).toBe(GOLDEN_TSL);
-    expect(buildTsl({ tocFileName: "poi" })).toBe(GOLDEN_TSL);
+    expect(buildTsl({ tocFileName: "pct", anchor: null })).toBe(GOLDEN_TSL);
+    expect(buildTsl({ tocFileName: "pct" })).toBe(GOLDEN_TSL);
   });
 
   it("keeps the anchor ABSOLUTE — autoheight FALSE, no autoheight_override", () => {
     // The anchor holds in absolute mode, so PCT keeps its baked-ASL model: the place stays
     // autoheight=false and the anchor object carries no override (it agrees with the place) — the
     // standard form of an absolute object.
-    const tsl = buildTsl({ tocFileName: "poi", anchor: { position: { lon: 11.85, lat: 48.376 }, heightAsl: 520 } });
+    const tsl = buildTsl({ tocFileName: "pct", anchor: { position: { lon: 11.85, lat: 48.376 }, heightAsl: 520 } });
     expect(tsl).toContain("<[bool][autoheight][false]>");
     expect(tsl).not.toContain("autoheight_override");
     expect(tsl).toContain(`<[string8u][geometry][${ANCHOR_GEOMETRY}]>`);
@@ -186,16 +186,16 @@ describe("buildTsl — place_simple wrapper", () => {
     // The override is what makes autoheight reach the cultivation, and heightAsl on the anchor is
     // ignored (the AGL z is a fixed literal, BURIED at -1.0), so it can be 0.
     const anchor = { position: { lon: 11.85, lat: 48.376 }, heightAsl: 0 };
-    expect(buildTsl({ tocFileName: "poi", anchor, autoheight: true })).toBe(GOLDEN_TSL_AUTOHEIGHT);
+    expect(buildTsl({ tocFileName: "pct", anchor, autoheight: true })).toBe(GOLDEN_TSL_AUTOHEIGHT);
   });
 
   it("autoheight is opt-in per call — default (absent) stays FALSE, so baked-asl output never moves", () => {
     // The regression lock: every existing caller omits `autoheight`, so it must default false and leave
     // both the plain and anchored goldens byte-identical.
-    expect(buildTsl({ tocFileName: "poi" })).toBe(GOLDEN_TSL);
+    expect(buildTsl({ tocFileName: "pct" })).toBe(GOLDEN_TSL);
     const anchor = { position: { lon: 11.85, lat: 48.376 }, heightAsl: 520 };
-    expect(buildTsl({ tocFileName: "poi", anchor })).toBe(GOLDEN_TSL_ANCHORED);
-    expect(buildTsl({ tocFileName: "poi", anchor, autoheight: false })).toBe(GOLDEN_TSL_ANCHORED);
+    expect(buildTsl({ tocFileName: "pct", anchor })).toBe(GOLDEN_TSL_ANCHORED);
+    expect(buildTsl({ tocFileName: "pct", anchor, autoheight: false })).toBe(GOLDEN_TSL_ANCHORED);
   });
 });
 
@@ -223,11 +223,11 @@ describe("planExport", () => {
     expect(plan.folderName).toBe("e01185n4838_munich_test");
   });
 
-  it("writes poi.tsl, poi.toc and a README carrying the PCT marker", () => {
+  it("writes pct.tsl, pct.toc and a README carrying the PCT marker", () => {
     const plan = planExport(project, [TOWER, BARREL]);
-    expect(plan.files.map((f) => f.relPath)).toEqual(["poi.tsl", "poi.toc", "README.txt"]);
+    expect(plan.files.map((f) => f.relPath)).toEqual(["pct.tsl", "pct.toc", "__README.txt"]);
     expect(plan.files[1].content).toBe(GOLDEN_TOC);
-    const readme = plan.files.find((f) => f.relPath === "README.txt")!;
+    const readme = plan.files.find((f) => f.relPath === "__README.txt")!;
     expect(readme.content).toContain(POI_README_MARKER);
     expect(plan.warnings).toEqual([]);
   });
@@ -235,7 +235,7 @@ describe("planExport", () => {
   it("warns (does not throw) on an empty POI", () => {
     const plan = planExport(project, []);
     expect(plan.warnings.length).toBe(1);
-    expect(plan.files.find((f) => f.relPath === "poi.tsl")!.content).not.toContain("cultivation");
+    expect(plan.files.find((f) => f.relPath === "pct.tsl")!.content).not.toContain("cultivation");
   });
 
   it("a zero or absent shift leaves the .toc positions untouched", () => {
@@ -258,7 +258,7 @@ describe("planExport", () => {
 
   it("a POI with plants emits the anchor object and ships the anchor assets", () => {
     const plan = planExport(project, [PLANT]);
-    const tsl = plan.files.find((f) => f.relPath === "poi.tsl")!.content;
+    const tsl = plan.files.find((f) => f.relPath === "pct.tsl")!.content;
     expect(tsl).toContain("<[list_tmsimulator_scenery_object][objects][]");
     expect(tsl).toContain(`<[string8u][geometry][${ANCHOR_GEOMETRY}]>`);
     expect(plan.assets).toEqual([...ANCHOR_ASSETS]);
@@ -266,14 +266,14 @@ describe("planExport", () => {
 
   it("a POI without plants emits no anchor and ships no assets (byte-identical to the plain golden)", () => {
     const plan = planExport(project, [TOWER, BARREL]);
-    expect(plan.files.find((f) => f.relPath === "poi.tsl")!.content).toBe(GOLDEN_TSL);
+    expect(plan.files.find((f) => f.relPath === "pct.tsl")!.content).toBe(GOLDEN_TSL);
     expect(plan.assets).toEqual([]);
   });
 
   it("places the anchor at the centroid + mean ASL of the SHIFTED plants", () => {
     const p2: ResolvedPlant = { ...PLANT, id: "p2", position: { lon: 11.8502, lat: 48.3762 }, heightAsl: 522 };
     const shift = { east: 12, north: -8 };
-    const tsl = planExport({ ...project, shift }, [PLANT, p2]).files.find((f) => f.relPath === "poi.tsl")!.content;
+    const tsl = planExport({ ...project, shift }, [PLANT, p2]).files.find((f) => f.relPath === "pct.tsl")!.content;
     const s1 = shiftEastNorth(PLANT.position, shift.east, shift.north);
     const s2 = shiftEastNorth(p2.position, shift.east, shift.north);
     const c = { lon: (s1.lon + s2.lon) / 2, lat: (s1.lat + s2.lat) / 2 };
@@ -288,7 +288,7 @@ describe("planExport", () => {
 
   it("autoheight mode: place is autoheight=true, anchor is present, assets ship — even for an xref-only POI", () => {
     const plan = planExport(ahProject, [AGL_TOWER, AGL_BARREL]);
-    const tsl = plan.files.find((f) => f.relPath === "poi.tsl")!.content;
+    const tsl = plan.files.find((f) => f.relPath === "pct.tsl")!.content;
     expect(tsl).toContain("<[bool][autoheight][true]>");
     expect(tsl).toContain("<[int32][autoheight_override][-1]>");
     expect(tsl).toContain(`<[string8u][geometry][${ANCHOR_GEOMETRY}]>`);
@@ -296,7 +296,7 @@ describe("planExport", () => {
   });
 
   it("autoheight anchor sits at the centroid of ALL objects, not just plants", () => {
-    const tsl = planExport(ahProject, [AGL_TOWER, AGL_BARREL]).files.find((f) => f.relPath === "poi.tsl")!.content;
+    const tsl = planExport(ahProject, [AGL_TOWER, AGL_BARREL]).files.find((f) => f.relPath === "pct.tsl")!.content;
     const c = {
       lon: (TOWER.position.lon + BARREL.position.lon) / 2,
       lat: (TOWER.position.lat + BARREL.position.lat) / 2,
@@ -305,14 +305,14 @@ describe("planExport", () => {
   });
 
   it("autoheight .toc writes each object at its AGL z (terrain→0, offset→the offset)", () => {
-    const toc = planExport(ahProject, [AGL_TOWER, AGL_BARREL]).files.find((f) => f.relPath === "poi.toc")!.content;
+    const toc = planExport(ahProject, [AGL_TOWER, AGL_BARREL]).files.find((f) => f.relPath === "pct.toc")!.content;
     expect(toc).toContain(`${fmtLonLat(TOWER.position.lon)} ${fmtLonLat(TOWER.position.lat)} 0.00]>`);
     expect(toc).toContain(`${fmtLonLat(BARREL.position.lon)} ${fmtLonLat(BARREL.position.lat)} 25.00]>`);
   });
 
   it("an empty autoheight POI emits no anchor and no assets (nothing to ground)", () => {
     const plan = planExport(ahProject, []);
-    expect(plan.files.find((f) => f.relPath === "poi.tsl")!.content).not.toContain("tmsimulator_scenery_object");
+    expect(plan.files.find((f) => f.relPath === "pct.tsl")!.content).not.toContain("tmsimulator_scenery_object");
     expect(plan.assets).toEqual([]);
   });
 });
