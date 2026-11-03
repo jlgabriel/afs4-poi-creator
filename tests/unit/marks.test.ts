@@ -104,6 +104,10 @@ describe("ground text, jetway and car lot — the model", () => {
     expect(groundTextsOf(updateAirportGroundText(p, "g1", { size: [3, 4.25] }).airport)[0]!.size).toEqual([3, 4.25]);
   });
 
+  it("makes sure the decimal point is allowed in a ground text's value", () => {
+    expect(cleanGroundTextValue("121.500")).toBe("121.500");
+  });
+
   it("clamps a jetway's ranged numbers and refuses a non-finite one", () => {
     const p = withMarks();
     const q = updateAirportJetway(p, "j1", {
