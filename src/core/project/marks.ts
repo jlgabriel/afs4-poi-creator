@@ -38,7 +38,7 @@ export const DEFAULT_GROUNDTEXT_POINTING: GroundTextPointing = "none";
  *  is raised; anything else is dropped. That also keeps `]` and line breaks out of the `.tap`, whose
  *  grammar has no escape. */
 export function cleanGroundTextValue(value: string): string {
-  return value.toUpperCase().replace(/[^A-Z0-9 +-]/g, "");
+  return value.toUpperCase().replace(/[^A-Z0-9 .+-]/g, "");
 }
 
 /** The `.tap` `direction` of a ground text, from its compass heading in the project. Written as the
