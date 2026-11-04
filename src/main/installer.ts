@@ -95,6 +95,30 @@ export function resolvePoiPath(
   return dest;
 }
 
+/** The folder a POI goes into when the user picked `chosen` for an export. Picking a POI folder instead of
+ *  its parent is the natural click when updating one: it means the parent, or the POI would be written
+ *  inside itself and the files in view would stay old. A POI nested in a POI also never loads in the sim. */
+export function exportRootFor(chosen: string, folderName: string): string {
+  return path.basename(chosen) === folderName || hasPctMarker(chosen) ? path.dirname(chosen) : chosen;
+}
+
+/** Other PCT folders of the same POI in `root`. The folder name carries the anchor's coordinates, so with
+ *  an automatic anchor, moving objects far enough writes a new folder and leaves the old one in place. */
+export function otherFoldersOfPoi(root: string, folderName: string): string[] {
+  const slug = folderName.replace(/^[ew]\d{5}[ns]\d{4}_/, "");
+  return readdirSync(root, { withFileTypes: true })
+    .filter(
+      (e) =>
+        e.isDirectory() &&
+        e.name !== folderName &&
+        isSafePoiFolderName(e.name) &&
+        e.name.replace(/^[ew]\d{5}[ns]\d{4}_/, "") === slug &&
+        hasPctMarker(path.join(root, e.name)),
+    )
+    .map((e) => e.name)
+    .sort();
+}
+
 /** Write a planned POI into `<root>/<plan.folderName>/`. `root` is poiRoot(userDir) for an install
  *  or a user-chosen dir for export-to-folder. Refuses to clobber unless `overwrite`; an overwrite
  *  replaces only PCT's own files (planExport.ts pctOwnedFiles) and carries every other top-level entry

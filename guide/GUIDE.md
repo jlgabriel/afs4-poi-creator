@@ -535,7 +535,13 @@ consistently a few metres off in the sim, shift the lot rather than moving every
 
 **Destination** — *Aerofly FS 4 — …/scenery/poi* writes straight into your `scenery/poi/`, and the
 button at the foot of the dialog reads **Export to /poi**. *A folder I choose…* writes it somewhere
-else — for sharing, or for a manual install — and the button becomes **Export to folder…**.
+else — for sharing, or for a manual install — and the button becomes **Export to folder…**. To update
+an earlier export, pick the same folder again, or the POI's own folder: PCT asks before replacing it.
+The dialog's **Reveal in folder** opens the place where the POI landed.
+
+The folder's name starts with the anchor's coordinates, so if you moved the objects far with the anchor
+on Auto, the export writes a new folder beside the old one. PCT tells you when that happens; in
+`scenery/poi/`, uninstall the old copy or its objects keep loading too.
 
 Then: **restart Aerofly FS 4**. The dialog says so for a reason.
 

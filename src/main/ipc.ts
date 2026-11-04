@@ -59,8 +59,10 @@ import {
   UnsafeCountryError,
   UnsafeFolderNameError,
   airportRoot,
+  exportRootFor,
   listInstalledHeliports,
   listInstalledPois,
+  otherFoldersOfPoi,
   poiRoot,
   resolvePoiPath,
   uninstallHeliport,
@@ -259,6 +261,22 @@ const pickExportFolder = (): Promise<string | null> =>
 const pickDirectory = (title: string): Promise<string | null> =>
   showOpenFile({ title, properties: ["openDirectory"] });
 
+// Both held here because no path crosses from the renderer (P0-2): it only says which POI, or "overwrite".
+// The folder picked for an export that stopped at "already exists": the confirmed retry goes to the same
+// place instead of asking again.
+let exportRetry: { folderName: string; root: string } | null = null;
+// Where the last export landed, so Reveal works for a folder outside scenery/poi.
+let lastExport: { folderName: string; path: string } | null = null;
+
+/** Tells the user about older folders of this POI that the export left in place. */
+function otherFoldersWarnings(root: string, folderName: string, installed: boolean): string[] {
+  return otherFoldersOfPoi(root, folderName).map((other) =>
+    installed
+      ? `Another copy of this POI is still installed: ${other}. Its objects still load in Aerofly FS 4, so they can show up twice. The folder name follows the objects' position, so remove the old copy with Uninstall in this dialog if you don't need it.`
+      : `Another copy of this POI is in the same folder: ${other}. The folder name follows the objects' position, so this export wrote a new folder and did not update that one.`,
+  );
+}
+
 /** Export: resolve heights (manual base, else the elevation provider), plan the POI, and write it —
  *  into scenery/poi/ (install) or a chosen folder. Returns null only when choose-folder is cancelled. */
 async function runExport(project: Project, opts: ExportOptions): Promise<InstallResult | null> {
@@ -304,18 +322,35 @@ async function runExport(project: Project, opts: ExportOptions): Promise<Install
   };
 
   if (opts.target === "install") {
-    const w = writePoi(plan, poiRoot(afs4UserDirOrThrow()), { overwrite: opts.overwrite, assetsDir });
+    const root = poiRoot(afs4UserDirOrThrow());
+    const w = writePoi(plan, root, { overwrite: opts.overwrite, assetsDir });
     writeProjectSidecar(w.path, project); // re-openable copy beside the POI
-    return done({ folderName: w.folderName, path: w.path, installed: true, warnings: plan.warnings });
+    lastExport = { folderName: w.folderName, path: w.path };
+    return done({
+      folderName: w.folderName,
+      path: w.path,
+      installed: true,
+      warnings: [...plan.warnings, ...otherFoldersWarnings(root, w.folderName, true)],
+    });
   }
-  const chosen = await pickExportFolder();
+  const retryRoot = opts.overwrite && exportRetry?.folderName === plan.folderName ? exportRetry.root : null;
+  const chosen = retryRoot ?? (await pickExportFolder());
   if (!chosen) {
     log.info("export cancelled at the folder picker");
     return null;
   }
-  const w = writePoi(plan, chosen, { overwrite: opts.overwrite, assetsDir });
+  const root = retryRoot ?? exportRootFor(chosen, plan.folderName);
+  exportRetry = { folderName: plan.folderName, root };
+  const w = writePoi(plan, root, { overwrite: opts.overwrite, assetsDir });
+  exportRetry = null;
   writeProjectSidecar(w.path, project); // re-openable copy beside the POI
-  return done({ folderName: w.folderName, path: w.path, installed: false, warnings: plan.warnings });
+  lastExport = { folderName: w.folderName, path: w.path };
+  return done({
+    folderName: w.folderName,
+    path: w.path,
+    installed: false,
+    warnings: [...plan.warnings, ...otherFoldersWarnings(root, w.folderName, false)],
+  });
 }
 
 /** Install the project as a heliport: an airport folder under scenery/airports/<country>/.
@@ -779,6 +814,10 @@ export function registerIpc(): void {
 
   ipcMain.handle("pct:revealInFolder", (_e, folderName: string): void => {
     try {
+      if (lastExport?.folderName === folderName) {
+        if (existsSync(lastExport.path)) shell.showItemInFolder(lastExport.path);
+        return;
+      }
       const dir = currentSettings().afs4UserDir ?? detectUserDir(documents());
       if (!dir) return;
       const target = resolvePoiPath(poiRoot(dir), folderName); // validates the name at the boundary

@@ -17,7 +17,9 @@ import {
   MissingAssetsDirError,
   UnsafeAssetNameError,
   UnsafeFolderNameError,
+  exportRootFor,
   listInstalledPois,
+  otherFoldersOfPoi,
   poiRoot,
   resolvePoiPath,
   uninstallPoi,
@@ -42,6 +44,40 @@ const plan = (folderName: string, tocContent = "TOC\n"): ExportPlan => ({
   ],
   assets: [],
   warnings: [],
+});
+
+describe("exportRootFor", () => {
+  it("keeps an ordinary folder", () => {
+    expect(exportRootFor(tmp, SAFE)).toBe(tmp);
+  });
+  it("goes up from the POI's own folder, even before it exists", () => {
+    expect(exportRootFor(path.join(tmp, SAFE), SAFE)).toBe(tmp);
+  });
+  it("goes up from a PCT folder of the same POI at other coordinates", () => {
+    const old = "e01100n4838_munich_test";
+    writePoi(plan(old), tmp, { overwrite: false });
+    expect(exportRootFor(path.join(tmp, old), SAFE)).toBe(tmp);
+  });
+  it("keeps a folder that only looks like a POI but is not PCT's and has another name", () => {
+    const other = path.join(tmp, "e01100n4838_someone_else");
+    mkdirSync(other);
+    expect(exportRootFor(other, SAFE)).toBe(other);
+  });
+});
+
+describe("otherFoldersOfPoi", () => {
+  it("lists only PCT folders of the same slug at other coordinates", () => {
+    writePoi(plan(SAFE), tmp, { overwrite: false });
+    writePoi(plan("e01100n4838_munich_test"), tmp, { overwrite: false });
+    writePoi(plan("e01000n4838_munich_test"), tmp, { overwrite: false });
+    writePoi(plan("e01100n4838_munich"), tmp, { overwrite: false }); // another slug
+    mkdirSync(path.join(tmp, "e00900n4838_munich_test")); // same slug, not PCT's
+    expect(otherFoldersOfPoi(tmp, SAFE)).toEqual(["e01000n4838_munich_test", "e01100n4838_munich_test"]);
+  });
+  it("is empty when the POI is alone", () => {
+    writePoi(plan(SAFE), tmp, { overwrite: false });
+    expect(otherFoldersOfPoi(tmp, SAFE)).toEqual([]);
+  });
 });
 
 describe("writePoi", () => {
