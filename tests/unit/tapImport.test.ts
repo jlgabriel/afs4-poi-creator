@@ -36,7 +36,7 @@ const BASE: Project = {
       height: { mode: "terrain" },
       group: "conifer_forest",
       species: "02",
-      heightRange: [20.1, 22.5],
+      heightRange: [20, 20],
     },
     {
       id: "l1",
@@ -214,6 +214,89 @@ describe("Import TAP — round trip", () => {
     // The writer's filler names come back empty.
     expect(a.groundtexts![0]!.name).toBe("");
     expect(a.taxisigns![0]!.name).toBe("");
+  });
+});
+
+describe("TAP plants", () => {
+  const exportWith = (heightRange: [number, number]): string => {
+    const objects = BASE.objects.map((o) => (o.kind === "plant" ? { ...o, heightRange } : o));
+    return exportTap({ ...BASE, objects }).tap;
+  };
+  const plantBlock = (tap: string): string => tap.slice(tap.indexOf("[tm_airport_pd_plant]"), tap.indexOf("[list_tm_airport_pd_light]"));
+  const plants = (tap: string): PlacedObject[] => readTap(tap, null).project.objects.filter((o) => o.kind === "plant");
+
+  it("writes one whole-number height and string8u type and species", () => {
+    const block = plantBlock(exportWith([20, 20]));
+    expect(block).toContain("<[float64][height][20]>");
+    expect(block).toContain("<[string8u][type][conifer_forest]>");
+    expect(block).toContain("<[string8u][species][02]>");
+    expect(block).not.toContain("height_range");
+    expect(block).not.toContain("[group]");
+  });
+
+  it.each([
+    [[20.14, 20.14], 20],
+    [[12.5, 12.5], 13],
+    [[0.3, 0.3], 1], // a small plant must not turn into 0, the texture's own height
+    [[0, 0], 0],
+    [[18, 25], 18], // the first value, the one the inspector shows
+  ] as [[number, number], number][])("rounds %j to %i", (range, height) => {
+    expect(plantBlock(exportWith(range))).toContain(`<[float64][height][${height}]>`);
+  });
+
+  it("imports the current rows", () => {
+    const exported = exportWith([20, 20]);
+    const block = plantBlock(exported);
+    const tap = exported.replace(
+      block,
+      `[tm_airport_pd_plant][element][0]
+          <[vector2_float64][position][-71.615200 -33.656100]>
+          <[float64][height][20]>
+          <[string8u][type][palm]>
+          <[string8u][species][08]>
+        >
+      >
+      <`,
+    );
+    const { project, warnings } = readTap(tap, null);
+    expect(warnings).toEqual([]);
+    expect(plants(tap)).toHaveLength(1);
+    expect(project.objects.find((o) => o.kind === "plant")).toMatchObject({
+      position: { lon: -71.6152, lat: -33.6561 },
+      group: "palm",
+      species: "08",
+      heightRange: [20, 20],
+    });
+  });
+
+  it("still imports the rows of older files, range and decimals included", () => {
+    const older = exportWith([20, 20])
+      .replace("<[float64][height][20]>", "<[vector2_float32][height_range][18.50 25.00]>")
+      .replace("<[string8u][type][conifer_forest]>", "<[string8][group][conifer_forest]>")
+      .replace("<[string8u][species][02]>", "<[string8][species][02]>");
+    const { warnings, project } = readTap(older, null);
+    expect(warnings).toEqual([]);
+    expect(project.objects.find((o) => o.kind === "plant")).toMatchObject({
+      group: "conifer_forest",
+      species: "02",
+      heightRange: [18.5, 25],
+    });
+  });
+
+  it("keeps a plant with no height, at the default, and says so", () => {
+    const tap = exportWith([20, 20]).replace("<[float64][height][20]>", "");
+    const { warnings, project } = readTap(tap, null);
+    expect(plants(tap)).toHaveLength(1);
+    expect(project.objects.find((o) => o.kind === "plant")).toMatchObject({ heightRange: [0, 0] });
+    expect(warnings.join(" | ")).toContain("height");
+  });
+
+  it.each(["type", "species"])("leaves out a plant with no %s and imports the rest", (row) => {
+    const tap = exportWith([20, 20]).replace(new RegExp(`<\\[string8u\\]\\[${row}\\]\\[[^\\]]*\\]>`), "");
+    const { warnings, project } = readTap(tap, null);
+    expect(project.objects.some((o) => o.kind === "plant")).toBe(false);
+    expect(project.objects.length).toBeGreaterThan(0);
+    expect(warnings.join(" | ")).toMatch(new RegExp(`Plant 1 has no ${row}`));
   });
 });
 

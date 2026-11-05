@@ -20,7 +20,8 @@
 // a taxi sign's is in the convention of objects (marks.ts), every other `direction` is the compass
 // heading; polygons are stored open (a repeated closing point is dropped); `marking_nonumbers` is the
 // negation of the RWY NUMBER marking; the name the writer puts in place of an empty one ("FATO/TLOF",
-// "Parking", "GROUNDTEXT", "TAXISIGN") comes back empty.
+// "Parking", "GROUNDTEXT", "TAXISIGN") comes back empty. A plant's `height` fills both ends of the model's
+// range, and the plant rows older `.tap` files use (`height_range`, `group`) are still read.
 import type {
   AirportCarlot,
   AirportGroundText,
@@ -522,16 +523,24 @@ export function readTap(
     ...each<PlacedObject>("tm_airport_pd_plant", "Plant", (r) => {
       const at = r.lonLat("position");
       if (at === null) return noPosition(r.label);
+      const group = r.has("type") ? r.str("type", "") : r.str("group", "");
+      const species = r.str("species", "");
+      for (const [row, value] of [["type", group], ["species", species]] as const) {
+        if (value === "") {
+          warnings.push(`${r.label} has no ${row}, so it is left out.`);
+          return null;
+        }
+      }
       const range = r.nums("height_range", 2);
-      if (range === null) r.str("height_range", "");
+      const height = r.has("height") || range === null ? Math.max(0, r.num("height", 0)) : null;
       return {
         id: newId(),
         kind: "plant",
         position: at,
         height: { mode: "terrain" },
-        group: r.str("group", ""),
-        species: r.str("species", ""),
-        heightRange: range === null ? [0, 0] : [Math.max(0, range[0]!), Math.max(0, range[1]!)],
+        group,
+        species,
+        heightRange: height !== null ? [height, height] : [Math.max(0, range![0]!), Math.max(0, range![1]!)],
       };
     }),
     ...each<PlacedObject>("tm_airport_pd_light", "Light", (r) => {

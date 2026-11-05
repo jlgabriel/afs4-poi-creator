@@ -263,9 +263,9 @@ const GOLDEN_TAP = `<[file][][]
         <[list_tm_airport_pd_plant][plants][]
             <[tm_airport_pd_plant][element][0]
                 <[vector2_float64][position][-71.6160000 -33.6558000]>
-                <[vector2_float32][height_range][20.14 20.14]>
-                <[string8][group][conifer_forest]>
-                <[string8][species][02]>
+                <[float64][height][20]>
+                <[string8u][type][conifer_forest]>
+                <[string8u][species][02]>
             >
         >
         <[list_tm_airport_pd_light][lights][]

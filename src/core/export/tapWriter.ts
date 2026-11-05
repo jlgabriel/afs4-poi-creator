@@ -13,10 +13,11 @@
 //     markings.
 //   • helipad / parking: compass `direction` (not heading), parking `radius` (not size) and `type`
 //     (not tags).
-//   • objects: plants and XREFs carry a 2-D `position` and no height; an XREF has no `scale_factor`; an
+//   • objects: plants and XREFs carry a 2-D `position` and no altitude; an XREF has no `scale_factor`; an
 //     airport light's fixture is `name` (not type_name) and its facing is `direction` (not
-//     orientation); plant `group`/`species` are `string8`. Point and airport lights keep a 3-D position
-//     with the same height the `.toc` gets.
+//     orientation). A plant has one whole-number `height` (not `height_range`) and its `type` (not
+//     `group`) and `species` are `string8u`. Point and airport lights keep a 3-D position with the same
+//     height the `.toc` gets.
 //   • an XREF's `direction` is the COMPASS HEADING, not the `.toc` rotation: the converter applies the
 //     heading → `.toc` direction conversion itself (orientation.ts), so writing the `.toc` value would
 //     convert it twice.
@@ -71,10 +72,11 @@ import type {
   HeliportWinchSpec,
 } from "./heliportTemplate";
 
-/** A plant as the `.tap` wants it: no height (the converter resolves it). Position already shifted. */
+/** A plant as the `.tap` wants it: no altitude (the converter resolves it). Position already shifted.
+ *  `height` is how tall it grows, in metres; the writer rounds it. */
 export interface TapPlantSpec {
   position: LonLat;
-  heightRange: [number, number];
+  height: number;
   group: string;
   species: string;
 }
@@ -279,6 +281,9 @@ function parkingPositions(parkings: HeliportParkingSpec[]): string[] {
   );
 }
 
+/** The `.tap` takes whole metres. 0 means the texture's own height, so a plant with a size stays at 1 or more. */
+const plantHeight = (h: number): number => (h > 0 ? Math.max(1, Math.round(h)) : 0);
+
 function plants(plantList: TapPlantSpec[]): string[] {
   return list(
     "list_tm_airport_pd_plant",
@@ -286,9 +291,9 @@ function plants(plantList: TapPlantSpec[]): string[] {
     plantList.map((p, i) =>
       block("tm_airport_pd_plant", "element", String(i), [
         tag("vector2_float64", "position", deg(p.position)),
-        tag("vector2_float32", "height_range", p.heightRange.map((h) => fmtMeters(h)).join(" ")),
-        tag("string8", "group", sanitizeValue(p.group)),
-        tag("string8", "species", sanitizeValue(p.species)),
+        tag("float64", "height", String(plantHeight(p.height))),
+        tag("string8u", "type", sanitizeValue(p.group)),
+        tag("string8u", "species", sanitizeValue(p.species)),
       ]),
     ),
   );

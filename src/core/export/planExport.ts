@@ -556,7 +556,7 @@ export function planTap(project: Project, resolvedLights: ResolvedObject[], terr
     carlots,
     plants: placedPlants.map((p) => ({
       position: shiftPoint(p.position, shift),
-      heightRange: p.heightRange,
+      height: p.heightRange[0], // the one the inspector edits; PCT keeps MIN = MAX
       group: p.group,
       species: p.species,
     })),
