@@ -1,6 +1,7 @@
 // FirstRunWizard.tsx — the first-run / Rescan flow (design §5): Welcome → Install dir (auto-detected
 // candidates + Browse, validated by attempting the scan) → scan spinner → "N objects in M bundles" +
-// Open editor. It only loads the catalog + persists settings; it does NOT touch the project, so the
+// Open editor. "Continue without Aerofly FS 4" scans with no install, for the user's own objects only.
+// It only loads the catalog + persists settings; it does NOT touch the project, so the
 // store's blank initial project stands on first run and Rescan never wipes an open project. Rendered
 // only in Electron (the browser preview seeds the demo and never reaches the wizard branch).
 import { useEffect, useState } from "react";
@@ -65,11 +66,10 @@ export function FirstRunWizard({ onDone }: { onDone: () => void }): React.ReactE
     setError(null);
   };
 
-  const runScan = async (): Promise<void> => {
-    if (installDir === null) return;
+  const runScan = async (dir: string | null): Promise<void> => {
     setError(null);
     setStep("scanning");
-    const res = await pct.scan(installDir, userDir);
+    const res = await pct.scan(dir, userDir);
     if (!res.ok) {
       setError(
         res.error.code === "no-xref"
@@ -85,8 +85,8 @@ export function FirstRunWizard({ onDone }: { onDone: () => void }): React.ReactE
   };
 
   const finish = async (): Promise<void> => {
-    if (catalog === null || installDir === null) return;
-    await pct.setSettings({ installDir, afs4UserDir: userDir });
+    if (catalog === null) return;
+    await pct.setSettings({ installDir: catalog.installDir, afs4UserDir: userDir });
     editorStore.getState().loadCatalog(catalog);
     onDone();
   };
@@ -100,7 +100,12 @@ export function FirstRunWizard({ onDone }: { onDone: () => void }): React.ReactE
           <>
             <p>Place Aerofly FS 4 built-in objects on a satellite map and export an installable POI.</p>
             <p>First, point PCT at your Aerofly FS 4 install so it can scan the object catalog.</p>
+            <p>
+              Aerofly FS 4 isn&apos;t on this computer? PCT still works: you can draw an airport and export it as
+              files, but without the sim&apos;s objects.
+            </p>
             <div className="pct-wizard-actions">
+              <button onClick={() => void runScan(null)}>Continue without Aerofly FS 4</button>
               <span className="pct-spacer" />
               <button className="pct-primary" onClick={() => setStep("install")}>
                 Get started
@@ -131,9 +136,14 @@ export function FirstRunWizard({ onDone }: { onDone: () => void }): React.ReactE
             </div>
             <div className="pct-wizard-actions">
               <button onClick={() => void browse()}>Browse…</button>
+              <button onClick={() => void runScan(null)}>Continue without it</button>
               <span className="pct-spacer" />
               <button onClick={() => setStep("welcome")}>Back</button>
-              <button className="pct-primary" disabled={installDir === null} onClick={() => void runScan()}>
+              <button
+                className="pct-primary"
+                disabled={installDir === null}
+                onClick={() => installDir !== null && void runScan(installDir)}
+              >
                 Scan
               </button>
             </div>
@@ -143,24 +153,41 @@ export function FirstRunWizard({ onDone }: { onDone: () => void }): React.ReactE
         {step === "scanning" && (
           <>
             <h2>Scanning…</h2>
-            <p className="pct-empty">Reading scenery/xref from the install folder.</p>
+            <p className="pct-empty">Reading the object catalog.</p>
             <div className="pct-spinner" aria-label="Scanning" />
           </>
         )}
 
         {step === "result" && catalog !== null && (
           <>
-            <h2>Catalog ready</h2>
+            <h2>{catalog.installDir === null ? "Ready, without Aerofly FS 4" : "Catalog ready"}</h2>
             <p className="pct-wizard-summary">{bundleSummary(catalog)}</p>
-            <div className="pct-wizard-list pct-wizard-bundles">
-              {catalog.bundles.map((b) => (
-                <div key={`${b.source}:${b.bundle}`} className="pct-bundle-row">
-                  <code>{b.bundle}</code>
-                  <span className="pct-bundle-src">{b.source}</span>
-                  <span className="pct-count">{b.count}</span>
-                </div>
-              ))}
-            </div>
+            {catalog.bundles.length > 0 && (
+              <div className="pct-wizard-list pct-wizard-bundles">
+                {catalog.bundles.map((b) => (
+                  <div key={`${b.source}:${b.bundle}`} className="pct-bundle-row">
+                    <code>{b.bundle}</code>
+                    <span className="pct-bundle-src">{b.source}</span>
+                    <span className="pct-count">{b.count}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {catalog.installDir === null && (
+              <>
+                <p>
+                  Runways, tarmac, lines, signs, parking and the rest of an airport all work. Objects, plants and
+                  airport lights come from the install, so the catalog only lists your own models. Others that
+                  a project or a <code>.tap</code> already holds stay in it, marked as missing.
+                </p>
+                <p>
+                  To get your work out, use <strong>Export TAP…</strong> or <strong>Export /poi…</strong> to a
+                  folder you choose. Your folders are in <strong>Settings</strong>, and{" "}
+                  <strong>Rescan</strong> adds an install later.
+                </p>
+              </>
+            )}
 
             {/* Parse problems used to be dropped in main: the catalog just came out smaller and the user
                 had no way to tell a damaged install from a PCT bug. Folded away — it's informational, and
@@ -184,7 +211,7 @@ export function FirstRunWizard({ onDone }: { onDone: () => void }): React.ReactE
 
             {/* Without a user folder the catalog still loads and objects still place — but Export has
                 nowhere to install to. Say it HERE, not at the end of the user's first POI. */}
-            {userDir === null && (
+            {userDir === null && catalog.installDir !== null && (
               <p className="pct-warn">
                 No Aerofly FS 4 user folder found. You can place objects, but installing a POI needs it —
                 set it in Settings.

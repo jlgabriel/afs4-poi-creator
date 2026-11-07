@@ -26,7 +26,18 @@ describe("decideBootPhase", () => {
     expect(decideBootPhase(settings(), null)).toBe("wizard");
   });
 
-  it("→ wizard when the install dir is unknown (never scanned)", () => {
-    expect(decideBootPhase(settings({ installDir: null }), catalog)).toBe("wizard");
+  it("→ wizard when the install dir is unknown and the catalog expects one", () => {
+    const scanned = { installDir: "/afs4" } as Catalog;
+    expect(decideBootPhase(settings({ installDir: null }), scanned)).toBe("wizard");
+  });
+
+  it("→ editor when the catalog was scanned without an install", () => {
+    const without = { installDir: null } as Catalog;
+    expect(decideBootPhase(settings({ installDir: null }), without)).toBe("editor");
+  });
+
+  it("→ editor when an install was set after scanning without one", () => {
+    const without = { installDir: null } as Catalog;
+    expect(decideBootPhase(settings(), without)).toBe("editor");
   });
 });

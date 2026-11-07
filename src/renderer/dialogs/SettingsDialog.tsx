@@ -189,7 +189,10 @@ export function SettingsDialog({
                   Re-detect
                 </button>
               </div>
-              <span className="pct-field-meta">Rescan after changing the install to reload objects.</span>
+              <span className="pct-field-meta">
+                Optional. Without it PCT lists only your own objects. Rescan after changing the install to reload
+                objects.
+              </span>
             </div>
 
             <div className="pct-field pct-field-col">

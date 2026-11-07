@@ -99,6 +99,11 @@ object, and since **v1.4** there are five of them — a **runway**, a **helipad*
 so you only ever place objects you already own. Nothing from the sim is copied into this project or
 into your finished POIs — just the *names* of the objects you chose.
 
+**The sim is optional.** Without Aerofly FS 4 on the computer, PCT still opens and you can draw an
+airport and export it as files, but the catalog lists only your own models. PCT exports for Aerofly
+FS 4 only: using the result in Aerofly FS Global means converting it yourself. See
+[Getting PCT running](guide/GUIDE.md#2-getting-pct-running).
+
 ## How to use it
 
 The short version is below. For the whole thing walked through with pictures, see

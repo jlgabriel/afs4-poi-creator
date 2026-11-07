@@ -182,7 +182,8 @@ export interface ExportOptions {
  *  project method means the user cancelled a dialog. */
 export interface PctApi {
   detectPaths(): Promise<DetectResult>;
-  scan(installDir: string, userXrefDir: string | null): Promise<PctResult<ScanResult>>;
+  /** `installDir` null scans without an install: only the user's own objects. */
+  scan(installDir: string | null, userXrefDir: string | null): Promise<PctResult<ScanResult>>;
   getCachedCatalog(): Promise<Catalog | null>;
   getSettings(): Promise<Settings>;
   setSettings(patch: Partial<Settings>): Promise<Settings>;

@@ -58,6 +58,7 @@ const POINT_TITLE = "Point light (custom)";
 
 export function LightsSection({ popovers }: { popovers: CardPopovers }): React.ReactElement {
   const lights = useEditor((s) => s.catalog?.airportLights);
+  const noInstall = useEditor((s) => s.catalog?.installDir === null);
   const placing = useEditor((s) => s.placing);
   // The search box sits ABOVE every section, so it filters this one too. Not deferred like the gallery's:
   // a short list re-renders for free.
@@ -119,7 +120,11 @@ export function LightsSection({ popovers }: { popovers: CardPopovers }): React.R
             Rescan, since the fixtures come from the install scan (the point light above needs none). */}
         {sorted.length === 0 && !showPoint && <p className="pct-empty">No matching lights</p>}
         {sorted.length === 0 && !q && (
-          <p className="pct-empty pct-lights-hint">Rescan to load airport lights from your install.</p>
+          <p className="pct-empty pct-lights-hint">
+            {noInstall
+              ? "Airport lights come from the Aerofly FS 4 install."
+              : "Rescan to load airport lights from your install."}
+          </p>
         )}
       </div>
     </details>

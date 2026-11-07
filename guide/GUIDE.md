@@ -106,6 +106,18 @@ you're in.
 Bundles you added yourself are listed here too, tagged `user` instead of `install` — that's the
 `xref_air_race_pylons` line above, and section 12 covers how to register your own.
 
+**No Aerofly FS 4 on this computer?** Press **Continue without Aerofly FS 4**. PCT opens normally and
+you can draw a whole airport, but some things come from the install and aren't there:
+
+- The object catalog lists only your own models, from the user folder set in **Settings**.
+- **Plants** and **airport lights** are not listed. The point light still is.
+- Objects, plants and lights already in a project or a `.tap` stay in it, marked as **missing**.
+- PCT can't check an airport code against the sim's own airports, so choosing a free one is up to you.
+
+To get your work out, use **Export TAP…**, or **Export /poi…** with **A folder I choose…**. PCT exports
+for Aerofly FS 4 only: using the result in Aerofly FS Global means converting it yourself. If you
+install the sim later, press **Rescan** and point PCT at it.
+
 You can change the install folder later in **Settings**, and you can re-run this same scan at any
 time with **Rescan** — which is how PCT picks up anything you add to the sim afterwards. Settings is
 also where the photo and footprint folders live (section 11) and where the log file is (section 13).

@@ -499,7 +499,7 @@ async function tapAirportTerrain(project: Project, opts: TapExportOptions): Prom
  *  pct:scan and the post-registration rescan so a freshly registered bundle appears with zero new read
  *  code. Scan warnings (a corrupt .tmi, an entry with no bbox) + any overlay-load warning are handed
  *  back — the wizard/result surface shows them, instead of an object silently missing looking like a bug. */
-function scanAndCache(installDir: string, userXrefDir: string | null): ScanResult {
+function scanAndCache(installDir: string | null, userXrefDir: string | null): ScanResult {
   const load = loadXrefTable(defaultXrefTableCandidates(process.env, process.resourcesPath));
   const { catalog, warnings } = scanXref(installDir, userXrefDir, undefined, load.table);
   writeCatalogCache(userData(), catalog);
@@ -512,7 +512,7 @@ function scanAndCache(installDir: string, userXrefDir: string | null): ScanResul
     `scan ok — ${catalog.xref.length} xref in ${catalog.bundles.length} bundles, ` +
       `${catalog.plants.length} plants, ${catalog.airportLights.length} airport lights` +
       (catalog.xrefTable ? `, xref_table ${catalog.xrefTable.matched}/${catalog.xrefTable.rows} matched` : "") +
-      ` · install ${installDir} · user xref ${userXrefDir ?? "— none —"}`,
+      ` · install ${installDir ?? "— none —"} · user xref ${userXrefDir ?? "— none —"}`,
   );
   for (const w of all) log.warn(`scan warning: ${w}`);
   return { catalog, warnings: all };
@@ -525,7 +525,7 @@ export function registerIpc(): void {
     (): DetectResult => ({ installDirs: detectInstallDirs(), userDir: detectUserDir(documents()) }),
   );
 
-  ipcMain.handle("pct:scan", (_e, installDir: string, userXrefDir: string | null) =>
+  ipcMain.handle("pct:scan", (_e, installDir: string | null, userXrefDir: string | null) =>
     guarded("scan", (): ScanResult => scanAndCache(installDir, userXrefDir)),
   );
 
@@ -549,10 +549,8 @@ export function registerIpc(): void {
       const userDir = afs4UserDirOrThrow();
       const result = registerXref(userDir, userData());
       // Rescan so the renderer just reloads the fresh catalog: a registered bundle now resolves via its
-      // generated .tmi and the loose original is gone. Needs the install dir the user already scanned with.
-      const installDir = currentSettings().installDir;
-      if (!installDir) throw new Error("Scan your Aerofly install first, then register.");
-      const scan = scanAndCache(installDir, userDir);
+      // generated .tmi and the loose original is gone. Uses the install dir the user scanned with, if any.
+      const scan = scanAndCache(currentSettings().installDir, userDir);
       log.info(`registerXref ok — ${result.registered.length} bundles registered under ${userDir}`);
       for (const w of result.warnings) log.warn(`registerXref warning: ${w}`);
       return { registered: result.registered.length, scan, warnings: result.warnings };

@@ -93,6 +93,7 @@ function useIcaoStatus(icao: string, wellFormed: boolean): IcaoStatus {
 
 export function AirportDataFields({ airport }: { airport: ProjectAirport }): React.ReactElement {
   const store = editorStore.getState;
+  const noInstall = useEditor((s) => s.catalog?.installDir === null);
 
   const identity = {
     icao: airport.icao.trim().toLowerCase(),
@@ -216,7 +217,11 @@ export function AirportDataFields({ airport }: { airport: ProjectAirport }): Rea
           </span>
         )}
         {problem !== "icao-format" && !status.taken && !replacing && airport.icao.trim() !== "" && (
-          <span className="pct-field-meta">Free on this machine.</span>
+          <span className="pct-field-meta">
+            {noInstall
+              ? "Not used in your user folder. With no Aerofly FS 4 install, PCT can't check the sim's own airports."
+              : "Free on this machine."}
+          </span>
         )}
       </label>
 

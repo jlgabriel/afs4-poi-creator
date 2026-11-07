@@ -260,7 +260,13 @@ export function CatalogPanel(): React.ReactElement {
             next mouse rest). onWheel bubbles from the virtualized list; the scroll event doesn't. */}
         <div className="pct-catalog-list" onWheel={onHidePreview}>
           {objects.length === 0 ? (
-            <p className="pct-empty">{catalog ? "No matching objects" : "No catalog loaded"}</p>
+            <p className="pct-empty">
+              {!catalog
+                ? "No catalog loaded"
+                : catalog.installDir === null && catalog.xref.length === 0
+                  ? "No objects. They come from the Aerofly FS 4 install, or from your own models in its user folder."
+                  : "No matching objects"}
+            </p>
           ) : (
             <List
               className="pct-vlist"

@@ -267,7 +267,16 @@ export function installMockBridge(): void {
 
   const api: PctApi = {
     detectPaths: async () => ({ installDirs: ["C:/Mock/Aerofly FS 4"], userDir: "C:/Mock/User" }),
-    scan: async () => ({ ok: true, value: { catalog, warnings: [] } }),
+    scan: async (installDir) => ({
+      ok: true,
+      value: {
+        catalog:
+          installDir === null
+            ? { ...catalog, installDir: null, bundles: [], xref: [], plants: [], airportLights: [] }
+            : catalog,
+        warnings: [],
+      },
+    }),
     getCachedCatalog: async () => (wantRecover ? catalog : null), // recover → editor; else wizard
     getSettings: async () => settings,
     setSettings: async (patch) => {

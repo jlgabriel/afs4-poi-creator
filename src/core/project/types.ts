@@ -95,7 +95,7 @@ export interface CatalogPlant extends UserFootprint {
 export interface Catalog {
   schemaVersion: 1;
   scannedAt: string; // ISO 8601
-  installDir: string;
+  installDir: string | null; // null = scanned without an install: only the user's own objects
   userXrefDir: string | null;
   bundles: BundleInfo[];
   xref: CatalogObject[];
@@ -607,7 +607,7 @@ export interface WindowBounds {
 
 export interface Settings {
   schemaVersion: 1;
-  installDir: string | null; // AFS4 install (read: scenery/xref)
+  installDir: string | null; // AFS4 install (read: scenery/xref). Optional: PCT runs without one.
   afs4UserDir: string | null; // AFS4 user folder (write: scenery/poi)
   // Optional folder of USER-supplied object photos (v0.6). A file named `<xref name>.<jpg|jpeg|png|webp>`
   // in here replaces that object's generated category glyph in the catalog + placed list. The photos are

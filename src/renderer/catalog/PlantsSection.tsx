@@ -58,6 +58,7 @@ const PlantCard = memo(function PlantCard({
 
 export function PlantsSection({ popovers }: { popovers: CardPopovers }): React.ReactElement {
   const plants = useEditor((s) => s.catalog?.plants);
+  const noInstall = useEditor((s) => s.catalog?.installDir === null);
   const placing = useEditor((s) => s.placing);
   // The search box sits ABOVE every section, so it filters this one too. Not deferred: a short list
   // re-renders for free.
@@ -113,7 +114,9 @@ export function PlantsSection({ popovers }: { popovers: CardPopovers }): React.R
             catalog (it loads with an empty `plants` list rather than crashing) means Rescan. */}
         {shown.length === 0 && q && <p className="pct-empty">No matching plants</p>}
         {shown.length === 0 && !q && (
-          <p className="pct-empty pct-lights-hint">Rescan to load plants from your install.</p>
+          <p className="pct-empty pct-lights-hint">
+            {noInstall ? "Plants come from the Aerofly FS 4 install." : "Rescan to load plants from your install."}
+          </p>
         )}
       </div>
     </details>

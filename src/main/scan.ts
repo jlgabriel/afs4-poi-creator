@@ -84,21 +84,22 @@ function listUserTmb(xrefRoot: string): UserTmbInput[] {
 /** Read + parse an install's (and optional user's) XREF into a Catalog. `scannedAt` is injectable
  *  for deterministic tests. `table` is the optional object-table overlay (null = disabled, the shipping
  *  default; ipc.ts loads it from the injected candidates). Throws NoXrefError if the install has no
- *  scenery/xref. */
+ *  scenery/xref. `installDir` null scans without an install: the catalog holds only the user's own XREF,
+ *  and no plants or airport lights, which exist only in an install. */
 export function scanXref(
-  installDir: string,
+  installDir: string | null,
   userDir: string | null,
   scannedAt: string = new Date().toISOString(),
   table: XrefTable | null = null,
 ): BuildResult {
-  const xrefDir = resolveXrefDir(installDir);
-  if (!xrefDir) throw new NoXrefError(installDir);
-
-  const sources: TmiSource[] = findTmi(xrefDir).map((p) => ({
-    path: p,
-    source: "install",
-    text: readFileSync(p, "utf8"),
-  }));
+  const sources: TmiSource[] = [];
+  if (installDir !== null) {
+    const xrefDir = resolveXrefDir(installDir);
+    if (!xrefDir) throw new NoXrefError(installDir);
+    for (const p of findTmi(xrefDir)) {
+      sources.push({ path: p, source: "install", text: readFileSync(p, "utf8") });
+    }
+  }
 
   const userTmbs: UserTmbInput[] = [];
   if (userDir) {
@@ -114,7 +115,7 @@ export function scanXref(
   // v0.2 airport lights: enumerate airport_lights/**/*.tmb from the INSTALL — filenames only, no bytes
   // read (the .tmb is opaque binary). type_name = basename minus "al_"; see core/catalog/airportLights.
   const airportLightFiles: AirportLightFile[] = [];
-  const alDir = resolveAirportLightsDir(installDir);
+  const alDir = installDir === null ? null : resolveAirportLightsDir(installDir);
   if (alDir) {
     for (const p of findTmb(alDir)) {
       airportLightFiles.push({ folder: path.basename(path.dirname(p)), base: path.basename(p, ".tmb") });
@@ -126,7 +127,7 @@ export function scanXref(
   // not a self-imposed limit but the whole library: those textures ARE the plants, there is no
   // geometry file to read. group/species/height all decode from the name; see core/catalog/plants.
   const plantFiles: PlantFile[] = [];
-  const plantsDir = resolvePlantsDir(installDir);
+  const plantsDir = installDir === null ? null : resolvePlantsDir(installDir);
   if (plantsDir) {
     for (const p of findTtx(plantsDir)) plantFiles.push({ base: path.basename(p, ".ttx") });
   }

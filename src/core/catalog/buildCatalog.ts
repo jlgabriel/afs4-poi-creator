@@ -64,7 +64,7 @@ function userXrefObject(name: string, bundle: string, bbMin: Vec3, bbMax: Vec3, 
 
 export function buildCatalog(
   sources: TmiSource[],
-  meta: { installDir: string; userXrefDir: string | null; scannedAt: string },
+  meta: { installDir: string | null; userXrefDir: string | null; scannedAt: string },
   airportLights: CatalogAirportLight[] = [],
   // Optional object-table overlay (built but disabled — see xrefTable.ts). null = the shipping
   // default: pure heuristic. The overlay is STRICTLY ADDITIVE and consulted only per scanned install-source entry —

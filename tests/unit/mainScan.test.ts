@@ -129,6 +129,47 @@ describe("scanXref", () => {
   });
 });
 
+describe("scanXref without an install", () => {
+  it("gives an empty catalog when there is no user folder either", () => {
+    const { catalog, warnings } = scanXref(null, null, "t");
+    expect(catalog.installDir).toBeNull();
+    expect(catalog.xref).toEqual([]);
+    expect(catalog.bundles).toEqual([]);
+    expect(catalog.plants).toEqual([]);
+    expect(catalog.airportLights).toEqual([]);
+    expect(warnings).toEqual([]);
+  });
+
+  it("tolerates a user folder with no scenery/xref", () => {
+    const { catalog } = scanXref(null, path.join(tmp, "nothing-here"), "t");
+    expect(catalog.xref).toEqual([]);
+  });
+
+  it("lists the user's own objects, each from the user source", () => {
+    writeTmi(
+      "user/scenery/xref/mine/mine.tmi",
+      `<[file][][]
+    <[tmxglscene_info][][]
+        <[string8][filename][mine]>
+        <[list_tmxglscene_info_entry][geometries][]
+            <[tmxglscene_info_entry][element][0]
+                <[string8u][name][my_shed]>
+                <[vector3_float64][bb_min][0.0 0.0 0.0]>
+                <[vector3_float64][bb_max][2.0 2.0 3.0]>
+                <[vector3_float64][bs_center][1.0 1.0 1.5]>
+                <[float64][bs_radius][2.0]>
+            >
+        >
+    >
+>`,
+    );
+    const { catalog } = scanXref(null, path.join(tmp, "user"), "t");
+    expect(catalog.installDir).toBeNull();
+    expect(catalog.xref.map((o) => o.name)).toEqual(["my_shed"]);
+    expect(catalog.bundles.map((b) => b.source)).toEqual(["user"]);
+  });
+});
+
 describe("catalog cache", () => {
   const fakeCatalog = (): Catalog => ({
     schemaVersion: 1,
