@@ -220,7 +220,7 @@ export function GroundTextFields({ text, index }: { text: AirportGroundText; ind
         onChange={(v) => patch({ strokeColor: v })}
       />
       <Choice
-        label="Arrow"
+        label="Pointing"
         value={text.pointing}
         options={GROUNDTEXT_POINTING}
         onChange={(v) => patch({ pointing: v })}
@@ -231,7 +231,6 @@ export function GroundTextFields({ text, index }: { text: AirportGroundText; ind
         <input
           className="pct-text"
           value={text.name}
-          placeholder="GROUNDTEXT"
           aria-label="Ground text name"
           onChange={(e) => patch({ name: e.target.value })}
         />

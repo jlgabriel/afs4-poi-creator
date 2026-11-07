@@ -175,7 +175,7 @@ describe("ground text, jetway and car lot — Export TAP", () => {
         "                <[vector2_float64][position][-71.6160000 -33.6559000]>",
         "                <[vector2_float64][size][1 3]>",
         "                <[float64][direction][90]>",
-        "                <[string8][name][GROUNDTEXT]>",
+        "                <[string8][name][]>",
         "                <[string8][value][A]>",
         "                <[string8][textcolor][yellow]>",
         "                <[string8][background][box]>",

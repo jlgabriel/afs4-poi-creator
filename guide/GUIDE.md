@@ -958,8 +958,9 @@ In the Inspector:
   button each: `1 × 3` and `3 × 4.25`.
 - **Text colour**, **Background** (`box` or `circle`), **Background colour** and **Outline colour** —
   `none`, `black`, `blue`, `green`, `red`, `white` or `yellow`. `none` leaves that part out.
-- **Arrow** — `none`, `left` or `right`: an arrow at that end of the text.
-- **Name** — the element's name in the file. Empty is written as `GROUNDTEXT`.
+- **Pointing** — `none`, `left`, `right`, `up` or `down`: an arrow with the text, pointing that way. The
+  map draws `left` at the left end of the text and the other three at the right end.
+- **Name** — the element's name in the file. Optional: left empty, the row stays empty.
 
 ### Taxi Sign
 

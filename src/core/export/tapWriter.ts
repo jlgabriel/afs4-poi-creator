@@ -403,7 +403,7 @@ function groundTexts(list_: TapGroundTextSpec[]): string[] {
         tag("vector2_float64", "position", deg(g.position)),
         tag("vector2_float64", "size", `${fmtNum(g.size[0])} ${fmtNum(g.size[1])}`),
         tag("float64", "direction", fmtNum(groundTextTapDirection(g.heading), 3)),
-        tag("string8", "name", text(g.name) || "GROUNDTEXT"),
+        tag("string8", "name", text(g.name)),
         tag("string8", "value", cleanGroundTextValue(g.value)),
         tag("string8", "textcolor", g.textColor),
         tag("string8", "background", g.background),

@@ -337,7 +337,7 @@ export interface AirportGroundText {
   heading: number;
   /** Metres PER LETTER, [width, height]. Both positive. */
   size: [number, number];
-  /** Free text, the element's name in the `.tap`. Empty ≡ the writer's "GROUNDTEXT". */
+  /** Free text, the element's name in the `.tap`. Empty stays empty there. */
   name: string;
   /** What is painted: A–Z, 0–9, space, `+`, `-` (marks.ts cleanGroundTextValue). */
   value: string;

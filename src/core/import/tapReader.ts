@@ -261,7 +261,8 @@ function open(points: LonLat[]): LonLat[] {
   return Math.abs(a.lon - b.lon) < 1e-9 && Math.abs(a.lat - b.lat) < 1e-9 ? points.slice(0, -1) : points;
 }
 
-/** The name the writer puts in place of an empty one comes back empty. */
+/** The name the writer puts in place of an empty one comes back empty. A ground text's writer no longer
+ *  fills it, but `.tap` files already written still carry "GROUNDTEXT". */
 const unfill = (name: string, filler: string): string => (name === filler ? "" : name);
 
 const centroidOf = (points: readonly LonLat[]): LonLat => ({

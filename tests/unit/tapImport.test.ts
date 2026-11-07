@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { PlacedObject, Project, ResolvedObject } from "../../src/core/project/types";
 import { planTap } from "../../src/core/export/planExport";
+import { parseProject } from "../../src/core/project/schemas";
 import { TapImportError, parseTmLenient, readTap } from "../../src/core/import/tapReader";
 import {
   addAirportAerotow,
@@ -214,6 +215,35 @@ describe("Import TAP — round trip", () => {
     // The writer's filler names come back empty.
     expect(a.groundtexts![0]!.name).toBe("");
     expect(a.taxisigns![0]!.name).toBe("");
+  });
+});
+
+describe("TAP ground text", () => {
+  const groundTexts = (tap: string) => readTap(tap, null).project.airport!.groundtexts!;
+
+  it("leaves an empty name empty and writes one the user typed", () => {
+    const empty = exportTap(fixture()).tap;
+    expect(empty).toContain("<[tm_airport_pd_groundtext][element][0]");
+    expect(empty).toContain("<[string8][name][]>");
+    expect(empty).not.toContain("[name][GROUNDTEXT]");
+    const typed = exportTap(updateAirportGroundText(fixture(), "g1", { name: "North apron" })).tap;
+    expect(typed).toContain("<[string8][name][North apron]>");
+    expect(groundTexts(typed)[0]!.name).toBe("North apron");
+  });
+
+  it("reads the filler older files carry as an empty name", () => {
+    const older = exportTap(fixture()).tap.replace("<[string8][name][]>", "<[string8][name][GROUNDTEXT]>");
+    expect(older).toContain("[name][GROUNDTEXT]");
+    expect(groundTexts(older)[0]!.name).toBe("");
+  });
+
+  it.each(["none", "left", "right", "up", "down"] as const)("carries pointing %s through a round trip", (pointing) => {
+    const tap = exportTap(updateAirportGroundText(fixture(), "g1", { pointing })).tap;
+    expect(tap).toContain(`<[string][pointing][${pointing}]>`);
+    const { project, warnings } = readTap(tap, null);
+    expect(project.airport!.groundtexts![0]!.pointing).toBe(pointing);
+    expect(warnings.join(" ")).not.toContain("pointing");
+    expect(parseProject(JSON.parse(JSON.stringify(project))).airport!.groundtexts![0]!.pointing).toBe(pointing);
   });
 });
 

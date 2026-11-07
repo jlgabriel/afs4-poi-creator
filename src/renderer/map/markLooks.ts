@@ -75,7 +75,10 @@ export const GROUNDTEXT_LOOK: MarkLook<AirportGroundText> = {
       `${ch === " " ? "&nbsp;" : escapeHtml(ch)}</span></span>`;
     const cells = [...g.value].map(cell);
     if (g.pointing === "left") cells.unshift(cell("◀"));
+    // The map's own choice: `up` and `down` sit at the right end, like `right`.
     if (g.pointing === "right") cells.push(cell("▶"));
+    if (g.pointing === "up") cells.push(cell("▲"));
+    if (g.pointing === "down") cells.push(cell("▼"));
     const radius = g.background === "circle" ? "border-radius:9999px;" : "";
     const stroke =
       g.strokeColor === "none" ? "" : `box-shadow:inset 0 0 0 ${Math.max(1, w * 0.08)}px ${PAINT[g.strokeColor]};`;

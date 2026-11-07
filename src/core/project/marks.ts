@@ -15,8 +15,8 @@ export type GroundTextColor = (typeof GROUNDTEXT_COLORS)[number];
 export const GROUNDTEXT_BACKGROUNDS = ["box", "circle"] as const;
 export type GroundTextBackground = (typeof GROUNDTEXT_BACKGROUNDS)[number];
 
-/** An arrow beside the text, on its left or right end. */
-export const GROUNDTEXT_POINTING = ["none", "left", "right"] as const;
+/** The arrow painted with the text, and where it points. */
+export const GROUNDTEXT_POINTING = ["none", "left", "right", "up", "down"] as const;
 export type GroundTextPointing = (typeof GROUNDTEXT_POINTING)[number];
 
 /** The standard letter sizes, metres per letter: [width, height]. Any other positive size is legal. */
