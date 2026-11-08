@@ -438,7 +438,8 @@ export interface AirportWinch {
   /** Where the WINCH stands, degrees. The far end of the rope. */
   winch: LonLat;
   /** How far apart two gliders launched side by side stand, metres — roughly the wingspan. A winch with
-   *  two ropes starts two gliders at once; FS4 represents that with this one number. */
+   *  two ropes starts two gliders at once; FS4 represents that with this one number. 0 (the default) is
+   *  one glider on one rope; never negative. */
   spacing: number;
 }
 

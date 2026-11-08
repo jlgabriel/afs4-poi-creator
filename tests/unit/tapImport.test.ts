@@ -211,6 +211,7 @@ describe("Import TAP — round trip", () => {
     expect(a.taxisigns![0]!.heading).toBeCloseTo(211, 6);
     expect(a.jetways![0]).toMatchObject({ extensionDirection: -35, extensionAmount: 12.5, exitDirection: 20, docked: true });
     expect(a.winches).toHaveLength(1);
+    expect(a.winches![0]!.spacing).toBe(0); // 0 (one rope) round-trips, not swapped for a default
     expect(a.aerotows).toHaveLength(1);
     // The writer's filler names come back empty.
     expect(a.groundtexts![0]!.name).toBe("");

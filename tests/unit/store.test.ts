@@ -763,7 +763,7 @@ describe("store — glider starts", () => {
     expect(st.airportSelection).toEqual({ kind: "winch", id });
     const w = st.project.airport!.winches![0];
     expect(w.position).toEqual({ lon: 10, lat: 48 });
-    expect(w.spacing).toBe(25); // roughly a glider's span
+    expect(w.spacing).toBe(0); // one glider, one rope
     // The rope keeps a realistic winch-launch length (900 m) — unlike the runway, it is not shortened
     // for convenience. It shares the default north bearing.
     near(haversine(w.position, w.winch), NEW_WINCH_ROPE_M, 1); // a typical 800–1000 m winch launch
@@ -803,13 +803,15 @@ describe("store — glider starts", () => {
     expect(w.winch).toEqual(before.winch); // undone
   });
 
-  it("refuses a non-positive glider spacing rather than clamping it", () => {
+  it("refuses a negative glider spacing rather than clamping it, and takes 0 back", () => {
     const { store } = makeStore();
     const id = placeWinch(store, 10, 48);
-    store.getState().setAirportWinchSpacing(id, 0);
-    expect(store.getState().project.airport!.winches![0].spacing).toBe(25);
     store.getState().setAirportWinchSpacing(id, 18);
     expect(store.getState().project.airport!.winches![0].spacing).toBe(18);
+    store.getState().setAirportWinchSpacing(id, -5);
+    expect(store.getState().project.airport!.winches![0].spacing).toBe(18);
+    store.getState().setAirportWinchSpacing(id, 0);
+    expect(store.getState().project.airport!.winches![0].spacing).toBe(0);
   });
 
   it("Delete removes THAT glider start and leaves the other kind alone", () => {

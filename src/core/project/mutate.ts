@@ -1322,15 +1322,15 @@ export function updateAirportAerotow(
   return { ...project, airport: { ...airport, aerotows }, modifiedAt: now };
 }
 
-/** Patch one winch launch. A non-positive `spacing` is refused rather than clamped, like every other
- *  metre value in the model. */
+/** Patch one winch launch. A negative `spacing` is refused rather than clamped; 0 is valid (one glider,
+ *  one rope) and is the default. */
 export function updateAirportWinch(
   project: Project,
   winchId: string,
   patch: Partial<Omit<AirportWinch, "id">>,
   now = nowIso(),
 ): Project {
-  if (patch.spacing !== undefined && !(Number.isFinite(patch.spacing) && patch.spacing > 0)) {
+  if (patch.spacing !== undefined && !(Number.isFinite(patch.spacing) && patch.spacing >= 0)) {
     return project;
   }
   const airport = project.airport;

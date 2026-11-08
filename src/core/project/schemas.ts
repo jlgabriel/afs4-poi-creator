@@ -287,7 +287,7 @@ const zWinch = z.looseObject({
   name: z.string().max(IDENTITY_MAX),
   position: zLonLat,
   winch: zLonLat,
-  spacing: z.number().finite().positive(),
+  spacing: z.number().finite().nonnegative(),
 });
 
 /** A parking position (types.ts AirportParking). `type` is validated as an ENUM, not a free string, and

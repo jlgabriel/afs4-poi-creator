@@ -187,8 +187,8 @@ export function WinchFields({ winch }: { winch: AirportWinch }): React.ReactElem
         <span className="pct-field-label">
           Glider spacing — m
           <Help>
-            A two-rope winch launches two gliders side by side; this is how far apart they stand —
-            basically a wingspan.
+            Leave it at 0 for a single rope. A two-rope winch launches two gliders side by side; then
+            this is how far apart they stand — basically a wingspan.
           </Help>
         </span>
         <NumberInput

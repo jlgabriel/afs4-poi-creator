@@ -445,7 +445,7 @@ function GliderRows(): React.ReactElement | null {
             <span className="pct-placed-code">{Math.round(haversine(w.position, w.winch))} m</span>
           </span>
           <span className="pct-placed-meta">
-            lon {w.position.lon.toFixed(6)} · lat {w.position.lat.toFixed(6)} · {w.spacing} m apart
+            lon {w.position.lon.toFixed(6)} · lat {w.position.lat.toFixed(6)} · {w.spacing > 0 ? `${w.spacing} m apart` : "one rope"}
           </span>
         </span>
       </button>,

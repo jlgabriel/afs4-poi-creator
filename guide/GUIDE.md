@@ -1073,8 +1073,8 @@ pairs gives you the length and the bearing back: `899 m of rope · 260° true. U
 range is what a real winch launch uses.
 
 **Glider spacing — m** is for the two-rope case: a two-rope winch launches two gliders side by side, and
-this is how far apart they stand — basically a wingspan. PCT starts at 25 m, which is ApfelFlieger's own
-figure.
+this is how far apart they stand — basically a wingspan. PCT starts at 0, which is a single rope; leave it
+there unless the launch has two.
 
 **Name** — the runway again, with a letter added if it needs one: `26`, `26W`.
 

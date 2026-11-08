@@ -97,9 +97,9 @@ export function airportPartCount(airport: ProjectAirport): number {
 // check the app needs is FS4's own floor — at least one helipad or one runway — and the install asks it
 // (renderer/dialogs/HeliportDialog).
 
-/** How far apart two side-by-side gliders stand on a winch launch, metres — roughly a glider's span.
- *  A starting value; the user edits it. */
-export const DEFAULT_WINCH_SPACING_M = 25;
+/** How far apart two side-by-side gliders stand on a winch launch, metres. 0 is the default and a valid
+ *  value: one glider on one rope. A two-rope winch sets roughly a wingspan. */
+export const DEFAULT_WINCH_SPACING_M = 0;
 
 /** The approach-lighting vocabulary, in the order a menu should offer it: the common modern systems
  *  first, then older ones FS4 still loads. FS4 accepts both halves (types.ts ApproachLightSystem). */

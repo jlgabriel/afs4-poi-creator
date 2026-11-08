@@ -628,7 +628,7 @@ export function readTap(
         const winch = r.lonLat("winch");
         if (at === null || winch === null) return noPosition(r.label);
         const spacing = r.num("spacing", DEFAULT_WINCH_SPACING_M);
-        return { id: newId(), name: r.str("name", ""), position: at, winch, spacing: spacing > 0 ? spacing : DEFAULT_WINCH_SPACING_M };
+        return { id: newId(), name: r.str("name", ""), position: at, winch, spacing: spacing >= 0 ? spacing : DEFAULT_WINCH_SPACING_M };
       });
       aerotows = eachAdd<AirportAerotow>("tm_airport_pd_glider_aerotow", "Aerotow", (r) => {
         const at = r.lonLat("position");

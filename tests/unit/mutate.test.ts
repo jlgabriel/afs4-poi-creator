@@ -538,7 +538,7 @@ describe("the airport block", () => {
       const p = withBoth();
       expect(aerotowsOf(p.airport)).toEqual([{ id: "ato-1", name: "", position: G, heading: 0 }]);
       expect(winchesOf(p.airport)).toEqual([
-        { id: "wnc-1", name: "", position: G, winch: W, spacing: 25 },
+        { id: "wnc-1", name: "", position: G, winch: W, spacing: 0 },
       ]);
     });
 
@@ -547,8 +547,9 @@ describe("the airport block", () => {
       expect(aerotowsOf(p.airport)[0]).toMatchObject({ name: "26", heading: 260 });
       p = updateAirportWinch(p, "wnc-1", { name: "26", spacing: 18 }, LATER);
       expect(winchesOf(p.airport)[0]).toMatchObject({ name: "26", spacing: 18 });
-      // A non-positive spacing is refused rather than clamped, like every other metre value.
-      expect(updateAirportWinch(p, "wnc-1", { spacing: 0 }, LATER)).toBe(p);
+      // A negative spacing is refused rather than clamped; 0 (one rope) is valid.
+      expect(updateAirportWinch(p, "wnc-1", { spacing: -1 }, LATER)).toBe(p);
+      expect(winchesOf(updateAirportWinch(p, "wnc-1", { spacing: 0 }, LATER).airport)[0]!.spacing).toBe(0);
       // …and a patch that changes nothing keeps the reference.
       expect(updateAirportAerotow(p, "ato-1", { name: "26" }, LATER)).toBe(p);
       expect(updateAirportWinch(p, "wnc-1", { name: "26" }, LATER)).toBe(p);

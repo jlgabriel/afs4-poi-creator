@@ -485,7 +485,7 @@ describe("zProject — the airport block", () => {
     expect("winches" in none.airport!).toBe(false);
   });
 
-  it("REFUSES a winch with no second point or a non-positive spacing", () => {
+  it("REFUSES a winch with no second point or a negative spacing, and accepts 0", () => {
     const withWinches = (winches: unknown[]): unknown => ({
       ...validProject(),
       airport: { icao: "sclc", name: "Vitacura", country: "cl", pads: [], winches },
@@ -493,7 +493,8 @@ describe("zProject — the airport block", () => {
     const { winch: _dropped, ...noWinch } = WINCH;
     // The pair IS the element: without the far point there is no direction and no rope length.
     expect(() => parseProject(withWinches([noWinch]))).toThrow();
-    expect(() => parseProject(withWinches([{ ...WINCH, spacing: 0 }]))).toThrow();
+    expect(() => parseProject(withWinches([{ ...WINCH, spacing: -1 }]))).toThrow();
+    expect(() => parseProject(withWinches([{ ...WINCH, spacing: 0 }]))).not.toThrow(); // one rope
   });
 
   it("REJECTS a parking tag the sim would never match", () => {
