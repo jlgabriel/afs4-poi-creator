@@ -11,10 +11,12 @@
 import * as L from "leaflet";
 import type { AirportLine, AirportTarmac, LonLat } from "../../core/project/types";
 import { tarmacMaterial } from "../../core/project/surfaces";
+import { lineBends } from "../../core/project/airport";
 import { PolyShape } from "./PolyShape";
 
 export interface SurfaceCallbacks {
-  onChange(id: string, points: LonLat[]): void;
+  /** `bends` is one per edge for a line (it takes curves), null for a tarmac. */
+  onChange(id: string, points: LonLat[], bends: number[] | null): void;
   onSelect(id: string): void;
 }
 
@@ -79,6 +81,8 @@ interface ShapeKind<T> {
   style(item: T, selected: boolean): L.PathOptions;
   /** What the style depends on: when it changes, the shape is restyled. */
   styleKey(item: T): string;
+  /** One bend per edge for a kind that takes curves; absent for one that does not. */
+  bends?(item: T): number[];
 }
 
 /** A keyed list of PolyShapes, reconciled with the document by id. */
@@ -102,14 +106,22 @@ class ShapeList<T extends Element> {
     this.group.remove();
   }
 
-  sync(items: readonly T[], selectedId: string | null, editable: boolean): void {
+  /** `bendId` = the element in BEND mode (its mid-edge points bend instead of split). */
+  sync(items: readonly T[], selectedId: string | null, editable: boolean, bendId: string | null = null): void {
     const seen = new Set<string>();
     for (const item of items) {
       seen.add(item.id);
       let entry = this.entries.get(item.id);
       if (entry === undefined) entry = this.create(item);
       entry.item = item;
-      entry.shape.sync(item.points, item.id === selectedId, editable, this.kind.styleKey(item));
+      entry.shape.sync(
+        item.points,
+        item.id === selectedId,
+        editable,
+        this.kind.styleKey(item),
+        this.kind.bends?.(item) ?? null,
+        item.id === bendId,
+      );
     }
     for (const [id, e] of this.entries) {
       if (seen.has(id)) continue;
@@ -134,7 +146,7 @@ class ShapeList<T extends Element> {
         handlePane: this.panes.handles,
         style: (selected) => this.kind.style(entry.item, selected),
       },
-      { onChange: (p) => this.cb.onChange(id, p), onSelect: () => this.cb.onSelect(id) },
+      { onChange: (p, b) => this.cb.onChange(id, p, b), onSelect: () => this.cb.onSelect(id) },
     );
     this.entries.set(id, entry);
     return entry;
@@ -176,6 +188,7 @@ export class LineLayer {
         className: "pct-line",
         style: (l, selected) => lineStyle(l.name, selected),
         styleKey: (l) => l.name,
+        bends: lineBends,
       },
       panes,
       cb,
@@ -184,7 +197,7 @@ export class LineLayer {
   destroy(): void {
     this.list.destroy();
   }
-  sync(lines: readonly AirportLine[], selectedId: string | null, editable: boolean): void {
-    this.list.sync(lines, selectedId, editable);
+  sync(lines: readonly AirportLine[], selectedId: string | null, editable: boolean, bendId: string | null): void {
+    this.list.sync(lines, selectedId, editable, bendId);
   }
 }

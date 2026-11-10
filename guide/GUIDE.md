@@ -227,7 +227,7 @@ hand-build those files. Double-click a `.wad` read-out to copy it.
 Below the Inspector, **the placed list** is everything in the project. Click a row to select it,
 shift-click to add to the selection, **double-click to send the map to it** — handy once a project has
 grown past what fits on screen — and **Duplicate** / **Hide** at the top of the list act on whatever
-is selected. To delete, press **Delete**, or **right-click** a row (or the element on the map) and pick
+is selected; **Duplicate** copies airport parts too *(v2.8.8)*, see [section 9](#9-airports--somewhere-to-fly-from). To delete, press **Delete**, or **right-click** a row (or the element on the map) and pick
 **Delete** — there is no Delete button, so nothing is deleted by a stray click. Airport parts get rows of their own pinned above the objects — the airport first, then
 its parts in the same order the catalog lists them — and they stay out of the object count.
 
@@ -327,7 +327,7 @@ written across the whole selection:
 | Drag the cyan handle · with **Shift** | Rotate freely · snap to 5°. |
 | **R** | Jump to the rotation field and select it. |
 | **Shift**-click | Add to the selection. |
-| **Ctrl+D** | Duplicate the selection, 5 m east. |
+| **Ctrl+D** | Duplicate the selection, 5 m east. An airport part lands beside the original *(v2.8.8)*. |
 | **Delete** or **Backspace** | Remove the selection. |
 | **Ctrl+Z** · **Ctrl+Shift+Z** or **Ctrl+Y** | Undo · redo. |
 | **Ctrl+S** · **Ctrl+Shift+S** | Save · Save As. Works even while you're typing in a field. |
@@ -681,6 +681,13 @@ on the right — the two glider starts right after the runway they belong to *(v
 ApfelFlieger's rule: the sequences match so that finding a thing in one column tells you where it is in
 the other.
 
+**Duplicating a part** *(v2.8.8)*. Select any part except the airport itself and its boundary, and press
+**Ctrl+D**, click **Duplicate** above the placed list, or right-click it and pick **Duplicate**. The copy
+keeps every field — names and runway identifiers included, so change what has to differ — and lands
+beside the original, selected and ready to drag: a helipad, stand, aerotow, taxi sign, jetway or car lot
+to its right, side by side; a runway alongside, two widths across; a winch launch 20 m to the right of its
+rope; a ground text one line below; a tarmac or a line a little to the south-east. **Ctrl+Z** takes it back.
+
 On the map each part is drawn at its real size, and each one looks like itself:
 
 ![Shot 28 — a whole small airfield on the map: the runway as a strip with a threshold handle at each end, the helipad's white circle, the stand's violet one, the pink dots of the two glider starts with the winch's rope running off down the extended centreline, and the airport's own crosshair in the middle](images/28_airfield_on_map.jpg)
@@ -947,6 +954,13 @@ point stays the end of the line.
 drag a grey point to add one, right-click a white point to remove it (a line keeps at least two); drag
 the line itself, or use the arrow keys, to move it all.
 
+**Curves** *(v2.8.8)*. Click **Bend edges** in the Inspector and the grey points turn blue: drag one
+sideways and its edge bends into an arc through it. Drag it back onto the straight edge, or right-click
+it, and that edge is straight again; **Straighten all** does every edge at once. Two edges bent by half
+their length make a circle. **Esc**, or the button again, ends it — the white points still move while it
+is on, and a grey point added on a curved edge sits on the curve. Export TAP writes each arc as a row of
+points along it.
+
 **Marking** is the one field: which line it is, from the converter's list — `taxi_center` by default,
 `taxi_edge`, `hold_pos_b`, `stand_lead_in` and so on. A name ending in `_dashed` is the dashed version of
 the same line, and one with `_black` has a black border, for light pavement. The map draws the line in
@@ -965,7 +979,9 @@ In the Inspector:
 
 - **Text** — capital letters, digits, spaces, `+` and `-`. Lowercase becomes capitals; anything else is
   left out. An empty text paints nothing, and Export TAP says so.
-- **Lon**, **Lat**, **Heading — true**.
+- **Lon**, **Lat**, **Heading — true**, between **↺ 15°** and **↻ 15°**, and **Align** *(v2.8.8)*: it turns
+  the text exactly parallel or square to the nearest runway — whichever of the four directions is
+  closest to how it stands now. It needs a runway in the airport.
 - **Letter size** — the width and the height of **one** letter, in metres. The two standard sizes are a
   button each: `1 × 3` and `3 × 4.25`.
 - **Text colour**, **Background** (`box` or `circle`), **Background colour** and **Outline colour** —

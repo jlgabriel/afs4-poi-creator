@@ -9,7 +9,7 @@
 import { useMemo } from "react";
 import { editorStore, useEditor } from "../state/editorStore";
 import { openElementMenu } from "../state/elementMenu";
-import type { MarkKind } from "../state/store";
+import { canDuplicate, type MarkKind } from "../state/store";
 import { Thumbnail } from "../catalog/Thumbnail";
 import {
   AerotowIcon,
@@ -103,8 +103,8 @@ function DataRow(): React.ReactElement | null {
   );
 }
 
-/** One row per helicopter start pad. They are NOT objects and do not join their count — none of them goes into the
- *  cultivation and Duplicate means nothing for them — so they sit above the list rather than in it.
+/** One row per helicopter start pad. They are NOT objects and do not join their count — none of them goes
+ *  into the cultivation — so they sit above the list rather than in it.
  *
  *  The label is the pad's own name, not the airport's: with several pads the airport's name would not
  *  tell them apart, and it belongs to the Data row above. */
@@ -150,8 +150,8 @@ function HelipadRows(): React.ReactElement | null {
 }
 
 /** One row per parking position, pinned with the pads above the objects and for the same reasons: a stand
- *  is not an object, never joins their count, never goes into the cultivation, and Duplicate means
- *  nothing for it. The other repeatable airport kinds follow the same row shape. */
+ *  is not an object, never joins their count and never goes into the cultivation. The other repeatable
+ *  airport kinds follow the same row shape. */
 function ParkingRows(): React.ReactElement | null {
   const parkings = useEditor((s) => s.project.airport?.parkings);
   const selectedId = useEditor((s) =>
@@ -460,6 +460,7 @@ export function PlacedList(): React.ReactElement {
   const objects = useEditor((s) => s.project.objects);
   const selection = useEditor((s) => s.selection);
   const airportSelected = useEditor((s) => s.airportSelection !== null);
+  const duplicable = useEditor((s) => canDuplicate(s.selection, s.airportSelection));
   const catalogIndex = useEditor((s) => s.catalogIndex);
   const airportLightIndex = useEditor((s) => s.airportLightIndex);
   const plantIndex = useEditor((s) => s.plantIndex);
@@ -486,7 +487,7 @@ export function PlacedList(): React.ReactElement {
         <div className="pct-placed-actions">
           <button
             type="button"
-            disabled={!hasSelection}
+            disabled={!duplicable}
             title="Duplicate selection (Ctrl+D)"
             onClick={() => editorStore.getState().duplicateSelection()}
           >

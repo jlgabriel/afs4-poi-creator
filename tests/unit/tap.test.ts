@@ -692,3 +692,29 @@ describe("Export TAP — the addendum on disk", () => {
     expect(existsSync(both.file)).toBe(true);
   });
 });
+
+describe("Export TAP — a line with bent edges", () => {
+  const bent = (bends: number[] | undefined): Project => ({
+    ...TAP_PROJECT,
+    airport: {
+      ...TAP_PROJECT.airport!,
+      lines: [{ ...TAP_PROJECT.airport!.lines![0]!, ...(bends === undefined ? {} : { bends }) }],
+    },
+  });
+  /** The `(lon lat)` pairs of the line's points row: the last `points` row, the lines come after the tarmacs. */
+  const linePairs = (p: Project): number => {
+    const rows = valuesOf(planTap(p, TAP_LIGHTS).content, "points");
+    return (rows[rows.length - 1]!.match(/\(/g) ?? []).length;
+  };
+
+  it("writes a straight line's two points and nothing else", () => {
+    expect(linePairs(bent(undefined))).toBe(2);
+    expect(planTap(bent(undefined), TAP_LIGHTS).content).toBe(planTap(TAP_PROJECT, TAP_LIGHTS).content);
+  });
+
+  it("writes a bent edge as the points of its arc, ends included", () => {
+    const n = linePairs(bent([3]));
+    expect(n).toBeGreaterThan(4);
+    expect(n).toBeLessThanOrEqual(66);
+  });
+});

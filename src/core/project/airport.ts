@@ -21,6 +21,8 @@ import type {
   ParkingType,
   ProjectAirport,
 } from "./types";
+import { curvedPath } from "../geo/arc";
+import { EARTH_RADIUS_M, initialBearing } from "../geo/geo";
 
 /** Where the AIRPORT itself sits.
  *
@@ -57,6 +59,18 @@ export function tarmacsOf(airport: ProjectAirport | undefined): AirportTarmac[] 
 }
 export function linesOf(airport: ProjectAirport | undefined): AirportLine[] {
   return airport?.lines ?? [];
+}
+
+/** A line's bends, one per edge (points − 1), missing ones as 0 — what the editor works on. */
+export function lineBends(line: AirportLine): number[] {
+  const edges = Math.max(0, line.points.length - 1);
+  return Array.from({ length: edges }, (_, i) => line.bends?.[i] ?? 0);
+}
+
+/** The line as it is painted: its points with every bent edge expanded into an arc (geo/arc.ts). The map
+ *  draws this and Export TAP writes it. A line with no bends is its own points. */
+export function linePath(line: AirportLine): LonLat[] {
+  return curvedPath(line.points, line.bends);
 }
 
 /** The ground texts, taxi signs, jetways and car lots, absent and empty collapsed — same contract as
@@ -138,3 +152,55 @@ export const DEFAULT_PARKING_SIZE_M: Record<ParkingType, number> = {
   parked_jet: 40,
   pushback: 40,
 };
+
+/** How far `p` is from the runway's centreline (the segment between its two ends), metres — in a flat
+ *  frame around `p`, which at the size of an airport is exact enough to tell which runway is nearest. */
+function distanceToRunway(p: LonLat, r: AirportRunway): number {
+  const k = (EARTH_RADIUS_M * Math.PI) / 180;
+  const c = Math.cos((p.lat * Math.PI) / 180);
+  const xy = (q: LonLat): [number, number] => [(q.lon - p.lon) * k * c, (q.lat - p.lat) * k];
+  const [ax, ay] = xy(r.ends[0].threshold);
+  const [bx, by] = xy(r.ends[1].threshold);
+  const dx = bx - ax;
+  const dy = by - ay;
+  const len2 = dx * dx + dy * dy;
+  const t = len2 === 0 ? 0 : Math.max(0, Math.min(1, -(ax * dx + ay * dy) / len2));
+  return Math.hypot(ax + t * dx, ay + t * dy);
+}
+
+/** The heading that turns something standing at `p` and facing `heading` EXACTLY parallel or at a right
+ *  angle to the nearest runway — whichever of the four is closest to how it faces now, so a small
+ *  correction never flips it round. The runway's direction is taken at its middle (the average of the
+ *  bearings from each end). Null when there is no runway. Rounded to 0.01°. */
+export function runwayAlignedHeading(p: LonLat, heading: number, runways: readonly AirportRunway[]): number | null {
+  let nearest: AirportRunway | null = null;
+  let best = Infinity;
+  for (const r of runways) {
+    const d = distanceToRunway(p, r);
+    if (d < best) {
+      best = d;
+      nearest = r;
+    }
+  }
+  if (nearest === null) return null;
+  const a = nearest.ends[0].threshold;
+  const b = nearest.ends[1].threshold;
+  if (a.lon === b.lon && a.lat === b.lat) return null;
+  const fwd = initialBearing(a, b);
+  const back = (initialBearing(b, a) + 180) % 360;
+  // Average of two angles that are within a hair of each other, safe across north.
+  const diff = ((back - fwd + 540) % 360) - 180;
+  const axis = (fwd + diff / 2 + 360) % 360;
+  const h = ((heading % 360) + 360) % 360;
+  let out = axis;
+  let off = Infinity;
+  for (let k = 0; k < 4; k++) {
+    const cand = (axis + 90 * k) % 360;
+    const d = Math.abs(((cand - h + 540) % 360) - 180);
+    if (d < off) {
+      off = d;
+      out = cand;
+    }
+  }
+  return (Math.round(out * 100) / 100) % 360;
+}

@@ -47,7 +47,7 @@ import {
   type TapTarmacSpec,
 } from "./tapWriter";
 import { ringSelfIntersects } from "../geo/polygon";
-import { carlotsOf, groundTextsOf, jetwaysOf, taxisignsOf } from "../project/airport";
+import { carlotsOf, groundTextsOf, jetwaysOf, linePath, taxisignsOf } from "../project/airport";
 import { cleanGroundTextValue, cleanTaxisignValue, taxisignValueProblem } from "../project/marks";
 import {
   cleanRunwayExtension,
@@ -487,7 +487,8 @@ export function planTap(project: Project, resolvedLights: ResolvedObject[], terr
       warnings.push(`Line ${i + 1} has fewer than two points, so it is left out.`);
       return;
     }
-    lines.push({ points: l.points.map((p) => shiftPoint(p, shift)), name: l.name });
+    // A bent edge goes out as the points of its arc: the converter knows only straight segments.
+    lines.push({ points: linePath(l).map((p) => shiftPoint(p, shift)), name: l.name });
   });
 
   // The one-point elements: the position shifted with the scene, everything else as the project has it.

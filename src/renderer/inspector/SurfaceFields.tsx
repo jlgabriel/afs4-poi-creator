@@ -27,7 +27,8 @@ import {
 } from "../../core/project/surfaces";
 import { haversine } from "../../core/geo/geo";
 import { ringAreaM2, ringSelfIntersects } from "../../core/geo/polygon";
-import { editorStore } from "../state/editorStore";
+import { editorStore, useEditor } from "../state/editorStore";
+import { linePath } from "../../core/project/airport";
 import { Help } from "./HelpNote";
 import { NumberInput } from "./NumberInput";
 
@@ -237,6 +238,8 @@ export function TarmacFields({ tarmac, index }: { tarmac: AirportTarmac; index: 
 
 export function LineFields({ line, index }: { line: AirportLine; index: number }): React.ReactElement {
   const store = editorStore.getState;
+  const bending = useEditor((s) => s.bendLineId === line.id);
+  const curved = line.bends?.filter((b) => b !== 0).length ?? 0;
   return (
     <div className="pct-inspector-body">
       <div className="pct-field-title">Line {index + 1}</div>
@@ -251,8 +254,41 @@ export function LineFields({ line, index }: { line: AirportLine; index: number }
           </Help>
         </span>
         <span className="pct-field-meta">
-          {line.points.length} points · {fmtLength(lineLength(line.points))} long
+          {line.points.length} points
+          {curved > 0 && ` · ${curved} ${curved === 1 ? "edge" : "edges"} curved`} ·{" "}
+          {fmtLength(lineLength(linePath(line)))} long
         </span>
+      </div>
+
+      <div className="pct-field pct-field-col">
+        <span className="pct-field-label">
+          Curves
+          {/* ★ THIS TEXT IS A TEST too: PolyShape's BEND mode. */}
+          <Help>
+            With Bend edges on, each edge shows a blue point in its middle: drag it sideways to bend the edge
+            into an arc, drag it back onto the straight edge or right-click it to straighten that edge. Two
+            edges bent by half their length make a circle. Export TAP writes each arc as a row of points.
+          </Help>
+        </span>
+        <div className="pct-nudge-row">
+          <button
+            type="button"
+            aria-pressed={bending}
+            className={bending ? "pct-toggle-on" : undefined}
+            title={bending ? "Back to adding points with the grey points" : "Bend edges into curves"}
+            onClick={() => store().setBendLine(bending ? null : line.id)}
+          >
+            {bending ? "Bending edges — done" : "Bend edges"}
+          </button>
+          <button
+            type="button"
+            disabled={curved === 0}
+            title="Make every edge straight again"
+            onClick={() => store().straightenAirportLine(line.id)}
+          >
+            Straighten all
+          </button>
+        </div>
       </div>
 
       <label className="pct-field pct-field-col">

@@ -249,8 +249,8 @@ click the card, click the map, edit it in the inspector.
 | **Helipad** | A helicopter start. Its own point, at its own radius, as many as you like. |
 | **Parking** | A stand — General Aviation, Jet or Pushback — that an aircraft starts a flight from. |
 | **Tarmac** | An apron, taxiway, ground or flattened area, for Export TAP. Click its corners, double-click the last, as many as you like; each has a level, a material and a brightness. |
-| **Line** | A painted line — centre line, edge, hold position… — for Export TAP. Click its points, double-click the last; pick the marking in the inspector. |
-| **Ground Text** | Letters painted on the pavement — `A`, `B2`, `TAXI B` — for Export TAP: letter size, colours, a box or circle behind them, an arrow. |
+| **Line** | A painted line — centre line, edge, hold position… — for Export TAP. Click its points, double-click the last; pick the marking in the inspector, and bend its edges into curves. |
+| **Ground Text** | Letters painted on the pavement — `A`, `B2`, `TAXI B` — for Export TAP: letter size, colours, a box or circle behind them, an arrow; turned in 15° steps or lined up with the nearest runway. |
 | **Taxi Sign** | A taxiway sign, for Export TAP, built from components left to right — location, destination with arrows, runway, distance remaining — with a back face after a line break. |
 | **Jetway** | A boarding bridge, for Export TAP, placed where it is mounted on the terminal and turned to face out. |
 | **Car Lot** | Rows of parking spaces filled with cars at random, for Export TAP. |

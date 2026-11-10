@@ -4,10 +4,12 @@ import {
   NEW_ELEMENT_BEARING_DEG,
   NEW_RUNWAY_LENGTH_M,
   NEW_WINCH_ROPE_M,
+  canDuplicate,
   createEditorStore,
   type EditorDeps,
 } from "../../src/renderer/state/store";
 import { destination, haversine, initialBearing } from "../../src/core/geo/geo";
+import * as mutate from "../../src/core/project/mutate";
 
 const near = (got: number, want: number, tol: number): void =>
   expect(Math.abs(got - want)).toBeLessThan(tol);
@@ -1678,5 +1680,76 @@ describe("TAXI SIGN", () => {
     expect(store.getState().project.airport!.taxisigns![0]!.elements).toEqual([{ type: "location", value: "BC" }]);
     store.getState().deleteSelection();
     expect(store.getState().project.airport!.taxisigns).toEqual([]);
+  });
+});
+
+describe("duplicating airport parts, bending lines, aligning ground texts", () => {
+  const airportProject = (): Project => {
+    const p0 = { lon: 10, lat: 48 };
+    return mutate.addAirportLine(
+      mutate.addAirportGroundText(
+        mutate.addAirportRunway(baseProject(), destination(p0, 500, 270), destination(p0, 500, 90), { id: "r" }),
+        destination(p0, 60, 0),
+        { id: "g" },
+      ),
+      [p0, destination(p0, 100, 0)],
+      { id: "l" },
+    );
+  };
+  const airportStore = () => makeStore({ initialProject: airportProject() });
+
+  it("Duplicate copies the selected part, selects the copy, and is one undo entry", () => {
+    const { store } = airportStore();
+    store.getState().selectAirportPart({ kind: "groundtext", id: "g" });
+    expect(canDuplicate(store.getState().selection, store.getState().airportSelection)).toBe(true);
+    store.getState().duplicateSelection();
+    const texts = store.getState().project.airport!.groundtexts!;
+    expect(texts).toHaveLength(2);
+    expect(store.getState().airportSelection).toEqual({ kind: "groundtext", id: texts[1]!.id });
+    store.getState().undo();
+    expect(store.getState().project.airport!.groundtexts).toHaveLength(1);
+  });
+
+  it("has nothing to duplicate on the airport itself or its boundary", () => {
+    const { store } = airportStore();
+    store.getState().selectAirportPart({ kind: "data" });
+    expect(canDuplicate([], store.getState().airportSelection)).toBe(false);
+    const before = store.getState().project;
+    store.getState().duplicateSelection();
+    expect(store.getState().project).toBe(before);
+    expect(canDuplicate([], { kind: "boundary" })).toBe(false);
+    expect(canDuplicate([], null)).toBe(false);
+    expect(canDuplicate(["x"], null)).toBe(true);
+  });
+
+  it("Bend edges belongs to its line: selecting it again keeps it, anything else ends it", () => {
+    const { store } = airportStore();
+    store.getState().selectAirportPart({ kind: "line", id: "l" });
+    store.getState().setBendLine("l");
+    store.getState().selectAirportPart({ kind: "line", id: "l" });
+    expect(store.getState().bendLineId).toBe("l");
+    store.getState().selectAirportPart({ kind: "runway", id: "r" });
+    expect(store.getState().bendLineId).toBeNull();
+  });
+
+  it("a map edit of a line writes its points and bends in one commit; Straighten all undoes the curves", () => {
+    const { store } = airportStore();
+    const pts = store.getState().project.airport!.lines![0]!.points;
+    store.getState().setAirportLineShape("l", pts, [12]);
+    expect(store.getState().project.airport!.lines![0]!.bends).toEqual([12]);
+    store.getState().straightenAirportLine("l");
+    expect(store.getState().project.airport!.lines![0]!.bends).toBeUndefined();
+    store.getState().undo();
+    expect(store.getState().project.airport!.lines![0]!.bends).toEqual([12]);
+  });
+
+  it("Align turns the ground text square or parallel to the runway, whichever is nearer", () => {
+    const { store } = airportStore();
+    store.getState().rotateAirportMark("groundtext", "g", 80);
+    store.getState().alignGroundTextToRunway("g");
+    near(store.getState().project.airport!.groundtexts![0]!.heading, 90, 0.05);
+    store.getState().rotateAirportMark("groundtext", "g", 10);
+    store.getState().alignGroundTextToRunway("g");
+    near(store.getState().project.airport!.groundtexts![0]!.heading, 0, 0.05);
   });
 });

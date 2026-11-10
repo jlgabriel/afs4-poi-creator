@@ -37,7 +37,7 @@ import {
   taxisignValueProblem,
 } from "../../core/project/marks";
 import { clampLonLat } from "../../core/project/schemas";
-import { editorStore } from "../state/editorStore";
+import { editorStore, useEditor } from "../state/editorStore";
 import type { MarkKind } from "../state/store";
 import { Help } from "./HelpNote";
 import { holdSvg, isHoldToken } from "../map/holdMark";
@@ -47,7 +47,11 @@ const fmtDeg = (n: number): string => n.toFixed(6);
 const range = ([lo, hi]: readonly [number, number], unit: string): string =>
   lo < 0 ? `−${-lo} to +${hi}${unit}` : `${lo}–${hi}${unit}`;
 
-/** Lon, lat and the heading: what every one of the three has. */
+/** How far each turn button turns, degrees. */
+const TURN_STEP = 15;
+
+/** Lon, lat and the heading: what every one of the three has. `turn` adds the ±15° buttons and Align
+ *  (the ground text's). */
 function PlaceFields({
   kind,
   id,
@@ -55,6 +59,7 @@ function PlaceFields({
   heading,
   label,
   headingLabel = "Heading",
+  turn = false,
 }: {
   kind: MarkKind;
   id: string;
@@ -62,8 +67,17 @@ function PlaceFields({
   heading: number;
   label: string;
   headingLabel?: string;
+  turn?: boolean;
 }): React.ReactElement {
   const store = editorStore.getState;
+  const hasRunway = useEditor((s) => (s.project.airport?.runways?.length ?? 0) > 0);
+  const headingInput = (
+    <NumberInput
+      value={heading}
+      onCommit={(h) => store().rotateAirportMark(kind, id, h)}
+      ariaLabel={`${label} ${headingLabel.toLowerCase()}, true degrees`}
+    />
+  );
   return (
     <>
       <div className="pct-field pct-field-row">
@@ -86,14 +100,47 @@ function PlaceFields({
           />
         </label>
       </div>
-      <label className="pct-field pct-field-col">
-        <span className="pct-field-label">{headingLabel} — true</span>
-        <NumberInput
-          value={heading}
-          onCommit={(h) => store().rotateAirportMark(kind, id, h)}
-          ariaLabel={`${label} ${headingLabel.toLowerCase()}, true degrees`}
-        />
-      </label>
+      {turn ? (
+        <div className="pct-field pct-field-col">
+          <span className="pct-field-label">{headingLabel} — true</span>
+          <div className="pct-nudge-row">
+            <button
+              type="button"
+              title={`Turn ${TURN_STEP}° to the left`}
+              aria-label={`Turn ${label.toLowerCase()} ${TURN_STEP} degrees left`}
+              onClick={() => store().rotateAirportMark(kind, id, heading - TURN_STEP)}
+            >
+              ↺ {TURN_STEP}°
+            </button>
+            {headingInput}
+            <button
+              type="button"
+              title={`Turn ${TURN_STEP}° to the right`}
+              aria-label={`Turn ${label.toLowerCase()} ${TURN_STEP} degrees right`}
+              onClick={() => store().rotateAirportMark(kind, id, heading + TURN_STEP)}
+            >
+              ↻ {TURN_STEP}°
+            </button>
+            <button
+              type="button"
+              disabled={!hasRunway}
+              title={
+                hasRunway
+                  ? "Line it up with the nearest runway: parallel or square to it, whichever is nearer to how it stands now"
+                  : "Needs a runway in this airport"
+              }
+              onClick={() => store().alignGroundTextToRunway(id)}
+            >
+              Align
+            </button>
+          </div>
+        </div>
+      ) : (
+        <label className="pct-field pct-field-col">
+          <span className="pct-field-label">{headingLabel} — true</span>
+          {headingInput}
+        </label>
+      )}
     </>
   );
 }
@@ -163,7 +210,14 @@ export function GroundTextFields({ text, index }: { text: AirportGroundText; ind
         {text.value.trim() === "" && <span className="pct-warn">No text: nothing is painted.</span>}
       </label>
 
-      <PlaceFields kind="groundtext" id={text.id} position={text.position} heading={text.heading} label="Ground text" />
+      <PlaceFields
+        kind="groundtext"
+        id={text.id}
+        position={text.position}
+        heading={text.heading}
+        label="Ground text"
+        turn
+      />
 
       <div className="pct-field pct-field-col">
         <span className="pct-field-label">

@@ -216,6 +216,7 @@ const zLine = z.looseObject({
   id: z.string().min(1),
   points: z.array(zLonLat),
   name: z.string().max(IDENTITY_MAX),
+  bends: z.array(z.number().finite()).optional(),
 });
 
 /** The three one-point TAP elements (types.ts AirportGroundText / AirportJetway / AirportCarlot). The

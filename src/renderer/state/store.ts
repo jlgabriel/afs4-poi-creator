@@ -54,6 +54,7 @@ import {
   jetwaysOf,
   linesOf,
   parkingsOf,
+  runwayAlignedHeading,
   runwaysOf,
   tarmacsOf,
   winchesOf,
@@ -131,6 +132,13 @@ export type AirportSelection =
   // One per airport, so no id.
   | { kind: "boundary" }
   | { kind: "pad" | "runway" | "parking" | "aerotow" | "winch" | "tarmac" | "line" | MarkKind; id: string };
+
+/** Whether Duplicate has something to copy: placed objects, or an airport part other than the airport
+ *  itself and its boundary (one of each per airport). */
+export function canDuplicate(selection: readonly string[], airportSelection: AirportSelection | null): boolean {
+  if (airportSelection !== null) return airportSelection.kind !== "data" && airportSelection.kind !== "boundary";
+  return selection.length > 0;
+}
 
 /** The four one-point TAP elements, by the kind the selection and the placement use, and the airport
  *  list each lives in (mutate.ts MarkKey). */
@@ -338,6 +346,10 @@ export interface EditorState {
    *  one of those kinds. Ephemeral — the shape reaches the document in ONE commit when it is finished, so
    *  drawing it is one undo entry, and Escape (or arming anything else) throws the draft away. */
   shapeDraft: LonLat[];
+  /** The line whose edges the map's mid-edge handles BEND instead of splitting (the Line panel's Bend
+   *  edges button). Ephemeral: selecting anything else turns it off. Only meaningful while that line is
+   *  the selected airport part. */
+  bendLineId: string | null;
   filter: Filter;
   /** What the map leaves out (visibility.ts). Not the document: no undo, no dirty, no export. A new
    *  document keeps the hidden groups and forgets the hidden elements. */
@@ -440,6 +452,11 @@ export interface EditorState {
   setAirportTarmacPoints: (id: string, points: LonLat[]) => void;
   updateAirportTarmac: (id: string, patch: { level?: number; material?: string; brightness?: number }) => void;
   setAirportLinePoints: (id: string, points: LonLat[]) => void;
+  /** The map's one writer for a line: its points and the bend of every edge, in one commit. */
+  setAirportLineShape: (id: string, points: LonLat[], bends: number[] | undefined) => void;
+  straightenAirportLine: (id: string) => void;
+  /** Turn the Bend edges mode on for this line, or off with null. */
+  setBendLine: (id: string | null) => void;
   setAirportLineName: (id: string, name: string) => void;
   setAirportRunwaySurface: (id: string, patch: mutate.RunwaySurfacePatch) => void;
   setAirportRunwayEndMarkings: (id: string, end: 0 | 1, patch: Partial<RunwayEndMarkings>) => void;
@@ -447,6 +464,9 @@ export interface EditorState {
   //    fields.
   moveAirportMark: (kind: MarkKind, id: string, position: LonLat) => void;
   rotateAirportMark: (kind: MarkKind, id: string, heading: number) => void;
+  /** Turn a ground text parallel or at a right angle to the nearest runway, whichever is closer to how it
+   *  stands now. No runway → nothing happens. */
+  alignGroundTextToRunway: (id: string) => void;
   updateAirportGroundText: (id: string, patch: mutate.GroundTextPatch) => void;
   /** `typing` names the component whose value is being typed: those keystrokes share one undo entry. Without
    *  it, a change to the components (add, remove, reorder, a type) is an entry of its own. */
@@ -645,6 +665,7 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
           pendingAirportDelete: false,
           placing: null,
           shapeDraft: [],
+          bendLineId: null,
           resolvedElev: new Map(),
           hiddenIds: new Set(),
           pendingRecovery: null, // a fresh document clears any recovery banner
@@ -674,6 +695,7 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
         pendingAirportDelete: false,
         placing: null,
         shapeDraft: [],
+        bendLineId: null,
         filter: { query: "", category: null },
         hiddenGroups: new Set(),
         hiddenIds: new Set(),
@@ -736,7 +758,14 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
         clearSelection: () =>
           set({ selection: [], airportSelection: null, pendingAirportDelete: false }),
         selectAirportPart: (sel) =>
-          set({ airportSelection: sel, selection: [], pendingAirportDelete: false }),
+          set((s) => ({
+            airportSelection: sel,
+            selection: [],
+            pendingAirportDelete: false,
+            // Bend edges belongs to the line it was turned on for: selecting that line again keeps it,
+            // anything else turns it off.
+            bendLineId: sel?.kind === "line" && sel.id === s.bendLineId ? s.bendLineId : null,
+          })),
         // Any change of what is armed drops a boundary half drawn: it belonged to the old arming.
         armPlacement: (name) => set({ placing: name, shapeDraft: [] }),
         setFilter: (patch) => set((s) => ({ filter: { ...s.filter, ...patch } })),
@@ -1140,6 +1169,10 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
         // Same for tarmacs and lines: one map gesture, one commit, one undo entry.
         setAirportTarmacPoints: (id, points) => commit((proj) => mutate.setAirportTarmacPoints(proj, id, points)),
         setAirportLinePoints: (id, points) => commit((proj) => mutate.setAirportLinePoints(proj, id, points)),
+        setAirportLineShape: (id, points, bends) =>
+          commit((proj) => mutate.setAirportLineShape(proj, id, points, bends)),
+        straightenAirportLine: (id) => commit((proj) => mutate.straightenAirportLine(proj, id)),
+        setBendLine: (id) => set({ bendLineId: id }),
         // The Inspector's fields: a select or a ± button is one discrete change, so each is its own entry.
         updateAirportTarmac: (id, patch) => commit((proj) => mutate.updateAirportTarmac(proj, id, patch)),
         setAirportLineName: (id, name) => commit((proj) => mutate.setAirportLineName(proj, id, name)),
@@ -1207,6 +1240,13 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
 
         // Keys carry the kind and the id, like the stands' — two elements dragged one after the other are two
         // undo entries.
+        alignGroundTextToRunway: (id) => {
+          const a = get().project.airport;
+          const text = groundTextsOf(a).find((t) => t.id === id);
+          if (text === undefined) return;
+          const heading = runwayAlignedHeading(text.position, text.heading, runwaysOf(a));
+          if (heading !== null) get().rotateAirportMark("groundtext", id, heading);
+        },
         moveAirportMark: (kind, id, position) =>
           commitCoalesced(`airport:${kind}:pos:${id}`, (proj) =>
             mutate.moveAirportMark(proj, MARK_KEY[kind], id, position),
@@ -1270,7 +1310,18 @@ export function createEditorStore(overrides: Partial<EditorDeps> = {}): EditorSt
           ),
 
         duplicateSelection: (offsetM = 5) => {
-          const { selection } = get();
+          const { selection, airportSelection } = get();
+          // An airport part: a copy beside it, selected (mutate.ts duplicateAirportPart says where). The
+          // airport itself and its boundary are one per airport and have no copy.
+          if (airportSelection !== null) {
+            const sel = airportSelection;
+            if (sel.kind === "data" || sel.kind === "boundary") return;
+            const nid = deps.newId();
+            const before = get().project;
+            commit((proj) => mutate.duplicateAirportPart(proj, sel.kind, sel.id, { id: nid }));
+            if (get().project !== before) get().selectAirportPart({ kind: sel.kind, id: nid });
+            return;
+          }
           if (selection.length === 0) return;
           const created: string[] = [];
           commit((proj) => {

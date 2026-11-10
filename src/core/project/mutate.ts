@@ -53,6 +53,8 @@ import {
   winchesOf,
 } from "./airport";
 import { centroid } from "../geo/poiName";
+import { chordLength, clampSagitta } from "../geo/arc";
+import { destination, haversine, initialBearing } from "../geo/geo";
 import {
   DEFAULT_BRIGHTNESS,
   DEFAULT_LINE_NAME,
@@ -1035,7 +1037,28 @@ export function removeAirportLine(project: Project, lineId: string, now = nowIso
   return removeListItem(project, "lines", linesOf, lineId, now);
 }
 
-/** Every map edit of a line, like setAirportTarmacPoints. Fewer than 2 points is refused. */
+/** Bends fitted to `points`: one per edge, each clamped to what its edge can carry and kept to the
+ *  millimetre. All straight → undefined, so a line nobody bent carries no `bends` key. */
+function fitBends(points: readonly LonLat[], bends: readonly number[] | undefined): number[] | undefined {
+  if (bends === undefined) return undefined;
+  const out = points
+    .slice(0, -1)
+    .map((p, i) => Math.round(clampSagitta(bends[i] ?? 0, chordLength(p, points[i + 1]!)) * 1000) / 1000);
+  return out.some((b) => b !== 0) ? out : undefined;
+}
+
+/** A line with these points and bends; the `bends` key is dropped when there are none. */
+function withShape(line: AirportLine, points: readonly LonLat[], bends: readonly number[] | undefined): AirportLine {
+  const next: AirportLine = { ...line, points: copyPoints(points) };
+  const fitted = fitBends(points, bends);
+  if (fitted === undefined) delete next.bends;
+  else next.bends = fitted;
+  return next;
+}
+
+/** Move a line's points and keep its curves — for the same points, moved (a nudge). A different number of
+ *  points cannot keep them and comes out straight; the map's own edits go through setAirportLineShape,
+ *  which says what happens to each bend. Fewer than 2 points is refused. */
 export function setAirportLinePoints(
   project: Project,
   lineId: string,
@@ -1043,7 +1066,39 @@ export function setAirportLinePoints(
   now = nowIso(),
 ): Project {
   if (points.length < 2) return project;
-  return updateListItem(project, "lines", linesOf, lineId, (l) => ({ ...l, points: copyPoints(points) }), now);
+  return updateListItem(
+    project,
+    "lines",
+    linesOf,
+    lineId,
+    (l) => withShape(l, points, points.length === l.points.length ? l.bends : undefined),
+    now,
+  );
+}
+
+/** Every map edit of a line — a point moved, added or removed, an edge bent, the whole line moved — is one
+ *  call here with the new points AND the bend of each edge (geo/arc.ts). Fewer than 2 points is refused. */
+export function setAirportLineShape(
+  project: Project,
+  lineId: string,
+  points: readonly LonLat[],
+  bends: readonly number[] | undefined,
+  now = nowIso(),
+): Project {
+  if (points.length < 2) return project;
+  return updateListItem(project, "lines", linesOf, lineId, (l) => withShape(l, points, bends), now);
+}
+
+/** Every edge of a line straight again. A line already straight is left alone. */
+export function straightenAirportLine(project: Project, lineId: string, now = nowIso()): Project {
+  return updateListItem(
+    project,
+    "lines",
+    linesOf,
+    lineId,
+    (l) => (l.bends === undefined ? l : withShape(l, l.points, undefined)),
+    now,
+  );
 }
 
 export function setAirportLineName(project: Project, lineId: string, name: string, now = nowIso()): Project {
@@ -1487,4 +1542,139 @@ export function setAirportParkingType(
           },
     now,
   );
+}
+
+// ── DUPLICATE an airport part ────────────────────────────────────────────────
+//
+// Every airport element except the airport itself and its boundary (one of each per airport) can be
+// copied. The copy keeps every field of the original — name, identifiers, material, text — and gets a new
+// id and a place BESIDE the original, so it can be seen and grabbed. Where "beside" is depends on the kind
+// (duplicatePartOffset). It is APPENDED to its list, like a new element of that kind.
+
+/** The airport parts that can be duplicated, by the kind the editor's selection uses. */
+export type DuplicableAirportPart =
+  | "pad"
+  | "runway"
+  | "parking"
+  | "aerotow"
+  | "winch"
+  | "tarmac"
+  | "line"
+  | "groundtext"
+  | "taxisign"
+  | "jetway"
+  | "carlot";
+
+const PART_LIST: Record<DuplicableAirportPart, keyof ProjectAirport> = {
+  pad: "pads",
+  runway: "runways",
+  parking: "parkings",
+  aerotow: "aerotows",
+  winch: "winches",
+  tarmac: "tarmacs",
+  line: "lines",
+  groundtext: "groundtexts",
+  taxisign: "taxisigns",
+  jetway: "jetways",
+  carlot: "carlots",
+};
+
+/** Metres across the box around some points: the longer of its east-west and north-south sides. */
+function extentM(points: readonly LonLat[]): number {
+  const lons = points.map((p) => p.lon);
+  const lats = points.map((p) => p.lat);
+  const w = Math.min(...lons);
+  const e = Math.max(...lons);
+  const s = Math.min(...lats);
+  const n = Math.max(...lats);
+  return Math.max(haversine({ lon: w, lat: s }, { lon: e, lat: s }), haversine({ lon: w, lat: s }, { lon: w, lat: n }));
+}
+
+/** Where a copy of this part lands: `distance` metres along `bearing` (compass degrees) from the original.
+ *  - things with a facing (pads, stands, glider starts, taxi signs, jetways, car lots) go to their RIGHT,
+ *    side by side like a row of stands, far enough not to overlap;
+ *  - a runway goes sideways by twice its width: a parallel runway, one runway width apart;
+ *  - a winch launch goes 20 m to the right of its rope: a second lane;
+ *  - a ground text goes one line BELOW itself, like the next line of text;
+ *  - a tarmac or a line goes south-east by a fifth of its size (5–50 m): visibly apart, still on screen. */
+export function duplicatePartOffset(kind: DuplicableAirportPart, item: unknown): { distance: number; bearing: number } {
+  switch (kind) {
+    case "pad": {
+      const p = item as AirportPad;
+      return { distance: Math.max(5, 2.5 * p.radius), bearing: p.heading + 90 };
+    }
+    case "parking": {
+      const p = item as AirportParking;
+      return { distance: Math.max(5, 2.2 * p.size), bearing: p.heading + 90 };
+    }
+    case "aerotow":
+      return { distance: 20, bearing: (item as AirportAerotow).heading + 90 };
+    case "winch": {
+      const w = item as AirportWinch;
+      return { distance: 20, bearing: initialBearing(w.position, w.winch) + 90 };
+    }
+    case "runway": {
+      const r = item as AirportRunway;
+      return {
+        distance: Math.max(20, 2 * r.width),
+        bearing: initialBearing(r.ends[0].threshold, r.ends[1].threshold) + 90,
+      };
+    }
+    case "groundtext": {
+      const g = item as AirportGroundText;
+      return { distance: Math.max(2, 1.5 * g.size[1]), bearing: g.heading + 180 };
+    }
+    case "taxisign":
+      return { distance: 5, bearing: (item as AirportTaxisign).heading + 90 };
+    case "jetway":
+      return { distance: 20, bearing: (item as AirportJetway).heading + 90 };
+    case "carlot": {
+      const c = item as AirportCarlot;
+      return { distance: c.columns * 2.5 + 5, bearing: c.heading + 90 };
+    }
+    case "tarmac":
+    case "line": {
+      const pts = (item as AirportTarmac | AirportLine).points;
+      return { distance: Math.min(50, Math.max(5, 0.2 * extentM(pts))), bearing: 135 };
+    }
+  }
+}
+
+/** A copy of `item` with every point moved by `to` — the position, a winch's far end, a runway's ends, a
+ *  shape's points; every other field copied as it is. */
+function movedCopy<T>(kind: DuplicableAirportPart, item: T, id: string, to: (p: LonLat) => LonLat): T {
+  const copy = structuredClone(item) as T & { id: string; position?: LonLat; winch?: LonLat; points?: LonLat[] };
+  copy.id = id;
+  if (copy.position !== undefined) copy.position = to(copy.position);
+  if (kind === "winch" && copy.winch !== undefined) copy.winch = to(copy.winch);
+  if (copy.points !== undefined) copy.points = copy.points.map(to);
+  if (kind === "runway") {
+    const r = copy as unknown as AirportRunway;
+    r.ends = [
+      { ...r.ends[0], threshold: to(r.ends[0].threshold) },
+      { ...r.ends[1], threshold: to(r.ends[1].threshold) },
+    ];
+  }
+  return copy;
+}
+
+/** Append a copy of one airport part beside the original (duplicatePartOffset). No airport, or no part with
+ *  that id → the same project. */
+export function duplicateAirportPart(
+  project: Project,
+  kind: DuplicableAirportPart,
+  id: string,
+  opts: { id?: string } = {},
+  now = nowIso(),
+): Project {
+  const airport = project.airport;
+  if (airport === undefined) return project;
+  const key = PART_LIST[kind];
+  const list = (airport[key] as { id: string }[] | undefined) ?? [];
+  const src = list.find((x) => x.id === id);
+  if (src === undefined) return project;
+  const { distance, bearing } = duplicatePartOffset(kind, src);
+  const to = (p: LonLat): LonLat => destination(p, distance, norm360(bearing));
+  const copy = movedCopy(kind, src, opts.id ?? randomId(), to);
+  return { ...project, airport: withPadMirror({ ...airport, [key]: [...list, copy] }), modifiedAt: now };
 }

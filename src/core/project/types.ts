@@ -326,6 +326,11 @@ export interface AirportLine {
   id: string;
   points: LonLat[];
   name: string;
+  /** How much each edge is bent into a circular arc, metres (geo/arc.ts): `bends[i]` is the edge from
+   *  point i to point i+1, + bends it to the left of travel, 0 leaves it straight. Absent ≡ every edge
+   *  straight, which is what a line never bent keeps, so its project.json does not change. Export TAP
+   *  writes the arcs as points (airport.ts linePath). */
+  bends?: number[];
 }
 
 /** A GROUND TEXT: letters painted on the pavement, centred on `position`. Any number per airport. Only

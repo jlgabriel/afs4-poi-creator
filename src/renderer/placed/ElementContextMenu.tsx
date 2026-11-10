@@ -1,4 +1,5 @@
-// ElementContextMenu.tsx — the right-click menu of a placed element, on the map or in the placed list.
+// ElementContextMenu.tsx — the right-click menu of a placed element, on the map or in the placed list:
+// Duplicate (when the selection has a copy) and Delete.
 //
 // ★ THIS IS WHERE THE MOUSE DELETES. There is no Delete button: a button beside Hide and Duplicate is one
 // slip away from a deletion nobody meant. The Del key stays, and with the mouse it takes a right-click
@@ -13,6 +14,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { editorStore, useEditor } from "../state/editorStore";
+import { canDuplicate } from "../state/store";
 import { closeElementMenu, useElementMenu } from "../state/elementMenu";
 import { computeContextMenuPosition, type Pos } from "../catalog/contextMenuPosition";
 
@@ -25,6 +27,7 @@ function Menu({ x, y }: { x: number; y: number }): React.ReactElement {
   const count = useEditor((s) => s.selection.length);
   const airportSel = useEditor((s) => s.airportSelection);
   const pending = useEditor((s) => s.pendingAirportDelete);
+  const duplicable = useEditor((s) => canDuplicate(s.selection, s.airportSelection));
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<Pos | null>(null);
 
@@ -81,6 +84,11 @@ function Menu({ x, y }: { x: number; y: number }): React.ReactElement {
     if (!editorStore.getState().pendingAirportDelete) closeElementMenu();
   };
 
+  const duplicate = (): void => {
+    editorStore.getState().duplicateSelection();
+    closeElementMenu();
+  };
+
   return createPortal(
     <div
       ref={ref}
@@ -88,6 +96,13 @@ function Menu({ x, y }: { x: number; y: number }): React.ReactElement {
       role="menu"
       style={{ left: pos?.left ?? x, top: pos?.top ?? y, visibility: pos === null ? "hidden" : "visible" }}
     >
+      {/* The airport itself and its boundary have no copy, and while the airport's delete is armed the
+          menu is only that question. */}
+      {duplicable && !pending && (
+        <button type="button" role="menuitem" title="Same as Ctrl+D: a copy beside it, selected" onClick={duplicate}>
+          Duplicate
+        </button>
+      )}
       <button
         type="button"
         role="menuitem"

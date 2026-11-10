@@ -89,7 +89,7 @@ export function MapView(): React.ReactElement {
       onSelect: (id) => editorStore.getState().selectAirportPart({ kind: "tarmac", id }),
     });
     const line = new LineLayer(map, { shape: linePane, handles: handlePane }, {
-      onChange: (id, points) => editorStore.getState().setAirportLinePoints(id, points),
+      onChange: (id, points, bends) => editorStore.getState().setAirportLineShape(id, points, bends ?? undefined),
       onSelect: (id) => editorStore.getState().selectAirportPart({ kind: "line", id }),
     });
     const draft = new DraftLayer(map, handlePane);
@@ -202,7 +202,7 @@ export function MapView(): React.ReactElement {
         editable,
       );
       tarmac.sync(shown("tarmacs", a?.tarmacs), sel?.kind === "tarmac" ? sel.id : null, editable);
-      line.sync(shown("lines", a?.lines), sel?.kind === "line" ? sel.id : null, editable);
+      line.sync(shown("lines", a?.lines), sel?.kind === "line" ? sel.id : null, editable, s.bendLineId);
       const drawing = s.placing?.kind;
       draft.sync(isShapeKind(drawing) ? s.shapeDraft : null, drawing !== "line");
       // `position` and not airportPosition(): the airport's point must not follow pads[0], so
@@ -225,6 +225,7 @@ export function MapView(): React.ReactElement {
           s.airportSelection,
           s.placing,
           s.shapeDraft,
+          s.bendLineId,
           s.hiddenGroups,
           s.hiddenIds,
         ] as const,
@@ -278,7 +279,11 @@ export function MapView(): React.ReactElement {
     map.on("moveend", onMoveEnd);
 
     const onKey = (ev: KeyboardEvent): void => {
-      if (ev.key === "Escape") editorStore.getState().armPlacement(null);
+      if (ev.key !== "Escape") return;
+      const s = editorStore.getState();
+      // Esc ends Bend edges on a line first; otherwise it disarms placement.
+      if (s.bendLineId !== null) s.setBendLine(null);
+      else s.armPlacement(null);
     };
     window.addEventListener("keydown", onKey);
 

@@ -143,7 +143,8 @@ body {
   cursor: pointer;
 }
 .pct-shape-vertex,
-.pct-shape-mid {
+.pct-shape-mid,
+.pct-shape-bend {
   cursor: grab;
 }
 .pct-boundary.grab.leaflet-interactive,
@@ -1319,6 +1320,7 @@ body {
   box-shadow: 0 1px 1px rgba(15, 23, 42, 0.2);
   cursor: pointer;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 .pct-nudge-row button:hover:not(:disabled) {
   background: #cbd5e1;
@@ -1326,6 +1328,14 @@ body {
 .pct-nudge-row button:active:not(:disabled) {
   background: #cbd5e1;
   box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.35);
+}
+.pct-nudge-row button.pct-toggle-on {
+  background: #2563eb;
+  border-color: #1d4ed8;
+  color: #ffffff;
+}
+.pct-nudge-row button.pct-toggle-on:hover:not(:disabled) {
+  background: #1d4ed8;
 }
 .pct-nudge-row button:disabled {
   opacity: 0.5;
